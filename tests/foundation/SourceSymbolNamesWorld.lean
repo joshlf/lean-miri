@@ -16,6 +16,12 @@ def main (paths : List String) : IO Unit := do
     | throw (IO.userError "genuine main naming declaration absent")
   let key : Input.SourceCompilerWorld.InstanceKey := ⟨main.definition,#[]⟩
   let some mainId := Input.SourceCompilerWorld.findItem world key | throw (IO.userError "main canonical instance absent")
+  if main.attributes.symbolName.isNone && !main.attributes.noMangle && !main.attributes.stdInternalSymbol then
+    match Input.SourceCallFacts.symbolName world mainId with
+    | .error "source declaration has no explicit symbol attribute" => pure ()
+    | _ => throw (IO.userError "ordinary std main used a path/display or missing-source fallback")
+    IO.println s!"current std naming carrier retains {names.declarations.size} declarations; ordinary mangling demand rejects"
+    return
   unless (← checked (Input.SourceCallFacts.symbolName world mainId)) == "exact_main" do
     throw (IO.userError "current World did not derive raw export_name spelling")
   let [internal] := (names.declarations.filter (·.attributes.itemName == some "internal_name")).toList
