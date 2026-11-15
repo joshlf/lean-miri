@@ -8,8 +8,7 @@ open Lean
 /-- Pinned symbol_name_from_attrs precedence: std-internal namespace first,
 then export_name, then no_mangle. Proc-macro and non-ASCII internal mangling
 require additional source rules and remain explicitly unsupported. -/
-def symbol (namespacePrefix : String) (declaration : SourceSymbols.Declaration) : Except String String := do
-  let attributes := declaration.attributes
+def symbolFromAttributes (namespacePrefix : String) (attributes : SourceSymbols.Attributes) : Except String String := do
   unless !attributes.procMacroDeclarations do throw "proc-macro declaration symbol source rule unsupported"
   if attributes.stdInternalSymbol then
     unless namespacePrefix.startsWith "_RNvC" && namespacePrefix.endsWith "7___rustc" do
@@ -29,6 +28,11 @@ def symbol (namespacePrefix : String) (declaration : SourceSymbols.Declaration) 
     let some name := attributes.itemName | throw "no-mangle source item name absent"
     return name
   throw "source declaration has no explicit symbol attribute"
+
+/-- Export candidates and actual foreign declarations share the same fixed
+attribute spelling rule; traversal/winner metadata does not affect spelling. -/
+def symbol (namespacePrefix : String) (declaration : SourceSymbols.Declaration) : Except String String :=
+  symbolFromAttributes namespacePrefix declaration.attributes
 
 /-- Instance::mono erases lifetime slots and cannot invent type/const arguments.
 Called only for the selected function declaration, never during clash lookup. -/

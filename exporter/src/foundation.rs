@@ -48,6 +48,8 @@ mod link_initializer_material;
 mod dynamic_material;
 #[path = "foundation_dyn_metadata.rs"]
 mod dyn_metadata_material;
+#[path = "foundation_symbol_names.rs"]
+mod symbol_name_material;
 #[path = "foundation_function_headers.rs"]
 mod function_header_material;
 #[path = "foundation_named_type_source.rs"]
@@ -387,8 +389,10 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let frame_metadata = super::foundation_runtime_instances::frames(tcx);
     let foreign_symbol_material = foreign_symbol_material::export(tcx)?;
     let runtime_data_layout = super::foundation_target::export(tcx)?;
+    let symbol_name_source = m.symbol_name_source(tcx)?;
     let allocation_identity_source = m.allocation_identity_source(tcx)?;
     Ok(json!({
+        "symbol_name_source":symbol_name_source,
         "allocation_identity_source":allocation_identity_source,
         "closure_auto_source":closure_auto_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,

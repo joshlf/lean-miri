@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationSourceSymbolNames
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationSourceTypes
 import Miri.Input.Model.SourceAbi
@@ -303,5 +304,5 @@ def material (document : Document) : Except String Material := do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No",← objectTraitDeclarations document⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No",← objectTraitDeclarations document,← SourceSymbolNamesParser.material document⟩
 end Miri.Frontend.Foundation.SourceAbiParser

@@ -1,3 +1,4 @@
+import Miri.Input.Model.SourceSymbolNames
 import Miri.Input.Model.SourceDeclarations
 import Miri.Input.Model.SourceTypes
 
@@ -160,6 +161,7 @@ structure Material where
   autoTraits : Option AutoTraits := none
   optimizationDisabled : Bool := false
   objectTraits : Array ObjectTraitDeclaration := #[]
+  symbolNames : Option SourceSymbolNames.Material := none
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi

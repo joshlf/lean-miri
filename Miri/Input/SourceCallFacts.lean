@@ -1,4 +1,4 @@
-import Miri.Input.SourceCompilerWorld
+import Miri.Input.SourceCompilerSymbolNames
 
 /-! machine.rs::find_mir_or_eval_fn asks tcx.is_foreign_item(instance.def_id()).
 Pinned rustc_middle/hir/mod.rs defines that property by the definition's immediate
@@ -17,9 +17,9 @@ def isForeignItem (world : SourceCompilerWorld.World) (callee : CallInstance) : 
     | throw "foreign-item declaration attributes absent/ambiguous"
   return header.attributes.foreignItem
 
-/-- The source declaration currently carries no complete symbol mangling/link
-contract. An actual foreign call must reject this missing capability, rather
-than read a saved instance answer or use a DefPath as its symbol. -/
-def symbolName (_world : SourceCompilerWorld.World) (_callee : CallInstance) : Except String String :=
-  throw "source foreign symbol naming unavailable"
+/-- Declaration attributes determine fixed names through the same current
+World; unsupported mangling and missing source remain explicit failures. -/
+def symbolName (world : SourceCompilerWorld.World) (callee : CallInstance) : Except String String :=
+  SourceCompilerSymbolNames.symbolName world callee
+
 end Miri.Input.SourceCallFacts
