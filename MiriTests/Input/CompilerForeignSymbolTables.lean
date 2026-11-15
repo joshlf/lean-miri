@@ -70,19 +70,10 @@ private def prepare (symbols : Catalog.ForeignSymbols) (definitions : Array Defi
   let program : LoweredProgram := {
     bundle := {spans := #[], definitions, typeConstants := #[]}
     roots := #[], instances := #[], promoted := #[], input := source }
-  -- This fixture has an explicit target, no type/constant/layout tables, no
-  -- alias declarations, and no generic templates. Build that exact raw context;
-  -- foreign symbol preparation never asks it to synthesize a compiler answer.
-  let aliases ← AliasMaterial.program #[]
-  let normalizationContext : AliasRuntime.Context := {
-    generic := {
-      types := source.types, definitions, constants := source.typeConstants,
-      pointerBytes := target.pointerSize.bytes.toNat }
-    aliases, traits := source.traitProgram }
   let checked ← TypeArena.CheckedMaterial.create source.types source.typeConstants definitions source.predicates
     target.pointerSize.bytes.toNat
   let runtime : RuntimeMetadata := {
-    source, target, normalizationContext, materialLayoutFuel := definitions.size + 1,
+    source, target, materialLayoutFuel := definitions.size + 1,
     checkedMaterial := some checked, denseTypes := some checked.density }
   let context : CompilerFacts.Context := { runtime, program }
   let facts : CompilerFactAdapters.Prepared := { context, patterns := #[], castTypes := #[], obligations := #[] }
