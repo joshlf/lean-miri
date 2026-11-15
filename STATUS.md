@@ -6,6 +6,17 @@ See the [development guide](docs/development.md#check-commands) and
 [test guide](tests/README.md) for check entry points, prerequisites and coverage.
 Historical successes do not establish successful execution in the current checkout.
 
+## Live rustc provider feasibility
+
+The small [live provider experiment](docs/provider-feasibility.md) confirms
+that Lean can request concrete `Foo<T>` layouts while the pinned rustc
+`after_analysis` callback keeps its `TyCtxt` alive. Twenty-one JSON-line
+queries, including one after a 100 ms Lean pause, returned checked sizes and
+alignments. Five same-CPU trials measured request counts and round-trip costs;
+raw records are saved under ignored `scratch/provider-probe/`. Interpreter
+integration, general type identity, query coverage and context lifecycle
+beyond the callback remain open.
+
 The acceptance scope includes common MIR, memory/Tree Borrows, Rust main startup
 and exit, threads, synchronization, atomics, weak memory and data races. Finite
 QA and general whole-machine proofs are separate goals. Overall completion and
