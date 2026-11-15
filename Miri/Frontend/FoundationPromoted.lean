@@ -1,4 +1,5 @@
 import Miri.Frontend.Foundation
+import Miri.Frontend.FoundationGenericEnvironment
 
 /-! Complete promoted source-table decoding. These are generic MIR templates,
 not evaluated allocations, executable BodyIds or monomorphic compiler answers.
@@ -55,8 +56,9 @@ def promotedSourceTable (document : Document) (owner : Nat) : Except String Prom
   unless candidates.size == 1 do throw "missing or duplicate complete promoted source table"
   let some table := candidates[0]? | throw "promoted source table absent"
   let environment ← table.getObjVal? "environment"
-  let _ ← environment.getObjValAs? (Array Json) "parameters"
-  let _ ← environment.getObjValAs? (Array Json) "clauses"
+  let flat ← flattenEnvironment document environment
+  let _ ← flat.getObjValAs? (Array Json) "parameters"
+  let _ ← flat.getObjValAs? (Array Json) "clauses"
   let count ← table.getObjValAs? Nat "promoted_count"
   let bodies ← table.getObjValAs? (Array Json) "templates"
   unless count == bodies.size do throw "promoted source table count mismatch"

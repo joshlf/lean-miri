@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationGenericEnvironment
 
 /-! Finite ordinary closure source selection, not closure trait/shim resolution
 or execution. Pinned generic_args.rs::split_closure_args retains inherited args
@@ -53,8 +54,9 @@ def selectClosureTemplate (document : Document) (definition : Nat)
   let parentCount ← body.getObjValAs? Nat "parent_count"
   unless parentCount == parentArguments.size do throw "closure inherited argument count mismatch"
   let environment ← body.getObjVal? "parent_environment"
-  let parameters ← environment.getObjValAs? (Array Json) "parameters"
-  let _ ← environment.getObjValAs? (Array Json) "clauses"
+  let flat ← flattenEnvironment document environment
+  let parameters ← flat.getObjValAs? (Array Json) "parameters"
+  let _ ← flat.getObjValAs? (Array Json) "clauses"
   unless parameters.size == parentCount do throw "closure parent parameter count mismatch"
   let mut types : Array (Option ConcreteType) := #[]
   for h : i in [:parameters.size] do

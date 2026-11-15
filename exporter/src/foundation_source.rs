@@ -38,6 +38,9 @@ fn backtraces(ids: &mut SpanIds, tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Vec<V
     }).collect()
 }
 pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
+    capture_with_additional_spans(tcx,body,&[])
+}
+pub(super) fn capture_with_additional_spans(tcx: TyCtxt<'_>, body: &mir::Body<'_>, additional: &[rustc_span::Span]) -> Value {
     let mut ids = SpanIds::new();
     // Storage markers remain executable MIR. Whether a local is always live
     // can be derived from their absence, as in pinned interpret/stack.rs.
@@ -65,7 +68,8 @@ pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
         }),
         _ => Value::Null,
     }).collect::<Vec<_>>();
-    json!({"span":body_span,
+    let additional_spans = additional.iter().map(|value|span(&mut ids,tcx,*value)).collect::<Vec<_>>();
+    json!({"span":body_span,"additional_spans":additional_spans,
         "backtrace_spans":backtrace_spans,
         "definition_span":definition_span,
         "phase":crate::mir_phase_json(body.phase),

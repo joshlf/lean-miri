@@ -103,7 +103,7 @@ structure FunctionTypes where
 `LayoutData::unit(cx,true)`; rustc_abi/layout/simple.rs uses i8 alignment,
 empty arbitrary fields, Memory{sized:true}, size/seed zero and Single variant0.
 This is distinct from empty tuple aggregate alignment on some targets. -/
-private def fnDefLayout (target : ABI.RuntimeTargetDataLayout) : Except String Input.Layout := do
+def fnDefinitionLayout (target : ABI.RuntimeTargetDataLayout) : Except String Input.Layout := do
   let alignment ← target.i8Align.bytes.mapError toString
   return {
     maxReprAlignBytes := none
@@ -167,7 +167,7 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
       display }
     facts := facts.push ⟨typeId, some id, ⟨inputs, output, safety, .Rust, false⟩⟩
     typeIds := typeIds.push typeId
-  let unitLayout ← fnDefLayout target
+  let unitLayout ← fnDefinitionLayout target
   let layouts := if pool.functionInstances.isEmpty then physical.layouts
     else physical.layouts.push unitLayout
   return ⟨types, layouts, facts, typeIds⟩
