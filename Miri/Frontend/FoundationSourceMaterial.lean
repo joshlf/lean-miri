@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationWorldDeclarations
 import Miri.Frontend.FoundationTarget
+import Miri.Frontend.FoundationForeignDeclarations
 import Miri.Frontend.FoundationLinkSections
 import Miri.Input.Model.SourceMaterial
 
@@ -55,7 +56,7 @@ private def sectionDeclaration (entry : SourceLinkSection) : Except String Input
 const/closure body masquerade as a free Item or invalidate known main/start rows.
 Every zero-slot Item still retains its original zero-slot source layer. -/
 def typedSourceMaterial (document : Document) : Except String Input.SourceMaterial := do
-  let declarations ← sourceItemDeclarations document
+  let mut declarations ← sourceItemDeclarations document
   let headers ← match document.source.getObjVal? "source_function_signatures" with
     | .ok value => fromJson? value
     | .error _ => pure (#[] : Array Json)
@@ -72,6 +73,16 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
       if let some old := layers.find? (·.owner == layer.owner) then
         unless old == layer do throw "typed source lexical layer conflict"
       else layers := layers.push layer
+  let (foreignItems,foreignLayers) ← ForeignDeclarationSource.itemSource document.source
+  for layer in foreignLayers do
+    if let some old := layers.find? (·.owner == layer.owner) then
+      unless old == layer do throw "foreign/header lexical generic declaration conflict"
+    else layers := layers.push layer
+  for item in foreignItems do
+    if let some old := declarations.find? (·.definition == item.definition) then
+      unless old.path == item.path && old.kind == item.kind && old.parameters == item.parameters do
+        throw "foreign/header Item declaration conflict"
+    else declarations := declarations.push item
   let target : Input.SourceMaterial.Target := {
     triple := document.target.triple
     architecture := document.target.architecture

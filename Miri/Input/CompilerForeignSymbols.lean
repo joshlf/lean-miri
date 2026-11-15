@@ -39,6 +39,14 @@ def resolveSource (access : SourceCompilerWorld.Access S) (declaration : SourceS
   let item ← match CompilerSourceSymbols.itemDeclaration declaration with
     | .ok item => pure item
     | .error error => throw (.unsupported error)
+  let item ← if let some material := world.canonical.sourceMaterial then do
+    let matching := material.declarations.filter (·.definition == item.definition)
+    let [retained] := matching.toList
+      | throw (.unsupported "exported Item declaration absent or ambiguous in typed source universe")
+    unless retained.path == item.path && retained.kind == item.kind && retained.parameters == item.parameters do
+      throw (.unsupported "exported Item declaration contradicts typed source universe")
+    pure retained
+  else pure item
   let (world,callee) ← match SourceCompilerWorld.internItem #[item] world key with
     | .ok result => pure result
     | .error error => throw (.unsupported error)

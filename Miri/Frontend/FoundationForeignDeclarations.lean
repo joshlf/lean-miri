@@ -1,5 +1,5 @@
 import Lean
-import Miri.Input.Model.SourceSymbols
+import Miri.Input.Model.SourceDeclarations
 
 /-! Finite declaration source for the fixed foreign provider. The traversal is
 pinned helpers.rs::iter_exported_symbols: local used/extern HIR definitions,
@@ -188,6 +188,59 @@ def derive (document : Json) : Except String Miri.Input.SourceSymbols.Material :
   unless namespacePrefix.startsWith "_RNvC" && namespacePrefix.endsWith "7___rustc" do
     throw "foreign source internal symbol namespace unsupported"
   return ⟨namespacePrefix,declarations⟩
+
+/-- Project callable identity headers and their original lexical generic layers
+from the same checked complete symbolic traversal. This allocates no instances
+and supplies no ordinary/executable role. -/
+def itemSource (document : Json) : Except String
+    (Array Miri.Input.SourceDeclarations.ItemDeclaration × Array Miri.Input.SourceDeclarations.GenericLayer) := do
+  let material ← derive document
+  let graph ← document.getObjVal? "link_section_material"
+  let mut items ← graph.getObjValAs? (Array Json) "local_items"
+  let some dependencies ← graph.getObjValAs? (Option (Array Json)) "executable_dependencies"
+    | throw "foreign declaration executable dependency format unavailable"
+  for dependency in dependencies do
+    for exported in (← dependency.getObjValAs? (Array Json) "exports") do
+      if (← exported.getObjValAs? String "kind") == "non_generic" then
+        items := items.push (← exported.getObjVal? "item")
+  let mut declarations := #[]
+  let mut layers : Array Miri.Input.SourceDeclarations.GenericLayer := #[]
+  for declaration in material.declarations do
+    unless declaration.kind == "function" || declaration.kind == "associated_function" do continue
+    let kind : Miri.Input.SourceDeclarations.ItemKind :=
+      if declaration.kind == "function" then .function else .associatedFunction
+    let mut matching := #[]
+    for item in items do
+      if (← rawDefinition item) == declaration.definition then matching := matching.push item
+    unless !matching.isEmpty do throw "foreign callable lexical source missing"
+    for item in matching do
+      unless (← parameters declaration.definition item) == declaration.parameters do
+        throw "foreign callable lexical source differs from symbol declaration"
+      let some originals ← item.getObjValAs? (Option (Array Json)) "generic_layers"
+        | throw "foreign callable generic layers unavailable"
+      for original in originals do
+        let owner ← rawDefinition (← original.getObjVal? "owner")
+        let parent ← (← original.getObjValAs? (Option Json) "parent").mapM rawDefinition
+        let params ← (← original.getObjValAs? (Array Json) "parameters").mapM fun parameter => do
+          let kind ← match ← parameter.getObjValAs? String "kind" with
+            | "region" => pure Miri.Input.SourceSymbols.ParameterKind.region
+            | "type" => pure .typeParameter
+            | "const" => pure .constParameter
+            | _ => throw "foreign callable generic kind unsupported"
+          let definition ← rawDefinition (← parameter.getObjVal? "definition")
+          let index ← parameter.getObjValAs? Nat "index"
+          return ({definition,index,kind} : Miri.Input.SourceDeclarations.GenericParameter)
+        let layer : Miri.Input.SourceDeclarations.GenericLayer :=
+          ⟨owner,parent,← original.getObjValAs? Nat "parent_count",params⟩
+        if let some old := layers.find? (·.owner == owner) then
+          unless old == layer do throw "foreign callable lexical declaration conflict"
+        else layers := layers.push layer
+    let item : Miri.Input.SourceDeclarations.ItemDeclaration := {
+      definition := declaration.definition,path := declaration.path,kind,parameters := declaration.parameters }
+    if let some old := declarations.find? (·.definition == item.definition) then
+      unless old == item do throw "foreign callable declaration conflict"
+    else declarations := declarations.push item
+  return (declarations,layers)
 
 end ForeignDeclarationSource
 
