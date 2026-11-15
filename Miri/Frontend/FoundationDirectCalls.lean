@@ -208,7 +208,12 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
 where
   signatureTypeDisplay (physical : PhysicalTypeRegistry) (id : Nat) : Except String String := do
     let some entry := physical.registry.entries[id]? | throw "function signature type absent"
-    concreteRuntimeDisplay entry.type
+    match entry.type with
+    | .nominal _ arguments =>
+      unless arguments.isEmpty do throw "generic nominal function signature display unsupported"
+      let (node, _) ← physical.lookup id
+      return node.display
+    | _ => concreteRuntimeDisplay entry.type
   reconstructArguments (physical : PhysicalTypeRegistry) (args : Array MIR.GenericArg) :
       Except String (Array ItemArgument) := args.mapM fun arg => do
     match arg with

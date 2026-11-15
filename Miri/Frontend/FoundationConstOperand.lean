@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationConstEval
+import Miri.Frontend.FoundationConstAggregatePhysical
 import Miri.Frontend.FoundationPhysicalRegistry
 import Miri.Frontend.FoundationSpanRegistry
 
@@ -12,7 +13,7 @@ constructor, after pure source evaluation and document-local physical joins. -/
 def lowerScalarConstantOperand (physical : PhysicalTypeRegistry) (spans : SpanRegistry)
     (operand : Json) : Except String (PhysicalTypeRegistry × MIR.ConstOperand) := do
   let document := physical.registry.document
-  let result ← evaluateScalarConstant document operand
+  let result ← sourceConstantScalar document (← evaluateSourceConstant document operand)
   unless (← operand.getObjValAs? (Option Nat) "user_type").isNone do
     throw "const user-type annotation join unsupported"
   let key ← operand.getObjVal? "source_span_key"

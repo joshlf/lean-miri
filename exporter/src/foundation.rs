@@ -276,7 +276,7 @@ impl<'tcx> Material<'tcx> {
             && closure_callee_material::is_source_callee(tcx,roots,def)?
             && !tcx.is_const_fn(def) && tcx.is_mir_available(def);
         if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal
-            && !external_internal_callee && !external_closure_callee {
+            && !external_internal_callee && !external_closure_callee && !termination_material::unit_methods(tcx).contains(&def) {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -403,6 +403,9 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let mut link_sections = link_section_material::export(tcx);
     m.attach_link_initializers(tcx,&mut link_sections)?;
     let termination_source = m.termination_source(tcx)?;
+    for body in m.termination_templates(tcx,roots)? {
+        if !bodies.iter().any(|existing|existing["definition"]==body["definition"]) {bodies.push(body);}
+    }
     let named_type_source = if compiler_entry.is_some() { m.named_type_source(tcx)? } else { Value::Null };
     Ok(json!({
         "closure_auto_source":closure_auto_source,

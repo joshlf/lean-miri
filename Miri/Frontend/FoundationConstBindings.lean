@@ -2,6 +2,7 @@ import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationConst
 import Miri.Frontend.FoundationConstEval
+import Miri.Frontend.FoundationConstAggregate
 
 /-! Join a requested const-generic argument tuple with the source parameter
 types before checking all frame-entry required constants. -/
@@ -38,7 +39,7 @@ def checkRequiredConstants (d : Document) (body : Json)
   for operand in (← body.getObjValAs? (Array Json) "required_consts") do
     let value ← operand.getObjVal? "value"
     if (← value.getObjValAs? String "kind") == "unevaluated" then
-      let _ ← evaluateScalarConstant d operand arguments
+      let _ ← evaluateSourceConstant d operand arguments
     else
       evaluateRequiredConstant d.types d.target.pointerSizeBits arguments operand
 

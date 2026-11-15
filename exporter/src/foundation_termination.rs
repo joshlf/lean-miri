@@ -62,3 +62,26 @@ impl<'tcx> Material<'tcx> {
             "super_clauses":super_clauses,"associated_items":items,"complete_impl_headers":true,"implementations":implementations}))
     }
 }
+
+// Finite source-template domain, not trait selection: all non-generic unit
+// headers retain their method bodies. The complete declaration table above
+// remains authoritative; Lean chooses/rejects the requested concrete header.
+pub(super) fn unit_methods(tcx: TyCtxt<'_>) -> Vec<DefId> {
+    let Some(trait_def) = tcx.lang_items().termination() else {return Vec::new()};
+    tcx.all_impls(trait_def).filter(|implementation| {
+        let reference = tcx.impl_trait_header(*implementation).trait_ref.instantiate_identity().skip_normalization();
+        matches!(reference.self_ty().kind(),ty::Tuple(fields) if fields.is_empty())
+            && tcx.generics_of(*implementation).count()==0
+    }).flat_map(|implementation|tcx.associated_items(implementation).in_definition_order()
+        .filter(|item|matches!(item.kind,ty::AssocKind::Fn {..})).map(|item|item.def_id).collect::<Vec<_>>()).collect()
+}
+impl<'tcx> Material<'tcx> {
+    pub(super) fn termination_templates(&mut self, tcx: TyCtxt<'tcx>, roots: &[String]) -> Result<Vec<Value>> {
+        let Some(trait_def)=tcx.lang_items().termination() else {return Ok(Vec::new())};
+        if !self.def_ids.contains_key(&trait_def) {return Ok(Vec::new())}
+        unit_methods(tcx).into_iter().map(|definition| {
+            if !tcx.is_mir_available(definition) {return unsupported("unit trait method MIR unavailable",definition)}
+            self.body(tcx,definition,roots)
+        }).collect()
+    }
+}
