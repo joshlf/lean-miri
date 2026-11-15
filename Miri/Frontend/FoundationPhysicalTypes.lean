@@ -186,9 +186,6 @@ def physicalLayoutOfDocument (d : Document) (ty : ConcreteType) : Except String 
   let target ← runtimeTargetOfTarget d.target
   nominalPhysicalLayout d (physicalLayoutCore target (layoutOfDocument d)) ty
 
-def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input.Layout := do
-  physicalLayoutOfRuntime (← runtimeTargetOfTarget target) ty
-
 /-- Build a row from already interned child and length identities. The caller
 must bind those IDs in its document-local pools; no compiler facts are invented. -/
 def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)

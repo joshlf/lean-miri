@@ -143,11 +143,4 @@ def rustModeShapeOfDocument (d : Document) (isReturn : Bool) (ty : ConcreteType)
       scalar.validRange == some (0,1))
   rustModeCore d.target d.target.architecture isReturn ty (rustAbiLayoutOfDocument d)
 
-/-- Instantiate the requested finite type before computing its mode projection. -/
-def rustModeShapeOfType (d : Document) (architecture : String) (isReturn : Bool)
-    (id : Nat) (types : Array (Option ConcreteType)) (constants : Array (Option Nat)) :
-    Except String RustModeShape := do
-  rustModeShape d.target architecture isReturn
-    (← instantiate types constants (← typeExpr d id))
-
 end Miri.Frontend.Foundation

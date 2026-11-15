@@ -18,95 +18,39 @@ indices. It does not enumerate substitutions or serialize layout, ABI, predicate
 instance or interpreter query-answer catalogs. Unsupported source constructs
 abort export. The producer and decoder reject a different pinned rustc commit.
 
-In Lean, `Foundation.decode` loads this finite document, `typeExpr` resolves a
-requested type, `instantiate` substitutes a requested type/const argument tuple,
-and `checkEnvironment` checks the known `Sized`, `Copy` and `usize` obligations
-for the restricted structural type domain, and matches complete local primitive
-marker impl headers for a narrower domain. Each is a pure function of the
-document and explicit arguments. Unsigned scalar free const-item MIR with
-selected arithmetic, comparisons, switches and assertions is evaluated on
-demand. Four genuine values (37, 36, 42 and 600) match independent compiler
-CTFE, and the branch-derived 36 also returns through a fixed frame. Every
-required constant is checked on frame entry,
-including unreachable obligations. Generic/promoted const definitions and
-general const-MIR evaluation remain unsupported. Unknown obligations are errors. The existing
-fixed interpreter also now computes canonical nested-array layouts on demand
-from its imported type graph, with explicit cycle, overflow and contradiction
-errors.
+## Normal execution path
 
-Lean derives physical primitive types and layouts, a limited direct function
-ABI, ordinary item and frame
-identities, source spans, session settings, primitive and foreign catalogs, and
-the required input graph from the finite document. For a checked `u8` identity
-body, the canonical compiler provider preparation and the **fixed Miri
-interpreter** execute the actual assignment and Return from a direct call
-frame; the observed return is 42 and the frame stack becomes empty. The same
-source-derived path executes a scalar const-item body using `VALUE: u8 = 37`,
-retaining its required constant before the fixed frame returns 37. A genuine
-branch-derived scalar const returns 36 through another fixed frame. A genuine
-two-function `calls(42_u8)` run enters a callee frame and returns 42 through
-both fixed interpreter frames. The same checked call path preserves u16
-`0xBEEF` and usize `0x123456789ABCDEF0` through real callee/return frames,
-matching independent schema-12 runs. Pure
-complete-key call-graph closure also assembles a genuine three-frame chain and
-two sequential calls to the same callee. Their fixed runs match independent
-schema-12 runs; missing source/evidence and recursive graphs reject before
-execution. The supported closure is acyclic and restricted to these scalar
-calls. A byte-array literal returns a provenance
-pointer whose four bytes read `Miri` in the fixed memory machine. A Unicode
-`&str` returns a wide pointer whose actual metadata length 8 drives the fixed
-read of `Lean🦀` UTF-8 bytes; length 9 triggers the fixed bounds UB. A separate
-no_std custom `#[lang=start]` executable passes the fixed compiler-selected
-startup path and exits zero after thread/TLS cleanup; its start returns `argc`
-without calling main. These runs use explicit finite scheduling and choice
-profiles. They are bounded observations, not ordinary std startup or safety
-proofs. The schema-12 path
-still supplies general fixed-interpreter programs. The active missing work is
-tracked in [STATUS.md](../STATUS.md).
+`FoundationInput` decodes the finite document into typed source material and
+constructs the initial input for the normal runner. The existing lowerer,
+preparation, evaluator and finalizer execute it through the fixed interpreter.
+A persistent `SourceCompilerWorld` belongs to that evaluation and retains the
+typed definitions, generic MIR, type structure and target evidence. Runtime
+queries share its canonical instance, body, type and ABI identities. Supported
+queries derive missing rows on demand; they do not enumerate all substitutions
+or consult a running compiler. No cache is shared between evaluations.
 
-For an ordinary std executable, the finite export now selects the actual
-`std::rt::lang_start` MIR template and Lean checks its `T: 'static` obligation
-from source. Its body captures the main function pointer in a closure, unsizes a
-reference to `dyn Fn() -> i32 + Sync + RefUnwindSafe`, and calls
-`std::rt::lang_start_internal`. Its two direct calls reach
-`std::panic::catch_unwind` and `Result::unwrap_or_else`. The finite source
-preserves structural principal, projection and auto-trait predicates, ordered
-lexical generic environments, and the actual closure MIR. Lean checks explicit
-bounds and the Fn/FnMut/FnOnce supertrait chain. Source declarations and target
-material determine supported `dyn`, `&dyn`, and narrow nominal layouts, including
-the genuine `Result<isize, Box<dyn Any + Send>>` local. Source-derived symbolic
-closure shims and vtable slots have been compared with compiler output, but
-their symbolic identities, complete executable MIR/ABI, allocations and fixed
-interpreter effects still need a checked bridge. External static initializers,
-the pinned Miri constructor-section filter, and byte interner identity also
-limit startup fidelity. These source and layout comparisons do not establish
-ordinary std startup or a general Rust execution path.
+Free-function resolution checks the source declaration and full generic
+arguments before interning an instance. Body loading substitutes the selected
+source template and installs its actual body in the same World. Frame, span,
+layout and ABI consumers read that current World rather than preparation-time
+copies. Foreign-symbol lookup selects a source declaration before resolving the
+selected callable. Unsupported selection, missing source and contradictory
+identities remain errors.
 
-Lean rejects demands outside the supported source domain. In particular,
-general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
-byte-interner identity and general provenance, runtime symbol
-identities and broader MIR are not yet supplied by pure foundation queries.
-Finite Call MIR and direct FnDef evidence support the checked acyclic scalar
-call graphs. Source allocation images support the checked array and str literal reads while the
-byte interner is explicitly unavailable; any reservation demand still stops
-Unsupported. Coroutines, inlined
-frames, target features and caller-location tracking also stop. The direct
-identity frame needs none of those facts; its effect-domain check excludes
-their use before constructing the limited program. General migration requires
-computing each demanded query from finite source material and expanding the
-supported interpreter domain without invented compiler answers.
+The supported domain includes selected scalar and aggregate layouts, source
+signatures, ordinary direct calls, required constants, closure and dynamic-object
+material, and finite startup metadata. Compiler comparisons test these components;
+they do not establish support for every Rust type, trait, constant or MIR form.
+The normal custom-entry control reaches finalization. Ordinary std main has
+advanced into its actual startup MIR but does not yet complete. Broader trait
+selection, indirect calls, allocation identities and interpreter effects still
+have unsupported cases. The current concrete stop and remaining work are tracked
+in [STATUS.md](../STATUS.md).
 
-The normal runner now routes a foundation document through the existing input
-lowerer, preparation, evaluator and finalizer. Its custom-entry input currently
-stops in the foreign-symbol provider before a guest step: that provider demands
-all exported candidates and callable instance IDs during preparation. Ordered
-candidate declarations and linkage attributes are finite material, and their
-order and attributes have been checked against 231 custom-entry and 244 std
-candidates from an independent export. The pending provider change must select
-symbols on demand and resolve only the selected callable through one persistent
-pure compiler World shared by call, ABI, entry and panic consumers. A World
-identity may be allocated during one evaluation; no result may depend on a
-cache shared between evaluations. Missing body or ABI source remains an error.
+The schema-12 route remains available for compiler-produced inputs. Its existing
+answer tables are an input trust boundary, not evidence that the corresponding
+foundation queries have been implemented. Unsupported foundation demands must
+remain visible rather than falling back to those tables.
 
 ## Proof and trust boundary
 
