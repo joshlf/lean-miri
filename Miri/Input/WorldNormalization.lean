@@ -1,25 +1,14 @@
+import Miri.Input.GenericSyntax
 import Miri.Input.GenericInstantiationWorld
-import Miri.Input.AliasRuntime
 import Miri.Input.BinderRegions
 
-/-! Normalization in the single execution-owned type universe. Newly constructed
-syntax is normalized and re-interned in that same World. Existing material
-families outside the migrated normalizer keep their explicit normalization row;
-unsupported new constructors never borrow such a row or another universe. -/
+/-! Material normalization uses rustc's exact result. Constructed syntax may
+normalize structurally only when no compiler selection is required. -/
 namespace Miri.Input.WorldNormalization
 open GenericSubstitution TypeArena
 
 private def lift [Monad m] [MonadExceptOf String m] (value : Except String A) : m A :=
   match value with | .ok result => pure result | .error error => throw error
-
-private def structuralMaterial : TypeShape → Bool
-  | .bool | .char | .int _ | .uint _ | .float _ | .str | .never | .foreign _
-  | .rawPointer .. | .reference .. | .slice _ | .tuple _ | .dynamicTraitObject ..
-  | .alias .free false .. | .alias .projection false .. => true
-  | .functionPointer signature variables =>
-    variables.all (fun value => match value with | .Region _ => true | _ => false) &&
-      signature.rawSplatted.isSome
-  | _ => false
 
 private def residual (world : World) (source : TypeNode) : Except String TypeId := do
   let some facts := source.compilerFacts | throw "material normalization facts absent"
@@ -35,34 +24,33 @@ private def residual (world : World) (source : TypeNode) : Except String TypeId 
 private def normalizeRegion (fuel : Nat) (region : MIR.Region) : WorldM MIR.Region := do
   let world ← get
   let term ← lift (GenericInstantiationWorld.ofRegion world region)
-  let term ← lift (MirTemplate.eraseFreeRegions fuel term)
-  lift (MirTemplate.validateClosed fuel term)
+  let term ← lift (GenericSyntax.eraseFreeRegions fuel term)
+  lift (GenericSyntax.validateClosed fuel term)
   lift (GenericInstantiationWorld.resolveRegion world term)
 
-/-- Pure source alias/trait reduction embedded in the current query monad.
-Region erasure occurs both before and after reduction in AliasRuntime. -/
-def normalizeTerm (context : AliasRuntime.Context) (work fuel : Nat)
-    (term : Term) : WorldM Term :=
-  lift (AliasRuntime.normalizeTerm context work fuel #[] #[] term)
+def normalizeTerm (_context : Unit) (_work fuel : Nat)
+    (term : Term) : WorldM Term := do
+  let term ← lift (GenericSyntax.eraseFreeRegions fuel term)
+  lift (BinderRegions.requireAliasFree fuel term)
+  pure term
 
 /-- Normalize an instantiated source field expression, then intern the result
 in this execution's current universe. All newly created child IDs are retained. -/
-def resolveNormalizedTerm (context : AliasRuntime.Context) (work fuel : Nat)
+def resolveNormalizedTerm (context : Unit) (work fuel : Nat)
     (term : Term) : WorldM TypeId := do
   GenericInstantiationWorld.resolveType fuel (← normalizeTerm context work fuel term)
 
-private def normalizeConstant (context : AliasRuntime.Context) (fuel work : Nat)
+private def normalizeConstant (context : Unit) (fuel work : Nat)
     (id : TypeConstantId) : WorldM TypeConstantId := do
   let term ← lift (GenericInstantiationWorld.ofConstant (← get) fuel id)
-  let result ← lift (AliasRuntime.normalizeTerm context work fuel #[] #[] term)
+  let result ← normalizeTerm context work fuel term
   GenericInstantiationWorld.resolveConstant fuel result
 
-/-- Material query views are honored before inspection. Recursive constructor
-normalization observes every interning update; no material-only ID resolver is
-used for a constructed type or for a newly reduced alias RHS. -/
+/-- Material query views are honored before lookup. Constructed normalization
+observes every interning update. -/
 private abbrev NormalizeM := StateT (Std.HashMap TypeId TypeId) WorldM
 
-private def normalizeCached (context : AliasRuntime.Context) (work : Nat) :
+private def normalizeCached (context : Unit) (work : Nat) :
     Nat → TypeId → NormalizeM TypeId
   | 0, _ => throw "execution-world normalization traversal exhausted"
   | fuel + 1, id => do
@@ -76,45 +64,27 @@ private def normalizeCached (context : AliasRuntime.Context) (work : Nat) :
             unless queryView < world.materialTypes.size do
               throw "material normalization query view escapes its prefix"
             return ← normalizeCached context work fuel queryView
-        unless structuralMaterial source.shape do return ← lift (residual world source)
-      let constructor ← match view with
-        | .constructed constructor => pure constructor
-        | .material source => do
-          let some constructor ← lift (world.materialKey source)
-            | throw "structural material normalization constructor unavailable"
-          pure constructor
+        return ← lift (residual world source)
+      let .constructed constructor := view | throw "expected constructed type"
       if let .alias .. := constructor then
-        let term ← lift (GenericInstantiationWorld.ofType (← liftM (get : WorldM World)) (fuel + 1) id)
-        let result ← lift (AliasRuntime.normalizeTerm context work (fuel + 1) #[] #[] term)
-        return ← liftM (GenericInstantiationWorld.resolveType (fuel + 1) result)
+        throw "constructed alias has no exact rustc normalization result"
       if let .dynamic _ := constructor then
         unless ← lift (GenericInstantiationWorld.supportsTypeReification world (fuel + 1) id) do
-          match view with
-          | .material source => return ← lift (residual world source)
-          | .constructed _ => throw "dynamic normalization requires lossless child source"
+          throw "dynamic normalization requires lossless child source"
         let term ← lift (GenericInstantiationWorld.ofType world (fuel + 1) id)
         match BinderRegions.requireAliasFree (fuel + 1) term with
-        | .error error =>
-          match view with
-          | .material source => return ← lift (residual world source)
-          | .constructed _ => throw error
+        | .error error => throw error
         | .ok () => pure ()
         let term ← lift (BinderRegions.eraseAndAnonymize (fuel + 1) term)
-        let result ← lift (AliasRuntime.normalizeTerm context work (fuel + 1) #[] #[] term)
-        return ← liftM (GenericInstantiationWorld.resolveType (fuel + 1) result)
+        return ← liftM (GenericInstantiationWorld.resolveType (fuel + 1) term)
       if let .functionPointer signature := constructor then
         unless signature.variables.isEmpty do
           -- Bound children are open in isolation. Normalize the whole binder.
           unless ← lift (GenericInstantiationWorld.supportsTypeReification world (fuel + 1) id) do
-            match view with
-            | .material source => return ← lift (residual world source)
-            | .constructed _ => throw "constructed binder contains an unsupported raw constructor family"
+            throw "constructed binder contains an unsupported raw constructor family"
           let raw ← lift (GenericInstantiationWorld.ofType world (fuel + 1) id)
           match BinderRegions.requireAliasFree (fuel + 1) raw with
-          | .error error =>
-            match view with
-            | .material source => return ← lift (residual world source)
-            | .constructed _ => throw error
+          | .error error => throw error
           | .ok () => pure ()
           let normalized ← lift (BinderRegions.eraseAndAnonymize (fuel + 1) raw)
           return ← liftM (GenericInstantiationWorld.resolveType (fuel + 1) normalized)
@@ -154,7 +124,7 @@ private def normalizeCached (context : AliasRuntime.Context) (work : Nat) :
 
 /-- The memo exists only for this query. It records normalized syntax IDs, is
 not retained in World, and prevents repeated visits to shared constructor DAGs. -/
-def normalizeType (context : AliasRuntime.Context) (work fuel : Nat) (id : TypeId) :
+def normalizeType (context : Unit) (work fuel : Nat) (id : TypeId) :
     WorldM TypeId := do
   let (result,_) ← (normalizeCached context work fuel id).run {}
   pure result

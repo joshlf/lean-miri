@@ -5,6 +5,43 @@ inference-variable ownership are query-state obligations, not syntax checks. -/
 namespace Miri.Input.GenericSyntax
 open GenericSubstitution
 
+def eraseFreeRegions : Nat → Term → Except String Term
+  | 0, _ => .error "region-erasure traversal exhausted"
+  | fuel + 1, value => do
+    match value with
+    | .binder variables inner =>
+      unless variables.isEmpty do throw "normalization excludes nonempty binders"
+      return .binder variables (← eraseFreeRegions fuel inner)
+    | .bound .region .. => pure value
+    | _ =>
+      if value.sort == .region then return .atom .region "erased" ""
+      match value with
+      | .node sort tag payload children =>
+        return .node sort tag payload (← children.mapM (eraseFreeRegions fuel))
+      | .definition sort tag definition children =>
+        return .definition sort tag definition (← children.mapM (eraseFreeRegions fuel))
+      | _ => pure value
+
+/-- The source exporter checks that instantiated MIR retains no parameters,
+escaping bounds, inference variables or placeholders. The selected family has
+no nonempty binders, so every surviving bound variable here is escaping. -/
+def validateClosed : Nat → Term → Except String Unit
+  | 0, _ => .error "instantiated-type validation traversal exhausted"
+  | fuel + 1, value => do
+    match value with
+    | .parameter .. | .bound .. | .placeholder .. | .inference .. =>
+      throw "instantiated MIR retains unresolved generic variables"
+    | .binder variables inner =>
+      unless variables.isEmpty do throw "normalization excludes nonempty binders"
+      validateClosed fuel inner
+    | .node _ _ _ children | .definition _ _ _ children =>
+      let _ ← children.mapM (fun child => do
+        validateClosed fuel child
+        pure child)
+      pure ()
+    | .atom .. => pure ()
+
+
 inductive Role where
   | type | region | constant | signature | pattern | predicate | valtree | regionName
   deriving Repr, DecidableEq

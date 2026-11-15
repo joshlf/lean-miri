@@ -289,26 +289,13 @@ def validate (document : ImportDocument) (coverage : CoroutineCoverage) : Except
   let mut owners : Array Nat := #[]
   let mut auxiliary : Array Nat := #[]
   for row in coverage.coroutines do
-    let some seed := document.bodies[row.ownerBody]? |
+    let some body := document.bodies[row.ownerBody]? |
       throw "coroutine coverage: dangling owner body"
-    -- Metadata lookup checks exact template/instance argument joins without
-    -- constructing executable MIR or treating auxiliary snapshots as bodies.
     let owner ← SourceMir.metadata document row.ownerBody
-    match seed with
-    | .material body =>
-      match body.mir.phase with
-      | .Runtime _ => pure ()
-      | _ => throw "coroutine coverage: executable owner has not reached runtime MIR"
-      noResidual body
-    | .copyTemplate reference =>
-      let some source := document.mirTemplates[reference.templateId]? |
-        throw "coroutine coverage: raw runtime template absent"
-      unless source.sourceRole == .runtime && source.sourcePromoted.isNone &&
-          source.template.skeleton.phase == .Runtime .Optimized do
-        throw "coroutine coverage: raw owner template is not ordinary optimized runtime MIR"
-      -- This grammar has no Yield/CoroutineDrop/FalseEdge/FalseUnwind nodes.
-      MirTemplate.validateStructure source.template
-    | _ => throw "coroutine coverage: owner seed is not material or raw runtime template"
+    match body.mir.phase with
+    | .Runtime _ => pure ()
+    | _ => throw "coroutine coverage: executable owner has not reached runtime MIR"
+    noResidual body
     unless coverage.bodyCoroutines[row.ownerBody]? == some true && !owners.contains row.ownerBody do
       throw "coroutine coverage: missing marker or duplicate owner"
     owners := owners.push row.ownerBody

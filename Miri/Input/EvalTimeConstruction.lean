@@ -1,4 +1,3 @@
-import Miri.Input.CompilerInitialAllocationByteMachine
 import Miri.Input.CompilerProviders
 import Miri.Input.CompilerLibcTypeLayouts
 import Miri.Input.CompilerNamedFields
@@ -215,7 +214,7 @@ def fromSource [DecidableEq MiriMemoryKind] [DecidableEq Os]
       lift ((← readPlace place).toInt place.layout.layout.size |>.mapError ScalarOps.scalarError)
     writeFields, writeNamed, writeInt, writePointer
     dedupBytes := fun bytes => do
-      return (← CompilerInitialAllocation.ByteMachine.bytesCurrent EvalWorld.initialCompilerStoreInnerAccess p.runtime.target.base functions bytes.data).withOptionalProvenance
+      return (← GlobalByteMachine.bytes functions bytes.data).withOptionalProvenance
     setEinvalAndReturnNeg1 := IoError.setErrnoAndReturnNeg1I32 errors (.libc "EINVAL")
     utcTimestamp := host.utcTimestamp
     getTimezoneEnv

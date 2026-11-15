@@ -1,5 +1,3 @@
-import Miri.Input.RuntimeCtfeQueryMachine
-import Miri.Input.CompilerInitialAllocationByteMachine
 import Miri.Input.EvalConfiguration
 import Miri.Interpreter.NativeAllocationLifecycle
 import Miri.Interpreter.MemoryErrors
@@ -92,7 +90,6 @@ local storage, retagging, calls/returns and every ordinary MIR operation are
 constructed below, rather than independently chosen callbacks. -/
 structure Leaves (Os R P H D O Aff B Host C ClockHost : Type) where
   typeConstants : RuntimeEffectfulLayout.Provider (State Os R P H D O Aff B Host) := RuntimeEffectfulLayout.unavailable
-  constQueries : RuntimeCtfeQueryMachine.Capability
   pointerSource : EvalPointerSource.Leaves Os R P H D O Aff B Host C
   sync : P → Miri.Concurrency.SyncObject.AccessKind → PlaceMachine.MachineM MiriMemoryKind (User Os R P H D O Aff B Host) Unit
   storage : Size → Align → Option (Array UInt8)
@@ -129,7 +126,6 @@ The dimensions match EvalWorld's canonical Unix Other/Host payload exactly. -/
 structure SourceLeaves
     (Os R P H D Aff B Poll Instant System Native Profiler Raw Listener TcpStream Error ErrorHost
       Meta Path Place C ClockHost I AddrIter : Type) where
-  constQueries : RuntimeCtfeQueryMachine.Capability
   /-- The actual runtime configuration selected by the source runner.  Foreign
   callback and scheduler bindings project communication/host limits from this
   value; they do not choose an independent mode. -/
@@ -644,7 +640,7 @@ def makeWithForeignContext {Assembly : Type}
               (CompilerFacts.booleanInWorld context ty "is_monomorphic_enough") do
             throw (.invalidProgram "intrinsic type still requires instantiation")
         typeNameConstant := CompilerValueConstants.typeNameHook p EvalProjectionMachine.arrays functions
-          (CompilerInitialAllocation.ByteMachine.reserveCurrent EvalWorld.initialCompilerStoreInnerAccess p.runtime.target.base)
+          (fun bytes _ => GlobalByteMachine.reserve bytes ⟨0, by decide⟩)
           (fun a b => physical (compatibility a b))
         needsDrop := fun _ ty => RuntimeArrayQueries.perform EvalProjectionMachine.arrays
           (CompilerFacts.booleanInWorld context ty "needs_drop")
@@ -682,8 +678,7 @@ def makeWithForeignContext {Assembly : Type}
       control := ⟨CompilerBodySpan.get p EvalProjectionMachine.arrays⟩
       panic := EvalCallRuntime.panic p
         (EvalPanicMachine.queries p.program p.runtime bytes functions access
-          (CompilerInitialAllocation.ByteMachine.stringCurrent EvalWorld.initialCompilerStoreInnerAccess
-            p.runtime.target.base functions access (CompilerGlobalBytes.strLayout p.runtime bytes)))
+          (GlobalByteMachine.string functions access (CompilerGlobalBytes.strLayout p.runtime bytes)))
         EvalProjectionMachine.arrays access.runtime.base unwind operands
       unwindTerminateFunction := fun _ reason => do
         let (definition,arguments) ← physical (CompilerPanicFacts.unwindTerminateSeed p.program reason)
@@ -1010,7 +1005,6 @@ def makeFromSourcePackage [DecidableEq Os]
          }
       let leaves : Leaves Os R EvalSyncObjectAccess.Payload H D other CpuAffinity.Mask B sourceHost C ClockHost := {
         typeConstants := RuntimeEffectfulLayout.compilerResults EvalProjectionMachine.arrays p.runtime
-        constQueries := sourceLeaves.constQueries
         pointerSource := sourcePointer
         sync := EvalSyncObjectAccess.onAccess
         storage := sourceLeaves.storage

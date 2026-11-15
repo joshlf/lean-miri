@@ -1,13 +1,6 @@
-import Miri.Input.StructuralDiscriminantType
-import Miri.Input.StructuralConstructedFacts
-import Miri.Input.StructuralSized
-import Miri.Input.StructuralNeedsDrop
-import Miri.Input.StructuralAutoTraits
 import Miri.Input.CompilerGlobals
 import Miri.Input.CompilerPrimitiveFacts
-import Miri.Input.StructuralNormalization
 import Miri.Input.StructuralDeref
-import Miri.Input.StructuralTail
 import Miri.Interpreter.TypedRetag
 import Miri.Interpreter.LayoutCompat
 import Miri.Interpreter.ValidityVisitor
@@ -65,114 +58,24 @@ def ofProgram (runtime : RuntimeMetadata) (program : LoweredProgram) : Result Co
 private def node (context : Context) (id : TypeId) : Result TypeNode :=
   (context.runtime.node id).mapError toString
 private def facts (context : Context) (id : TypeId) : Result TypeCompilerFacts := do
-  let source ← node context id
+  let source ← (context.runtime.node id).mapError toString
   let some facts := source.compilerFacts | throw s!"missing compiler_facts for type {id}"
   unless facts.typingEnvironment == "fully_monomorphized" do
     throw "compiler query typing-environment mismatch"
   pure facts
 
-private def normalize (context : Context) (id : TypeId) : Result TypeId :=
-  StructuralNormalization.normalize (node context) context.program.input
-    (id + context.program.input.types.size + 1) id
-
-private def lazyBoolean (context : Context) (query : String) : Nat → TypeId → Result Bool
-  | 0, _ => .error "lazy type boolean traversal exhausted"
-  | fuel + 1, id => do
-    let source ← node context id
-    if id < context.program.input.types.size then
-      if ["is_freeze", "is_unpin", "is_unsafe_unpin"].contains query then
-        if ← StructuralAutoTraits.trivial (fun ty => return (← node context ty).shape) (fuel + 1) id then
-          return true
-      let f ← facts context id
-      let some (_, result) := f.booleanQueries.find? (·.1 == query)
-        | throw s!"missing material boolean query {query}"
-      return result
-    if ["is_box", "is_global_box", "is_unsafe_cell", "is_c_void", "is_simd"].contains query then return false
-    match source.shape with
-    | .rawPointer .. | .reference .. =>
-      if query == "needs_drop" then return false
-      if ["is_sized", "is_freeze", "is_unpin", "is_unsafe_unpin"].contains query then return true
-    | .array child _ constructor =>
-      if query == "is_sized" then
-        let _ ← context.runtime.lookup id |>.mapError toString
-        return true
-      if query == "needs_drop" && constructor.count == 0 then return false
-      if ["is_freeze", "is_unpin", "is_unsafe_unpin", "needs_drop"].contains query then
-        return ← lazyBoolean context query fuel child
-    | _ => pure ()
-    throw s!"unimplemented lazy type boolean query {query}"
-
 def boolean (context : Context) (id : TypeId) (query : String) : Result Bool := do
-  -- Pinned rustc TyKind tests in compiler_facts_json: inspect the original
-  -- shape before normalization. The input type language represents Alias but
-  -- excludes Param/Bound/Placeholder/Infer/Error nodes.
-  if query == "is_dynamic" then
-    return (← node context id).shapeKind == .dynamicTraitObject
-  if query == "is_too_generic" then
-    return (← node context id).shapeKind == .alias
-  if query == "is_sized" then
-    if let some answer ← StructuralSized.query (fun ty => do
-        pure (← node context (← normalize context ty)).shape)
-        (id + context.program.input.types.size + 1) id then return answer
-  if query == "needs_drop" then
-    let normalizedShape (ty : TypeId) : Result TypeShape := do
-      pure (← node context (← normalize context ty)).shape
-    let adtMaterial (definition : DefinitionRef) : Result StructuralNeedsDrop.AdtMaterial := do
-      let some raw := context.program.input.definitions[definition]?
-        | throw "needs_drop ADT definition material absent"
-      let some material := raw.adtDrop
-        | throw "needs_drop raw ADT drop material absent"
-      if let some destructor := material.destructor then
-        unless destructor < context.program.input.definitions.size do
-          throw "needs_drop destructor definition identity out of bounds"
-      pure material
-    if let some answer ← StructuralNeedsDrop.query normalizedShape adtMaterial
-        (id + context.program.input.types.size + 1) id then return answer
-  if id >= context.program.input.types.size then
-    if query == "opsem_inhabited" || query == "is_monomorphic_enough" then
-      let material := fun ty key => do
-        let f ← facts context ty
-        let some (_,value) := f.booleanQueries.find? (·.1 == key)
-          | throw s!"missing material compiler boolean query {key}"
-        pure value
-      if let some value ← StructuralConstructedFacts.query
-          (fun ty => return (← node context ty).shape) material context.program.input.types.size
-          query (id + context.program.input.types.size + 1) id then return value
-    return ← lazyBoolean context query (id + context.program.input.types.size + 1) id
-  let originalFacts ← facts context id
-  if query == "is_freeze" || query == "is_unpin" || query == "is_unsafe_unpin" then
-    let normalized ← normalize context id
-    if ← StructuralAutoTraits.trivial (fun ty => return (← node context ty).shape)
-        (context.program.input.types.size + 1) normalized then return true
-  let facts := originalFacts
-  let some (_,entry) := facts.booleanQueries.find? (·.1 == query) | throw s!"missing compiler boolean query {query}"
-  pure entry
+  let source ← (context.runtime.node id).mapError toString
+  if query == "is_dynamic" then return source.shapeKind == .dynamicTraitObject
+  if query == "is_too_generic" then return source.shapeKind == .alias
+  let value ← facts context id
+  let some (_,result) := value.booleanQueries.find? (·.1 == query)
+    | throw s!"missing exact rustc boolean result {query}"
+  pure result
 
 def optionalType (context : Context) (id : TypeId) (query : String) : Result (Option TypeId) := do
   let source ← node context id
-  let entry ← if query == "normalized" then
-      pure (some (← normalize context id))
-    else if query == "discriminant_type" then do
-      let root ← normalize context id
-      let hooks : StructuralDiscriminantType.Hooks := {
-        shape := fun ty => return (← node context ty).shape,
-        primitive := CompilerPrimitiveFacts.primitiveType context.runtime,
-        normalizeAlias := fun _ ty => normalize context ty,
-        -- Erasing arbitrary UnsafeBinder variables remains an explicit
-        -- residual dependency. No discriminant result row is consumed.
-        eraseUnsafeBinder := fun ty => do
-          let f ← facts context ty
-          let some (_,some inner) := f.typeQueries.find? (·.1 == "unsafe_binder_erased")
-            | throw "missing residual unsafe-binder erasure material"
-          pure inner }
-      pure (some (← StructuralDiscriminantType.query hooks
-        (id + context.program.input.types.size + 1) root))
-    else if query == "metadata_tail" then do
-      let root ← normalize context id
-      let result ← StructuralTail.tail (fun ty => return (← node context ty).shape)
-        (normalize context) (id + context.runtime.source.types.size + 1) root
-      pure (some result)
-    else if query == "builtin_deref_explicit" || query == "builtin_deref_implicit" || query == "boxed_type" then do
+  let entry ← if query == "builtin_deref_explicit" || query == "builtin_deref_implicit" || query == "boxed_type" then do
       -- Signature-bound source material keeps its Binder graph while facts
       -- use the explicitly instantiated query view recorded by the exporter.
       let source ← node context (source.layoutQueryInputTypeId.getD id)
@@ -184,8 +87,6 @@ def optionalType (context : Context) (id : TypeId) (query : String) : Result (Op
       else pure false
       if query == "boxed_type" then StructuralDeref.boxedType source.shape isBox
       else StructuralDeref.builtinDeref source.shape isBox (query == "builtin_deref_explicit")
-    else if query == "pointer_metadata_type" then
-      pure (some (← context.runtime.pointerMetadataType id |>.mapError toString))
     else if id >= context.program.input.types.size && query == "unsafe_binder_erased" then
       pure none
     else do

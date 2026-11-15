@@ -1,14 +1,9 @@
 import Miri.Input.CompilerFacts
 import Miri.Input.WorldNormalization
 import Miri.Input.WorldTypeFlags
-import Miri.Input.WorldInhabitedness
-import Miri.Input.WorldNeedsDrop
-import Miri.Input.WorldTrivialAutoTraits
-import Miri.Input.WorldDiscriminantType
 import Miri.Input.WorldPrimitiveConstructor
 
-/-! Execution compiler queries. Every constructor/layout action runs in the
-caller's one WorldM; source-only query functions are never synthetic-ID fallbacks. -/
+/-! Exact compiler results are checked against the caller's execution World. -/
 namespace Miri.Input.CompilerFacts
 open Lean Miri.ABI Miri.Memory Miri.Interpreter TypeArena
 private def worldLift [Monad m] [MonadExceptOf String m] (value : Except String A) : m A :=
@@ -32,7 +27,7 @@ private def constructor (id : TypeId) : WorldM TypeArena.Constructor := do
     pure value
 
 def normalizeInWorld (context : Context) (id : TypeId) : WorldM TypeId := do
-  WorldNormalization.normalizeType context.runtime.normalizationContext 10000 (← queryFuel) id
+  WorldNormalization.normalizeType () 10000 (← queryFuel) id
 
 def primitiveTypeInWorld (context : Context) (key : String) : WorldM TypeId := do
   WorldPrimitiveConstructor.query context.runtime.target key
@@ -43,22 +38,7 @@ def layoutOfInWorld (context : Context) (id : TypeId) : WorldM (TyAndLayout Type
 def unitLayoutInWorld (context : Context) : WorldM (TyAndLayout TypeId) := do
   layoutOfInWorld context (← primitiveTypeInWorld context "unit")
 
-private def sourceTrait (context : Context) (id : TypeId) (key : String) : WorldM Bool := do
-  let lang ← match key with
-    | "is_freeze" => pure "freeze" | "is_unpin" => pure "unpin"
-    | "is_unsafe_unpin" => pure "unsafe_unpin" | _ => throw "unknown world auto-trait query"
-  let source := context.runtime.normalizationContext
-  let declarations := source.traits.traits.filter (·.langItem == some lang)
-  unless declarations.size == 1 do throw s!"world trait declaration absent or duplicated: {lang}"
-  let some declaration := declarations[0]? | throw "world trait declaration absent"
-  let term ← worldLift (GenericInstantiationWorld.ofType (← get) (← queryFuel) id)
-  match ← worldLift (AliasRuntime.solveGoal source (← queryFuel) 10000
-      ⟨.positive,⟨declaration.definition,#[term]⟩⟩) with
-  | .proven _ => pure true | .noSolution => pure false
-  | .ambiguous reason => throw s!"world auto-trait query is ambiguous: {reason}"
-
-/-- Original-kind flags stay unnormalized. Sized/drop/inhabitedness and public
-trait queries execute their respective source normalization contracts. -/
+/-- Compiler-owned queries require an exact rustc row. -/
 def booleanInWorld (context : Context) (id : TypeId) (key : String) : WorldM Bool := do
   let kind ← worldLift ((← get).shapeKind id)
   if key == "is_dynamic" then return kind == .dynamicTraitObject
@@ -66,14 +46,8 @@ def booleanInWorld (context : Context) (id : TypeId) (key : String) : WorldM Boo
   if #["has_erasable_regions", "is_monomorphic_enough", "is_monomorphic"].contains key then
     return ← worldLift (WorldTypeFlags.query (← get) key (← queryFuel) id)
   if let some result ← materialBoolean id key then return result
-  if key == "is_sized" then return ← RuntimeMetadata.sizedInWorld context.runtime id
-  if key == "needs_drop" then return ← WorldNeedsDrop.query context.runtime (← queryFuel) id
-  if key == "opsem_inhabited" then return ← WorldInhabitedness.query context.runtime (← queryFuel) id
-  if #["is_freeze", "is_unpin", "is_unsafe_unpin"].contains key then
-    let normalized ← normalizeInWorld context id
-    if let some result ← materialBoolean normalized key then return result
-    if ← worldLift (WorldTrivialAutoTraits.query (← get) (← queryFuel) normalized) then return true
-    return ← sourceTrait context normalized key
+  if #["is_sized", "needs_drop", "opsem_inhabited", "is_freeze", "is_unpin", "is_unsafe_unpin"].contains key then
+    throw s!"missing exact rustc boolean result: {key}"
   if key == "is_like_maybe_dangling" && kind == .coroutine then return true
   if #["is_box", "is_global_box", "is_unsafe_cell", "is_c_void", "is_simd", "is_like_maybe_dangling"].contains key then
     if kind != .adt then return false
@@ -111,14 +85,6 @@ def optionalTypeInWorld (context : Context) (id : TypeId) (key : String) : World
   let _ ← worldLift ((← get).lookupType id)
   let result ← if key == "normalized" then
       pure (some (← normalizeInWorld context id))
-    else if key == "discriminant_type" then do
-      pure (some (← WorldDiscriminantType.query {
-        primitive := primitiveTypeInWorld context,
-        normalize := fun _ ty => normalizeInWorld context ty } (← queryFuel) id))
-    else if key == "metadata_tail" then
-      pure (some (← RuntimeMetadata.metadataTailInWorld context.runtime id))
-    else if key == "pointer_metadata_type" then
-      pure (some (← RuntimeMetadata.pointerMetadataTypeInWorld context.runtime id))
     else if key == "boxed_type" || key == "builtin_deref_explicit" || key == "builtin_deref_implicit" then do
       let id ← queryView id
       if let some child ← boxedInWorld context id then return some child

@@ -59,18 +59,6 @@ def prepare (program : LoweredProgram) : Except String Prepared := do
         else
           positionIndex := positionIndex.insert entry.position.bytePosition entry.position
           positions := positions.push entry.position
-  -- Undemanded raw templates also own immutable source-map positions.
-  -- Retaining them does not instantiate a body or assign a runtime body ID.
-  for source in program.input.mirTemplates do
-    let entries ← match spans program.input.files ctx tables source.backtraceSpans with
-      | .ok (entries,_) => pure entries
-      | .error _ => pure #[]
-    for entry in entries do
-      if let some old := positionIndex.get? entry.position.bytePosition then
-        unless old == entry.position do throw "conflicting exact source-map query"
-      else
-        positionIndex := positionIndex.insert entry.position.bytePosition entry.position
-        positions := positions.push entry.position
   let ctx := LowerContext.ofDocument program.input
   let records := program.input.queries.runtime.instances
   let mut names := #[]

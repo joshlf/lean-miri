@@ -1,5 +1,3 @@
-import Miri.Input.CtfeMirSource
-import Miri.Input.TraitSelection.Material
 import Miri.Input.Model.Types
 import Miri.Input.Model.Catalogs
 import Miri.Input.Model.Coroutine
@@ -15,7 +13,6 @@ structure CompilerTypeConstResult where
   deriving BEq
 
 structure ImportDocument where
-  traitProgram : TraitSelection.Program := {traits := #[]}
   compilerPredicates : Array CompilerPredicateEvidence := #[]
   /-- Version tag for source physical ArgAbi layouts in FnAbi evidence. -/
   compilerAbiLayoutSchema : Option String := none
@@ -37,10 +34,7 @@ structure ImportDocument where
   selectedScope : Option SelectedScope
   functionAbis : Array FunctionAbi
   bodyRoots : Array BodyRoot := #[]
-  mirTemplates : Array CopyTemplateSource := #[]
-  /-- Bounded raw CTFE frame sources; absence never grants query admission. -/
-  ctfeScalarSources : Array CtfeMirSource.Source := #[]
-  bodies : Array BodySeed
+  bodies : Array Body
   coroutineCoverage : Option CoroutineCoverage := none
   queries : Catalog.Queries
   producerSettings : Catalog.ProducerSettings

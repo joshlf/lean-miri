@@ -46,8 +46,6 @@ def prepare (program : LoweredProgram) : Except String Prepared := do
         tables := next
   return ⟨program.withCompilerTables tables,inlineAttributes⟩
 
-/-- Source scopes follow the exact execution-owned body key. Raw template
-scope evidence remains immutable; no constructed identity indexes a material row. -/
 def sourceScopeIdentity (prepared : Prepared) (identity : BodyIdentity) (scopeIndex : Nat) :
     RuntimeArrayTypes.CompilerM VirtualCalls.CallerScope := do
   let metadata ← SourceMir.metadataIdentity identity

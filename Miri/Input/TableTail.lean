@@ -1,5 +1,3 @@
-import Miri.Input.SourceEnvironmentCodec
-import Miri.Input.AliasMaterialCodec
 import Miri.Input.AdtDeclarationCodec
 import Miri.Input.TableCore
 import Miri.Input.GenericMaterialCodec
@@ -260,90 +258,26 @@ def parseAllocationMemoryInline (path : String) : Parser AllocationMemory :=
     (array (parseInitRange (path ++ ".initialization_ranges")))
     (array (parseRelocation (path ++ ".relocations")))
 
-private def parseAdtDropMaterial (path : String) : Parser AdtDropMaterial := do
-  let (manuallyDrop, destructor) ← object (none, none) fun (manual, dtor) key => do
-    match key with
-    | "manually_drop" => pure (some (← boolean), dtor)
-    | "destructor" => pure (manual, some (← nullable natural))
-    | _ => fail s!"{path}: unknown ADT drop material field `{key}`"
-  return ⟨← required manuallyDrop (path ++ ".manually_drop"),
-    ← required destructor (path ++ ".destructor")⟩
-
-private def parseFunctionAbiMaterial (path : String) : Parser FunctionAbiMaterial := do
-  let (neverUnwind,foreignItem,dropGlue,noWritable,alwaysComptime) ← object (none,none,none,none,none)
-      fun (neverUnwind,foreignItem,dropGlue,noWritable,alwaysComptime) key => do
-    match key with
-    | "never_unwind" => pure (some (← boolean),foreignItem,dropGlue,noWritable,alwaysComptime)
-    | "foreign_item" => pure (neverUnwind,some (← boolean),dropGlue,noWritable,alwaysComptime)
-    | "drop_glue" => pure (neverUnwind,foreignItem,some (← boolean),noWritable,alwaysComptime)
-    | "rustc_no_writable" => pure (neverUnwind,foreignItem,dropGlue,some (← boolean),alwaysComptime)
-    | "always_comptime" => pure (neverUnwind,foreignItem,dropGlue,noWritable,some (← boolean))
-    | _ => fail s!"{path}: unknown definition ABI attribute `{key}`"
-  pure ⟨← required neverUnwind (path ++ ".never_unwind"),
-    ← required foreignItem (path ++ ".foreign_item"),
-    ← required dropGlue (path ++ ".drop_glue"),
-    ← required noWritable (path ++ ".rustc_no_writable"),
-    ← required alwaysComptime (path ++ ".always_comptime")⟩
-
-private def parseCallableSource (path : String) : Parser CallableSource := do
-  let raw ← Lean.Json.Parser.anyCore
-  liftExcept do
-    for (key,_) in (← raw.getObj?).toArray do
-      unless ["has_self","definition_kind","container","trait_item"].contains key do
-        throw s!"{path}: unknown callable source field {key}"
-    let hasSelf ← (← raw.getObjVal? "has_self").getBool?
-    let definitionKind ← (← raw.getObjVal? "definition_kind").getStr?
-    let containerRaw ← raw.getObjVal? "container"
-    let container ← if containerRaw == .null then pure none else some <$> containerRaw.getStr?
-    let traitRaw ← raw.getObjVal? "trait_item"
-    let traitItem ← if traitRaw == .null then pure none else some <$> GenericMaterialCodec.readDefinition traitRaw
-    unless definitionKind == "function" || definitionKind == "associated_function" do
-      throw "callable source definition kind unsupported"
-    if definitionKind == "function" then
-      unless container.isNone && traitItem.isNone && !hasSelf do
-        throw "ordinary callable source has associated header"
-    else
-      unless container == some "trait" || container == some "trait_impl" || container == some "inherent_impl" do
-        throw "associated callable source container unsupported"
-      unless (container == some "trait_impl") == traitItem.isSome do
-        throw "callable source trait mapping and container disagree"
-    pure ⟨hasSelf,definitionKind,container,traitItem⟩
-
 private structure ParseDefinitionIdFields where
   crate : Option (Nat) := none
   index : Option (Nat) := none
   bodyTrackCaller : Option Bool := none
-  callableSource : Option CallableSource := none
-  adtDrop : Option AdtDropMaterial := none
   genericTemplate : Option GenericSubstitution.DefinitionTemplate := none
-  aliasDeclaration : Option AliasMaterial.Declaration := none
   adtDeclaration : Option Lean.Json := none
   rawPath : Option DefinitionPath.Material := none
-  sourceEnvironment : Option SourceEnvironment.Material := none
-  functionAbiMaterial : Option FunctionAbiMaterial := none
 
 def parseDefinitionId (path : String) : Parser (DefinitionId) := do
   let s ← object ({} : ParseDefinitionIdFields) fun s key => do
     match key with
     | "crate" => return { s with crate := some (← natural) }
     | "index" => return { s with index := some (← natural) }
-    | "function_abi_material" => return { s with functionAbiMaterial := some (← parseFunctionAbiMaterial (path ++ ".function_abi_material")) }
-    | "callable_source" => return { s with callableSource := some (← parseCallableSource (path ++ ".callable_source")) }
     | "body_track_caller" => return { s with bodyTrackCaller := some (← boolean) }
-    | "adt_drop" => return { s with adtDrop := some (← parseAdtDropMaterial (path ++ ".adt_drop")) }
-    | "source_environment" => return { s with sourceEnvironment := some (← liftExcept (SourceEnvironmentCodec.read (← Lean.Json.Parser.anyCore))) }
     | "raw_path" => return { s with rawPath := some (← DefinitionPath.decode) }
     | "generic_template" => return { s with genericTemplate := some (← GenericMaterialCodec.decodeTemplate) }
-    | "alias_declaration" => return { s with aliasDeclaration := some (← AliasMaterialCodec.decodeDeclaration) }
     | "adt_declaration" => return { s with adtDeclaration := some (← Lean.Json.Parser.anyCore) }
     | _ => skipValue; pure s
   let crate ← required s.crate (path ++ ".crate")
   let index ← required s.index (path ++ ".index")
-  if let some declaration := s.aliasDeclaration then
-    unless declaration.definition == (⟨crate,index⟩ : GenericSubstitution.DefinitionIdentity) do
-      fail s!"{path}: source alias declaration identity mismatch"
-    unless declaration.hasValue == s.genericTemplate.isSome do
-      fail s!"{path}: source alias RHS availability disagrees with shared template"
   let adtDeclaration ← match s.adtDeclaration with
     | none => pure none
     | some raw => do
@@ -355,9 +289,6 @@ def parseDefinitionId (path : String) : Parser (DefinitionId) := do
         fail s!"{path}: raw ADT source identity mismatch"
       pure (some (← liftExcept (AdtDeclarationCodec.read template raw)))
   if let some template := s.genericTemplate then
-    if let some environment := s.sourceEnvironment then
-      unless environment.parameters == template.parameters do
-        fail s!"{path}: source environment and declaration template parameter scopes disagree"
     if let .definition .type "adt" identity _ := template.typeExpression then
       if identity == (⟨crate,index⟩ : GenericSubstitution.DefinitionIdentity) && adtDeclaration.isNone then
         fail s!"{path}: nominal ADT source template requires raw declaration attributes"
@@ -365,14 +296,9 @@ def parseDefinitionId (path : String) : Parser (DefinitionId) := do
     crateIndex := crate
     index := index
     bodyTrackCaller := s.bodyTrackCaller
-    callableSource := s.callableSource
-    adtDrop := s.adtDrop
     genericTemplate := s.genericTemplate
-    aliasDeclaration := s.aliasDeclaration
     adtDeclaration := adtDeclaration
-    rawPath := s.rawPath
-    sourceEnvironment := s.sourceEnvironment
-    functionAbiMaterial := s.functionAbiMaterial }
+    rawPath := s.rawPath }
 
 def parseDefinitionRef (_path : String) : Parser DefinitionRef := natural
 

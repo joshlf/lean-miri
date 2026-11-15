@@ -182,8 +182,6 @@ def prepare (program : LoweredProgram) : Result Prepared := do
 private def liftWorld (result : Result A) : RuntimeArrayTypes.CompilerM A :=
   match result with | .ok value => pure value | .error message => throw message
 
-/-- Residual body/ABI/site records belong to the original source prefix.
-Constructed IDs must never alias a numeric row from an unrelated/truncated store. -/
 private def sourcePrefixInstance (document : ImportDocument) (world : RuntimeArrayTypes.World)
     (callee : CallInstance) : Result Unit := do
   let .material actual ← world.instances.lookup callee
@@ -195,10 +193,9 @@ private def sourcePrefixInstance (document : ImportDocument) (world : RuntimeArr
 
 def atSite (prepared : Prepared) (site : Site) : RuntimeArrayTypes.CompilerM Resolution := do
   let world ← get
-  let view ← liftWorld (world.bodies.lookup site.bodyIndex)
-  let matching : Array Entry := match view with
-    | .material _ => prepared.entries.filter (·.site == site)
-    | .constructed _ => #[]
+  unless site.bodyIndex < world.metadata.source.bodies.size do
+    throw "body identity is absent"
+  let matching : Array Entry := prepared.entries.filter (·.site == site)
   if !matching.isEmpty then
     unless matching.size == 1 do throw "missing or ambiguous compiler call site"
     let entry ← liftWorld (require matching[0]? "missing compiler call site")

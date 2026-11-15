@@ -1,4 +1,4 @@
-import Miri.Input.TraitSelection.Material
+import Miri.Input.GenericSubstitution
 import Miri.Input.ReprMaterial
 
 namespace Miri.Input

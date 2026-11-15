@@ -85,31 +85,17 @@ structure LoweredProgram where
   promoted : Array (Nat × Nat × Nat)
   input : ImportDocument
 
-/-- Source body count; preparation never constructs an executable MIR vector. -/
 def LoweredProgram.bodyCount (program : LoweredProgram) : Nat := program.input.bodies.size
 
 def LoweredProgram.bodyMetadata (program : LoweredProgram) (index : Nat) :
     LowerResult SourceMir.Metadata := SourceMir.metadata program.input index
 
-/-- Instantiate and lower only the actual body requested by a runtime operation.
-No instantiated result is cached in the immutable compilation input. -/
 def LoweredProgram.resolveBody (program : LoweredProgram) (index : Nat) :
     TypeArena.WorldM LoweredBody := do
   let source ← SourceMir.resolveBody program.input index
-  -- Body wrapping needs only these immutable tables. Constructing the full
-  -- source reference indexes here would scan every type/allocation on each
-  -- runtime frame/debug lookup without contributing to lowerBody.
   let ctx : LowerContext := {
     spans := program.bundle.spans, definitions := program.bundle.definitions,
     typeConstants := program.bundle.typeConstants, typeIds := #[]}
-  let ctx ← match program.input.bodies[index]? with
-    | some (.material _) => pure ctx
-    | some (.copyTemplate _) | some (.noopDrop _) | some (.fnPointerShim _) => do
-      let ctx := ctx.withWorld (← get)
-      for ty in source.mir.locals do
-        unless ctx.containsTypeId ty do throw "instantiated MIR local type is absent from its runtime type universe"
-      pure ctx
-    | none => throw "canonical body index is absent"
   match lowerBody ctx source with
   | .ok body => pure body
   | .error error => throw error

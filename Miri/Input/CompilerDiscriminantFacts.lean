@@ -3,10 +3,7 @@ import Miri.Input.RuntimeArrayQueries
 import Miri.Input.WorldTypeMetadata
 import Miri.Interpreter.Discriminant
 
-/-! Discriminant queries use the execution-owned type universe. Ordinary
-constructors and struct/union counts follow pinned ty/sty.rs and raw ADT
-metadata. Default enum values follow raw relative declarations in the active world.
-Explicit expressions and coroutine enumeration retain residual compiler evidence. -/
+/-! Discriminant values come from the concrete rustc query record. -/
 namespace Miri.Input.CompilerDiscriminantFacts
 open Lean Miri.ABI Miri.Interpreter TypeArena
 private def lift [Monad m] [MonadExceptOf String m] (value : Except String α) : m α :=
@@ -22,9 +19,6 @@ private def data (context : CompilerFacts.Context) (id : TypeId) : WorldM Discri
     let declaration ← WorldTypeMetadata.adtDeclaration id
     if declaration.kind != .enumKind then
       return ⟨false,some declaration.variantCount,#[]⟩
-    if let some values ← lift (RelativeDiscriminants.values (context.runtime.target.pointerSize.bytes.toNat * 8) declaration) then
-      let ty ← CompilerFacts.requiredTypeInWorld context id "discriminant_type"
-      return ⟨true,some declaration.variantCount,values.zipIdx.map fun (bits,index) => ⟨index,ty,bits.toNat⟩⟩
   else if kind != .coroutine && kind != .unsafeBinder then
     return ⟨false,none,#[]⟩
   match ← lift (world.lookupType id) with

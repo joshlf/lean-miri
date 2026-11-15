@@ -1,6 +1,4 @@
 import Miri.Input.CompilerBodyRole
-import Miri.Input.SourceEnvironment.Material
-import Miri.Input.AliasMaterial
 import Miri.Input.DefinitionPath
 import Miri.Input.AdtDeclaration
 import Lean
@@ -9,7 +7,6 @@ import Miri.MIR.Operators
 import Miri.ABI.ExternAbi
 import Miri.ABI.FnAbi
 import Miri.ABI.SignatureSeeds
-import Miri.Input.MirTemplate
 import Miri.Interpreter.Instance
 import Miri.Input.GenericSubstitution
 
@@ -259,16 +256,6 @@ structure Layout where
   backendReprKind : Option BackendReprKind
   variants : Option TaggedNode
   backendRepr : Option TaggedNode
-  primitiveRecipe : Option String := none
-  tupleType : Option TypeId := none
-  patternType : Option TypeId := none
-  sequenceType : Option TypeId := none
-  pointerType : Option TypeId := none
-  pointerDataType : Option TypeId := none
-  enumTagType : Option TypeId := none
-  structType : Option TypeId := none
-  enumType : Option TypeId := none
-  unionType : Option TypeId := none
 
 inductive ArmCallKind where
   | aapcs | cmseNonSecureCall | cmseNonSecureEntry
@@ -584,41 +571,13 @@ structure FunctionAbi where
   signatureSeed : Option AbiSignatureSeed := none
   deriving BEq
 
-/-- Raw ADT definition identity/impl material for synchronous drop. -/
-structure AdtDropMaterial where
-  manuallyDrop : Bool
-  destructor : Option DefinitionRef
-  deriving Repr, DecidableEq
-
-/-- Definition-local codegen attributes before FnAbi construction. -/
-structure FunctionAbiMaterial where
-  neverUnwind : Bool
-  foreignItem : Bool
-  dropGlue : Bool
-  rustcNoWritable : Bool
-  alwaysComptime : Bool
-  deriving Repr, DecidableEq
-
-/-- Raw callable header. Optional absence is unresolved source material. -/
-structure CallableSource where
-  hasSelf : Bool
-  definitionKind : String
-  container : Option String
-  traitItem : Option GenericSubstitution.DefinitionIdentity
-  deriving Repr, DecidableEq
-
 structure DefinitionId where
   crateIndex : Nat
   index : Nat
   bodyTrackCaller : Option Bool := none
-  callableSource : Option CallableSource := none
-  adtDrop : Option AdtDropMaterial := none
   genericTemplate : Option GenericSubstitution.DefinitionTemplate := none
-  aliasDeclaration : Option AliasMaterial.Declaration := none
   adtDeclaration : Option AdtDeclaration.Material := none
   rawPath : Option DefinitionPath.Material := none
-  sourceEnvironment : Option SourceEnvironment.Material := none
-  functionAbiMaterial : Option FunctionAbiMaterial := none
   deriving Repr, DecidableEq
 
 inductive VtableEntryKind where
@@ -866,63 +825,8 @@ structure PromotedBody where
 structure Body extends BodyCore where
   promotedBodies : Array PromotedBody
 
-/-- Generic source metadata contains no fabricated generic instance identity. -/
-structure CopyTemplateSource where
-  template : MirTemplate.Template
-  definitionId : DefinitionRef
-  defPath : String
-  spanId : SpanId
-  preambleDefSpanId : SpanId
-  injectionPhase : Option Miri.MIR.MirPhase
-  localSources : Array SourceInfo
-  sourceScopes : Array SourceScope
-  backtraceSpans : Array BacktraceSpan
-  sourcePromoted : Option Nat
-  sourceRole : CompilerBodyRole
-
-structure CopyTemplateRef where
-  templateId : Nat
-  instanceId : InstanceId
-  genericArgs : Array Miri.MIR.GenericArg
-  promotedBodies : Array PromotedBody
-
 /-- Exact no-op DropGlue source location. Its signature and complete arguments
 are source material reached through the existing instance/definition identity. -/
-structure NoopDropRef where
-  instanceId : InstanceId
-  sourceSpan : BacktraceSpan
-
-/-- Raw source method location and physical lang-item identities used by
-FnPtr conversion shim construction. No local type or executable body is stored. -/
-structure FnPointerShimRef where
-  instanceId : InstanceId
-  sourceSpan : BacktraceSpan
-  nonNullDefinition : DefinitionRef
-  codeDefinition : DefinitionRef
-  deriving Repr, DecidableEq
-
-/-- A selected source category has no monomorphic fallback. -/
-inductive BodySeed where
-  | material (body : Body)
-  | copyTemplate (reference : CopyTemplateRef)
-  | noopDrop (reference : NoopDropRef)
-  | fnPointerShim (reference : FnPointerShimRef)
-
-def BodySeed.instanceId : BodySeed → InstanceId
-  | .material body => body.instanceId
-  | .copyTemplate reference => reference.instanceId
-  | .noopDrop reference => reference.instanceId
-  | .fnPointerShim reference => reference.instanceId
-
-def BodySeed.promotedBodies : BodySeed → Array PromotedBody
-  | .material body => body.promotedBodies
-  | .copyTemplate reference => reference.promotedBodies
-  | .noopDrop _ | .fnPointerShim _ => #[]
-
-def BodySeed.materialBody? : BodySeed → Option Body
-  | .material body => some body
-  | .copyTemplate _ | .noopDrop _ | .fnPointerShim _ => none
-
 structure BodyRoot where
   bodyId : BodyId
   entryInstance : InstanceId

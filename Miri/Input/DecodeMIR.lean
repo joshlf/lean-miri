@@ -1,7 +1,6 @@
 import Miri.Input.JsonReader
 import Miri.Input.MIRParser
 import Miri.Input.MIRLeaves
-import Miri.Input.MirTemplateCodec
 import Miri.Input.DecoderValues
 
 namespace Miri.Input.DecodeMIR
@@ -1024,6 +1023,7 @@ structure ParseBodyFields where
 
 def parseBodyField (sourcePath : String) (s : ParseBodyFields) (key : String) : MIRParser.Parser (ParseBodyFields) := do
   match key with
+  | "body_kind" => reject "body_kind is obsolete; executable bodies are concrete rustc MIR"
   | "source_role" => return {s with sourceRole := some (← compilerBodyRole)}
   | "phase" => return {s with phase := some (← phase)}
   | "arg_count" => return {s with arg_count := some (← natural)}
@@ -1092,98 +1092,6 @@ def finishParseBodyFields (sourcePath : String) (s : ParseBodyFields) : MIRParse
     promotedBodies := s.promoted_bodies.getD #[] }
 def parseBodyRaw (sourcePath : String) : MIRParser.Parser Body := do
   finishParseBodyFields sourcePath (← MIRParser.object {} (parseBodyField sourcePath))
-
-structure ParsedBodySeed where
-  value : BodySeed
-  references : References
-
-private structure BodySeedFields where
-  kind : Option String := none
-  material : ParseBodyFields := {}
-  templateId : Option Nat := none
-  genericArgs : Option (Array Miri.MIR.GenericArg) := none
-  materialFields : Bool := false
-  noopSpan : Option BacktraceSpan := none
-  nonNullDefinition : Option Nat := none
-  codeDefinition : Option Nat := none
-
-private def parseBodySeedRaw (path : String) : MIRParser.Parser BodySeed := do
-  let fields ← MIRParser.object ({} : BodySeedFields) fun fields key => do
-    match key with
-    | "body_kind" => pure { fields with kind := some (← string) }
-    | "template_id" => pure { fields with templateId := some (← natural) }
-    | "source_span" => pure {fields with noopSpan := some (← backtrace s!"{path}.source_span")}
-    | "non_null_definition" =>
-      let id ← natural
-      recordDef id
-      pure {fields with nonNullDefinition := some id}
-    | "code_definition" =>
-      let id ← natural
-      recordDef id
-      pure {fields with codeDefinition := some id}
-    | "generic_args" =>
-      let args ← GenericArgsCodec.decode
-      recordArgs args
-      pure { fields with genericArgs := some args }
-    | "instance_id" | "promoted_bodies" =>
-      pure { fields with material := ← parseBodyField path fields.material key }
-    | _ => pure { fields with material := ← parseBodyField path fields.material key, materialFields := true }
-  match ← required fields.kind "body_kind" with
-  | "material" =>
-    unless fields.templateId.isNone && fields.genericArgs.isNone && fields.noopSpan.isNone &&
-        fields.nonNullDefinition.isNone && fields.codeDefinition.isNone do
-      reject "material body cannot carry a generic template reference"
-    return .material (← finishParseBodyFields path fields.material)
-  | "noop_drop" =>
-    unless !fields.materialFields && fields.templateId.isNone && fields.genericArgs.isNone &&
-        fields.material.promoted_bodies.isNone && fields.nonNullDefinition.isNone && fields.codeDefinition.isNone do
-      reject "no-op drop source cannot carry a monomorphic body or template reference"
-    return .noopDrop ⟨← required fields.material.instance_id "instance_id",
-      ← required fields.noopSpan "source_span"⟩
-  | "fn_pointer_shim" =>
-    reject "source FnPtr shim body is not a rustc MIR result"
-  | "copy_template" =>
-    reject "source MIR template body has no exact rustc executable result"
-  | _ => reject "unknown body seed kind"
-
-def parseBodySeed (path : String) (pools : Option MIRParser.SharedPools := none) : JsonReader.Parser ParsedBodySeed := do
-  let (value,state) ← (parseBodySeedRaw path).run {pools}
-  pure ⟨value,state.references⟩
-
-private structure CopyTemplateFields where
-  sourceRole : Option CompilerBodyRole := none
-  template : Option MirTemplate.Template := none
-  definitionId : Option Nat := none
-  defPath : Option String := none
-  spanId : Option Nat := none
-  preambleDefSpanId : Option Nat := none
-  injectionPhase : Option (Option Miri.MIR.MirPhase) := none
-  localSources : Option (Array Input.SourceInfo) := none
-  sourceScopes : Option (Array SourceScope) := none
-  backtraces : Option (Array BacktraceSpan) := none
-  sourcePromoted : Option (Option Nat) := none
-
-def parseCopyTemplate (path : String) : JsonReader.Parser CopyTemplateSource := do
-  let fields ← JsonReader.object ({} : CopyTemplateFields) fun fields key => do
-    match key with
-    | "source_role" => pure {fields with sourceRole := some (← compilerBodyRole)}
-    | "template" => pure {fields with template := some (← liftExcept (MirTemplateCodec.decode (← string)))}
-    | "source_def_id" => pure {fields with definitionId := some (← natural)}
-    | "source_promoted" => pure {fields with sourcePromoted := some (← JsonReader.nullable natural)}
-    | "def_path" => pure {fields with defPath := some (← string)}
-    | "span" => pure {fields with spanId := some (← natural)}
-    | "preamble_def_span" => pure {fields with preambleDefSpanId := some (← natural)}
-    | "injection_phase" => pure {fields with injectionPhase := some (← JsonReader.nullable phase)}
-    | "local_sources" => pure {fields with localSources := some (← JsonReader.array sourceInfo)}
-    | "source_scopes" => pure {fields with sourceScopes := some (← JsonReader.array scope)}
-    | "backtrace_spans" => pure {fields with backtraces := some (← JsonReader.arrayIndexed (fun i => backtrace s!"{path}.backtrace_spans[{i}]"))}
-    | _ => JsonReader.fail s!"{path}: unknown generic MIR template field `{key}`"
-  pure ⟨← required fields.template "template",← required fields.definitionId "source_def_id",
-    ← required fields.defPath "def_path",← required fields.spanId "span",
-    ← required fields.preambleDefSpanId "preamble_def_span",← required fields.injectionPhase "injection_phase",
-    ← required fields.localSources "local_sources",← required fields.sourceScopes "source_scopes",
-    ← required fields.backtraces "backtrace_spans",← required fields.sourcePromoted "source_promoted",
-    ← required fields.sourceRole "source_role"⟩
 
 def parseSharedStatement (pools : MIRParser.SharedPools) : JsonReader.Parser MIRParser.SharedStatement := do
   let (value, state) ← statementKind.run {pools := some pools}

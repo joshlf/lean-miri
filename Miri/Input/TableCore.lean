@@ -530,16 +530,6 @@ def parseLayoutFieldOffsets : Parser LayoutFieldOffsets := do
   return .arrayFormula (← required fields.stride "stride_bytes") (← required fields.count "field_count")
 
 private structure parseLayoutFields where
-  patternType : Option Nat := none
-  sequenceType : Option Nat := none
-  pointerType : Option Nat := none
-  pointerDataType : Option Nat := none
-  enumTagType : Option Nat := none
-  structType : Option Nat := none
-  enumType : Option Nat := none
-  unionType : Option Nat := none
-  tupleType : Option Nat := none
-  primitiveRecipe : Option String := none
   «kind» : Option (String) := none
   «field_offsets_bytes» : Option LayoutFieldOffsets := none
   «fields» : Option (Option (FieldShape)) := none
@@ -557,16 +547,9 @@ private structure parseLayoutFields where
 def parseLayout (path : String := "$parseLayout") : Parser (Layout) := do
   let s ← object ({} : parseLayoutFields) fun s key => do
     match key with
-    | "pattern_type" => return {s with patternType := some (← natural)}
-    | "sequence_type" => return {s with sequenceType := some (← natural)}
-    | "enum_tag_type" => return {s with enumTagType := some (← natural)}
-    | "pointer_data_type" => return {s with pointerDataType := some (← natural)}
-    | "pointer_type" => return {s with pointerType := some (← natural)}
-    | "struct_type" => return {s with structType := some (← natural)}
-    | "enum_type" => return {s with enumType := some (← natural)}
-    | "union_type" => return {s with unionType := some (← natural)}
-    | "tuple_type" => return {s with tupleType := some (← natural)}
-    | "primitive_recipe" => return {s with primitiveRecipe := some (← string)}
+    | "pattern_type" | "sequence_type" | "enum_tag_type" | "pointer_data_type"
+    | "pointer_type" | "struct_type" | "enum_type" | "union_type"
+    | "tuple_type" | "primitive_recipe" => fail s!"{path}: layout recipes are unsupported"
     | "kind" => return { s with «kind» := some (← string) }
     | "field_offsets_bytes" => return { s with «field_offsets_bytes» := some (← parseLayoutFieldOffsets) }
     | "fields" => return { s with «fields» := some (← nullable (parseFieldShape)) }
@@ -581,30 +564,6 @@ def parseLayout (path : String := "$parseLayout") : Parser (Layout) := do
     | "largest_niche" => return { s with «largest_niche» := some (← parseNicheLayout) }
     | "randomization_seed" => return { s with «randomization_seed» := some (← natural) }
     | _ => skipValue; pure s
-  let constructors := #[s.primitiveRecipe.isSome, s.tupleType.isSome, s.unionType.isSome,
-    s.structType.isSome, s.enumType.isSome, s.patternType.isSome, s.sequenceType.isSome, s.pointerType.isSome, s.pointerDataType.isSome, s.enumTagType.isSome].filter (fun enabled => enabled)
-  if !constructors.isEmpty then
-    unless constructors.size == 1 do fail s!"{path}: conflicting layout recipe constructors"
-    unless s.kind.isNone && s.field_offsets_bytes.isNone && s.fields.isNone &&
-        s.variants.isNone && s.backend_repr.isNone && s.size_bytes.isNone &&
-        s.abi_align_bytes.isNone && s.unadjusted_abi_align_bytes.isNone &&
-        s.max_repr_align_bytes.isNone && s.repr_c.isNone && s.uninhabited.isNone &&
-        s.largest_niche.isNone && s.randomization_seed.isNone do
-      fail s!"{path}: primitive recipe cannot contain eager layout results"
-    if let some recipe := s.primitiveRecipe then
-      unless ["bool", "char", "i8", "i16", "i32", "i64", "i128", "isize",
-        "u8", "u16", "u32", "u64", "u128", "usize", "f16", "f32", "f64", "f128",
-          "fn_pointer", "raw_pointer", "never"].contains recipe do
-        fail s!"{path}: unknown primitive layout recipe"
-    return {
-      primitiveRecipe := s.primitiveRecipe, tupleType := s.tupleType, unionType := s.unionType, structType := s.structType, enumType := s.enumType, patternType := s.patternType, sequenceType := s.sequenceType,
-      pointerType := s.pointerType, pointerDataType := s.pointerDataType, enumTagType := s.enumTagType, kind := .layout,
-      maxReprAlignBytes := none, reprC := false, uninhabited := false,
-      largestNiche := none, randomizationSeed := 0, sizeBytes := none,
-      abiAlignBytes := none, unadjustedAbiAlignBytes := none,
-      fieldOffsetsBytes := .explicit #[], fields := none, variantsLayout := none,
-      backendRepresentation := none, variantsKind := none, backendReprKind := none,
-      variants := none, backendRepr := none }
   unless s.kind.isNone || s.kind == some "layout" do fail s!"{path}: unrecognized LayoutKind"
   let offsets := (← required s.«field_offsets_bytes» "field_offsets_bytes")
   let fields := s.fields.join

@@ -1,11 +1,8 @@
 import Miri.Input.RuntimeMetadata
 import Miri.Input.GenericInstantiationWorld
 import Miri.Input.InstanceArena
-import Miri.Input.BodyArena
 
-/-! One execution-owned type/constant universe. Runtime arrays use the same
-constructor interner as generic MIR, ADTs and function items. Layout results are
-computed on demand and are never retained as a second canonical type table. -/
+/-! One execution-owned type/constant universe. -/
 namespace Miri.Input.RuntimeArrayTypes
 open Lean Miri.ABI TypeArena
 inductive Element where
@@ -19,26 +16,19 @@ structure World where
   metadata : RuntimeMetadata
   arena : TypeArena.World
   instances : InstanceArena.Store
-  bodies : BodyArena.Store
 inductive Error where
   | metadata (reason : String)
   | targetUsizeOverflow (count : UInt64)
-  | sizeOverflow
   | missingRuntimeType (id : TypeId)
-  | fieldOutOfBounds (index count : Nat)
   deriving DecidableEq, Repr
 private def lift (result : Except String α) : Except Error α := result.mapError Error.metadata
-
-def calculate (target : RuntimeTargetDataLayout) (element : LayoutData)
-    (count : UInt64) : Except Error LayoutData :=
-  (PrimitiveLayout.arrayLike target element count).mapError (fun _ => .sizeOverflow)
 
 def create (runtime : RuntimeMetadata) : Except Error World := do
   let some checked := runtime.checkedMaterial
     | throw (.metadata "checked source material prefix is absent")
   let arena := TypeArena.World.ofCheckedMaterial checked
   let instances ← lift (InstanceArena.Store.ofSource arena runtime.source.instances)
-  pure {metadata := runtime, arena, instances, bodies := BodyArena.Store.ofSource runtime.source.bodies}
+  pure {metadata := runtime, arena, instances}
 
 /-- Every stateful source query commits its returned constructor universe. -/
 def perform (world : World) (action : TypeArena.WorldM α) : Except Error (α × World) := do
@@ -64,28 +54,6 @@ def internInstance (kind : Miri.Interpreter.CallInstanceKind)
   let (id,instances) ← match result with
     | .ok value => pure value | .error error => throw error
   set {world with instances}
-  pure id
-
-def internBody (templateId instanceId : Nat) (promoted : Option Nat)
-    (role : CompilerBodyRole := .runtime) : CompilerM BodyId := do
-  let world ← get
-  let result := do
-    let key ← BodyArena.Key.create world.arena world.instances
-      world.metadata.source.mirTemplates templateId instanceId promoted role
-    world.bodies.intern world.arena world.instances world.metadata.source.mirTemplates world.metadata.source.bodies key
-  let (id,bodies) ← match result with
-    | .ok value => pure value | .error error => throw error
-  set {world with bodies}
-  pure id
-
-def internFnPointerShim (source : FnPointerShimRef) (instanceId : InstanceId) : CompilerM BodyId := do
-  let world ← get
-  let result := do
-    let key ← BodyArena.ShimKey.create world.arena world.instances world.metadata.source.instances source instanceId
-    world.bodies.internShim world.arena world.instances world.metadata.source.instances world.metadata.source.bodies key
-  let (id,bodies) ← match result with
-    | .ok value => pure value | .error error => throw error
-  set {world with bodies}
   pure id
 
 def performCompiler (world : World) (action : CompilerM α) : Except Error (α × World) :=

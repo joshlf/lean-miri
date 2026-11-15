@@ -1,4 +1,3 @@
-import Miri.Input.TraitSelection.Codec
 import Miri.Input.Model
 import Miri.Input.DecoderValues
 import Miri.Input.ValidateTables
@@ -9,12 +8,11 @@ import Miri.Input.SharedPools
 import Miri.Input.CoroutineCoverage
 import Miri.Input.RuntimeMetadata
 import Miri.Input.SourceMir
-import Miri.Input.CtfeMirSourceCodec
 
 namespace Miri.Input
 open Lean DecoderValues
 
-private def validateSelectedScope (scope : SelectedScope) (_bodies : Array BodySeed)
+private def validateSelectedScope (scope : SelectedScope) (_bodies : Array Body)
     (instances : Array InstanceNode) (bodyRoots : Array BodyRoot) : Except String Unit := do
   if scope.kind != "rooted_structural_closure" then
     throw ("$.selected_scope.kind" ++ ": " ++ s!"unrecognized selected-scope kind `{scope.kind}`")
@@ -103,9 +101,6 @@ private def parseProducer : JsonReader.Parser (Producer × Catalog.ProducerSetti
 /-- The completed import plus numeric reference bounds that require all tables.
 MIR and catalogs already have their final representation. -/
 private structure ParsedDocument where
-  initialSnapshot : Option Json := none
-  initialCtfeRoots : Option (Array Json) := none
-  initialSelectedCache : Option (Array Json) := none
   value : ImportDocument
   schema : String
   schemaVersion : Nat
@@ -272,10 +267,6 @@ private def finishWorld (nodes : Array AllocationNode) (hexByGraph : Array (Opti
     rawPool, dedupCatalog, pending.completeKeyFamilies, pending.nonExhaustiveKeyFamilies⟩
 
 private structure DocumentFields where
-  initialSnapshot : Option Json := none
-  initialCtfeRoots : Option (Array Json) := none
-  initialSelectedCache : Option (Array Json) := none
-  traitProgram : Option Json := none
   schema : Option (String) := none
   schemaVersion : Option (Nat) := none
   producer : Option (Producer × Catalog.ProducerSettings) := none
@@ -293,9 +284,7 @@ private structure DocumentFields where
   allocations : Option (Array (Array AllocationNode)) := none
   instances : Option (Array InstanceNode) := none
   compilerAbiLayoutSchema : Option (String) := none
-  bodies : Option (Array BodySeed) := none
-  mirTemplates : Option (Array CopyTemplateSource) := none
-  ctfeScalarSources : Option (Array CtfeMirSource.Source) := none
+  bodies : Option (Array Body) := none
   bodyReferences : Array DecodeMIR.References := #[]
   coroutineCoverage : Option CoroutineCoverageCodec.Parsed := none
   bodyRoots : Option (Array BodyRoot) := none
@@ -304,38 +293,21 @@ private structure DocumentFields where
   runtimeTargetDataLayout : Option TargetDataLayoutEvidence := none
   queries : CatalogDecoder.QueryFields := {}
 
-private inductive ProfileFields where
-  | reject
-  | initial
-
-private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) : JsonReader.Parser ParsedDocument := do
+private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser ParsedDocument := do
   let d ← JsonReader.object ({} : DocumentFields) fun d key => do
     match key with
-    | "compiler_initial_global_snapshot" =>
-      match policy with
-      | .reject => JsonReader.fail "initial compiler allocation/CTFE profiles require the dedicated initial-profile decoder; legacy decoding is unsupported"
-      | .initial => do
-        let snapshot ← Lean.Json.Parser.anyCore
-        let _ ← JsonReader.liftExcept snapshot.getObj?
-        return {d with initialSnapshot := some snapshot}
-    | "compiler_initial_ctfe_roots" =>
-      match policy with
-      | .reject => JsonReader.fail "initial compiler allocation/CTFE profiles require the dedicated initial-profile decoder; legacy decoding is unsupported"
-      | .initial => return {d with initialCtfeRoots := some (← JsonReader.array Lean.Json.Parser.anyCore)}
+    | "compiler_initial_global_snapshot" | "compiler_initial_ctfe_roots"
     | "compiler_initial_selected_query_cache" =>
-      match policy with
-      | .reject => JsonReader.fail "initial compiler query memo requires the dedicated cache-aware profile decoder; legacy decoding is unsupported"
-      | .initial => return {d with initialSelectedCache := some (← JsonReader.array Lean.Json.Parser.anyCore)}
+      JsonReader.fail "initial compiler query profiles are unsupported"
     | "schema" => return {d with schema := some (← JsonReader.string)}
     | "schema_version" => do
       let version ← JsonReader.natural
-      -- Reject a known obsolete header before interpreting later body fields
-      -- under the BodySeed contract. Earlier malformed fields still take
+      -- Reject a known obsolete header before interpreting later body fields.
+      -- Earlier malformed fields still take
       -- precedence; valid current inputs retain arbitrary root-field order.
       unless version == expectedSchemaVersion do
         JsonReader.fail "$.schema_version: unsupported schema version"
       return {d with schemaVersion := some version}
-    | "compiler_trait_program" => return {d with traitProgram := some (← Lean.Json.Parser.anyCore)}
     | "producer" => return {d with producer := some (← parseProducer)}
     | "predicates" => return {d with predicates := some (← parsePredicates)}
     | "compiler_predicate_queries" => return {d with compilerPredicates := some (← JsonReader.array decodeCompilerPredicateEvidence)}
@@ -357,25 +329,13 @@ private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) :
     | "instances" => return {d with instances := some (← parseInstances)}
     | "compiler_abi_layout_schema" => return {d with compilerAbiLayoutSchema := some (← JsonReader.string)}
     | "bodies" =>
-      let bodies ← JsonReader.arrayIndexed (fun index => DecodeMIR.parseBodySeed s!"$.bodies[{index}]" (some pools.mir))
+      let bodies ← JsonReader.arrayIndexed (fun index => DecodeMIR.parseBody s!"$.bodies[{index}]" (some pools.mir))
       return {d with bodies := some (bodies.map (·.value)), bodyReferences := bodies.map (·.references)}
-    | "ctfe_scalar_sources" =>
-      let sources ← JsonReader.arrayIndexed (fun _ => do JsonReader.liftExcept (CtfeMirSourceCodec.read (← Lean.Json.Parser.anyCore)))
-      unless sources.isEmpty do JsonReader.fail "ctfe_scalar_sources: source constant evaluator is not a rustc result"
-      return {d with ctfeScalarSources := some sources}
-    | "mir_templates" =>
-      let sources ← JsonReader.arrayIndexed (fun index => DecodeMIR.parseCopyTemplate s!"$.mir_templates[{index}]")
-      unless sources.isEmpty do JsonReader.fail "mir_templates: source executable body is not a rustc result"
-      return {d with mirTemplates := some sources}
+    | "ctfe_scalar_sources" | "mir_templates" =>
+      JsonReader.fail s!"{key}: source compiler answers are unsupported"
     | "compiler_coroutine_coverage" => return {d with coroutineCoverage := some (← CoroutineCoverageCodec.parse pools.mir)}
     | "body_roots" => return {d with bodyRoots := some (← JsonReader.arrayIndexed (fun index => parseBodyRoot s!"$.body_roots[{index}]"))}
-    | "compiler_alloc_id_world" =>
-      match policy with
-      | .reject => return {d with compilerAllocIdWorld := ← JsonReader.nullable (parseCompilerAllocIdWorld)}
-      | .initial => do
-        let legacy ← JsonReader.nullable Lean.Json.Parser.anyCore
-        if legacy.isSome then JsonReader.fail "initial and prepared compiler allocator profiles cannot coexist"
-        return d
+    | "compiler_alloc_id_world" => return {d with compilerAllocIdWorld := ← JsonReader.nullable (parseCompilerAllocIdWorld)}
     | "selected_scope" => return {d with selectedScope := ← JsonReader.nullable (parseSelectedScope "$.selected_scope")}
     | "runtime_target_data_layout" => return {d with runtimeTargetDataLayout := ← JsonReader.nullable (CatalogDecoder.targetDataLayout)}
     | _ =>
@@ -401,13 +361,10 @@ private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) :
   let images := byteImages.map (·.1)
   let allocations ← JsonReader.liftExcept (finishAllocations images groups pendingNodes)
   let seeds ← JsonReader.required d.bodies "bodies"
-  let bodies ← seeds.mapM fun seed => do
-    match seed with
-    | .copyTemplate _ | .noopDrop _ | .fnPointerShim _ => pure seed
-    | .material body =>
-      let values ← JsonReader.liftExcept (finishBodies images #[body])
-      let some value := values[0]? | JsonReader.fail "material body disappeared during allocation resolution"
-      pure (BodySeed.material value)
+  let bodies ← seeds.mapM fun body => do
+    let values ← JsonReader.liftExcept (finishBodies images #[body])
+    let some value := values[0]? | JsonReader.fail "body disappeared during allocation resolution"
+    pure value
   let compilerAllocIdWorld ← JsonReader.liftExcept (d.compilerAllocIdWorld.mapM (finishWorld allocations hexByGraph))
   let coroutineCoverage ← d.coroutineCoverage.mapM fun parsed => do
     let auxiliaryBodies ← parsed.value.auxiliaryBodies.mapM fun row => do
@@ -416,21 +373,8 @@ private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) :
       pure {row with body}
     pure {parsed.value with auxiliaryBodies}
   let definitions ← JsonReader.required d.definitions "definitions"
-  let rawTraitProgram ← JsonReader.required d.traitProgram "compiler_trait_program"
-  -- Invocation-local source identity index; catalog size must not multiply
-  -- canonical definition lookup work. This is never shared across executions.
-  let mut sourceTemplates : Std.HashMap (Nat × Nat) (Option GenericSubstitution.DefinitionTemplate) := {}
-  for definition in definitions do
-    let key := (definition.crateIndex, definition.index)
-    if sourceTemplates.contains key then
-      JsonReader.fail "trait RHS source definition reference ambiguous"
-    sourceTemplates := sourceTemplates.insert key definition.genericTemplate
-  let traitProgram ← JsonReader.liftExcept (TraitSelection.Codec.readProgram (fun identity => do
-    let some expression := sourceTemplates[(identity.crateIndex, identity.index)]?
-      | throw "trait RHS source definition reference missing"
-    pure expression) rawTraitProgram)
   let value : ImportDocument := {
-    producer, producerSettings, traitProgram
+    producer, producerSettings
     predicates := ← JsonReader.required d.predicates "predicates"
     compilerPredicates := ← JsonReader.required d.compilerPredicates "compiler_predicate_queries"
     definitions := definitions
@@ -445,8 +389,6 @@ private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) :
     instances := ← JsonReader.required d.instances "instances"
     compilerAbiLayoutSchema := some compilerAbiLayoutSchema
     bodies := bodies
-    mirTemplates := ← JsonReader.required d.mirTemplates "mir_templates"
-    ctfeScalarSources := ← JsonReader.required d.ctfeScalarSources "ctfe_scalar_sources"
     coroutineCoverage := coroutineCoverage
     bodyRoots := ← JsonReader.required d.bodyRoots "body_roots"
     compilerAllocIdWorld := compilerAllocIdWorld
@@ -460,9 +402,6 @@ private def parseDocumentFields (pools : SharedPools) (policy : ProfileFields) :
     schemaVersion := schemaVersion
     bodyReferences := d.bodyReferences ++ (d.coroutineCoverage.map (·.references)).getD #[]
     abiArguments := pools.abiArguments
-    initialSnapshot := d.initialSnapshot
-    initialCtfeRoots := d.initialCtfeRoots
-    initialSelectedCache := d.initialSelectedCache
   }
 
 private def validateParsedDocument (parsed : ParsedDocument) (profile : Options) : Except String ImportDocument := do
@@ -506,10 +445,6 @@ private def validateParsedDocument (parsed : ParsedDocument) (profile : Options)
           throw "$.definitions: stable crate identity belongs to multiple physical crates"
       crateIdentities := crateIdentities.insert definition.crateIndex path.stableCrateId
       identityCrates := identityCrates.insert path.stableCrateId.toNat definition.crateIndex
-    if let some material := definition.adtDrop then
-      if let some destructor := material.destructor then
-        unless destructor < definitions.size do
-          throw "$.definitions: ADT destructor definition identity out of bounds"
   if types.isEmpty then throw "$.types: input has no type graph; refusing an empty import"
   if bodies.isEmpty then throw "$.bodies: input has no MIR bodies; refusing an empty import"
   let mut typeConstKeys : Array (String × Bool × Nat × Array MIR.GenericArg) := #[]
@@ -571,8 +506,6 @@ private def validateParsedDocument (parsed : ParsedDocument) (profile : Options)
   | none => pure ()
   profileit "decoder.validate_catalog_queries" profile fun _ =>
     CatalogDecoder.validateQueries bodyContext d.queries
-  CtfeMirSource.validateCatalogue spans.size (fun identity => definitions.any fun definition =>
-    definition.crateIndex == identity.crateIndex && definition.index == identity.index) d.ctfeScalarSources
   let core := d
   profileit "decoder.validate_cross_table_references" profile fun _ => validateParsedTables core
   for (argument, index) in parsed.abiArguments.toList.zipIdx do
@@ -586,36 +519,13 @@ private def validateParsedDocument (parsed : ParsedDocument) (profile : Options)
 before returning the final import. Completion bookkeeping stays internal. -/
 def parseDocument (profile : Options := {}) : JsonReader.Parser ImportDocument := do
   let pools ← readSharedPools
-  let parsed ← parseDocumentFields pools .reject
+  let parsed ← parseDocumentFields pools
   JsonReader.liftExcept (profileit "decoder.validate_forward_references" profile fun _ =>
     validateParsedDocument parsed profile)
 
 def decodeJsonProfiled (text : String) (profile : Options) : Except String ExecutionInput := do
   let document ← profileit "decoder.parse" profile fun _ => JsonReader.run (parseDocument profile) text
   pure ⟨document⟩
-
-/-- Dedicated profile decoder: shares the typed streaming base parser, captures
-only owned initial descriptors, and never permits a missing/mixed profile. -/
-def decodeInitialQueryProfiled (text : String) (profile : Options) :
-    Except String (ExecutionInput × Json × Array Json × Option (Array Json)) := do
-  let parsed ← JsonReader.run (do
-    let pools ← readSharedPools
-    parseDocumentFields pools .initial) text
-  let some snapshot := parsed.initialSnapshot
-    | throw "initial CTFE roots require an explicit complete initial allocation snapshot"
-  let _ ← snapshot.getObj?
-  if parsed.value.compilerAllocIdWorld.isSome then
-    throw "initial and prepared compiler allocator profiles cannot coexist"
-  let document ← profileit "decoder.validate_forward_references" profile fun _ =>
-    validateParsedDocument parsed profile
-  pure (⟨document⟩,snapshot,parsed.initialCtfeRoots.getD #[],parsed.initialSelectedCache)
-
-/-- The allocation-only API never silently drops a query-memo capability. -/
-def decodeInitialProfiled (text : String) (profile : Options) :
-    Except String (ExecutionInput × Json × Array Json) := do
-  let (input,snapshot,roots,selected) ← decodeInitialQueryProfiled text profile
-  if selected.isSome then throw "selected initial compiler query memo requires the cache-aware decoder"
-  pure (input,snapshot,roots)
 
 def decodeJson (text : String) : Except String ExecutionInput := decodeJsonProfiled text {}
 

@@ -1,6 +1,6 @@
 import Miri.Input.AdtDeclaration
 import Miri.Input.ReprMaterialCodec
-import Miri.Input.TraitSelection.Codec
+import Miri.Input.GenericMaterialCodec
 
 namespace Miri.Input.AdtDeclarationCodec
 open GenericSubstitution AdtDeclaration
