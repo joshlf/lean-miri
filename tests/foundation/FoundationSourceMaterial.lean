@@ -22,7 +22,7 @@ def main (paths : List String) : IO Unit := do
     for declaration in material.declarations do
       let slots ← checked (Input.SourceDeclarations.fullParameters material.genericLayers declaration.definition)
       check (slots == declaration.parameters) "typed source full generic slots differ"
-    check (material.genericMir == .unsupported && material.typeExpressions == .unsupported &&
+    check (material.genericMir == .unsupported && material.physical.isNone &&
       material.constraints == .unsupported) "unrepresented typed source material claimed available"
     rejects ({material with target := {material.target with triple := ""}}.validate)
     rejects ({material with genericLayers := #[]}.validate)

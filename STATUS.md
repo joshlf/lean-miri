@@ -72,22 +72,23 @@ closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
 [foundation-architecture](docs/foundation-architecture.md).
 
-The normal `tools/run.sh` route now decodes foundation material into a checked
-`ImportDocument` and passes it through the existing lowerer, preparation,
-runner and finalizer. A fresh custom `#[lang=start]` entry completes this route
-and exits with its actual `argc` result. The runner now seeds one persistent,
-evaluation-local source compiler World and uses the exported Rust source path
-as `argv0`. Its normal MIR body provider reads the current World; a fresh
-three-frame and repeated-call check passes through the fixed call evaluator.
-Finite linked declaration source
+The normal `tools/run.sh` route now carries a source-header-derived,
+evaluation-local compiler World through the existing lowerer, preparation,
+runner and finalizer. It keeps typed target, declaration and lexical generic
+material and uses the exported Rust source path as `argv0`. Original FnDef
+calls resolve from that World rather than per-site precomputed answers; the
+three-frame and repeated-call checks pass through the fixed evaluator even
+with absent or forged call-answer rows. Finite linked declaration source
 matches independent exported-candidate order and attributes for 231 custom
-entry and 244 ordinary std candidates. The normal foundation decoder still
-routes every input through the restricted two-body custom-entry assembler;
-a fresh ordinary std main stops there at `unsupported primitive compiler facts`
-before evaluation. General source material must remain in the World and supply
-actual call, ABI, entry, type and panic queries on demand. Remaining call
-resolution and ABI consumers still read precomputed answers from Prepared.
-Neither source inventories nor the custom-entry run establish std execution.
+entry and 244 ordinary std candidates. Fresh custom and std inputs now pass
+decoding and enter the interpreter. At the last independently run `c78f097a`
+boundary, custom stops because an executable source body has not yet been
+derived, and std stops at a missing link-section answer. Subsequent commits
+retain typed link-section declarations and foreign callable headers;
+unsupported initializer data remains unavailable. Demand-time typed MIR body
+installation, broader ABI/type/const queries, lifecycle hooks and std startup
+are still being integrated. These runs do not establish successful custom or
+std execution through this route.
 
 For ordinary std main, the external `std::rt::lang_start`, its closure template,
 and `std::rt::lang_start_internal` are available as finite material. The latter

@@ -107,6 +107,7 @@ structure Definition where
   kind : String
   path : String
   adt : Option Adt
+  traitIsAuto : Option Bool := none
   deriving Repr, DecidableEq
 
 structure MetadataStruct where

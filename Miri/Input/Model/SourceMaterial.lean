@@ -1,4 +1,6 @@
 import Miri.Input.Model.SourceDeclarations
+import Miri.Input.Model.SourceTypes
+import Miri.Input.SourceTypeQueries
 
 /-! Evaluation-local typed source carrier. This first slice retains declaration
 identity, target and lexical generic slots. No JSON value is retained. Generic
@@ -36,7 +38,7 @@ structure SourceMaterial where
   /-- None is unknown coverage; Some retains the complete ordered declaration list. -/
   linkSections : Option (Array SourceMaterial.LinkSectionDeclaration) := none
   genericMir : SourceMaterial.Unavailable := .unsupported
-  typeExpressions : SourceMaterial.Unavailable := .unsupported
+  physical : Option SourceTypes.Material := none
   constraints : SourceMaterial.Unavailable := .unsupported
   deriving Repr, DecidableEq
 
@@ -51,6 +53,9 @@ def validate (material : Input.SourceMaterial) : Except String Unit := do
   if let some evidence := target.runtimeDataLayout then
     unless evidence.llvmDataLayout == target.dataLayout && evidence.pointerWidthBits == target.pointerSizeBits &&
         evidence.endian == target.endian do throw "typed source target evidence disagrees with declaration"
+  if let some physical := material.physical then
+    physical.validate
+    physical.validateTarget target.pointerSizeBits
   let mut seen : Array DefinitionId := #[]
   for declaration in material.declarations do
     unless declaration.definition.crateIndex < 2^32 && declaration.definition.index < 2^32 &&
