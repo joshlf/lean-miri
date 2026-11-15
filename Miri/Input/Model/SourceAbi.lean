@@ -113,6 +113,7 @@ structure Material where
   panicInDropUnwinds : Bool
   traits : Array TraitDeclaration := #[]
   callables : Array CallableDeclaration := #[]
+  optimizationDisabled : Bool := false
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi

@@ -3,6 +3,7 @@ import Miri.Input.Model.SourceAbi
 import Miri.Input.SourceCompilerTypes
 import Miri.Input.SourceTypeQueries
 import Miri.Input.SourcePhysical
+import Miri.Input.SourceSignatureTypes
 
 /-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
 MIR execution, compiler process, query catalog or private pool participates.
@@ -184,12 +185,15 @@ where
     | .functionPointer .. => pure ()
     | _ => throw "typed ABI array padding/union/nominal initialization unsupported"
 
-private def passMode (world : World) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
+private def passMode (world : World) (physical : SourceTypes.Material) (optimizationDisabled : Bool)
+    (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
   let some node := world.canonical.types[id]? | throw "typed ABI physical type absent"
   let some layout := world.canonical.layouts[node.layoutId]? | throw "typed ABI physical layout absent"
   let some bytes := layout.sizeBytes | throw "typed ABI unsized layout unsupported"
+  if layout.backendRepresentation.bind (·.sized) == some false then
+    throw "typed ABI unsized value pass mode unsupported"
   match type with
-  | .nominal .. | .dynamicObject .. | .closure .. | .patternNotNull .. => throw "typed ABI nominal/dyn/constrained type unsupported"
+  | .dynamicObject .. | .closure .. | .patternNotNull .. => throw "typed ABI dyn/closure/constrained type unsupported"
   | _ => pure ()
   let empty : AbiPassMode := ⟨.ignore,#[],none,none,none,none⟩
   if bytes == 0 then return empty
@@ -198,11 +202,42 @@ private def passMode (world : World) (type : SourceTypes.Concrete) (id : Nat) : 
   | .primitive "bool" "" => return {empty with kind := .direct,attributes := #[attrs 128 .zeroExtend]}
   | .primitive "int" _ | .primitive "uint" _ | .primitive "char" "" =>
     return {empty with kind := .direct,attributes := #[attrs 128]}
-  | .pointer tag _ =>
-    unless tag == "raw_pointer_const" || tag == "raw_pointer_mut" do throw "typed ABI reference attributes unsupported"
+  | .nominal .. =>
+    let some backend := layout.backendRepresentation | throw "typed ABI nominal backend unavailable"
+    let some scalar := backend.scalar | throw "typed ABI nominal scalar unavailable"
+    unless backend.kind == .scalar && scalar.kind == .initialized && scalar.primitive.kind == .integer &&
+        scalar.validRange.isSome do throw "typed ABI nominal noninteger scalar unsupported"
+    let bool := scalar.primitive.sizeBytes == 1 && scalar.primitive.signed == some false && scalar.validRange == some (0,1)
+    return {empty with kind := .direct,attributes := #[attrs 128 (if bool then .zeroExtend else .none)]}
+  | .pointer tag pointee =>
     let some backend := layout.backendRepresentation | throw "typed ABI pointer backend unavailable"
-    unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI wide raw pointer unsupported"
-    return {empty with kind := .direct,attributes := #[attrs 128]}
+    if tag == "raw_pointer_const" || tag == "raw_pointer_mut" then
+      unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI wide raw pointer unsupported"
+      return {empty with kind := .direct,attributes := #[attrs 128]}
+    unless #["reference_static_const","reference_static_mut","reference_erased_const","reference_erased_mut"].contains tag &&
+        optimizationDisabled do throw "typed ABI reference requires source OptLevel::No"
+    let .reference pointeeId _ _ := node.shape | throw "typed ABI reference canonical shape unavailable"
+    let some pointeeNode := world.canonical.types[pointeeId]? | throw "typed ABI pointee type unavailable"
+    let some pointeeLayout := world.canonical.layouts[pointeeNode.layoutId]? | throw "typed ABI pointee layout unavailable"
+    let some align := pointeeLayout.abiAlignBytes | throw "typed ABI pointee alignment unavailable"
+    -- Pinned layout.rs skips Freeze/Unpin at OptLevel::No. Both shared and
+    -- mutable references then have size0 and no alias/read-only/writable flags;
+    -- initialized pointer validity still supplies NoUndef|NonNull.
+    let data : AbiAttributes := ⟨144,0,if align > 1 then some align else none,.none⟩
+    if backend.kind == .scalar then
+      return {empty with kind := .direct,attributes := #[data]}
+    unless backend.kind == .scalarPair do throw "typed ABI reference backend unsupported"
+    let metadata ← match pointee with
+      | .primitive "str" "" => pure (attrs 128)
+      | .dynamicObject _ => do
+        -- The vtable scalar's source field type is &'static [usize; N]. Its
+        -- pointee size is zero at optNo, and its alignment is usize alignment
+        -- for every method count. No vtable identity or entry is invented.
+        let row ← SourcePhysical.calculate physical (← SourcePhysical.target world) (.primitive "uint" "usize")
+        let some align := row.abiAlignBytes | throw "typed ABI vtable pointee alignment unavailable"
+        pure (AbiAttributes.mk 144 0 (if align > 1 then some align else none) .none)
+      | _ => throw "typed ABI reference metadata unsupported"
+    return {empty with kind := .pair,attributes := #[data,metadata]}
   | .functionPointer .. =>
     let some backend := layout.backendRepresentation | throw "typed ABI function pointer backend unavailable"
     unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI function pointer scalar unavailable"
@@ -269,22 +304,24 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
     owner := layer.parent
   checkClauses source material physical types constants key.definition
   let signature := function.signature
-  unless signature.abi == .Rust && !signature.cVariadic && signature.boundVariables.isEmpty do
+  unless signature.abi == .Rust && !signature.cVariadic do
     throw "typed ABI convention/binder/variadic source unsupported"
+  let (updated,_) ← SourceSignatureTypes.boundVariables world signature.boundVariables
+  world := updated
   let attrs := function.attributes
   unless !attrs.trackCaller && !attrs.foreignItem && !attrs.dropGlue do throw "typed ABI function attribute adjustment unsupported"
-  let output ← SourceTypes.instantiate physical types constants signature.output
+  let output ← SourceTypes.instantiate physical types constants signature.output signature.boundVariables
   let (updated,result) ← SourcePhysical.intern world output
   world := updated
   let some resultNode := world.canonical.types[result]? | throw "typed ABI result type absent"
-  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world output result⟩
+  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world physical material.optimizationDisabled output result⟩
   let mut inputs := #[]
   for sourceType in signature.inputs do
-    let type ← SourceTypes.instantiate physical types constants sourceType
+    let type ← SourceTypes.instantiate physical types constants sourceType signature.boundVariables
     let (updated,id) ← SourcePhysical.intern world type
     world := updated
     let some node := world.canonical.types[id]? | throw "typed ABI input type absent"
-    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world type id))
+    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world physical material.optimizationDisabled type id))
   let abi : FunctionAbi := {
     arguments := inputs,returnValue := result,callingConvention := ⟨.rust,none,none,none⟩,
     canUnwind := !attrs.neverUnwind && material.panicUnwinds,cVariadic := false,fixedCount := inputs.size }

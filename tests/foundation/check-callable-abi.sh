@@ -8,7 +8,8 @@ flock /tmp/lean-miri-lake-build.lock env ELAN_HOME="$ROOT/.elan" \
 bash tools/export-mir.sh --output "$TASK_DIR/source.json" --foundation --root main \
   --root std::rt::lang_start --root 'std::rt::lang_start::{closure#0}' \
   --root std::rt::lang_start_internal \
-  --foundation-signature-root std::sys::backtrace::__rust_begin_short_backtrace -- \
+  --foundation-signature-root std::sys::backtrace::__rust_begin_short_backtrace \
+  --foundation-signature-root std::process::ExitCode::to_i32 -- \
   tests/foundation/fixtures/std-main.rs --crate-name foundation_std_main
 bash tools/export-mir.sh --output "$TASK_DIR/compiler.json" --root main -- \
   tests/foundation/fixtures/std-main.rs --crate-name foundation_std_main
@@ -29,6 +30,22 @@ assert compiler['abi_arguments'][abi['return']]['type']==unit
 assert [compiler['abi_arguments'][a]['type'] for a in abi['arguments']]==[arguments[0]['value']]
 abi=dict(abi,return_mode=compiler['abi_arguments'][abi['return']]['mode'],argument_modes=[compiler['abi_arguments'][a]['mode'] for a in abi['arguments']])
 (out/'oracle.json').write_text(json.dumps(abi))
+internal=[i for i in compiler['instances'] if i['def_path']=='std::rt::lang_start_internal']
+assert len(internal)==1 and not internal[0]['generic_args']
+queries=[q for q in compiler['compiler_instance_abis'] if q['instance_id']==internal[0]['instance_id'] and not q['extra_argument_types']]
+assert len(queries)==1
+abi=compiler['fn_abis'][queries[0]['abi_query']]
+def argument(id):
+ row=compiler['abi_arguments'][id]
+ return {'mode':row['mode'],'layout':compiler['layout_values'][compiler['layouts'][row['layout']]]}
+reference=dict(abi,return_argument=argument(abi['return']),arguments=[argument(a) for a in abi['arguments']])
+inherent=[i for i in compiler['instances'] if i['def_path']=='std::process::ExitCode::to_i32']
+assert len(inherent)==1 and not inherent[0]['generic_args']
+queries=[q for q in compiler['compiler_instance_abis'] if q['instance_id']==inherent[0]['instance_id'] and not q['extra_argument_types']]
+assert len(queries)==1
+method=compiler['fn_abis'][queries[0]['abi_query']]
+reference['inherent']={'return_argument':argument(method['return']),'arguments':[argument(a) for a in method['arguments']]}
+(out/'reference-oracle.json').write_text(json.dumps(reference))
 # Keep the independently extracted evidence, not the full compiler closure.
 (out/'compiler.json').unlink()
 source=json.loads((out/'source.json').read_text())
@@ -45,6 +62,9 @@ PY
 flock /tmp/lean-miri-lake-build.lock env ELAN_HOME="$ROOT/.elan" \
   "$ROOT/.elan/bin/lake" env lean --run tests/foundation/FoundationCallableAbi.lean \
   "$TASK_DIR/source.json" "$TASK_DIR/oracle.json" "$TASK_DIR"/malformed-*.json
+flock /tmp/lean-miri-lake-build.lock env ELAN_HOME="$ROOT/.elan" \
+  "$ROOT/.elan/bin/lake" env lean --run tests/foundation/FoundationReferenceAbi.lean \
+  "$TASK_DIR/source.json" "$TASK_DIR/reference-oracle.json"
 RUSTC="$ROOT/.rustup/toolchains/miri-exporter-8144389c895d/bin/rustc"
 export LD_LIBRARY_PATH="$ROOT/.rustup/toolchains/miri-exporter-8144389c895d/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 for mode in safe unsafe foreign inputs output; do

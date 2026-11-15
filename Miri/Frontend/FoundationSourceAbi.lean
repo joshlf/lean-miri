@@ -219,5 +219,5 @@ def material (document : Document) : Except String Material := do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,(← compilation.getObjValAs? String "opt_level") == "No"⟩
 end Miri.Frontend.Foundation.SourceAbiParser
