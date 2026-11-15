@@ -67,8 +67,9 @@ private def phase (j : Json) : Except String MIR.MirPhase := do
   | "optimized" => return .Runtime .Optimized
   | _ => throw "foundation body injection phase is unsupported"
 
-/-- Relocate supported whole-local Copy/Move assignments and Return into a
-BodyCore. Metadata and instructions are read afresh from the prepared item,
+/-- Relocate supported syntax and checked projected-place facts into BodyCore.
+Rvalue physical IDs come only from these bindings; unresolved source/upvar joins
+remain errors. Metadata and instructions are read afresh from the prepared item,
 so a caller cannot smuggle an arbitrary mutated candidate into this boundary.
 This is a partial join, not a whole-document compiler-evidence validator. -/
 def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
@@ -76,9 +77,23 @@ def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
       fun _ => .error "foundation scalar constant query is unavailable")
     (callTerminator : Nat → Json → Json → Except String MIR.TerminatorKind :=
       fun _ _ _ => .error "foundation call query is unavailable")
-    (callEvidence : Array (Option Input.CallResolutionEvidence) := #[]) :
+    (callEvidence : Array (Option Input.CallResolutionEvidence) := #[])
+    (rvalueJoins : RvalueSourceJoins := {}) :
     Except String Input.BodyCore := do
-  let candidate ← lowerPreparedMIR prepared constantOperand callTerminator
+  let physicalType (type : ConcreteType) : Except String Nat := do
+    let entries := bindings.types.filter (fun entry => sameConcrete 1024 entry.concrete type)
+    unless entries.size == 1 do throw "foundation body missing or duplicate physical type binding"
+    let some entry := entries[0]? | throw "foundation body physical type binding absent"
+    unless bindings.physicalTypeIds.contains entry.typeId do throw "foundation body physical type is not in document"
+    return entry.typeId
+  let checkedConstant (source : Json) : Except String (MIR.ConstOperand × ConcreteType) := do
+    let (constant, type) ← constantOperand source
+    let .Val _ typeId := constant.value
+    unless typeId == (← physicalType type) && constant.span.id < bindings.spans.size do
+      throw "foundation constant type/span physical join mismatch"
+    return (constant, type)
+  let joins := { rvalueJoins with physicalType }
+  let candidate ← lowerPreparedMIR prepared checkedConstant callTerminator joins
   let callEvidence := if callEvidence.isEmpty then Array.replicate candidate.body.basicBlocks.size none
     else callEvidence
   unless callEvidence.size == candidate.body.basicBlocks.size do
@@ -166,6 +181,17 @@ def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
     blocks := blocks.push { block with
       statements := statements
       terminator := { block.terminator with sourceInfo := ⟨⟨info.spanId⟩, info.scope⟩ } }
+  let mut placeFacts := (localIds.toList.zipIdx.map fun (typeId, index) =>
+    { place := ⟨index, #[]⟩, typeId, projectionTypes := #[] } : List Input.PlaceFact).toArray
+  for projected in candidate.projectedPlaces do
+    let typeId ← physicalType projected.type
+    let projectionTypes ← projected.projectionTypes.mapM physicalType
+    unless projectionTypes.size == projected.place.projection.size do
+      throw "foundation projected place type arity mismatch"
+    if let some prior := placeFacts.find? (·.place == projected.place) then
+      unless prior.typeId == typeId && prior.projectionTypes == projectionTypes do
+        throw "foundation conflicting projected place type facts"
+    else placeFacts := placeFacts.push ⟨projected.place, typeId, projectionTypes⟩
   let injection ← metadata.getObjVal? "injection_phase"
   let injectionPhase ← if injection == Json.null then pure none else some <$> phase injection
   return {
@@ -178,8 +204,7 @@ def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
     backtraceSpans := bindings.backtraceSpans
     callEvidence
     nodeFacts := blocks.map (fun block => Array.replicate (block.statements.size + 1)
-      { places := (localIds.toList.zipIdx.map fun (typeId, index) =>
-          { place := ⟨index, #[]⟩, typeId, projectionTypes := #[] } : List Input.PlaceFact).toArray })
+      { places := placeFacts })
     requiredConsts }
 
 end Miri.Frontend.Foundation
