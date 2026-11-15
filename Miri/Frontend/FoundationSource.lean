@@ -42,6 +42,35 @@ private def span (j : Json) : Except String SourceSpan := do
   unless result.lo ≤ result.hi do throw "source span has reversed byte positions"
   return result
 
+structure SourceBacktrace where
+  span : SourceSpan
+  bytePosition : Nat
+  line : Nat
+  zeroBasedCharColumn : Nat
+  filename : String
+  deriving Repr, DecidableEq
+
+/-- Compiler body-relative hygiene-collapsed positions, distinct from raw
+source-span starts. Filenames use rustc's remapped display path. -/
+def sourceBacktraces (body : Json) : Except String (Array SourceBacktrace) := do
+  let metadata ← body.getObjVal? "source_metadata"
+  let records ← metadata.getObjValAs? (Array Json) "backtrace_spans"
+  let mut result := #[]
+  for record in records do
+    let position ← record.getObjVal? "source_position"
+    let entry : SourceBacktrace := {
+      span := ← span (← record.getObjVal? "span")
+      bytePosition := ← position.getObjValAs? Nat "byte_position"
+      line := ← position.getObjValAs? Nat "line"
+      zeroBasedCharColumn := ← position.getObjValAs? Nat "zero_based_char_column"
+      filename := ← position.getObjValAs? String "filename"
+    }
+    unless entry.bytePosition < 2^32 do throw "backtrace byte position exceeds rustc BytePos"
+    if result.any (fun previous => previous.span == entry.span) then
+      throw "duplicate source backtrace span"
+    result := result.push entry
+  return result
+
 private def info (scopeCount : Nat) (j : Json) : Except String SourceInfo := do
   let scope ← j.getObjValAs? Nat "scope"
   unless scope < scopeCount do throw "source scope is out of bounds"
@@ -51,8 +80,9 @@ private def info (scopeCount : Nat) (j : Json) : Except String SourceInfo := do
 Inlining is rejected by the producer and remains unsupported here. -/
 def validateSourceMetadata (body : Json) : Except String Unit := do
   let source ← body.getObjVal? "source_metadata"
-  let _ ← span (← source.getObjVal? "span")
-  let _ ← span (← source.getObjVal? "definition_span")
+  let mut required := #[← span (← source.getObjVal? "span"),
+    ← span (← source.getObjVal? "definition_span")]
+  let backtraces ← sourceBacktraces body
   let phase ← source.getObjVal? "phase"
   unless (← phase.getObjValAs? String "kind") == "runtime" do
     throw "source body is not runtime MIR"
@@ -71,7 +101,8 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
   unless declarations.size == locals.size do throw "source local count mismatch"
   for declaration in declarations do
     let _ ← declaration.getObjValAs? Bool "mutable"
-    let _ ← info scopes.size (← declaration.getObjVal? "source_info")
+    let entry ← info scopes.size (← declaration.getObjVal? "source_info")
+    required := required.push entry.span
   let blocks ← body.getObjValAs? (Array Json) "blocks"
   let locations ← source.getObjValAs? (Array Json) "blocks"
   unless blocks.size == locations.size do throw "source block count mismatch"
@@ -79,8 +110,14 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
     let statements ← block.getObjValAs? (Array Json) "statements"
     let sources ← location.getObjValAs? (Array Json) "statements"
     unless statements.size == sources.size do throw "source statement count mismatch"
-    for entry in sources do let _ ← info scopes.size entry
-    let _ ← info scopes.size (← location.getObjVal? "terminator")
+    for entry in sources do
+      required := required.push (← info scopes.size entry).span
+    required := required.push (← info scopes.size (← location.getObjVal? "terminator")).span
+  for entry in required do
+    unless backtraces.any (fun b => b.span == entry) do
+      throw "missing compiler backtrace source span"
+  for entry in backtraces do
+    unless required.contains entry.span do throw "unexpected compiler backtrace source span"
 
 /-- Derive storage initialization from finite MIR markers. Pinned rustc
 `always_storage_live_locals` removes locals mentioned by either StorageLive or

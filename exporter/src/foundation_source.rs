@@ -15,10 +15,29 @@ fn span(tcx: TyCtxt<'_>, value: rustc_span::Span) -> Value {
 fn info(tcx: TyCtxt<'_>, value: mir::SourceInfo) -> Value {
     json!({"span":span(tcx,value.span),"scope":value.scope.as_u32()})
 }
+fn backtraces(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Vec<Value> {
+    // Same body-relative hygiene collapse as schema12 backtrace_spans_json.
+    let mut spans = vec![body.span, tcx.def_span(body.source.def_id())];
+    spans.extend(body.local_decls.iter().map(|l| l.source_info.span));
+    for block in body.basic_blocks.iter() {
+        spans.extend(block.statements.iter().map(|s| s.source_info.span));
+        if let Some(t) = &block.terminator { spans.push(t.source_info.span); }
+    }
+    let mut seen = std::collections::HashSet::new();
+    spans.into_iter().filter(|s| seen.insert(*s)).map(|original| {
+        let collapsed = rustc_span::hygiene::walk_chain_collapsed(original, body.span);
+        let position = tcx.sess.source_map().lookup_char_pos(collapsed.lo());
+        json!({"span":span(tcx,original),"source_position":{
+            "byte_position":collapsed.lo().0,"line":position.line,
+            "zero_based_char_column":position.col.0,
+            "filename":position.file.name.prefer_remapped_unconditionally().to_string()}})
+    }).collect()
+}
 pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
     // Storage markers remain executable MIR. Whether a local is always live
     // can be derived from their absence, as in pinned interpret/stack.rs.
     json!({"span":span(tcx,body.span),
+        "backtrace_spans":backtraces(tcx,body),
         "definition_span":span(tcx,tcx.def_span(body.source.def_id())),
         "phase":crate::mir_phase_json(body.phase),
         "injection_phase":body.injection_phase.map(crate::mir_phase_json),
