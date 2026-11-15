@@ -130,6 +130,7 @@ def scalarCallGraphProgram (document : Document) (definition : Nat) :
     runtimeTargetDataLayout := some (← evidenceOfTarget document.target)
     compilerAbiLayoutSchema := some "physical_ty_and_layout_v1"
     definitions := pool.registry.definitions
+    predicates := pool.registry.physical.predicates
     typeConstants := pool.registry.physical.typeConstants
     layouts := frozen.layouts
     files := globalFiles

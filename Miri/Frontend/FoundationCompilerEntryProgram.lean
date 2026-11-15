@@ -204,6 +204,7 @@ def restrictedCompilerEntryProgram (document : Document) : Except String Input.L
     runtimeTargetDataLayout := some (← evidenceOfTarget document.target)
     compilerAbiLayoutSchema := some "physical_ty_and_layout_v1"
     definitions := pool.registry.definitions, typeConstants := physical.typeConstants
+    predicates := physical.predicates
     layouts := frozen.layouts, types := frozen.types, files, spans
     allocations := sourceGraph, instances := pool.registry.instances
     selectedScope := none, compilerAllocIdWorld := none

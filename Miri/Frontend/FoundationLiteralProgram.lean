@@ -81,6 +81,7 @@ def literalProgram (document : Document) (definition : Nat) (view : LiteralView 
     runtimeTargetDataLayout := some (← evidenceOfTarget document.target)
     compilerAbiLayoutSchema := some "physical_ty_and_layout_v1"
     definitions := registry.definitions, typeConstants := physical.typeConstants
+    predicates := physical.predicates
     layouts := physical.layouts, files := source.files, spans := source.spans, types := physical.types
     allocations, instances := #[instanceNode], selectedScope := none, compilerAllocIdWorld := none
     functionAbis := #[abi]

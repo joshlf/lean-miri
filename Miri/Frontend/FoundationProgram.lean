@@ -113,6 +113,7 @@ def assembleSourceProgram (document : Document) (definition : Nat)
     runtimeTargetDataLayout := some (← evidenceOfTarget components.physical.registry.document.target)
     compilerAbiLayoutSchema := some facts.compilerAbiLayoutSchema
     definitions := components.definitions
+    predicates := components.physical.predicates
     typeConstants := components.physical.typeConstants
     layouts := components.physical.layouts
     files := components.source.files, spans := components.source.spans
