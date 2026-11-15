@@ -119,7 +119,7 @@ class FoundationExport(unittest.TestCase):
                 ], cwd=ROOT, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 doc = json.loads(output.read_text())
-                self.assertEqual(doc["compilation"], {"panic_strategy":"unwind","panic_in_drop":"unwind"})
+                self.assertEqual(doc["compilation"], {"panic_strategy":"unwind","panic_in_drop":"unwind","opt_level":"No"})
                 body = doc["bodies"][0]
                 metadata = body["source_metadata"]
                 self.assertEqual(len(metadata["locals"]), len(body["locals"]))
