@@ -650,12 +650,13 @@ def makeWithForeignContext {Assembly : Type}
     let llvm := fun callee => query (EvalArchitectureMachine.compilerDispatcher context p.intrinsics pointers
       leaves.checkLlvmSymbolClash math access projection (intrinsics callee).simdHooks (fun name os => .unsupported s!"unsupported foreign item {name} on {os}"))
     let ⟨rootSpan⟩ ← liftConstruction (pureQuery (CompilerContextSpan.rootSpan p.program))
-    let ⟨helpers⟩ ← liftConstruction (pureQuery (CompilerCallConstruction.helpers p rootSpan (CompilerSignatureAbi.hook p)))
+    let ⟨helpers⟩ ← liftConstruction (pureQuery (CompilerCallConstruction.helpers p
+      EvalCoreMachine.sourceCompilerAccess rootSpan (CompilerSignatureAbi.hook p)))
     let config : ExecutionMachine.Config MiriMemoryKind (User Os R P H D O Aff B Host) C O ABI.ExternAbi ClockHost := {
       access,allocation,compiler,projection,copy,retag,validity,lifecycle,functions,atomics,varArgs,intrinsics,floats
       operands := ⟨operands.checkPlaceType,operands.dereference,operands.runtimeChecks,operands.boolLayout,operands.constant⟩
       validationRecursive := fun _ _ => ValidityMachine.enforceValidityRecursively
-      calls := CompilerCallConstruction.leaves p options.compatibilityBudget
+      calls := CompilerCallConstruction.leaves p EvalCoreMachine.sourceCompilerAccess options.compatibilityBudget
         (foreignOverride.orElse fun _ => leaves.foreign.map pure) callBackend leaves.dynSymName llvm
       virtual := CompilerCallConstruction.virtual p table PointerPlaceMachine.controlledAlignment
       helpers := helpers

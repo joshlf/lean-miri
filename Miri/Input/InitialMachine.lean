@@ -40,6 +40,8 @@ structure Configuration (Aff B : Type) where
   /-- Explicit allocation identities selected for source tracking diagnostics.
   Runtime allocation identities must already have been resolved by the caller. -/
   trackedAllocations : Array AllocId := #[]
+  /-- Seeded from one checked input before compiler queries are enabled. -/
+  sourceCompiler : Option SourceCompilerWorld.World := none
   validation : ValidityMachine.ValidationMode
   alignment : ValidityMachine.AlignmentCheck
   affinity : Option Aff
@@ -71,7 +73,8 @@ def create (config : Configuration Aff B)
     environment := .uninit, directories := {}, descriptors := descriptors, ownership := ownership
     entry := ⟨none,none,none,none⟩, externStatics := {} }
   let world : EvalWorld.World Os R P H D O Aff B Host :=
-    {runtime, main := none, types, functions := ⟨#[],#[]⟩, vtables := ⟨#[]⟩
+    {runtime, main := none, types, sourceCompiler := config.sourceCompiler,
+     functions := ⟨#[],#[]⟩, vtables := ⟨#[]⟩
      symbols := .empty, choices, trackedAllocations := config.trackedAllocations
      backend := config.backend, host}
   let user : EvalWorld.User Os R P H D O Aff B Host := {

@@ -16,6 +16,25 @@ abbrev Stored Os R P H D O Aff B Host := ThreadStacks.Storage (World Os R P H D 
 abbrev User Os R P H D O Aff B Host := ExecutionStateTransport.Inner (World Os R P H D O Aff B Host)
 abbrev State Os R P H D O Aff B Host := MachineHooks.State MiriMemoryKind (User Os R P H D O Aff B Host)
 
+/-- Compiler queries in the inner execution state use the same World as the
+outer source state after transport. -/
+def sourceCompilerAccess : SourceCompilerWorld.Access (State Os R P H D O Aff B Host) where
+  get := fun state => state.machine.user.payload.payload.user.sourceCompiler
+  put := fun state compiler =>
+    {state with machine := {state.machine with user := {state.machine.user with payload :=
+      {state.machine.user.payload with payload := {state.machine.user.payload.payload with user :=
+        {state.machine.user.payload.payload.user with sourceCompiler := some compiler}}}}}}
+
+theorem sourceCompiler_get_inward (state : EvalWorld.State Os R P H D O Aff B Host) :
+    sourceCompilerAccess.get (ExecutionStateTransport.inward state) =
+      EvalWorld.sourceCompilerAccess.get state := rfl
+
+theorem sourceCompiler_put_inward (state : EvalWorld.State Os R P H D O Aff B Host)
+    (compiler : SourceCompilerWorld.World) :
+    ExecutionStateTransport.outward
+        (sourceCompilerAccess.put (ExecutionStateTransport.inward state) compiler) =
+      EvalWorld.sourceCompilerAccess.put state compiler := rfl
+
 /-- One tape in the actual World; registry and Control survive every draw. -/
 def tape : ExecutionChoices.Access (State Os R P H D O Aff B Host) where
   get := fun s => s.machine.user.payload.payload.user.choices
