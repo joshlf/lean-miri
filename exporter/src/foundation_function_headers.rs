@@ -38,18 +38,9 @@ fn selected_closure_callee(tcx: TyCtxt<'_>, requested: &str, source_roots: &[Str
     let closures = closure_material::selected(tcx,source_roots)?;
     let mut methods = Vec::new();
     for closure in closures {
-    let body = tcx.instance_mir(ty::InstanceKind::Item(closure));
-    super::super::ensure_untainted_mir(body)?;
-    if body.source.instance != ty::InstanceKind::Item(closure) || body.source.promoted.is_some() {
-        return unsupported("inherent callee source owner",body.source);
-    }
-    for block in body.basic_blocks.iter() {
-        if let mir::TerminatorKind::Call {func:mir::Operand::Constant(operand),..} = &block.terminator().kind {
-            if let ty::FnDef(definition,_) = *operand.const_.ty().kind() {
-                if tcx.def_path_str(definition)==requested { methods.push(definition); }
-            }
+        for definition in closure_callee_material::direct_callees_of(tcx,closure)? {
+            if tcx.def_path_str(definition)==requested { methods.push(definition); }
         }
-    }
     }
     methods.sort_by_key(|d|tcx.def_path_str(*d)); methods.dedup();
     if methods.len()!=1 { return unsupported("function signature source demand",requested); }
@@ -72,9 +63,3 @@ pub(super) fn capture_for_roots<'tcx>(tcx: TyCtxt<'tcx>, material: &mut Material
     Ok(result)
 }
 
-// Keep the existing header-only hook source-compatible while the new explicit
-// source-root hook is integrated. An empty owner frontier fails closed for
-// closure-callee requests; the original start-internal header remains supported.
-pub(super) fn capture<'tcx>(tcx: TyCtxt<'tcx>, material: &mut Material<'tcx>, roots: &[String]) -> Result<Vec<Value>> {
-    capture_for_roots(tcx,material,roots,&[])
-}
