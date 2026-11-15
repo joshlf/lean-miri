@@ -385,7 +385,9 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
     session["root_span"] = source_material::root_span(tcx);
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
     let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
-    let fn_vtable_source = if has_dynamic { m.fn_vtable_source(tcx)? } else { Value::Null };
+    let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() {
+        m.fn_vtable_source(tcx)?
+    } else { Value::Null };
     Ok(json!({
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
