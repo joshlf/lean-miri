@@ -48,6 +48,23 @@ private def runtimePhase (source : Json) : Except String MIR.MirPhase := do
   | "optimized" => return .Runtime .Optimized
   | _ => throw "foundation MIR runtime phase is unsupported"
 
+/-- Exact non-call control syntax. A resume is admitted only in a cleanup
+block; it does not turn an unwinding frame into a normal return. -/
+def lowerSourceControlTerminator (source : Json) (blockCount : Nat) (cleanup : Bool) :
+    Except String MIR.TerminatorKind := do
+  match ← source.getObjValAs? String "kind" with
+  | "return" =>
+    unless !cleanup do throw "foundation return in cleanup unsupported"
+    pure .Return
+  | "goto" =>
+    let target ← source.getObjValAs? Nat "target"
+    unless target < blockCount do throw "foundation goto target out of bounds"
+    pure (.Goto target #[])
+  | "unwind_resume" =>
+    unless cleanup do throw "foundation unwind resume outside cleanup"
+    pure .UnwindResume
+  | _ => throw "foundation MIR control terminator is unsupported"
+
 /-- Lower every supported block of one template after substitution.
 Span references use candidate-local indices into `sourceLocations`. The locals
 array uses local ordinals; type-bearing rvalues use explicit joins. The remaining
@@ -76,8 +93,7 @@ def lowerPreparedMIR (prepared : PreparedItem)
   for h : blockIndex in [:blocks.size] do
     let block := blocks[blockIndex]
     let some location := locations[blockIndex]? | throw "foundation MIR source block absent"
-    unless !(← block.getObjValAs? Bool "cleanup") do
-      throw "foundation MIR cleanup is unsupported"
+    let cleanup ← block.getObjValAs? Bool "cleanup"
     let sources ← location.getObjValAs? (Array Json) "statements"
     let statementsSource ← block.getObjValAs? (Array Json) "statements"
     unless sources.size == statementsSource.size do throw "foundation MIR statement source mismatch"
@@ -124,21 +140,15 @@ def lowerPreparedMIR (prepared : PreparedItem)
       sourceLocations := sourceLocations.push source
     let terminalSource ← location.getObjVal? "terminator"
     let terminal ← block.getObjVal? "terminator"
-    let kind ← match ← terminal.getObjValAs? String "kind" with
-      | "return" => pure MIR.TerminatorKind.Return
-      | "goto" => do
-        let target ← terminal.getObjValAs? Nat "target"
-        unless target < blocks.size do throw "foundation goto target out of bounds"
-        pure (MIR.TerminatorKind.Goto target #[])
-      | "call" => do
+    let kind ← if (← terminal.getObjValAs? String "kind") == "call" then do
         let some spans := callSpans[blockIndex]? | throw "foundation call spans absent"
         callTerminator blockIndex terminal spans
-      | _ => throw "foundation MIR terminator is unsupported"
+      else lowerSourceControlTerminator terminal blocks.size cleanup
     let terminator : MIR.Terminator := {
       sourceInfo := ⟨⟨sourceLocations.size⟩, ← terminalSource.getObjValAs? Nat "scope"⟩
       kind }
     sourceLocations := sourceLocations.push terminalSource
-    loweredBlocks := loweredBlocks.push ⟨statements, terminator, false⟩
+    loweredBlocks := loweredBlocks.push ⟨statements, terminator, cleanup⟩
   return {
     body := { phase, argumentCount := item.argumentCount, spreadArgument := none
               locals := Array.range item.localTypes.size
