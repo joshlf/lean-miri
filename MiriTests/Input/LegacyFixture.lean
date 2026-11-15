@@ -80,7 +80,7 @@ def adaptLegacyFixture (source : String) : Except String String := do
   | .ok _ => pure ()
   let raw ← Json.parse source
   let version := (raw.getObjVal? "schema_version" >>= Json.getNat?).toOption
-  let oldBodyEncoding := version == some 13 && !(raw.getObjVal? "mir_templates").isOk &&
+  let oldBodyEncoding := version == some 13 &&
     ((raw.getObjVal? "bodies" >>= Json.getArr?).toOption.any fun bodies =>
       !bodies.isEmpty && bodies.all (fun body => !(body.getObjVal? "body_kind").isOk))
   unless version == some 11 || version == some 12 || oldBodyEncoding do return source
@@ -89,14 +89,6 @@ def adaptLegacyFixture (source : String) : Except String String := do
     if !(producer.getObjVal? "freeze_lang_item").isOk then
       -- Hypothetical historical component environment, not recovered lang items.
       value := value.setObjVal! "producer" (producer.setObjVal! "freeze_lang_item" .null)
-  if !(raw.getObjVal? "ctfe_scalar_sources").isOk then
-    value := value.setObjVal! "ctfe_scalar_sources" (toJson (#[] : Array Json))
-  if !(raw.getObjVal? "mir_templates").isOk then
-    value := value.setObjVal! "mir_templates" (toJson (#[] : Array Json))
-  if !(raw.getObjVal? "compiler_trait_program").isOk then
-    value := value.setObjVal! "compiler_trait_program" (Json.mkObj [
-      ("traits", toJson (#[] : Array Json)),
-      ("constructor_scope", Json.mkObj [("kind", toJson "all_source_impls")])])
   if let .ok bodies := raw.getObjVal? "bodies" >>= Json.getArr? then
     value := value.setObjVal! "bodies" (toJson (bodies.map fun body =>
       if (body.getObjVal? "body_kind").isOk then body

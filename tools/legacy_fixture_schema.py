@@ -61,7 +61,6 @@ def _bound_free_arguments(types, constants, arguments):
 def adapt_legacy_fixture(document):
     bodies = document.get("bodies")
     old_13_body_encoding = (document.get("schema_version") == 13
-                           and "mir_templates" not in document
                            and isinstance(bodies, list) and bool(bodies)
                            and all(isinstance(body, dict) and "body_kind" not in body for body in bodies))
     if document.get("schema_version") not in (11, 12) and not old_13_body_encoding:
@@ -74,8 +73,6 @@ def adapt_legacy_fixture(document):
         producer.setdefault("freeze_lang_item", None)
     # Historical executable bodies remain material. No source template or trait
     # proof is reconstructed from a monomorphic execution fixture.
-    result.setdefault("mir_templates", [])
-    result.setdefault("compiler_trait_program", {"traits": [], "constructor_scope": {"kind": "all_source_impls"}})
     for body in result.get("bodies", []):
         if isinstance(body, dict):
             body.setdefault("body_kind", "material")
