@@ -100,7 +100,7 @@ catalog for the exact checked custom-start domain. Main's FnPtr allocation is
 left to the fixed interpreter, not fabricated as a compiler global. Body-local
 source namespaces append independently; no cross-body rustc span alias theorem
 is claimed. Any retained source memory graph or selected static rejects. -/
-def restrictedCompilerEntryProgram (document : Document) : Except String Input.LoweredProgram := do
+def restrictedCompilerEntryDocument (document : Document) : Except String Input.ImportDocument := do
   let sourceGraph ← sourceMemoryGraph document
   unless sourceGraph.isEmpty do throw "compiler entry source memory graph unsupported"
   let initial ← DirectCallPool.start (PhysicalTypeRegistry.start document)
@@ -211,6 +211,10 @@ def restrictedCompilerEntryProgram (document : Document) : Except String Input.L
     functionAbis := pool.abis
     bodyRoots := #[⟨0, mainNode.id, entry.definition, mainBody.defPath, false, false, #[]⟩]
     bodies, queries }
-  Input.lowerProgram input
+  return input
+
+/-- The same source-derived import enters the ordinary fixed input lowerer. -/
+def restrictedCompilerEntryProgram (document : Document) : Except String Input.LoweredProgram := do
+  Input.lowerProgram (← restrictedCompilerEntryDocument document)
 
 end Miri.Frontend.Foundation

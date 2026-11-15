@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationInput
 import Miri.Input.EvalSourceRunFinalization
 import Miri.Input.ExecutionChoicePolicy
 import Miri.Input.CompilerMiriEntry
@@ -701,7 +702,7 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
   boundary s!"choice_mode={choiceMode diagnosticSeed}; generated_choices=unbounded; byte_length=uncapped; supplied_prefix=preserved"
   boundary "raw_host_poll: finite source initialization replay; no live poll capability"
   boundary "decode: start"
-  let decoded ← must (Input.decodeJsonProfiled input profile)
+  let decoded ← must (Miri.Frontend.Foundation.decodeRunnerInputProfiled input profile)
   boundary "decode: accepted"
   boundary "lower: start"
   let program ← must (Input.lowerProgram decoded.document)
@@ -710,15 +711,6 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
   let attempt := Input.EvalPreparation.prepareProfiled profile program
   let prepared ← must attempt.outcome
   boundary "prepare: complete"
-  -- Keep the actual prepared identity tables visible at the body reported by
-  -- the source105 terminal. This is diagnostic only; all lookups stay exact.
-  let bodyIndex := 1814
-  let bodySource := prepared.compiler.program.bundle.bodies[bodyIndex]?.map fun body =>
-    s!"source_path={body.input.sourcePath}, def_path={body.input.defPath}, definition={reprStr body.input.definitionId}"
-  let sourceRows := prepared.compiler.program.instances.filter (·.2 == bodyIndex)
-  let callRows := (prepared.compiler.lifecycle.calls.calls.bodies.filter (·.bodyIndex == bodyIndex)).map fun row =>
-    s!"fnInstance={reprStr row.fnInstance}, sourceInstanceId={row.sourceInstanceId}, bodyIndex={row.bodyIndex}"
-  boundary s!"canonical_body_1814: {reprStr bodySource}; source_rows={reprStr sourceRows}; call_rows={reprStr callRows}"
   let (pageSize,hostCpus) ← captureLinuxProfile
   let numCpus := if ui.isSome then 1 else hostCpus
   let actualProfile := match ui with
