@@ -23,6 +23,7 @@ impl<'tcx> Material<'tcx> {
         let attrs = tcx.codegen_fn_attrs(definition);
         if !attrs.target_features.is_empty() { return unsupported("signature target features",definition); }
         Ok(json!({"definition":self.definition(tcx,definition),"owner_declaration":owner,
+            "runtime_source":super::super::foundation_runtime_instances::item(tcx,definition),
             "environment":self.environment(tcx,definition)?,"signature":self.signature(tcx,definition)?,
             "function_attributes":{
                 "never_unwind":attrs.flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
@@ -32,17 +33,19 @@ impl<'tcx> Material<'tcx> {
     }
 }
 
-/// Resolve one explicit inherent callee only through the explicitly selected generic
-/// closure MIR. This is a source edge, not trait selection or an ABI query.
+/// Resolve an explicit local declaration or a callee named by selected generic
+/// closure MIR. Neither route selects an instance or requires a local MIR body.
 fn selected_closure_callee(tcx: TyCtxt<'_>, requested: &str, source_roots: &[String]) -> Result<DefId> {
     let closures = closure_material::selected(tcx,source_roots)?;
-    let mut methods = Vec::new();
+    let mut methods = tcx.hir_crate_items(()).definitions().map(|d|d.to_def_id())
+        .filter(|d|matches!(tcx.def_kind(*d),rustc_hir::def::DefKind::Fn)
+            && tcx.def_path_str(*d)==requested).collect::<Vec<_>>();
     for closure in closures {
         for definition in closure_callee_material::direct_callees_of(tcx,closure)? {
             if tcx.def_path_str(definition)==requested { methods.push(definition); }
         }
     }
-    methods.sort_by_key(|d|tcx.def_path_str(*d)); methods.dedup();
+    methods.sort_by_key(|d|(d.krate.as_u32(),d.index.as_u32())); methods.dedup();
     if methods.len()!=1 { return unsupported("function signature source demand",requested); }
     Ok(methods[0])
 }

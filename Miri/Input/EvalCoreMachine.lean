@@ -16,14 +16,9 @@ abbrev Stored Os R P H D O Aff B Host := ThreadStacks.Storage (World Os R P H D 
 abbrev User Os R P H D O Aff B Host := ExecutionStateTransport.Inner (World Os R P H D O Aff B Host)
 abbrev State Os R P H D O Aff B Host := MachineHooks.State MiriMemoryKind (User Os R P H D O Aff B Host)
 
-/-- Compiler queries in the inner execution state use the same World as the
-outer source state after transport. -/
-def sourceCompilerAccess : SourceCompilerWorld.Access (State Os R P H D O Aff B Host) where
-  get := fun state => state.machine.user.payload.payload.user.sourceCompiler
-  put := fun state compiler =>
-    {state with machine := {state.machine with user := {state.machine.user with payload :=
-      {state.machine.user.payload with payload := {state.machine.user.payload.payload with user :=
-        {state.machine.user.payload.payload.user with sourceCompiler := some compiler}}}}}}
+/-- The shared lower-state lens is also the core execution lens. -/
+abbrev sourceCompilerAccess : SourceCompilerWorld.Access (State Os R P H D O Aff B Host) :=
+  EvalBackendMachine.sourceCompilerAccess
 
 theorem sourceCompiler_get_inward (state : EvalWorld.State Os R P H D O Aff B Host) :
     sourceCompilerAccess.get (ExecutionStateTransport.inward state) =
@@ -76,7 +71,7 @@ def config
   let access := EvalBackendMachine.access
     (MemoryExtras.bindAccess extra (TypedMemoryProviders.bindAccess pointers base.access))
   let allocation := EvalAllocationMachine.allocation pointers extra base.allocation
-  let pointerCompiler := CompilerExecutionProviders.pointerCompiler prepared
+  let pointerCompiler := CompilerExecutionProviders.pointerCompiler prepared EvalCoreMachine.sourceCompilerAccess
   let vtable := ExecutionChoiceBindings.vtableHooks tape base.validity.vtable
   let projection := EvalProjectionMachine.bindProjection prepared base.projection
   let dynamic := PlaceDynamic.withVTable projection.dynamic vtable
@@ -86,12 +81,12 @@ def config
   let projection := {projection with dynamic,place := ValidityMachine.placeHooks access allocation compiler}
   let validityBase := {base.validity with projection,vtable}
   let retag := RuntimeArrayFacts.retagHooks EvalProjectionMachine.arrays prepared.context
-    (TypedValidityProviders.retagHooks prepared runtime access projection vtable pointers choice base.retag)
+    (TypedValidityProviders.retagHooks prepared runtime sourceCompilerAccess access projection vtable pointers choice base.retag)
   let validity := RuntimeArrayQueries.validityHooks EvalProjectionMachine.arrays
-    (TypedValidityProviders.visitor prepared runtime access allocation compiler pointers retag limits.retag validityBase)
+    (TypedValidityProviders.visitor prepared runtime sourceCompilerAccess access allocation compiler pointers retag limits.retag validityBase)
   let (compiler,copy) := ValidityMachine.bindValidation compiler base.copy validity limits.validation
   let floats := ExecutionChoiceBindings.floatHooks tape (CompilerExecutionProviders.floatHooks prepared.context base.floats)
-  let scalar := CompilerExecutionProviders.machineScalarHooks prepared access pointers dynamic vtable
+  let scalar := CompilerExecutionProviders.machineScalarHooks prepared sourceCompilerAccess access pointers dynamic vtable
     projection.dynamicFuel floats (ExecutionMachine.scalarHooks base)
   let discr := TypedMemoryProviders.discriminant prepared.context access projection (ExecutionMachine.discriminantHooks base)
   let deallocation := { deallocation with

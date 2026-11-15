@@ -1,5 +1,6 @@
 import Miri.Interpreter.RaceMode
 import Miri.Input.EvalWorld
+import Miri.Input.SourceCompilerArrays
 import Miri.Concurrency.GlobalState
 
 /-! Portable machine.rs::new initialization on canonical shared storage.
@@ -55,6 +56,11 @@ def create (config : Configuration Aff B)
     (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
     (types : RuntimeArrayTypes.World) (choices : ExecutionChoices.Tape) (host : Host) :
     Except StepError (EvalWorld.State Os R P H D O Aff B Host) := do
+  let types ← match config.sourceCompiler with
+    | none => pure types
+    | some compiler =>
+      (SourceCompilerArrays.view types compiler).mapError (fun reason =>
+        StepError.unsupported s!"canonical array bootstrap: {reason}")
   let addresses ← (GlobalAddressState.new config.provenance config.addressMode
     config.geometry.stackAddress config.addressStop config.addressReuse).mapError
       (fun error => .invalidProgram s!"initial addresses: {reprStr error}")

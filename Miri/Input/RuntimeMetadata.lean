@@ -337,6 +337,13 @@ def field (metadata : RuntimeMetadata) (parent : TyAndLayout TypeId) (index : Na
     | .tuple values => require values[index]? "tuple field"
     | .array element .. | .slice element => pure element
     | .str => return ← stringElementLayout metadata
+    | .closure _ args count => do
+      unless index < count do throw (.invalid "closure field" "index exceeds capture count")
+      let some (.Type upvars) := args.back? | throw (.invalid "closure field" "tupled upvars argument absent")
+      let tuple ← metadata.node upvars
+      let .tuple fields := tuple.shape | throw (.invalid "closure field" "upvars argument is not a tuple")
+      unless fields.size == count do throw (.invalid "closure field" "tuple/capture count differs")
+      require fields[index]? "closure capture field"
     | .adt data => do
       let .Single selected := parent.layout.variants
         | throw (.unsupported "ADT field needs selected variant")

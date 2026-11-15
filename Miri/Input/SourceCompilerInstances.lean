@@ -19,6 +19,26 @@ def instanceKind (access : SourceCompilerWorld.Access S) (callee : CallInstance)
     EStateM StepError S CallInstanceKind := do
   return (← query (SourceCompilerWorld.node (← current access) callee)).instanceKind
 
+/-- Pointwise proof boundary for the live kind query. The selected current
+World supplies the actual node; absent World and invalid node failures retain
+the incoming state just as successful lookup does. No prepared row is read. -/
+theorem instanceKind_at (access : SourceCompilerWorld.Access S) (before : S) (callee : CallInstance) :
+    instanceKind access callee before =
+      match access.get before with
+      | none => .error (.unsupported "source compiler World is unavailable") before
+      | some world => match SourceCompilerWorld.node world callee with
+        | .error reason => .error (.unsupported reason) before
+        | .ok node => .ok node.instanceKind before := by
+  cases present : access.get before with
+  | none =>
+    simp [instanceKind,current,query,present,get,getThe,MonadStateOf.get,EStateM.get,
+      bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure]
+    with_unfolding_all rfl
+  | some world =>
+    cases lookup : SourceCompilerWorld.node world callee <;>
+      simp [instanceKind,current,query,present,lookup,get,getThe,MonadStateOf.get,EStateM.get,
+        bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure] <;> with_unfolding_all rfl
+
 def instanceArgs (access : SourceCompilerWorld.Access S) (callee : CallInstance) :
     EStateM StepError S (Array MIR.GenericArg) := do
   return (← query (SourceCompilerWorld.node (← current access) callee)).genericArgs

@@ -7,6 +7,27 @@ use serde_json::{Value, json};
 impl<'tcx> super::Material<'tcx> {
     pub(super) fn source_allocation(&mut self, tcx: TyCtxt<'tcx>, raw: AllocId) -> super::Result<usize> {
         if let Some(id) = self.allocation_ids.get(&raw) { return Ok(*id); }
+        if let Some(GlobalAlloc::Static(definition)) = tcx.try_get_global_alloc(raw) {
+            let id = self.allocations.len();
+            self.allocation_ids.insert(raw, id);
+            self.allocations.push(Value::Null);
+            let rustc_hir::def::DefKind::Static {mutability,nested,..} = tcx.def_kind(definition)
+                else { return super::unsupported("GlobalAlloc Static declaration",definition); };
+            let ty = tcx.type_of(definition).instantiate_identity().skip_normalization();
+            let initializer = if definition.is_local() {
+                let body = tcx.mir_for_ctfe(definition);
+                crate::ensure_untainted_mir(body)?;
+                let required = self.required_constants(tcx,body)?;
+                json!({"status":"mir","body":self.constant_mir_body(tcx,body,required)?})
+            } else {
+                json!({"status":"unavailable","reason":"pinned metadata omits external static initializer MIR"})
+            };
+            self.allocations[id] = json!({"allocation_id":id,"source_alloc_id":raw.0.get(),"kind":"static",
+                "definition":self.definition(tcx,definition),"type":self.ty(tcx,ty)?,
+                "mutable":mutability.is_mut(),"nested":nested,"thread_local":tcx.is_thread_local_static(definition),
+                "foreign_item":tcx.is_foreign_item(definition),"initializer":initializer});
+            return Ok(id);
+        }
         let Some(GlobalAlloc::Memory(memory)) = tcx.try_get_global_alloc(raw) else {
             return super::unsupported("source allocation kind or unavailable image", raw);
         };

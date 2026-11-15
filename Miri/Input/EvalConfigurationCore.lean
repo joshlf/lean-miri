@@ -360,6 +360,9 @@ def environmentMemoryFromCore [DecidableEq MiriMemoryKind]
   let arrays : RuntimeArrayQueries.Access
       (EvalHostRuntimeConstruction.RuntimeState
         (ValidityMachine.Control (Stored Os R P H D O Aff B Host))) := {
+    sourceCompiler := EvalPointerSource.arrays.sourceCompiler.map fun source => {
+      get := fun state => source.get state.machine
+      put := fun state compiler => {state with machine := source.put state.machine compiler} }
     get := fun state => EvalPointerSource.arrays.get state.machine
     set := fun state types => {state with machine := EvalPointerSource.arrays.set state.machine types} }
   let deallocate := fun pointer old kind =>
@@ -471,7 +474,7 @@ def makeWithForeignContext {Assembly : Type}
     let compiler := EvalPlaceConstruction.compiler p placeOptions access pointers table
       (CompilerPlaceTypes.place p EvalCoreMachine.sourceCompilerAccess options.place.debugAssertions covariance) validate
     let projection := EvalPlaceConstruction.projection p placeOptions access allocation compiler table
-    let pointerCompiler := CompilerExecutionProviders.pointerCompiler facts
+    let pointerCompiler := CompilerExecutionProviders.pointerCompiler facts EvalCoreMachine.sourceCompilerAccess
     let dereference := PointerPlaceMachine.dereference access pointerCompiler projection.dynamic table projection.dynamicFuel
     let operands : OperandMachine.Hooks MiriMemoryKind (User Os R P H D O Aff B Host) C := {
       compiler,projection
@@ -513,7 +516,7 @@ def makeWithForeignContext {Assembly : Type}
         match ← EvalBackendMachine.handler state.machine with
         | .none => pure .none
         | .vclocks _ => pure .vclocks }
-    let retag := EvalRetagMachine.hooks facts p.lifecycle.calls.runtime (CompilerRetagOptions.make p options.retag) access projection table pointers choice
+    let retag := EvalRetagMachine.hooks facts p.lifecycle.calls.runtime EvalCoreMachine.sourceCompilerAccess (CompilerRetagOptions.make p options.retag) access projection table pointers choice
     let scalarQueries := CompilerScalarLeaves.scalar p
     let floats : FloatOpsHooks Provenance (State Os R P H D O Aff B Host) C := {
       integerKindOf := fun _ ty => physical (CompilerExecutionProviders.integerKind context ty)
@@ -530,14 +533,14 @@ def makeWithForeignContext {Assembly : Type}
         | throw (.invalidProgram "pointee layout requested for a non-pointer type")
       query (CompilerFacts.layoutOf context pointee)
     let scalar := ExecutionScalar.hooks scalarQueries access pointers.arithmetic isRaw usize pointeeLayout dereference floats
-    let discrQueries := CompilerScalarLeaves.discriminant p (fun _ => ValidityMachine.scalarMayBeNull)
+    let discrQueries := CompilerScalarLeaves.discriminant p EvalCoreMachine.sourceCompilerAccess (fun _ => ValidityMachine.scalarMayBeNull)
     let discr := discriminant discrQueries access operands
-    let validity := EvalValidityMachine.hooks facts p.lifecycle.calls.runtime
+    let validity := EvalValidityMachine.hooks facts p.lifecycle.calls.runtime EvalCoreMachine.sourceCompilerAccess
       (CompilerValidityLeaves.make p image EvalProjectionMachine.arrays projection pointers)
       access allocation compiler projection (FunctionPointerConsumers.vtable functions table) discr pointers retag options.limits.retag
     let copy := CompilerCopy.hooks p.runtime options.place.debugAssertions compatibility access
       PointerMachine.User.addresses pointers.arithmetic validity options.limits.validation
-    let castQueries := CompilerCastLeaves.make p (CompilerCastQueries.required p) table
+    let castQueries := CompilerCastLeaves.make p EvalCoreMachine.sourceCompilerAccess (CompilerCastQueries.required p EvalCoreMachine.sourceCompilerAccess) table
       (fun _ provenance => PointerMachine.exposeProvenance pointers provenance)
       (fun _ address => PointerMachine.pointerFromExposedAddress pointers address)
       (fun value layout => EvalProjectionMachine.assertAbi p.runtime.target value layout |>.mapError IntrinsicVectorMachine.projectionError)
@@ -1564,7 +1567,7 @@ def makeFromSourcePackage [DecidableEq Os]
                     (SourceOther Raw Listener TcpStream Error) Native Profiler)
                 let strings := EvalUnixFsConstruction.osStringsFromSource
                   sourceLeaves.foreignSource.host.os fsMemory
-                let metadata ← match EvalUnixFsConstruction.metadataFromSource p
+                let metadata ← match EvalUnixFsConstruction.metadataFromSource p EvalCoreMachine.sourceCompilerAccess
                     context.validityAccess context.projection selectedChoice strings
                     fsCapability.pathFromOs seed.errors seed.registry.readiness files
                     (fun other => do return .inl (← files.hostMetadata (.other other)))

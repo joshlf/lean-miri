@@ -17,8 +17,23 @@ def main (paths : List String) : IO Unit := do
     check (material.target.triple == document.target.triple &&
       material.target.pointerSizeBits == document.target.pointerSizeBits &&
       material.target.runtimeDataLayout.isSome) "typed source target projection differs"
-    let expected ← checked (sourceItemDeclarations document)
-    check (material.declarations == expected && !expected.isEmpty) "typed source declaration projection differs"
+    let headers ← checked (sourceItemDeclarations document)
+    let foreign ← checked (ForeignDeclarationSource.derive document.source)
+    let callable := foreign.declarations.filter fun item =>
+      item.kind == "function" || item.kind == "associated_function"
+    let expected := ((headers.map (·.definition) ++ callable.map (·.definition)).toList.eraseDups).toArray
+    check (material.declarations.map (·.definition) == expected && !headers.isEmpty)
+      "typed source declaration coverage/order differs"
+    for header in headers do
+      check (material.declarations.find? (·.definition == header.definition) == some header)
+        "typed source header role/identity changed"
+    for item in callable do
+      let some declaration := material.declarations.find? (·.definition == item.definition)
+        | throw (IO.userError "typed foreign header absent")
+      let kind : Input.SourceDeclarations.ItemKind :=
+        if item.kind == "function" then .function else .associatedFunction
+      check (declaration.path == item.path && declaration.kind == kind && declaration.parameters == item.parameters)
+        "typed foreign declaration differs from independently parsed symbolic source"
     for declaration in material.declarations do
       let slots ← checked (Input.SourceDeclarations.fullParameters material.genericLayers declaration.definition)
       check (slots == declaration.parameters) "typed source full generic slots differ"

@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationSourceAllocations
+import Miri.Frontend.FoundationAllocations
 import Miri.Frontend.FoundationSourceMir
 import Miri.Frontend.FoundationSourceAbi
 import Miri.Frontend.FoundationSourceTypes

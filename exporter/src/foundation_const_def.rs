@@ -74,7 +74,7 @@ impl<'tcx> Material<'tcx> {
         }
         Ok(json!({"kind":"unevaluated","definition":definition,"arguments":[]}))
     }
-    fn constant_mir_body(&mut self, tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, required: Vec<Value>) -> Result<Value> {
+    pub(super) fn constant_mir_body(&mut self, tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, required: Vec<Value>) -> Result<Value> {
         let locals = body.local_decls.iter().map(|local|self.ty(tcx,local.ty)).collect::<Result<Vec<_>>>()?;
         let blocks = body.basic_blocks.iter().map(|block| {
             if block.is_cleanup { return unsupported("const cleanup block", block); }

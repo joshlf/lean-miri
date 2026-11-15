@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationSourceAllocations
+import Miri.Frontend.FoundationAllocations
 open Lean Miri Miri.Frontend.Foundation
 private def checked {α : Type} (value : Except String α) : IO α :=
   match value with | .ok value => pure value | .error error => throw (IO.userError error)
@@ -7,7 +7,9 @@ def main (paths : List String) : IO Unit := do
   let document ← checked (decode (← checked (Json.parse (← IO.FS.readFile path))))
   let material ← checked (sourceAllocationMaterial document)
   unless material.images.size == 2 do throw (IO.userError "genuine literal source graph count changed")
-  let contents ← material.images.mapM fun image => checked image.memory.bytesHex.checkedBytes
+  let contents ← material.images.mapM fun image => do
+    let .memory memory := image.payload | throw (IO.userError "literal source unexpectedly not memory")
+    checked memory.bytesHex.checkedBytes
   unless contents.contains "Miri".toUTF8.data && contents.contains "foundation-bytes".toUTF8.data do
     throw (IO.userError "typed compiler literal memory images differ from Rust fixture")
   let some first := material.images[0]? | throw (IO.userError "genuine source image missing")

@@ -41,9 +41,9 @@ def dynamic (p : CompilerProviders.Prepared) (options : Options)
     DynamicLayoutHooks Provenance (State Os R P H D O Aff B Host) C where
   target := p.runtime.target.base
   maxSizeOfVal := options.maxSizeOfVal
-  classify := fun _ ty => lift (EvalProjectionMachine.dynamicKind p.lifecycle.calls.symbols.facts ty)
-  field := fun _ layout index => do lift (EvalProjectionMachine.field (EvalProjectionMachine.arrays.get (← get)) layout index)
-  packedAlign := fun _ ty => lift (EvalProjectionMachine.packed p.runtime ty)
+  classify := fun _ ty => EvalProjectionMachine.currentDynamicKind ty
+  field := fun _ layout index => EvalProjectionMachine.currentField layout index
+  packedAlign := fun _ ty => EvalProjectionMachine.currentPacked ty
   vtableSizeAndAlign := VTable.getSizeAndAlign vtable
 
 /-- The configured validation mode is the source Machine option. Final state
@@ -70,7 +70,7 @@ def compiler
    projection
    deref := fun choice source skip => do
      let source ← operand choice source
-     let pointerCompiler := CompilerExecutionProviders.pointerCompiler p.lifecycle.calls.symbols.facts
+     let pointerCompiler := CompilerExecutionProviders.pointerCompiler p.lifecycle.calls.symbols.facts EvalCoreMachine.sourceCompilerAccess
      let memory ← if skip then do
          PointerPlaceMachine.fromImmediate access pointerCompiler choice (← ValidityMachine.readImmediate access source)
        else PointerPlaceMachine.dereference access pointerCompiler (dynamic p options vtable) vtable options.dynamicFuel choice source
@@ -98,14 +98,10 @@ def projection
   maxSizeOfVal := options.maxSizeOfVal
   dynamic := dynamic p options vtable
   dynamicFuel := options.dynamicFuel
-  isSliceOrStr := fun _ ty => do
-    let node ← match p.runtime.node ty with
-      | .ok value => pure value | .error error => throw (.unsupported (toString error))
-    pure (node.shapeKind == .slice || node.shapeKind == .str)
-  field := fun _ layout index => do lift (EvalProjectionMachine.field (EvalProjectionMachine.arrays.get (← get)) layout index)
-  variant := fun _ layout index => match p.runtime.forVariant layout index with
-    | .ok value => pure value | .error error => throw (.unsupported (toString error))
-  packedAlign := fun _ ty => lift (EvalProjectionMachine.packed p.runtime ty)
+  isSliceOrStr := fun _ ty => EvalProjectionMachine.currentSliceOrStr ty
+  field := fun _ layout index => EvalProjectionMachine.currentField layout index
+  variant := fun _ layout index => EvalProjectionMachine.currentVariant layout index
+  packedAlign := fun _ ty => EvalProjectionMachine.currentPacked ty
   subsliceLayout := fun _ => EvalProjectionMachine.subslice
   layoutOf := fun _ ty => RuntimeArrayQueries.layoutOf EvalProjectionMachine.arrays ty
   localIndex := fun _ id => do

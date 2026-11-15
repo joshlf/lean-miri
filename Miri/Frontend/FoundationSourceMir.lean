@@ -9,7 +9,7 @@ The resulting data contain no JSON and no instantiated compiler answers. -/
 namespace Miri.Frontend.Foundation.SourceMirParser
 open Lean Miri Input.SourceMir
 
-private structure Context where
+structure Context where
   types : Nat
   definitions : Nat
   locals : Nat
@@ -67,7 +67,7 @@ private def place (c : Context) (j : Json) : Except String Place := do
     | "index" => return .index (← localRef c (← p.getObjValAs? Nat "local"))
     | tag => pure (.unsupported tag)
   return ⟨localId,projection⟩
-private def constant (c : Context) (j : Json) : Except String Constant := do
+def constant (c : Context) (j : Json) : Except String Constant := do
   let type ← typeRef c (← j.getObjValAs? Nat "type")
   let value ← j.getObjVal? "value"
   let value : ConstantValue ← match ← value.getObjValAs? String "kind" with
@@ -169,7 +169,7 @@ private def info (c : Context) (j : Json) : Except String Input.SourceMir.Source
   let scope ← j.getObjValAs? Nat "scope"
   unless scope < c.scopes do throw "source MIR source scope reference out of bounds"
   return ⟨source.identity,scope⟩
-private def terminator (c : Context) (j call : Json) : Except String TerminatorKind := do
+def terminator (c : Context) (j : Json) (call : Option Json) : Except String TerminatorKind := do
   match ← j.getObjValAs? String "kind" with
   | "return" => pure .returnValue | "unwind_resume" => pure .resumeUnwind | "unreachable" => pure .unreachable
   | "unwind_terminate" => return .terminateUnwind (← reason (← j.getObjVal? "reason"))
@@ -186,6 +186,7 @@ private def terminator (c : Context) (j call : Json) : Except String TerminatorK
     unless values.toList.Pairwise (fun a b => a.1 != b.1) do throw "source MIR duplicate switch value"
     return .switchInt (← operand c (← j.getObjVal? "operand")) values (← blockRef c (← j.getObjValAs? Nat "otherwise"))
   | "call" =>
+    let some call := call | throw "source MIR call span evidence unavailable"
     let target ← (← optionalNat j "target").mapM (blockRef c)
     let argumentValues ← j.getObjValAs? (Array Json) "arguments"
     let spans ← call.getObjValAs? (Array Json) "arguments"
@@ -195,6 +196,14 @@ private def terminator (c : Context) (j call : Json) : Except String TerminatorK
     return .call (← operand c (← j.getObjVal? "function")) args (← place c (← j.getObjVal? "destination"))
       target (← unwind c (← j.getObjVal? "unwind")) (callSource (← j.getObjValAs? String "call_source"))
       (← sourceSpan (← call.getObjVal? "function")).identity
+  | tag => pure (.unsupported tag)
+/-- Shared instruction parser; initializer syntax has no invented SourceInfo. -/
+def statementKind (c : Context) (statement : Json) : Except String StatementKind := do
+  match ← statement.getObjValAs? String "kind" with
+  | "assign" => pure (StatementKind.assign (← place c (← statement.getObjVal? "place")) (← rvalue c (← statement.getObjVal? "value")))
+  | "storage_live" => pure (StatementKind.storageLive (← localRef c (← statement.getObjValAs? Nat "local")))
+  | "storage_dead" => pure (StatementKind.storageDead (← localRef c (← statement.getObjValAs? Nat "local")))
+  | "nop" => pure .nop
   | tag => pure (.unsupported tag)
 private def phase (j : Json) : Except String Phase := do
   let tag ← j.getObjValAs? String "kind"
@@ -242,14 +251,10 @@ def body (document : Document) (j : Json) (promoted : Option Nat := none) : Exce
     let statements ← block.getObjValAs? (Array Json) "statements"
     let sources ← location.getObjValAs? (Array Json) "statements"
     let statements ← (statements.zip sources).mapM fun (statement,source) => do
-      let kind : StatementKind ← match ← statement.getObjValAs? String "kind" with
-        | "assign" => pure (StatementKind.assign (← place c (← statement.getObjVal? "place")) (← rvalue c (← statement.getObjVal? "value")))
-        | "storage_live" => pure (StatementKind.storageLive (← localRef c (← statement.getObjValAs? Nat "local")))
-        | "storage_dead" => pure (StatementKind.storageDead (← localRef c (← statement.getObjValAs? Nat "local")))
-        | "nop" => pure .nop | tag => pure (.unsupported tag)
+      let kind ← statementKind c statement
       return Statement.mk (← info c source) kind
     return Block.mk (← block.getObjValAs? Bool "cleanup") statements
-      ⟨← info c (← location.getObjVal? "terminator"),← terminator c (← block.getObjVal? "terminator") call⟩
+      ⟨← info c (← location.getObjVal? "terminator"),← terminator c (← block.getObjVal? "terminator") (some call)⟩
   let required ← (← j.getObjValAs? (Array Json) "required_consts").mapM fun entry => do
     unless (← entry.getObjValAs? String "kind") == "constant" do throw "source MIR required entry is not a constant"
     constant c entry

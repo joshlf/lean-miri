@@ -3,8 +3,9 @@ import Miri.Input.RuntimeMetadata
 /-! Runtime canonical array constructors, including OsStr and argv arrays.
 Sources: rustc_middle ty/sty.rs::Ty::new_array, rustc_type_ir sty/consts.rs
 ::from_target_usize, rustc_abi layout.rs::layout_of_array_like (182–207).
-Runtime IDs are allocations in this explicit interner, never compiler IDs
-borrowed by equal layout. Keep one World for the lifetime of an interpreter.
+Legacy static sessions allocate IDs in this interner. Source-backed sessions
+set canonicalOwned and allocate only through SourceCompilerWorld; this World
+is then a checked layout cache. Equal layout never establishes type identity.
 -/
 namespace Miri.Input.RuntimeArrayTypes
 open Lean Miri.ABI
@@ -30,6 +31,8 @@ structure World where
   wideLayout : TyAndLayout TypeId
   entries : Array Entry
   nextId : TypeId
+  /-- Source-backed sessions allocate every type ID in SourceCompilerWorld. -/
+  canonicalOwned : Bool := false
   obligations : Array String
   aliases : Array (Key × TypeId) := #[]
 inductive Error where
@@ -155,6 +158,8 @@ def intern (world : World) (element : Element) (count : UInt64) :
         unless imported.layout == layout do throw (.compilerLayoutMismatch id)
       pure (id,Origin.compiler id,world.nextId)
     | none => do
+      if world.canonicalOwned then
+        throw (.metadata "source-owned array constructor requires the shared canonical World")
       unless !(world.metadata.source.types.any (·.id == world.nextId)) &&
           !(world.entries.any (·.value.ty == world.nextId)) do throw .conflictingCanonicalIdentity
       pure (world.nextId,Origin.runtimeConstructor,world.nextId + 1)

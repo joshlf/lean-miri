@@ -203,16 +203,23 @@ def itemSource (document : Json) : Except String
     for exported in (← dependency.getObjValAs? (Array Json) "exports") do
       if (← exported.getObjValAs? String "kind") == "non_generic" then
         items := items.push (← exported.getObjVal? "item")
+  let callables := material.declarations.filter fun declaration =>
+    declaration.kind == "function" || declaration.kind == "associated_function"
+  if callables.isEmpty then return (#[],#[])
+  -- Decode each raw identity once. Lists retain traversal order and duplicate
+  -- rows, so all original lexical consistency checks still run below.
+  let mut byDefinition : Std.HashMap (Nat × Nat) (Array Json) := {}
+  for item in items do
+    let definition ← rawDefinition item
+    let key := (definition.crateIndex,definition.index)
+    byDefinition := byDefinition.insert key (((byDefinition[key]?).getD #[]).push item)
   let mut declarations := #[]
   let mut layers : Array Miri.Input.SourceDeclarations.GenericLayer := #[]
-  for declaration in material.declarations do
-    unless declaration.kind == "function" || declaration.kind == "associated_function" do continue
+  for declaration in callables do
     let kind : Miri.Input.SourceDeclarations.ItemKind :=
       if declaration.kind == "function" then .function else .associatedFunction
-    let mut matching := #[]
-    for item in items do
-      if (← rawDefinition item) == declaration.definition then matching := matching.push item
-    unless !matching.isEmpty do throw "foreign callable lexical source missing"
+    let key := (declaration.definition.crateIndex,declaration.definition.index)
+    let some matching := byDefinition[key]? | throw "foreign callable lexical source missing"
     for item in matching do
       unless (← parameters declaration.definition item) == declaration.parameters do
         throw "foreign callable lexical source differs from symbol declaration"

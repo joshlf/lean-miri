@@ -12,13 +12,15 @@ def expectedLayout (runtime : RuntimeMetadata) (world : SourceCompilerWorld.Worl
   if requested.projection.isEmpty then
     let some id := body.mir.locals[requested.localId]? | throw "place local absent in executable body"
     return ← {runtime with source := world.canonical}.lookup id |>.mapError toString
-  if world.canonical.sourceMaterial.isSome then
-    throw "typed source projected place type derivation unsupported"
   let mut ids := #[]
   for block in body.nodeFacts do
     for node in block do
       for place in node.places do
-        if place.place == requested then ids := ids.push place.typeId
+        if place.place == requested then
+          if world.canonical.sourceMaterial.isSome then
+            unless place.projectionTypes.size == requested.projection.size do
+              throw "source-derived projected place type path incomplete"
+          ids := ids.push place.typeId
   let some id := ids[0]? | throw "place has no compiler type in its executable body"
   unless ids.all (· == id) do throw "same place has conflicting compiler types"
   {runtime with source := world.canonical}.lookup id |>.mapError toString

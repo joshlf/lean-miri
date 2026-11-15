@@ -70,7 +70,13 @@ def sourceItemDeclaration (document : Document) (definition : Nat) :
   let raw : Input.DefinitionId := ⟨← row.getObjValAs? Nat "crate_index",← row.getObjValAs? Nat "index"⟩
   unless raw.crateIndex < 2^32 && raw.index < 2^32 do throw "Item source DefId exceeds rustc index width"
   let role ← match bodies[0]?,headers[0]? with
-    | some body,_ => sourceItemRole body
+    | some body,some header => do
+      let original ← sourceItemRole body
+      let declared ← sourceItemRole header
+      unless original == .unavailable || declared == .unavailable || original == declared do
+        throw "conflicting Item declaration role"
+      pure (if original == .unavailable then declared else original)
+    | some body,none => sourceItemRole body
     | none,some header => sourceItemRole header
     | none,none => throw "Item declaration role source absent"
   return ⟨raw,← row.getObjValAs? String "path",kind,parameters,role⟩

@@ -1,3 +1,4 @@
+import Miri.Input.SourceCompilerRuntime
 import Miri.Input.CompilerFrameContext
 import Miri.Interpreter.DynamicLayout
 
@@ -42,7 +43,11 @@ def hooks [DecidableEq K] (p : CompilerProviders.Prepared)
     (dynamicBudget : Nat) (choice : C)
     (deallocateStack : Pointer (Option Provenance) → MachineHooks.M K U Unit) :
     MachineHooks.StorageHooks K U where
-  veryTriviallySized := veryTriviallySized p.runtime
+  veryTriviallySized := fun ty => do
+    let runtime ← SourceCompilerRuntime.current p.runtime.target world
+    match veryTriviallySized runtime ty with
+    | .ok value => pure value
+    | .error error => throw error
   layout := CompilerFrameContext.computeLocalLayout p world
   allocateDyn := fun layout metadataValue => do
     let some (size,align) ← DynamicLayout.sizeAndAlignFromMeta dynamic choice dynamicBudget metadataValue layout

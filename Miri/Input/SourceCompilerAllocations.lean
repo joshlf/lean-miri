@@ -27,7 +27,7 @@ def demand (world : SourceCompilerWorld.World) (sourceId : Nat) :
     return (world,known.id)
   let ids ← reachable (material.images.size + 1) (fun id => do
     let some image := material.images[id]? | throw "source memory image absent"
-    pure (image.memory.relocations.map (·.target))) sourceId
+    pure (match image.payload with | .memory memory => memory.relocations.map (·.target) | .static _ => #[])) sourceId
   let mut mapping : Array (Nat × Nat) := #[]
   let mut next := world.canonical.allocations.size
   for id in ids do
@@ -43,11 +43,12 @@ def demand (world : SourceCompilerWorld.World) (sourceId : Nat) :
   for id in ids do
     let some image := material.images[id]? | throw "source memory graph index absent"
     let some (_,canonicalId) := mapping.find? (·.1 == id) | throw "source memory canonical mapping absent"
-    let relocations ← image.memory.relocations.mapM fun relocation => do
+    let .memory sourceMemory := image.payload | throw "source static initializer demand not connected"
+    let relocations ← sourceMemory.relocations.mapM fun relocation => do
       let some (_,target) := mapping.find? (·.1 == relocation.target)
         | throw "source relocation canonical mapping absent"
       return {relocation with target}
-    let memory := {image.memory with relocations}
+    let memory := {sourceMemory with relocations}
     let node : AllocationNode := {
       id := canonicalId
       sourceAllocId := some image.rawId

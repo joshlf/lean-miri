@@ -22,7 +22,8 @@ private def memory (place : RuntimePlace Provenance) : MachineHooks.M K U (MPlac
   | .local .. => throw (.invalidProgram "freeze projection returned a local place")
 
 def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
-    (runtime : CompilerRuntimeQueries.Prepared) (leaves : Leaves K U)
+    (runtime : CompilerRuntimeQueries.Prepared)
+    (world : SourceCompilerWorld.Access (ValidityMachine.State K U)) (leaves : Leaves K U)
     (access : ValidityMachine.Access K U)
     (projection : PlaceProjectionHooks Provenance (ValidityMachine.State K U) C MachineHooks.FrameExtra)
     (vtable : VTableHooks Provenance (ValidityMachine.State K U) C F A)
@@ -43,7 +44,7 @@ def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
     implicitWrites := leaves.implicitWrites
     rustcNoWritable := leaves.rustcNoWritable
     preciseInteriorMut := leaves.preciseInteriorMut
-    immPtrToMPlace := PointerPlaceMachine.fromImmediate access (CompilerExecutionProviders.pointerCompiler prepared) choice
+    immPtrToMPlace := PointerPlaceMachine.fromImmediate access (CompilerExecutionProviders.pointerCompiler prepared world) choice
     sizeAndAlign := size
     checkPtrAccess := ValidityMachine.checkPointerAccess access
     resolveAllocation := TypedValidityProviders.resolveAllocation pointers
