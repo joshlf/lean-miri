@@ -7,12 +7,18 @@ does not claim process startup, CTFE or whole-machine safety. -/
 namespace Miri.Frontend.Foundation
 open Lean
 
-def literalProgram (document : Document) (definition : Nat) : Except String Input.LoweredProgram := do
+inductive LiteralView where
+  | bytes | str
+  deriving DecidableEq
+
+def literalProgram (document : Document) (definition : Nat) (view : LiteralView := .bytes) :
+    Except String Input.LoweredProgram := do
   let prepared ← prepareItem document definition #[]
   let some resultType := prepared.item.localTypes[0]? | throw "literal return type absent"
-  match resultType with
-  | .pointer "reference_erased_const" (.array (.primitive "uint" "u8") 4) => pure ()
-  | _ => throw "literal direct frame requires shared reference to four u8 values"
+  match view, resultType with
+  | .bytes, .pointer "reference_erased_const" (.array (.primitive "uint" "u8") 4) => pure ()
+  | .str, .pointer "reference_erased_const" (.primitive "str" "") => pure ()
+  | _, _ => throw "literal direct frame return type differs from requested source view"
   let (physical, abi) ← rustFunctionAbiOfItem document definition #[]
   let registry ← InstanceRegistry.start physical
   let (registry, instanceNode) ← registry.intern definition #[]
@@ -46,9 +52,10 @@ def literalProgram (document : Document) (definition : Nat) : Except String Inpu
   match statement.kind with
   | .Assign destination (.Use (.Constant constant) _) =>
     unless destination == ⟨0,#[]⟩ do throw "literal destination differs from return place"
-    match constant.value with
-    | .Val (.Scalar (.Ptr (.Allocation _ 0 _ _))) _ => pure ()
-    | _ => throw "literal direct frame requires an source root pointer at offset zero"
+    match view, constant.value with
+    | .bytes, .Val (.Scalar (.Ptr (.Allocation _ 0 _ _))) _ => pure ()
+    | .str, .Val (.Slice _ _) _ => pure ()
+    | _, _ => throw "literal constant source representation differs from requested view"
   | _ => throw "literal frame has unsupported source effects"
   let allocations ← sourceMemoryGraph document
   let runtime ← buildRuntimeItem document definition #[]

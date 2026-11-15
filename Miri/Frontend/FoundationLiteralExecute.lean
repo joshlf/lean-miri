@@ -80,7 +80,7 @@ private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
 /-- Execute one direct literal frame under the explicit fixed-scheduling, shallow
 validation, vclock profile below. Only the observed finite literal read is asserted;
 startup, process exit and other permitted choices are outside this check. -/
-def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Array UInt8) : Except String String := do
+def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Array UInt8) (view : LiteralView := .bytes) : Except String String := do
   let dummy ← Input.CompilerContextSpan.rootSpan prepared.program
   let definition ← prepared.program.rootDefinitionId 0
   let some root := prepared.program.input.bodyRoots[0]? | throw "root absent"
@@ -158,11 +158,19 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Array 
     let (inner, localOp) ← checkedState (MachineHooks.run
       (PlaceMachine.localToOp config.compiler () 0) (ExecutionStateTransport.inward after))
     let (inner, value) ← checkedState (MachineHooks.run (PlaceMachine.readImmediate config.access localOp) inner)
-    let scalar ← (value.imm.toScalar.mapError reprStr)
+    let (scalar, length) ← match view with
+      | .bytes => do
+        unless expected.size == 4 do throw "byte literal observer requires four bytes"
+        pure (← value.imm.toScalar.mapError reprStr, (4 : UInt64))
+      | .str => do
+        let (pointer, metadata) ← value.imm.toScalarPair.mapError reprStr
+        let length ← (metadata.toTargetUsize prepared.runtime.target.pointerOffset).mapError reprStr
+        unless length.toNat == expected.size do throw "fixed str metadata length differs from expected source bytes"
+        pure (pointer, length)
     let pointer ← (scalar.toPointer prepared.runtime.target.base).mapError reprStr
     unless pointer.provenance.isSome do throw "literal returned pointer lacks provenance"
     let (inner, contents) ← checkedState (MachineHooks.run
-      (RawMemoryMachine.readBytes config.access config.arithmetic pointer (UInt64.ofNat expected.size)) inner)
+      (RawMemoryMachine.readBytes config.access config.arithmetic pointer length) inner)
     unless contents.data == expected do throw "fixed memory read differs from source literal"
     -- The imported source bytes do not establish byte-interner membership.
     for key in #[expected, "not-in-source".toUTF8.data] do
