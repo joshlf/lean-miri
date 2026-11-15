@@ -41,8 +41,8 @@ def monoKey (declaration : SourceSymbols.Declaration) : Except String SourceComp
 
 /-- The shared World consumes this source identity header only at actual demand. -/
 def itemDeclaration (declaration : SourceSymbols.Declaration) : Except String SourceCompilerWorld.ItemDeclaration := do
-  let kind ← match declaration.kind with
-    | "function" => pure SourceCompilerWorld.ItemKind.function
+  let kind : SourceCompilerWorld.ItemKind ← match declaration.kind with
+    | "function" => pure .function
     | "associated_function" => pure .associatedFunction
     | _ => throw "exported source declaration is not callable"
   return { definition := declaration.definition, path := declaration.path, kind, parameters := declaration.parameters }

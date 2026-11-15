@@ -26,6 +26,10 @@ private def sourceHeader (d : Document) (definition : Nat) : Except String Json 
       unless (← body.getObjVal? key) == (← header.getObjVal? key) do throw "conflicting function signature source"
     return header
 
+/-- Parse-time declaration reader; does not inspect MIR locals or instructions. -/
+def functionHeaderSource (d : Document) (definition : Nat) : Except String Json :=
+  sourceHeader d definition
+
 private def substitutions (d : Document) (source : Json) (arguments : Array ItemArgument) :
     Except String (Array (Option ConcreteType) × Array (Option Nat)) := do
   let sourceEnvironment ← source.getObjVal? "environment"

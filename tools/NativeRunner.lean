@@ -463,13 +463,16 @@ private def terminalDiagnostic (prepared : Input.EvalPreparation.Prepared)
 private def prepareRun (prepared : Input.EvalPreparation.Prepared)
     (initialMemory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
     (pageSize : UInt64) (numCpus hostPid : UInt32) (diagnosticSeed : Option UInt64)
-    (profile : Lean.Options) (ui : Option UiSettings) (argv0 : String) :
+    (profile : Lean.Options) (ui : Option UiSettings) (argv0 : String)
+    (initialWorld : Option Input.SourceCompilerWorld.World) :
     Except String ((Option (Array HostStdio.Entry) → Array ExecutionChoices.Input → Except StepError
       (Input.EvalSourceRunFinalization.Result OuterState)) ×
       (Array ExecutionChoices.Input → Except String String)) := do
   let options := (ui.map uiOptions).getD options
   let compiler := prepared.compiler
-  let sourceCompiler ← Input.SourceCompilerWorld.create compiler.program.input
+  let sourceCompiler ← match initialWorld with
+    | some world => pure world
+    | none => Input.SourceCompilerWorld.create compiler.program.input
   let dummy := prepared.dummySpan
   let selectedEntry ← (Input.CompilerMain.sourceCompilerEntry compiler.main).mapError toString
   let (definition, entryType) ← match selectedEntry with
@@ -734,7 +737,8 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
   let hostPid ← IO.Process.getPID
   boundary "run: start"
   let (execute, checkValidationMismatch) ← must
-    (prepareRun prepared attempt.memory pageSize numCpus hostPid diagnosticSeed profile ui argv0)
+    (prepareRun prepared attempt.memory pageSize numCpus hostPid diagnosticSeed profile ui argv0
+      decoded.initialWorld)
   let mismatch ← match checkValidationMismatch initialInputs with
     | .ok report => pure report
     | .error error => throw (IO.userError s!"validation preflight regression failed: {error}")

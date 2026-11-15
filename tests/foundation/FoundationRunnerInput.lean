@@ -9,8 +9,13 @@ def main (paths : List String) : IO Unit := do
   let source ← IO.FS.readFile sourcePath
   let decoded ← checked (decodeRunnerInputProfiled source {})
   let program ← checked (Input.lowerProgram decoded.document)
-  unless program.input.bodyRoots.size == 1 && program.input.bodies.size == 2 &&
-      program.input.queries.main.entries.size == 1 do throw (IO.userError "source compiler-entry import incomplete")
+  unless program.input.bodyRoots.isEmpty && program.input.bodies.isEmpty &&
+      program.input.queries.main.entries.size == 1 &&
+      program.input.instances.all (fun node => node.kind == .identityOnly && node.bodyId.isNone) do
+    throw (IO.userError "header seed fabricated executable source bodies")
+  let some world := decoded.initialWorld | throw (IO.userError "derived startup World discarded")
+  unless world.derivedInstanceAbis.size == 2 && world.canonical.sourceMaterial.isSome do
+    throw (IO.userError "typed material or derived header ABI memo discarded")
   let ordinary ← IO.FS.readFile ordinaryPath
   let existing ← checked (Input.decodeJson ordinary)
   let routed ← checked (decodeRunnerInputProfiled ordinary {})
@@ -22,4 +27,4 @@ def main (paths : List String) : IO Unit := do
   | .error expected, .error actual =>
     unless actual == expected do throw (IO.userError "ordinary invalid-input diagnostic changed")
   | _, _ => throw (IO.userError "unknown input unexpectedly accepted")
-  IO.println "normal input dispatch: foundation compiler-entry import uses normal lowerer; existing ordinary decoder success/error paths preserved"
+  IO.println "normal input dispatch: typed header-only World reaches normal lowerer without fabricated MIR; derived ABI memo and ordinary decode paths preserved"
