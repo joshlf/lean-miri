@@ -55,7 +55,9 @@ where
       unless size < bound do throw "foundation array layout size overflow"
       return ⟨size, elem.align⟩
     | .tuple elements =>
-      if elements.isEmpty then return ⟨0, 1⟩
+      if elements.isEmpty then
+        let align ← target.aggregateAlign.bytes.mapError toString
+        return ⟨0, align.toNat⟩
       throw "nonempty Rust tuple layout is unsupported"
     | .pointer _ _ => throw "foundation pointer layout is unsupported"
 

@@ -10,7 +10,8 @@ cache shared between runs.
 
 `--foundation` starts that boundary with the separate `lean-miri-foundation` v1
 input. It exports selected **generic** MIR templates, structural type and
-definition graphs, the target data layout, and generic clauses. IDs name rows
+definition graphs, complete target evidence, source metadata, signatures,
+compilation settings, required-constant source material and generic clauses. IDs name rows
 within the document. Type and const parameters retain rustc's shared parameter
 indices. It does not enumerate substitutions or serialize layout, ABI, predicate,
 instance or interpreter query-answer catalogs. Unsupported source constructs
@@ -20,7 +21,9 @@ In Lean, `Foundation.decode` loads this finite document, `typeExpr` resolves a
 requested type, `instantiate` substitutes a requested type/const argument tuple,
 and `checkEnvironment` checks the known `Sized`, `Copy` and `usize` obligations
 for the restricted structural type domain. Each is a pure function of the
-document and explicit arguments. Unknown obligations are errors. The existing
+document and explicit arguments. Known scalar required constants are checked
+on frame demand, including unreachable obligations; unevaluated const MIR
+remains unsupported. Unknown obligations are errors. The existing
 fixed interpreter also now computes canonical nested-array layouts on demand
 from its imported type graph, with explicit cycle, overflow and contradiction
 errors.
@@ -29,21 +32,23 @@ The restricted foundation evaluator exercises identity and array-body fixtures
 after those checks. It accepts only fully initialized scalar and aggregate
 values with a single straight-line block and whole-local assignments. It is a
 fixture validator, **not** the fixed Miri interpreter and not a safety proof.
-The current schema-12 input still feeds the fixed interpreter. The migration is
+Pure item preparation also joins requested type arguments, target evidence,
+source locations and function signature fields. A separate syntax lowering
+produces an `MIR.Body` candidate for the restricted straight-line subset. The
+current schema-12 input still feeds the fixed interpreter. The migration is
 complete only when the fixed interpreter receives its required data from the
 finite foundation material and Lean computes its remaining compiler queries.
 The active missing work is tracked in [STATUS.md](../STATUS.md).
 
 A direct bridge to the fixed interpreter cannot correctly pad the new document
-with placeholders. Its preparation requires complete target alignment and
-pointer evidence, physical type layouts, function ABI and instance metadata,
-source MIR details, and relevant allocation material. Foundation currently
-omits function signatures and many MIR forms, and supports no general ABI or
-trait-resolution algorithm. It rejects frame-entry features that the restricted
-domain cannot reproduce, including nonempty or unknown `required_consts`,
-coroutines, inlined frames, target features and caller-location tracking. The
-next bridge must retain the remaining finite source facts and compute the
-needed answers in Lean before claiming fixed-interpreter execution.
+with placeholders. It still needs complete physical type/layout identity,
+function ABI, instance and `BodyCore` joins, as well as relevant allocation
+material. Lean computes a limited Rust ABI/unwind component, but its IDs are
+not yet validated against fixed-interpreter physical pools. Foundation supports
+no general trait-resolution or const-MIR evaluation algorithm. It rejects
+coroutines, inlined frames, target features and caller-location tracking, plus
+many MIR forms. The bridge must calculate every remaining answer in Lean before
+claiming fixed-interpreter execution.
 
 ## Proof and trust boundary
 
@@ -60,12 +65,12 @@ unsupported forms must stop with errors rather than successful execution.
 
 For one 134-byte concrete `[u16; 3]` source, three alternating sequential trials
 used the same pinned release exporter binary, CPU 2 and one Lean thread. The
-ordinary schema-12 export had median wall/CPU time 0.220478/0.178710 s and a
+ordinary schema-12 export had median wall/CPU time 0.141958/0.134849 s and a
 137,397-byte output. Foundation v1 had median wall/CPU time
-0.062050/0.051717 s and a 955-byte output. Wall ranges were 0.167829–0.236291
-and 0.038194–0.125017 s respectively. One trial in each mode saw 0.01 s
-selected CPU steal; cgroup throttling deltas were zero. Raw timings, hashes and
-counters are in ignored `scratch/performance/` in the measuring workspace. The
-shared-host spread is substantial and these formats currently support different
-operations, so this is an export-only comparison, not a claim of equivalent
-executions or interpreter speedup.
+0.037632/0.028979 s and a 7,822-byte output. Wall ranges were 0.136678–0.234222
+and 0.035744–0.038428 s respectively. One ordinary trial saw 0.01 s selected
+CPU steal; cgroup throttling deltas were zero. Raw timings, hashes and counters
+are in ignored `scratch/performance/` in the measuring workspace. The ordinary
+measurements vary substantially and these formats support different operations,
+so this is an export-only comparison, not a claim of equivalent executions or
+interpreter speedup.

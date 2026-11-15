@@ -15,22 +15,24 @@ the ability to verify arbitrary Rust are not claimed.
 
 The experimental `--foundation` export begins a replacement for schema-12's
 eager compiler-query closure. It retains generic MIR templates, structural
-types and definitions, target data and generic predicates as finite material;
+types and definitions, complete target data, source metadata, signatures,
+compilation settings, required constants and generic predicates as finite material;
 it does not enumerate monomorphic substitutions or emit query-answer catalogs.
 The new Lean reader computes type expansion, generic substitution, a restricted
-`Sized`/`Copy`/`usize` obligation check and primitive/array layouts as pure
-on-demand queries. The existing fixed interpreter separately computes nested
+`Sized`/`Copy`/`usize` obligation check, supported required-constant checks,
+primitive/array layouts and partial ABI components as pure on-demand queries.
+It constructs requested item templates and typed MIR syntax candidates. The existing fixed interpreter separately computes nested
 array layouts on demand from imported material. A restricted straight-line
 foundation evaluator checks selected scalar/array fixtures, but it is **not**
 the fixed Miri interpreter and establishes no Rust safety theorem.
 
 The fixed interpreter still consumes schema 11/12, including precomputed
-layout, ABI, instance and other query tables. Full migration requires retaining
-the canonical executable MIR/source facts missing from foundation, implementing
-Lean layout and ABI algorithms for the required target/type range, generic
-instance and trait resolution, constant evaluation, allocation identity and
-provenance, and then feeding the fixed interpreter without invented compiler
-facts. Current foundation export fails closed on many MIR, type, lifetime,
+layout, ABI, instance and other query tables. Full migration requires validating
+physical type/layout IDs and complete ABI rows against the finite material,
+completing `BodyCore` and instance joins, supporting broader types/MIR and
+trait/const queries, allocation identity and provenance, then feeding the fixed
+interpreter without invented compiler facts. A limited physical-layout constructor
+and parametric ABI constructor do not yet satisfy those joins. Current foundation export fails closed on many MIR, type, lifetime,
 allocation and call forms. Neither the foundation path nor the old query
 closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
