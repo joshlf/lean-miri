@@ -30,7 +30,8 @@ def main (paths : List String) : IO Unit := do
   rejects (internType world (.tuple #[document.types.size]) aggregate "absent child")
   rejects (internType world (.adt ⟨document.definitions.size,.structKind,
     ⟨none,none,none,0,none,0⟩,#[],#[]⟩) layout "absent definition")
-  let (withDef,defId) ← expect (internDefinition world document.definitions[0]!)
+  let some originalDefinition := document.definitions[0]? | throw (IO.userError "compiler definition absent")
+  let (withDef,defId) ← expect (internDefinition world originalDefinition)
   check (defId == 0 && withDef.canonical.definitions.size == world.canonical.definitions.size) "raw definition was renumbered"
   rejects (internDefinition world ⟨2^32,0⟩)
   IO.println "PASS canonical structural physical keys, complete layout contradictions, append-only pools and no fabricated facts"
