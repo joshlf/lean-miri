@@ -36,6 +36,19 @@ def closureUpvarCount (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except 
   | .closure _ _ count => pure (some count)
   | _ => pure none
 
+/-- Canonical shapes have already passed interning validation. Tuple children
+and closure capture counts retain their actual type-pool identities. -/
+def tupleFieldsSource (world : SourceCompilerWorld.World) (ty : MIR.TyId) : Except String (Array MIR.TyId) := do
+  let some node := world.canonical.types[ty]? | throw "source RustCall tuple type unavailable"
+  let .tuple fields := node.shape | throw "source RustCall spreading requires the exact tuple type"
+  return fields
+
+def closureUpvarCountSource (world : SourceCompilerWorld.World) (ty : MIR.TyId) : Except String (Option Nat) := do
+  let some node := world.canonical.types[ty]? | throw "source closure argument type unavailable"
+  match node.shape with
+  | .closure _ _ count => pure (some count)
+  | _ => pure none
+
 /-- Exact source ExternAbi identity, canonical FnAbi records, shared DefIds/
 TypeConstIds and actual current BodyIdentity all belong to this same program. -/
 def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
@@ -55,11 +68,15 @@ def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
     LayoutCompat.checkArgumentCompat (CompilerFacts.compatibilityQueries p.lifecycle.calls.symbols.facts.context)
       compatibilityBudget caller callee
   targetFeatures := CompilerTargetFeatures.dictionary p.intrinsics world
-  tupleFields := fun ty => lift (tupleFields p ty)
+  tupleFields := fun ty => if p.runtime.source.sourceMaterial.isSome then
+    source world (tupleFieldsSource · ty)
+    else lift (tupleFields p ty)
   isClosureLike := fun callee => if p.runtime.source.sourceMaterial.isSome then
     source world (SourceCallFacts.isClosureLike · callee)
     else lift (CompilerCallFacts.isClosureLike p.intrinsics callee)
-  closureUpvarCount := fun ty => lift (closureUpvarCount p ty)
+  closureUpvarCount := fun ty => if p.runtime.source.sourceMaterial.isSome then
+    source world (closureUpvarCountSource · ty)
+    else lift (closureUpvarCount p ty)
   llvmLinkName := fun callee => do
     let name ← if p.runtime.source.sourceMaterial.isSome then
       source world (SourceCallFacts.codegenSymbolName · callee)
