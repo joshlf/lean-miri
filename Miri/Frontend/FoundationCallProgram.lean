@@ -15,7 +15,7 @@ private def place (count : Nat) (j : Json) : Except String MIR.Place := do
   unless localIndex < count do throw "call program local out of bounds"
   return ⟨localIndex, #[]⟩
 
-private def callSyntax (prepared : PreparedItem) (frozen : DirectCallPool.FunctionTypes)
+def lowerScalarDirectCall (prepared : PreparedItem) (frozen : DirectCallPool.FunctionTypes)
     (demand : DirectCallPool.Demand) (j spans : Json) : Except String MIR.TerminatorKind := do
   let function ← j.getObjVal? "function"
   unless (← function.getObjValAs? String "kind") == "constant" &&
@@ -84,7 +84,7 @@ def relocateBodySource (body : Input.BodyCore) (offset : Nat) (files : Array Nat
     backtraceSpans := backtraces
     requiredConsts := body.requiredConsts.map fun c => { c with span := ⟨c.span.id + offset⟩ } }
 
-private def checkScalarIdentity (body : Input.BodyCore) (typeId : Nat) : Except String Unit := do
+def checkScalarIdentity (body : Input.BodyCore) (typeId : Nat) : Except String Unit := do
   unless body.mir.argumentCount == 1 && body.mir.locals == #[typeId, typeId] &&
       body.mir.basicBlocks.size == 1 do throw "scalar identity leaf locals/control flow mismatch"
   let some block := body.mir.basicBlocks[0]? | throw "scalar identity entry block absent"
@@ -170,7 +170,7 @@ def restrictedDirectCallProgram (document : Document) (definition : Nat) :
       (fun block terminal spans => do
         unless node.id == rootNode.id do throw "call leaf may not call"
         let some (_, d) := demands.find? (·.1 == block) | throw "call demand site absent"
-        callSyntax prepared frozen d terminal spans) evidence
+        lowerScalarDirectCall prepared frozen d terminal spans) evidence
     if node.id == demand.node.id then
       let some returnType := body.mir.locals[0]? | throw "scalar identity return local absent"
       checkScalarIdentity body returnType

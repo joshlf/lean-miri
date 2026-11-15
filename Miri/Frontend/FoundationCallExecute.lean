@@ -88,10 +88,16 @@ private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
     pure (.memory destination)
   checkedState (MachineHooks.run action state)
 
+structure FrameObservation where
+  depth : Nat := 2
+  entries : Nat := 1
+  distinct : Nat := 1
+
 /-- Execute a bounded two-body scalar call under the explicit fixed-scheduling, shallow
 validation, vclock profile below. Only the observed finite call is asserted;
 startup, process exit and other permitted choices are outside this check. -/
-def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat := 42) : Except String String := do
+def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat := 42)
+    (frames : FrameObservation := {}) : Except String String := do
   let dummy ← Input.CompilerContextSpan.rootSpan prepared.program
   let definition ← prepared.program.rootDefinitionId 0
   let some root := prepared.program.input.bodyRoots[0]? | throw "root absent"
@@ -155,13 +161,21 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat :=
     unless (match returnPlace with | .memory _ => true | _ => false) do
       throw "non-unit root return place was not backed by real memory"
     let mut current : OuterState := ExecutionStateTransport.outward inner
-    let mut sawCallee := false
+    let mut maximumDepth := 1
+    let mut previousDepth := 1
+    let mut calleeEntries := 0
+    let mut visited : Array CallInstance := #[]
     let mut observed : Option Nat := none
     for _ in [:32] do
       let some frame := current.stack.currentFrame? | break
+      let depth := current.stack.frames.size
+      maximumDepth := max maximumDepth depth
+      if depth > previousDepth then
+        unless depth == previousDepth + 1 do throw "unexpected multi-frame stack push"
+        calleeEntries := calleeEntries + 1
       if frame.functionInstance != rootInstance then
-        unless current.stack.frames.size == 2 do throw "unexpected direct call stack depth"
-        sawCallee := true
+        unless depth >= 2 && depth <= frames.depth do throw "unexpected direct call stack depth"
+        if !visited.contains frame.functionInstance then visited := visited.push frame.functionInstance
       else
         match frame.location with
         | .mir location =>
@@ -179,11 +193,13 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat :=
       let (after, stepped) ← checkedState
         (Input.EvalConfigurationCore.step prepared image bytes options coreLeaves () current)
       unless stepped || after.stack.frames.isEmpty do throw "fixed interpreter made no call-program step"
+      previousDepth := depth
       current := after
     unless current.stack.frames.isEmpty && current.stack.currentFrame?.isNone do
       throw "direct-call observation bound exhausted before Return"
-    unless sawCallee && observed == some expected do
+    unless maximumDepth == frames.depth && calleeEntries == frames.entries &&
+        visited.size == frames.distinct && observed == some expected do
       throw s!"fixed direct call did not enter callee and return {expected}"
-    pure s!"fixed interpreter {root.defPath}({expected})={expected}; width={returnPlace.layout.layout.size.bytes}; real callee frame entered; both Returns executed; stack empty"
+    pure s!"fixed interpreter {root.defPath}({expected})={expected}; width={returnPlace.layout.layout.size.bytes}; depth={maximumDepth}, callee entries={calleeEntries}, distinct callees={visited.size}; stack empty"
 
 end Miri.Frontend.Foundation.FixedDirectCallRun
