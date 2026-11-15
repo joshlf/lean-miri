@@ -1,3 +1,4 @@
+import Miri.Input.SourceCompilerFrame
 import Miri.Input.CompilerCallPipeline
 import Miri.Interpreter.FrameMetadataBindings
 
@@ -49,6 +50,67 @@ def hooks (p : Prepared) (userRelevantCrates : Array Nat) : FrameMetadata.Compil
       return actual
     unless actual.body == body do throw (.invalidProgram "frame body identity/content mismatch")
     lift (CompilerScopes.sourceScope p.calls.scopes identity.index scope) }
+
+/-- Current canonical scope data, including exact inline instance and span IDs. -/
+def sourceScope (world : SourceCompilerWorld.World) (identity : BodyIdentity)
+    (callee : CallInstance) (mir : MIR.Body) (index : Nat) :
+    Except String VirtualCalls.CallerScope := do
+  let body ← SourceCompilerFrame.body world callee identity mir
+  let some scope := body.sourceScopes[index]? | throw "canonical source scope absent"
+  match scope.inlined with
+  | none => return ⟨none,scope.inlinedParent⟩
+  | some inline =>
+    let _ ← SourceCompilerWorld.node world inline.instanceId
+    unless inline.callsiteSpanId < world.canonical.spans.size do throw "inline callsite span absent"
+    return ⟨some (inline.instanceId,⟨inline.callsiteSpanId⟩),scope.inlinedParent⟩
+
+def requiresCallerLocation (world : SourceCompilerWorld.World) (callee : CallInstance) : Except String Bool := do
+  let node ← SourceCompilerWorld.node world callee
+  if let some material := world.canonical.sourceMaterial then
+    unless matchesItem node.instanceKind do throw "typed source caller-location instance kind unsupported"
+    let some definition := world.canonical.definitions[node.instanceKind.defId]?
+      | throw "caller-location source definition absent"
+    let some abi := material.abi | throw "typed source function attributes absent"
+    let functions := abi.functions.filter (·.definition == definition)
+    unless functions.size == 1 do throw "typed source function attributes absent/ambiguous"
+    let some function := functions[0]? | throw "typed source function attributes absent"
+    return function.attributes.trackCaller
+  let inline := world.canonical.bodies.flatMap fun body => body.sourceScopes.filterMap fun scope =>
+    scope.inlined.bind fun row => if row.instanceId == callee then some row.requiresCallerLocation else none
+  if let some first := inline[0]? then
+    unless inline.all (· == first) do throw "conflicting inline caller-location attributes"
+    return first
+  let some row := world.canonical.queries.runtime.instances.find? (·.instanceId == callee)
+    | throw "current full-instance caller-location attribute absent"
+  return row.requiresCallerLocation
+where
+  matchesItem : CallInstanceKind → Bool
+    | .Item _ => true
+    | _ => false
+
+/-- Every compiler leaf reads the current shared World, including bodies added
+since preparation. Crate names and source attributes remain actual evidence. -/
+def liveHooks (access : SourceCompilerWorld.Access (MachineHooks.State K User))
+    (userRelevantCrates : Array Nat) : FrameMetadata.CompilerHooks K User := Id.run do
+  let current : MachineHooks.M K User SourceCompilerWorld.World := do
+    let some world := access.get (← get)
+      | throw (.unsupported "compiler frame metadata: source compiler World unavailable")
+    return world
+  return {
+    requiresCallerLocation := fun callee => do lift (requiresCallerLocation (← current) callee)
+    isLocalDefinition := fun callee => do
+      let world ← current
+      return (← lift (SourceCompilerFrame.definitionCrate world callee)) == world.canonical.queries.frameMetadata.localCrate
+    definitionCrate := fun callee => do lift (SourceCompilerFrame.definitionCrate (← current) callee)
+    userRelevantCrate := fun id => pure (userRelevantCrates.contains id)
+    crateName := fun id => do
+      let world ← current
+      lift do
+        let some (_,name) := world.canonical.queries.frameMetadata.crates.find? (·.1 == id)
+          | throw "compiler crate name absent"
+        return name
+    sourceScope := fun identity callee mir scope => do
+      lift (sourceScope (← current) identity callee mir scope) }
 
 end Miri.Input.CompilerFrameMetadata
 

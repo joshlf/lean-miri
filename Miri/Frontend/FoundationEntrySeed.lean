@@ -76,11 +76,14 @@ def compilerEntrySeed (document : Document) : Except String Input.SourceCompiler
   let initialSpans : SpanRegistry := ⟨#[],#[],#[],#[]⟩
   let (spans, rootSpan) ← appendSessionRootSpan initialSpans document.source
   let some sourceMemory := material.allocations | throw "typed source memory graph unavailable"
-  unless sourceMemory.images.isEmpty do throw "source allocation materialization capability unavailable in entry seed"
-  -- This empty canonical graph is justified by the checked complete typed
-  -- source graph, rather than a second JSON parse or a guessed absence.
+  -- Source images remain typed templates until an allocation constant demand.
   let memory : Array Input.AllocationNode := #[]
-  let (_, globalBytes) ← globalBytesWithoutCandidates physical memory
+  let globalBytes ← if sourceMemory.images.isEmpty then do
+    pure (← globalBytesWithoutCandidates physical memory).2
+  else do
+    let candidates := physical.types.filter (·.shapeKind == .str)
+    let [str] := candidates.toList | throw "source str primitive absent/ambiguous"
+    pure (Input.Catalog.GlobalBytes.unavailable str.id)
   let sections ← sourceLinkSections document.source
   let mainCatalog : Input.Catalog.Main := {
     startLangItem := some start, compilerEntry := some entry.definition

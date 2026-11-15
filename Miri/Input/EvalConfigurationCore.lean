@@ -1,4 +1,5 @@
 import Miri.Input.EvalConfiguration
+import Miri.Input.SourceCompilerAllocations
 import Miri.Interpreter.NativeAllocationLifecycle
 import Miri.Interpreter.MemoryErrors
 import Miri.Interpreter.LeakCheck
@@ -435,7 +436,10 @@ def makeWithForeignContext {Assembly : Type}
     let allocation := {allocation with
       allocationBacktrace := if options.collectLeakBacktraces then some (fun id kind => do
         unless LeakCheck.mayLeak kind do
-          let trace ← match CompilerAllocationBacktrace.collect p (← get).stack.frames with
+          let state ← get
+          let some world := EvalCoreMachine.sourceCompilerAccess.get state
+            | throw (.unsupported "allocation backtrace requires the shared compiler World")
+          let trace ← match CompilerAllocationBacktrace.collect world state.stack.frames with
             | .ok trace => pure trace
             | .error reason => throw (.unsupported s!"compiler allocation backtrace: {reason}")
           let state ← get
@@ -465,19 +469,43 @@ def makeWithForeignContext {Assembly : Type}
       | .error error => throw error
       | .ok config => ValidityMachine.validateRuntime config.validity c options.limits.validation place true
     let compiler := EvalPlaceConstruction.compiler p placeOptions access pointers table
-      (CompilerPlaceTypes.place p options.place.debugAssertions covariance) validate
+      (CompilerPlaceTypes.place p EvalCoreMachine.sourceCompilerAccess options.place.debugAssertions covariance) validate
     let projection := EvalPlaceConstruction.projection p placeOptions access allocation compiler table
     let pointerCompiler := CompilerExecutionProviders.pointerCompiler facts
     let dereference := PointerPlaceMachine.dereference access pointerCompiler projection.dynamic table projection.dynamicFuel
     let operands : OperandMachine.Hooks MiriMemoryKind (User Os R P H D O Aff B Host) C := {
       compiler,projection
       layoutCompatible := compatibility
-      checkPlaceType := CompilerPlaceTypes.operand p options.place.debugAssertions covariance
+      checkPlaceType := CompilerPlaceTypes.operand p EvalCoreMachine.sourceCompilerAccess options.place.debugAssertions covariance
       dereference
       runtimeChecks := CompilerScalarLeaves.runtimeChecks p
       boolLayout := CompilerScalarLeaves.boolLayout p
-      constant := fun _ constant known =>
-        ConstantMachine.evalOperandWithLayout p.runtime functions pointers.arithmetic
+      constant := fun _ constant known => do
+        let state ← get
+        let runtime ← match EvalCoreMachine.sourceCompilerAccess.get state with
+          | some world => do
+            if world.canonical.sourceMaterial.isSome then
+              let root := match constant.value with
+                | .Val (.Slice allocation _) _ | .Val (.Indirect allocation _) _ => some allocation
+                | .Val (.Scalar (.Ptr (.Allocation allocation _ _ _))) _ => some allocation
+                | _ => none
+              if let some root := root then
+                let imported ← match SourceCompilerAllocations.importDemanded p.runtime.target world root state.machine.memory with
+                  | .ok result => pure result
+                  | .error reason => throw (.unsupported reason)
+                set {state with machine := {state.machine with memory := imported.memory}}
+                match imported.outcome with
+                | .ok _ => pure ()
+                | .error reason => throw (.unsupported reason)
+              -- Target evidence is fixed at initialization; typed physical
+              -- demands extend only the canonical source rows in this World.
+              pure {p.runtime with source := world.canonical}
+            else pure p.runtime
+          | none => do
+            if p.program.input.sourceMaterial.isSome then
+              throw (.unsupported "constant query requires the shared source compiler World")
+            pure p.runtime
+        ConstantMachine.evalOperandWithLayout runtime functions pointers.arithmetic
           externStatic MemoryErrors.constant constant known
           (if options.place.debugAssertions then some (fun computed expected => physical (compatibility computed expected)) else none) }
     let callBackend : CallDispatchMachine.Backend (State Os R P H D O Aff B Host) := {

@@ -7,7 +7,8 @@ import Miri.Input.SourcePhysical
 /-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
 MIR execution, compiler process, query catalog or private pool participates.
 This initial common domain is scalar/unit/raw-pointer/array signatures and
-source-backed Sized/Copy/MetaSized clauses. Other forms fail at demand. -/
+source-backed Sized/Copy/MetaSized and safe Rust function-pointer callable
+clauses/projections. Other forms fail at demand. -/
 namespace Miri.Input.SourceAbi
 open Miri.Interpreter
 abbrev World := SourceCompilerWorld.World
@@ -83,6 +84,42 @@ where
       go fuel output
     | _ => throw "typed ABI nominal/dyn outlives unsupported"
 
+/-- Structural equality for the callable domain, not layout equivalence. -/
+private def callableTypeEqual (a b : SourceTypes.Concrete) : Except String Bool := go 1024 a b
+where
+  go (fuel : Nat) (a b : SourceTypes.Concrete) : Except String Bool := do
+    let .succ fuel := fuel | throw "typed ABI callable equality exhausted"
+    match a,b with
+    | .primitive ak an,.primitive bk bn => pure (ak == bk && an == bn)
+    | .array a al,.array b bl => return al == bl && (← go fuel a b)
+    | .pointer ak a,.pointer bk b => return ak == bk && (← go fuel a b)
+    | .tuple a,.tuple b =>
+      if a.size != b.size then return false
+      for (a,b) in a.zip b do unless (← go fuel a b) do return false
+      pure true
+    | .functionPointer ai ao aSafety aa av,.functionPointer bi bo bs ba bv =>
+      if aSafety != bs || aa != ba || av != bv || ai.size != bi.size then return false
+      for (a,b) in ai.zip bi do unless (← go fuel a b) do return false
+      go fuel ao bo
+    | .nominal ..,_ | .dynamicObject ..,_ | .closure ..,_ | .patternNotNull ..,_ |
+      _,.nominal .. | _,.dynamicObject .. | _,.closure .. | _,.patternNotNull .. =>
+      throw "typed ABI callable nominal/dyn/closure equality unsupported"
+    | _,_ => pure false
+
+/-- Pinned rustc's callable builtin: safe, nonvariadic Rust fn pointers have
+exact tupled inputs and output. Higher-ranked pointers remain unsupported by
+source instantiation rather than being instantiated with guessed lifetimes. -/
+private def callableOutput (self args : SourceTypes.Concrete) : Except String SourceTypes.Concrete := do
+  let .functionPointer inputs output safety convention variadic := self
+    | throw "typed ABI callable self is not a function pointer"
+  unless safety == .Safe && convention == .Rust && !variadic do
+    throw "typed ABI callable requires safe nonvariadic Rust function pointer"
+  let .tuple elements := args | throw "typed ABI callable argument is not a tuple"
+  unless (← callableTypeEqual (.tuple inputs) (.tuple elements)) do
+    throw "typed ABI callable input tuple mismatch"
+  unless (← builtin .sized output) do throw "typed ABI callable output is not Sized"
+  return output
+
 private def checkClauses (source : Input.SourceMaterial) (abi : Material) (physical : SourceTypes.Material)
     (types : Array (Option SourceTypes.Concrete)) (constants : Array (Option Nat)) (owner : DefinitionId) : Except String Unit :=
   go (source.genericLayers.size + 1) #[] owner
@@ -107,11 +144,25 @@ where
         let type ← SourceTypes.instantiate physical types constants self
         unless (← builtin role type) do throw "typed ABI builtin obligation unsatisfied"
       | .trait definition none arguments =>
-        let [self] := arguments.toList | throw "typed ABI ordinary trait arguments unsupported"
-        let .tuple fields ← SourceTypes.instantiate physical types constants self
-          | throw "typed ABI ordinary impl matcher supports unit only"
-        unless fields.isEmpty do throw "typed ABI ordinary impl matcher supports unit only"
-        let _ ← unitTraitImpl abi definition
+        if abi.callables.any (·.definition == definition) then
+          let [self,args] := arguments.toList | throw "typed ABI callable trait arity unsupported"
+          let _ ← callableOutput (← SourceTypes.instantiate physical types constants self)
+            (← SourceTypes.instantiate physical types constants args)
+        else
+          let [self] := arguments.toList | throw "typed ABI ordinary trait arguments unsupported"
+          let .tuple fields ← SourceTypes.instantiate physical types constants self
+            | throw "typed ABI ordinary impl matcher supports unit only"
+          unless fields.isEmpty do throw "typed ABI ordinary impl matcher supports unit only"
+          let _ ← unitTraitImpl abi definition
+      | .projection definition parent arguments term =>
+        let [declaration] := (abi.callables.filter fun row => row.definition == parent && row.output == some definition).toList
+          | throw "typed ABI associated projection declaration unsupported"
+        unless declaration.kind == .fnOnce do throw "typed ABI projection is not FnOnce Output"
+        let [self,args] := arguments.toList | throw "typed ABI callable projection arity unsupported"
+        let output ← callableOutput (← SourceTypes.instantiate physical types constants self)
+          (← SourceTypes.instantiate physical types constants args)
+        unless (← callableTypeEqual output (← SourceTypes.instantiate physical types constants term)) do
+          throw "typed ABI callable Output mismatch"
       | .typeOutlives type .static =>
         staticOutlives (← SourceTypes.instantiate physical types constants type)
       | .constHasType parameter type =>

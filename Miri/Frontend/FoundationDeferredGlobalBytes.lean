@@ -29,6 +29,6 @@ def deferredGlobalBytes {P E K : Type} (runtime : Input.RuntimeMetadata)
   let _ ← (runtime.lookup node.id).mapError toString
   -- Prepared's key array is unused by configuration/strLayout; only attach
   -- installs keys in memory. No attach call is performed on this path.
-  return ⟨node.id, #[]⟩
+  return {strType := node.id,keys := #[],evidenceAvailable := false}
 
 end Miri.Frontend.Foundation

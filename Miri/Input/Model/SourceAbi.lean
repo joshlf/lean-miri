@@ -18,6 +18,7 @@ structure BuiltinDeclaration where
 
 inductive Clause where
   | trait (definition : DefinitionId) (role : Option BuiltinTrait) (arguments : Array SourceTypes.TypeRef)
+  | projection (definition parentTrait : DefinitionId) (arguments : Array SourceTypes.TypeRef) (term : SourceTypes.TypeRef)
   | constHasType (parameter : Nat) (type : SourceTypes.TypeRef)
   | typeOutlives (type : SourceTypes.TypeRef) (region : SourceTypes.Region)
   | unsupported (kind : String)
@@ -93,6 +94,17 @@ structure TraitDeclaration where
   implementations : Array ImplHeader
   deriving Repr, DecidableEq
 
+inductive CallableKind where
+  | fn | fnMut | fnOnce
+  deriving Repr, DecidableEq
+
+/-- Validated pinned callable declaration identities; these are not impl selections. -/
+structure CallableDeclaration where
+  definition : DefinitionId
+  kind : CallableKind
+  output : Option DefinitionId
+  deriving Repr, DecidableEq
+
 structure Material where
   functions : Array Function
   owners : Array OwnerClauses
@@ -100,6 +112,7 @@ structure Material where
   panicUnwinds : Bool
   panicInDropUnwinds : Bool
   traits : Array TraitDeclaration := #[]
+  callables : Array CallableDeclaration := #[]
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi

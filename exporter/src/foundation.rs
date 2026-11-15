@@ -395,8 +395,10 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let source_function_signatures = function_header_material::capture_for_roots(tcx,&mut m,signature_roots,roots)?;
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
     let has_fn_pointer = m.types.iter().any(|row| row["shape"]["kind"] == "function_pointer");
+    let has_callable_declaration = [tcx.lang_items().fn_trait(),tcx.lang_items().fn_mut_trait(),tcx.lang_items().fn_once_trait()]
+        .into_iter().flatten().any(|def| m.def_ids.contains_key(&def));
     let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
-    let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() || has_fn_pointer {
+    let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() || has_fn_pointer || has_callable_declaration {
         m.fn_vtable_source(tcx)?
     } else { Value::Null };
     let closure_auto_source = m.closure_auto_source(tcx)?;

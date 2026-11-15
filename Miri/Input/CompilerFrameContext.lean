@@ -1,3 +1,4 @@
+import Miri.Input.SourceCompilerFrame
 import Miri.Input.CompilerProviders
 import Miri.Interpreter.AllocationDriver
 
@@ -26,11 +27,7 @@ def bodyOfFrame (p : CompilerProviders.Prepared) (frame : ActualFrame) :
 canonical identity and ownership; it does not lower or rediscover source MIR. -/
 def worldBodyOfFrame (world : SourceCompilerWorld.World) (frame : ActualFrame) :
     Except String Body := do
-  let index ← SourceCompilerWorld.bodyId world frame.functionInstance
-  unless index == frame.bodyIdentity.index do throw "full-instance/canonical body identity mismatch"
-  let some body := world.canonical.bodies[index]? | throw "canonical body identity is absent"
-  unless body.mir == frame.body do throw "canonical body/content mismatch"
-  return body
+  SourceCompilerFrame.body world frame.functionInstance frame.bodyIdentity frame.body
 
 private def currentWorld (access : SourceCompilerWorld.Access (MachineHooks.State K User)) :
     MachineHooks.M K User SourceCompilerWorld.World := do

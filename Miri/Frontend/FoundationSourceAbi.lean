@@ -35,6 +35,15 @@ private def declaration (document : Document) (clause : Json) : Except String (C
         let pinned ← clause.getObjValAs? Bool "pinned_core_builtin"
         pure (some (BuiltinDeclaration.mk definition kind pinned))
     return (.trait definition sourceRole arguments,builtin)
+  | "projection" =>
+    unless (← clause.getObjValAs? (Array Json) "bound_variables").isEmpty do return (.unsupported "bound projection",none)
+    let term ← clause.getObjVal? "term"
+    unless (← term.getObjValAs? String "kind") == "type" do return (.unsupported "const projection",none)
+    let arguments ← (← clause.getObjValAs? (Array Json) "arguments").mapM fun argument => do
+      unless (← argument.getObjValAs? String "kind") == "type" do throw "ABI projection non-type argument"
+      argument.getObjValAs? Nat "type"
+    return (.projection (← raw document (← clause.getObjValAs? Nat "definition"))
+      (← raw document (← clause.getObjValAs? Nat "parent_trait")) arguments (← term.getObjValAs? Nat "type"),none)
   | "type_outlives" =>
     return (.typeOutlives (← clause.getObjValAs? Nat "type") (← SourceTypesParser.region (← clause.getObjVal? "region")),none)
   | "const_has_type" =>
@@ -81,6 +90,77 @@ private def ordinaryTraits (document : Document) : Except String (Array TraitDec
     let pinned ← match source.getObjValAs? Bool "meta_sized_core_source" with | .ok value => pure value | .error _ => pure false
     return BuiltinDeclaration.mk (← raw document id) .metaSized pinned
   return (#[declaration],builtins)
+
+/-- Validate the pinned callable declarations once. The compact typed record
+retains identities only after all generic declaration obligations are checked. -/
+private def callableDeclarations (document : Document) : Except String (Array CallableDeclaration) := do
+  let source ← document.source.getObjVal? "fn_vtable_source"
+  if source == Json.null then return #[]
+  let declarations ← source.getObjValAs? (Array Json) "declarations"
+  -- Older source envelopes lack full declaration clauses, so provide no callable capability.
+  if declarations.any (fun row => (row.getObjVal? "clause_source").toOption.isNone) then return #[]
+  let roots ← source.getObjValAs? (Array Json) "roots"
+  let root (name : String) : Except String Nat := do
+    let [row] := (roots.filter fun row => (row.getObjValAs? String "kind").toOption == some name).toList
+      | throw "ABI callable root absent/ambiguous"
+    row.getObjValAs? Nat "definition"
+  let fnId ← root "fn"
+  let mutId ← root "fn_mut"
+  let onceId ← root "fn_once"
+  let named (name : String) : Except String Nat := do
+    let [row] := (declarations.filter fun row => (row.getObjValAs? String "lang_item").toOption == some name).toList
+      | throw "ABI callable declaration absent/ambiguous"
+    row.getObjValAs? Nat "definition"
+  let metadataId ← named "meta_sized"
+  let mut result := #[]
+  for (id, name, kind, parent) in #[(fnId,"fn",CallableKind.fn,some mutId),
+      (mutId,"fn_mut",CallableKind.fnMut,some onceId),(onceId,"fn_once",CallableKind.fnOnce,none)] do
+    let [row] := (declarations.filter fun row => (row.getObjValAs? Nat "definition").toOption == some id).toList
+      | throw "ABI callable declaration identity ambiguous"
+    unless (← row.getObjValAs? Bool "core_source") && (← row.getObjValAs? Bool "has_self") &&
+        (← row.getObjValAs? String "lang_item") == name do throw "ABI callable declaration role mismatch"
+    let parameters ← row.getObjValAs? (Array Json) "parameters"
+    unless parameters.size == 2 do throw "ABI callable generic arity unsupported"
+    for (parameter,index) in parameters.zip #[0,1] do
+      unless (← parameter.getObjValAs? Nat "index") == index &&
+          (← parameter.getObjValAs? String "kind") == "type" && !(← parameter.getObjValAs? Bool "has_default") do
+        throw "ABI callable generic declaration unsupported"
+    let owners ← row.getObjValAs? (Array Json) "clause_source"
+    let [owner] := owners.toList | throw "ABI callable lexical clauses unsupported"
+    unless (← owner.getObjValAs? Nat "definition") == id && (← owner.getObjVal? "parent") == Json.null do
+      throw "ABI callable clause owner mismatch"
+    let mut observed : Array (String × Array Nat) := #[]
+    for clause in (← owner.getObjValAs? (Array Json) "clauses") do
+      unless (← clause.getObjValAs? String "kind") == "trait" &&
+          (← clause.getObjValAs? Bool "core_source") && (← clause.getObjValAs? String "polarity") == "Positive" &&
+          (← clause.getObjValAs? (Array Json) "bound_variables").isEmpty do throw "ABI callable clause unsupported"
+      let role ← clause.getObjValAs? String "lang_item"
+      let target ← clause.getObjValAs? Nat "definition"
+      let expectedId ← match role with
+        | "fn" => pure fnId | "fn_mut" => pure mutId | "fn_once" => pure onceId
+        | "meta_sized" => pure metadataId
+        | "sized" | "tuple" => pure target
+        | _ => throw "ABI callable clause language role unsupported"
+      unless target == expectedId do throw "ABI callable clause identity mismatch"
+      let arguments ← (← clause.getObjValAs? (Array Json) "arguments").mapM fun argument => do
+        unless (← argument.getObjValAs? String "kind") == "type" do throw "ABI callable argument unsupported"
+        let type ← argument.getObjVal? "type"
+        unless (← type.getObjValAs? String "kind") == "param" do throw "ABI callable type template unsupported"
+        type.getObjValAs? Nat "index"
+      observed := observed.push (role,arguments)
+    let expected := #[("meta_sized",#[0]),("sized",#[1]),("tuple",#[1]),(name,#[0,1])] ++
+      (if parent == some mutId then #[("fn_mut",#[0,1])] else if parent == some onceId then #[("fn_once",#[0,1])] else #[])
+    unless observed.size == expected.size && expected.all (fun value => (observed.filter (· == value)).size == 1) do
+      throw "ABI callable declaration conditions unsupported"
+    let mut output := none
+    for item in (← row.getObjValAs? (Array Json) "associated_items") do
+      if ((item.getObjValAs? (Option String) "lang_item").toOption.bind fun value => value) == some "fn_once_output" then
+        unless kind == .fnOnce && output.isNone && (← item.getObjValAs? String "kind") == "type" do
+          throw "ABI callable Output identity unsupported"
+        output := some (← raw document (← item.getObjValAs? Nat "definition"))
+    unless (kind == .fnOnce) == output.isSome do throw "ABI callable Output declaration absent"
+    result := result.push ⟨← raw document id,kind,output⟩
+  return result
 
 /-- Preserve every captured source header and lexical clause owner exactly once.
 No concrete substitutions, ABI results or selected implementations are produced. -/
@@ -139,5 +219,5 @@ def material (document : Document) : Except String Material := do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document⟩
 end Miri.Frontend.Foundation.SourceAbiParser

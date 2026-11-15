@@ -50,7 +50,8 @@ private def sizeAlign (row : Layout) : Except String (Nat × Nat) := do
 /-- Typed finite source target; no host or triple-derived defaults. -/
 def target (world : SourceCompilerWorld.World) : Except String ABI.RuntimeTargetDataLayout := do
   let some source := world.canonical.sourceMaterial | throw "Unsupported typed compiler source unavailable"
-  source.validate
+  -- World.create validates the retained finite source once. Each demand checks
+  -- only the target evidence it consumes, rather than rewalking all source rows.
   let some evidence := source.target.runtimeDataLayout | throw "Unsupported complete source target unavailable"
   for space in evidence.addressSpaceInfo do
     let bound ← match space.spec.pointerSizeBytes with

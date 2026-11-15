@@ -35,6 +35,16 @@ private def shapePresent (world : World) (shape : TypeShape) : Except String Uni
     typePresent world id
     unless length < world.canonical.typeConstants.size && constructor.canonicalValueConstructor do
       throw "physical array constant identity absent"
+  | .functionDefinition definition args signature bound =>
+    definitionPresent world definition
+    argumentsPresent world args
+    for id in signature.inputs do typePresent world id
+    typePresent world signature.output
+    for entry in bound do
+      match entry with
+      | .Region (.Named id) => definitionPresent world id
+      | .Region _ => pure ()
+      | _ => throw "physical function-item non-region binder unsupported"
   | .functionPointer signature bound =>
     unless bound.isEmpty do throw "physical bound function pointer unsupported"
     for id in signature.inputs do typePresent world id
@@ -65,6 +75,7 @@ private def sameIdentity : TypeShape → TypeShape → Bool
   | .array a al _,.array b bl _ => a == b && al == bl
   | .adt a,.adt b => a.definition == b.definition && a.args == b.args
   | .closure a args _,.closure b args' _ => a == b && args == args'
+  | .functionDefinition a args _ _,.functionDefinition b args' _ _ => a == b && args == args'
   | .functionPointer a av,.functionPointer b bv =>
     a.inputs == b.inputs && a.output == b.output && a.safety == b.safety &&
       a.abi == b.abi && a.cVariadic == b.cVariadic && av == bv
@@ -72,6 +83,9 @@ private def sameIdentity : TypeShape → TypeShape → Bool
   | _,_ => false
 private def sameMetadata (a b : TypeShape) : Bool :=
   sameIdentity a b && match a,b with
+    | .functionDefinition _ _ a av,.functionDefinition _ _ b bv =>
+      a.inputs == b.inputs && a.output == b.output && a.safety == b.safety &&
+      a.abi == b.abi && a.cVariadic == b.cVariadic && av == bv
     | .adt a,.adt b => a.kind == b.kind && a.representation == b.representation && a.variants == b.variants
     | .array _ _ a,.array _ _ b => a.count == b.count && a.canonicalValueConstructor == b.canonicalValueConstructor
     | .closure _ _ a,.closure _ _ b => a == b

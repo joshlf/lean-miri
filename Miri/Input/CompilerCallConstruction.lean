@@ -69,7 +69,7 @@ def lifecycle (p : CompilerProviders.Prepared)
     (world : SourceCompilerWorld.Access (MachineHooks.State K U)) (userRelevantCrates : Array Nat)
     (storage : MachineHooks.StorageHooks K U) (identity : ExecutionCallLeaves.IdentityAccess U)
     (unwind : Unwind.Hooks K U C Other) : CallMachine.Lifecycle K U C where
-  compiler := CompilerFrameMetadata.hooks p.lifecycle.frames userRelevantCrates
+  compiler := CompilerFrameMetadata.liveHooks world userRelevantCrates
   storage := storage
   freshLocalsIdentity := fun machine =>
     let (supply,label) := (identity.get machine.user).allocate

@@ -282,7 +282,7 @@ private def environment
     StepError.unsupported s!"compiler target architecture for Unix environment shims: {reason}"
   let symbols ← p.foreignSymbols |>.mapError fun reason =>
     StepError.unsupported s!"compiler foreign-symbol table for Unix environment shims: {reason}"
-  let frame := CompilerFrameMetadata.hooks p.lifecycle.frames userRelevantCrates
+  let frame := CompilerFrameMetadata.liveHooks EvalCoreMachine.sourceCompilerAccess userRelevantCrates
   let checkArgumentCompat := CompilerCallConstruction.argumentCompat p compatibilityBudget
   let u32Layout ← match p.primitiveLayout "u32" with
     | .ok value => pure ⟨value.ty,value.layout⟩

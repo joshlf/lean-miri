@@ -57,7 +57,7 @@ def lifecycleHooks (p : Prepared)
     (world : SourceCompilerWorld.Access (MachineHooks.State K User)) (userRelevantCrates : Array Nat)
     (base : CallMachine.Lifecycle K User C) : CallMachine.Lifecycle K User C :=
   CompilerLifecycle.liveHooks p.lifecycle world {base with
-    compiler := CompilerFrameMetadata.hooks p.frames userRelevantCrates}
+    compiler := CompilerFrameMetadata.liveHooks world userRelevantCrates}
 
 /-- Source query closure composes with BacktraceMachine's actual memory binding.
 Actual function allocation/address/provenance lookup remains the machine's job. -/

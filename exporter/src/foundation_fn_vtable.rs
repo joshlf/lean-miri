@@ -102,7 +102,8 @@ impl<'tcx> Material<'tcx> {
             let mut associated = Vec::new();
             for item in tcx.associated_items(definition).in_definition_order() {
                 let mut record = json!({"definition":self.definition(tcx,item.def_id),"name":item.name().as_str(),
-                    "kind":match item.kind {ty::AssocKind::Fn{..}=>"method",ty::AssocKind::Type{..}=>"type",ty::AssocKind::Const{..}=>"const"}});
+                    "kind":match item.kind {ty::AssocKind::Fn{..}=>"method",ty::AssocKind::Type{..}=>"type",ty::AssocKind::Const{..}=>"const"},
+                    "lang_item":if tcx.is_lang_item(item.def_id,rustc_attr_ir::LangItem::FnOnceOutput) {Some("fn_once_output")} else {None}});
                 if item.is_fn() {
                     let signature = tcx.fn_sig(item.def_id).instantiate_identity().skip_normalization();
                     let raw = signature.skip_binder();
@@ -123,7 +124,7 @@ impl<'tcx> Material<'tcx> {
             }
             declarations.push(json!({"definition":self.definition(tcx,definition),"core_source":true,"lang_item":lang_item,"has_self":generics.has_self,
                 "parameters":generics.own_params.iter().map(|p|match p.kind {ty::GenericParamDefKind::Type{has_default,..}=>json!({"index":p.index,"kind":"type","has_default":has_default}),_=>json!({"index":p.index,"kind":"unsupported","source":format!("{:?}",p.kind)})}).collect::<Vec<_>>(),
-                "super_clauses":super_clauses,"associated_items":associated}));
+                "clause_source":self.fn_method_clause_source(tcx,definition)?,"super_clauses":super_clauses,"associated_items":associated}));
         }
         Ok(json!({"roots":root_records,"declarations":declarations,"no_trait_vptr":tcx.sess.opts.unstable_opts.no_trait_vptr}))
     }

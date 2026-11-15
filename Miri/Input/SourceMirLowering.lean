@@ -1,3 +1,6 @@
+import Miri.Input.SourceMirReferences
+import Miri.Input.SourceMirRvalues
+import Miri.Input.SourceCompilerAllocations
 import Miri.Input.Model.SourceMir
 import Miri.Input.SourceAbi
 import Miri.Input.SourceCompilerWorldAbi
@@ -18,58 +21,87 @@ private structure Context where
   source : SourceMir.Body
   types : Array (Option Nat)
   spans : Array Nat
+  world : World
+  localTypes : Array Nat
+  definitions : Array (Option Nat)
+  allocations : Array (Nat × Nat)
 
 private def span (c : Context) (id : Nat) : Except String Nat := do
   let some id := c.spans[id]? | throw "Invalid source MIR span reference"
   return id
 private def info (c : Context) (source : SourceMir.SourceInfo) : Except String MIR.SourceInfo := do
   return ⟨⟨← span c source.span⟩,source.scope⟩
-private def place (c : Context) (p : SourceMir.Place) : Except String MIR.Place := do
-  unless p.localId < c.source.locals.size do throw "Invalid source MIR local reference"
-  -- Projected-place facts need an independently derived type path. The initial
-  -- common lowering domain deliberately rejects them rather than omit facts.
-  unless p.projection.isEmpty do throw "Unsupported typed source projected place facts"
-  return ⟨p.localId,#[]⟩
 private def constant (c : Context) (value : SourceMir.Constant) : Except String MIR.ConstOperand := do
   unless value.userType.isNone do throw "Unsupported source MIR user type annotation"
   let some type := c.types[value.type]?.join | throw "Unsupported source MIR constant type not yet instantiated"
   let matching :=  c.source.spans.filter (·.key == value.span)
   let [sourceSpan] := matching.toList | throw "Invalid source MIR constant span identity absent/ambiguous"
+  let allocation (source : Nat) : Except String Nat := do
+    let some (_,id) := c.allocations.find? (·.1 == source)
+      | throw "source constant allocation demand missing"
+    pure id
   let value' ← match value.value with
     | .zeroSized => pure MIR.ConstValue.ZeroSized
     | .scalar bits bytes => pure (.Scalar (.Int bits bytes))
+    | .allocationSlice source metadata => pure (.Slice (← allocation source) metadata)
+    | .allocationIndirect source offset => pure (.Indirect (← allocation source) offset)
+    | .allocationPointer source offset immutable sharedRef =>
+      pure (.Scalar (.Ptr (.Allocation (← allocation source) offset immutable sharedRef)))
     | _ => throw "Unsupported typed source constant evaluation"
   return ⟨⟨← span c sourceSpan.identity⟩,value.userType,.Val value' type⟩
-private def operand (c : Context) : SourceMir.Operand → Except String MIR.Operand
-  | .copy p => return .Copy (← place c p)
-  | .move p => return .Move (← place c p)
-  | .constant value => return .Constant (← constant c value)
-  | .unsupported tag => throw s!"Unsupported source MIR operand {tag}"
-private def rvalue (c : Context) : SourceMir.Rvalue → Except String MIR.Rvalue
-  | .use op retag => return .Use (← operand c op) (if retag then .Yes else .No)
-  | .binary op left right => return .BinaryOp (← known op) (← operand c left) (← operand c right)
-  | .unary op value => return .UnaryOp (← known op) (← operand c value)
-  | .aggregateTuple values => return .Aggregate .Tuple (← values.mapM (operand c))
-  | _ => throw "Unsupported typed source MIR rvalue"
-private def statement (c : Context) (s : SourceMir.Statement) : Except String MIR.Statement := do
-  let kind : MIR.StatementKind ← match s.kind with
-    | .assign p value => pure (MIR.StatementKind.Assign (← place c p) (← rvalue c value))
-    | .storageLive id => pure (.StorageLive id)
-    | .storageDead id => pure (.StorageDead id)
-    | .nop => pure .Nop
+private def rvalueContext (c : Context) : SourceMirRvalues.Context :=
+  ⟨c.world,c.localTypes,c.types,c.definitions,constant c⟩
+private def facts (values : Array PlaceFact) : Except String NodeFacts := do
+  let mut places := #[]
+  for value in values do
+    if let some prior := places.find? (fun p : PlaceFact => p.place == value.place) then
+      unless prior.typeId == value.typeId && prior.projectionTypes == value.projectionTypes do
+        throw "Invalid source projection facts conflict"
+    else places := places.push value
+  return {places}
+private def statement (c : Context) (s : SourceMir.Statement) : Except String (MIR.Statement × NodeFacts) := do
+  let (kind,places) ← match s.kind with
+    | .assign destination value => do
+      let (destination,p) ← SourceMirRvalues.place (rvalueContext c) destination
+      let (value,places) ← SourceMirRvalues.lower (rvalueContext c) p.typeId value
+      pure (MIR.StatementKind.Assign destination value,#[p] ++ places)
+    | .storageLive id => pure (.StorageLive id,#[])
+    | .storageDead id => pure (.StorageDead id,#[])
+    | .nop => pure (.Nop,#[])
     | .unsupported tag => throw s!"Unsupported source MIR statement {tag}"
-  return ⟨← info c s.source,kind⟩
-private def terminator (c : Context) (t : SourceMir.Terminator) : Except String MIR.Terminator := do
-  let kind : MIR.TerminatorKind ← match t.kind with
-    | .returnValue => pure MIR.TerminatorKind.Return
-    | .goto target => pure (.Goto target #[])
-    | .resumeUnwind => pure .UnwindResume
-    | .terminateUnwind reason => pure (MIR.TerminatorKind.UnwindTerminate (← known reason))
-    | .unreachable => pure .Unreachable
+  return (⟨← info c s.source,kind⟩,← facts places)
+private def unwind : SourceMir.Unwind → Except String MIR.UnwindAction
+  | .continueUnwind => pure .Continue
+  | .unreachable => pure .Unreachable
+  | .cleanup target => pure (.Cleanup target)
+  | .terminate reason => return .Terminate (← known reason)
+  | .unsupported tag => throw s!"Unsupported source MIR unwind {tag}"
+private def terminator (c : Context) (t : SourceMir.Terminator) : Except String (MIR.Terminator × NodeFacts) := do
+  let (kind,places) ← match t.kind with
+    | .returnValue => pure (MIR.TerminatorKind.Return,#[])
+    | .goto target => pure (.Goto target #[],#[])
+    | .resumeUnwind => pure (.UnwindResume,#[])
+    | .terminateUnwind reason => pure (.UnwindTerminate (← known reason),#[])
+    | .unreachable => pure (.Unreachable,#[])
     | .switchInt op values otherwise => do
-      pure (MIR.TerminatorKind.SwitchInt (← operand c op) ⟨values.map (fun (v,b) => .Case v b),otherwise⟩)
-    | _ => throw "Unsupported typed source MIR terminator"
-  return ⟨← info c t.source,kind⟩
+      let (op,_,places) ← SourceMirRvalues.operand (rvalueContext c) op
+      pure (.SwitchInt op ⟨values.map (fun (v,b) => .Case v b),otherwise⟩,places)
+    | .call function arguments destination target action source functionSpan => do
+      let (function,_,places) ← SourceMirRvalues.operand (rvalueContext c) function
+      let mut places := places
+      let mut args := #[]
+      for argument in arguments do
+        let (value,_,extra) ← SourceMirRvalues.operand (rvalueContext c) argument.operand
+        args := args.push (MIR.SpannedOperand.mk ⟨← span c argument.span⟩ value)
+        places := places ++ extra
+      let (destination,extra) ← SourceMirRvalues.place (rvalueContext c) destination
+      pure (.Call function args destination target (← unwind action) (← known source) ⟨← span c functionSpan⟩,
+        places.push extra)
+    | .drop value target action replace asyncDrop => do
+      let (value,p) ← SourceMirRvalues.place (rvalueContext c) value
+      pure (.Drop value target (← unwind action) replace asyncDrop,#[p])
+    | .unsupported tag => throw s!"Unsupported source MIR terminator {tag}"
+  return (⟨← info c t.source,kind⟩,← facts places)
 
 /-- Install one genuine typed body. Existing canonical rows retain their IDs.
 No compiler function/allocation identity is inferred from these local handles. -/
@@ -84,7 +116,7 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
   let [body] := (mir.bodies.filter fun b => b.definition == key.definition && b.promoted.isNone).toList
     | throw "Unsupported source MIR body absent/ambiguous"
   unless body.promotedCount == 0 do throw "Unsupported source MIR promoted body installation"
-  let some physical := material.physical | throw "Unsupported typed source MIR type expressions unavailable"
+  let some _ := material.physical | throw "Unsupported typed source MIR type expressions unavailable"
   let parameters ← SourceDeclarations.fullParameters material.genericLayers key.definition
   unless parameters.size == key.arguments.size do throw "Invalid source MIR substitution count"
   let mut typeArguments := #[]
@@ -112,19 +144,15 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
     unless existing == rootId do throw "Invalid source session root identity conflict"
   else world := {world with derivedSourceSpans := world.derivedSourceSpans.push (root.key,rootId)}
   let mut types := #[]
-  -- Only referenced types are instantiated, not all source type rows.
-  let mut typeMap : Array (Option Nat) := Array.replicate physical.types.size none
-  let mut seen := #[]
-  let needed := body.locals.map (·.type) ++ body.requiredConstants.map (·.type)
-  for ref in needed do
-    unless seen.contains ref do
-      let concrete ← SourceTypes.instantiate physical typeArguments constArguments ref
-      let concrete ← SourceTypes.eraseRegions concrete
-      let (updated,id) ← SourcePhysical.intern world concrete
-      unless ref < typeMap.size do throw "Invalid source MIR local type reference"
-      typeMap := typeMap.setIfInBounds ref (some id)
-      seen := seen.push ref
+  let (prepared,referencePool) ← SourceMirReferences.prepare world body typeArguments constArguments
+  world := prepared
+  let mut allocations : Array (Nat × Nat) := #[]
+  for source in referencePool.allocations do
+    unless allocations.any (·.1 == source) do
+      let (updated,id) ← SourceCompilerAllocations.demand world source
       world := updated
+      allocations := allocations.push (source,id)
+  let typeMap := referencePool.types
   for source in body.locals do
     let some id := typeMap[source.type]?.join | throw "Invalid source MIR local type absent"
     types := types.push id
@@ -149,9 +177,14 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
         canonical := {world.canonical with files,spans := world.canonical.spans.push row}}
       pure id
     spanIds := spanIds.push id
-  let c : Context := ⟨body,typeMap,spanIds⟩
-  let blocks ← body.blocks.mapM fun b => do
-    return MIR.BasicBlock.mk (← b.statements.mapM (statement c)) (← terminator c b.terminator) b.cleanup
+  let c : Context := ⟨body,typeMap,spanIds,world,types,referencePool.definitions,allocations⟩
+  let mut blocks := #[]
+  let mut nodeFacts := #[]
+  for b in body.blocks do
+    let statements ← b.statements.mapM (statement c)
+    let (terminator,fact) ← terminator c b.terminator
+    blocks := blocks.push ⟨statements.map (·.1),terminator,b.cleanup⟩
+    nodeFacts := nodeFacts.push ((statements.map (·.2)).push fact)
   let sourceScopes ← body.scopes.mapIdxM fun id s => do
     return SourceScope.mk id s.parent (← span c s.span) none s.inlinedParent
   let mut backtraceSpans := #[]
@@ -169,7 +202,7 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
     spanId := ← span c body.bodySpan,preambleDefSpanId := ← span c body.definitionSpan,
     injectionPhase := ← body.injectionPhase.mapM phase,instanceId := callee,
     localSources,sourceScopes,backtraceSpans,callEvidence := Array.replicate blocks.size none,
-    nodeFacts := blocks.map (fun b => Array.replicate (b.statements.size+1) {}),
+    nodeFacts,
     requiredConsts := ← body.requiredConstants.mapM (constant c),promotedBodies := #[] }
   LocalValidation.validateBody actual s!"source.bodies[{bodyId}]"
   let lowered ← lowerBody (LowerContext.ofDocument world.canonical) actual.toBodyCore
