@@ -5,6 +5,7 @@ import Miri.Input.SourceTypeQueries
 import Miri.Input.SourcePhysical
 import Miri.Input.SourceSignatureTypes
 import Miri.Input.SourceTraitSelection
+import Miri.Input.SourceParamAttrs
 
 /-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
 MIR execution, compiler process, query catalog or private pool participates.
@@ -270,6 +271,29 @@ where
             cursor := cursor + bytes
         return layout.sizeBytes == some cursor
 
+/-- Return default indirect attributes only when all possible deduction gates
+agree. Unknown defining-crate gates never inherit the caller's optimization. -/
+private def indirectBits (world : World) (optimizationDisabled : Bool)
+    (definition : DefinitionId) (parameter : Nat) : Except String Nat := do
+  if definition.crateIndex == 0 && optimizationDisabled then return 670
+  let some source := world.canonical.sourceMaterial | throw "typed ABI indirect source unavailable"
+  let some material := source.mirUses | throw s!"typed ABI indirect parameter {parameter} requires defining-crate MIR deduction evidence"
+  let [declaration] := (material.declarations.filter (·.definition == definition)).toList
+    | throw "typed ABI indirect MIR-use declaration absent/ambiguous"
+  if let some compilation := declaration.compilation then
+    if compilation.optimization == .no || compilation.incremental then return 670
+  -- Consumer-side absence of external MIR only means it was not encoded;
+  -- deduced attributes may still have been encoded by the defining crate.
+  let some body := declaration.body | do
+    if definition.crateIndex == 0 then return 670
+    throw s!"typed ABI indirect parameter {parameter} requires defining MIR availability evidence"
+  if body.spreadArgument.isSome then return 670
+  let usage ← SourceParamAttrs.parameterUsage body parameter
+  if usage.mutated && usage.captured then return 670
+  let some _ := declaration.compilation
+    | throw s!"typed ABI indirect parameter {parameter} requires defining-crate compilation options"
+  throw s!"typed ABI indirect parameter {parameter} requires defining Freeze/comptime deduction prerequisites"
+
 private def passMode (world : World) (physical : SourceTypes.Material) (optimizationDisabled : Bool)
     (definition : DefinitionId) (parameter : Nat) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
   let some node := world.canonical.types[id]? | throw "typed ABI physical type absent"
@@ -299,10 +323,9 @@ private def passMode (world : World) (physical : SourceTypes.Material) (optimiza
       let register : AbiRegister := ⟨.integer,bytes*8,none⟩
       let cast : AbiCastTarget := ⟨#[],none,register,bytes,false,attrs (if initialized && castSize == bytes then 128 else 0)⟩
       return {empty with kind := .cast,castTarget := some cast,padI32Count := some 0}
-    unless definition.crateIndex == 0 && optimizationDisabled do
-      throw s!"typed ABI indirect parameter {parameter} requires defining-crate MIR deduction evidence"
+    let bits ← indirectBits world optimizationDisabled definition parameter
     let some align := layout.abiAlignBytes | throw "typed ABI indirect alignment unavailable"
-    return {empty with kind := .indirect,attributes := #[⟨670,bytes,some align,.none⟩],indirectMode := some .pointer}
+    return {empty with kind := .indirect,attributes := #[⟨bits,bytes,some align,.none⟩],indirectMode := some .pointer}
   match type with
   | .primitive "bool" "" => return {empty with kind := .direct,attributes := #[attrs 128 .zeroExtend]}
   | .primitive "int" _ | .primitive "uint" _ | .primitive "char" "" =>

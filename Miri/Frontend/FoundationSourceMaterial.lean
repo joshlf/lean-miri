@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationSourceMirUses
 import Miri.Frontend.FoundationSourceTraitImpls
 import Miri.Frontend.FoundationSourceAllocationIdentity
 import Miri.Frontend.FoundationAllocations
@@ -106,6 +107,7 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     allocations := some (← sourceAllocationMaterial document),
     allocationIdentity := ← SourceAllocationIdentityParser.material document.source document.types.size,
     physical := some physical,
+    mirUses := ← SourceMirUsesParser.material document,
     traitImpls := ← SourceTraitImplsParser.material document physical,
     abi := some (← SourceAbiParser.material document)}
   material.validate
