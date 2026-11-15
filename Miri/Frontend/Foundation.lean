@@ -120,8 +120,17 @@ where
       for entry in (← array shape "elements") do
         elements := elements.push (← go remaining seen (← entry.getNat?))
       return .tuple elements
-    | "raw_pointer" | "reference" =>
-      return .pointer kind (← go remaining seen (← nat shape "pointee"))
+    | "raw_pointer" =>
+      let mutable ← shape.getObjValAs? Bool "mutable"
+      let tag := if mutable then "raw_pointer_mut" else "raw_pointer_const"
+      return .pointer tag (← go remaining seen (← nat shape "pointee"))
+    | "reference" =>
+      let mutable ← shape.getObjValAs? Bool "mutable"
+      let region ← string shape "region"
+      unless region == "static" || region == "erased" do
+        throw "unsupported reference region"
+      let tag := s!"reference_{region}_{if mutable then "mut" else "const"}"
+      return .pointer tag (← go remaining seen (← nat shape "pointee"))
     | "bool" | "char" | "never" | "str" => return .primitive kind ""
     | "int" | "uint" | "float" => return .primitive kind (← string shape "name")
     | other => throw s!"unsupported demand-time foundation type {other}"

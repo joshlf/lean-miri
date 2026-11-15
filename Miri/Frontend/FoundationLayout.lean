@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationTarget
+import Miri.Frontend.FoundationPointer
 
 /-! Pure size/ABI alignment queries over structural foundation material.
 Target facts use the fixed interpreter runtime target bridge;
@@ -33,7 +34,8 @@ private def integerWidth (target : ABI.RuntimeTargetDataLayout) (kind name : Str
 
 /-- Compute only requested layouts. Nonempty Rust tuples can reorder fields;
 without the complete pinned aggregate algorithm they remain explicit errors.
-Pointers, floats, unsized types and nominal types likewise remain unsupported. -/
+Thin pointers to supported Sized structural types are supported; floats,
+unsized types and nominal types remain unsupported. -/
 def layoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) : Except String FoundationLayout := do
   target.validate.mapError toString
   let bound := target.base.objSizeBound.toNat
@@ -59,7 +61,13 @@ where
         let align ← target.aggregateAlign.bytes.mapError toString
         return ⟨0, align.toNat⟩
       throw "nonempty Rust tuple layout is unsupported"
-    | .pointer _ _ => throw "foundation pointer layout is unsupported"
+    | .pointer kind pointee =>
+      let _ ← pointerKindInfo kind
+      -- Every supported pointee is Sized; unknown/unsized cases fail recursively.
+      let _ ← go bound remaining pointee
+      let spec ← (target.pointerSpecIn ABI.AddressSpace.ZERO).mapError toString
+      let align ← spec.pointerAlign.bytes.mapError toString
+      return ⟨spec.pointerSize.bytes.toNat, align.toNat⟩
 
 /-- Foundation queries require complete finite target evidence; missing or
 inconsistent evidence cannot recover LLVM parser defaults. -/

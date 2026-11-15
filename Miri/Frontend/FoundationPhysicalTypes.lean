@@ -5,6 +5,10 @@ pinned rustc_abi/layout/simple.rs::scalar and layout.rs::layout_of_array_like.
 Empty tuples use layout_of_univariant_biased with no fields and default repr:
 rustc_ty_utils/src/layout.rs::layout_of_uncached maps tuples to univariant;
 its empty-field alignment is aggregate_align and its seed is zero.
+Thin pointer layout follows rustc_ty_utils/src/layout.rs's Ref/RawPtr branch:
+Primitive::Pointer(AddressSpace::ZERO), a full raw range or reference start 1.
+These are representation facts and supply no dereferenceability, allocation,
+provenance or borrow permission evidence.
 They supply no compiler boolean-query catalog or nominal type facts. -/
 namespace Miri.Frontend.Foundation
 
@@ -80,7 +84,18 @@ where
       let align ← target.aggregateAlign.bytes.mapError toString
       return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
         (.explicit #[]) memoryBackend none
-    | .pointer _ _ => throw "physical pointer unsupported"
+    | .pointer kind _ =>
+      let info ← pointerKindInfo kind
+      let first := if info.region.isSome then 1 else 0
+      let last := 2 ^ (basic.size * 8) - 1
+      let primitive : Input.PrimitiveLayout :=
+        ⟨.pointer, basic.size, none, none, none, some 0⟩
+      let scalar : Input.ScalarLayout := ⟨.initialized, primitive, some (first, last)⟩
+      let niche := if first == 0 then none else some (Input.NicheLayout.mk 0 primitive (first, last))
+      let rotate (n : Nat) := UInt64.ofNat ((n % 2^64) / 2^16 + (n % 2^16) * 2^48)
+      let seed := (UInt64.ofNat basic.size + UInt64.ofNat (4 * 2^32) + rotate first + rotate last).toNat
+      return baseLayout basic.size basic.align seed ⟨.primitive, 0, none, none, #[], #[]⟩
+        (.explicit #[]) ⟨.scalar, none, some scalar, none, none, none, none, none, none⟩ niche
 
 def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input.Layout := do
   physicalLayoutOfRuntime (← runtimeTargetOfTarget target) ty
@@ -88,7 +103,8 @@ def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input
 /-- Build a row from already interned child and length identities. The caller
 must bind those IDs in its document-local pools; no compiler facts are invented. -/
 def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
-    (arrayReferences : Option (Nat × Nat) := none) : Except String Input.TypeNode := do
+    (arrayReferences : Option (Nat × Nat) := none)
+    (pointeeReference : Option Nat := none) : Except String Input.TypeNode := do
   let (shape, display) ← match ty with
     | .primitive "bool" "" => pure (Input.TypeShape.bool, "bool")
     | .primitive "char" "" => pure (Input.TypeShape.char, "char")
@@ -106,6 +122,12 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     | .tuple elements =>
       unless elements.isEmpty do throw "nonempty physical tuple unsupported"
       pure (.tuple #[], "()")
+    | .pointer kind _ =>
+      let info ← pointerKindInfo kind
+      let some pointee := pointeeReference | throw "pointer pointee identity absent"
+      match info.region with
+      | none => pure (.rawPointer pointee info.mutability, s!"foundation-pointer-{id}")
+      | some region => pure (.reference pointee info.mutability region, s!"foundation-reference-{id}")
     | _ => throw "unsupported physical type shape"
   return { id, layoutId, shape, display }
 

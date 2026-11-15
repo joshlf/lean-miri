@@ -54,10 +54,15 @@ where
           | none => ({ r with typeConstants := r.typeConstants.push constant }, r.typeConstants.size)
         pure (r, some (elementId, constantId))
       | _ => pure (r, none)
+    let (r, pointeeReference) ← match ty with
+      | .pointer _ pointee => do
+        let (r, pointeeId) ← go fuel r pointee
+        pure (r, some pointeeId)
+      | _ => pure (r, none)
     let (registry, id) ← r.registry.intern ty
     unless id == r.types.size && id == r.layouts.size do
       throw "physical registry pool identity mismatch"
-    let node ← physicalTypeNode ty id id references
+    let node ← physicalTypeNode ty id id references pointeeReference
     return ({ r with registry, types := r.types.push node, layouts := r.layouts.push layout }, id)
 
 /-- Resolve source types without changing the identity scheme. -/
