@@ -71,19 +71,44 @@ private def elementOfId (world : World) (id : TypeId) : Element :=
   if id == world.byteLayout.ty then .u8
   else if id == world.wideLayout.ty then .u16
   else .compiler id
+/-- Evaluate the constructor graph at demand. Fuel bounds traversal by the
+finite number of source aliases; exhausting it is an error, never a layout.
+Imported array layouts are deliberately not used as answers. -/
+private def layoutAt (world : World) (id : TypeId) : Nat → Except Error (TyAndLayout TypeId)
+  | 0 => throw (.metadata "cyclic canonical array constructor graph")
+  | fuel + 1 => do
+    if let some entry := world.entries.find? (·.value.ty == id) then return entry.value
+    if let some (key,_) := world.aliases.find? (·.2 == id) then
+      let element ← match key.element with
+        | .u8 => pure world.byteLayout
+        | .u16 => pure world.wideLayout
+        | .compiler element => layoutAt world element fuel
+      unless element.layout.isSized do
+        throw (.metadata "source array element requires a sized type")
+      unless key.count.toNat < 2^(world.metadata.target.base.pointerWidth.bits.toNat) do
+        throw (.targetUsizeOverflow key.count)
+      let computed ← calculate world.metadata.target element.layout key.count
+      -- Exported layout evidence, when available, is checked but never supplies
+      -- a missing constructor result.
+      if let .ok imported := world.metadata.lookup id then
+        unless imported.layout == computed do throw (.compilerLayoutMismatch id)
+      return ⟨id,computed⟩
+    let node ← metadata (world.metadata.node id)
+    if let .array .. := node.shape then
+      throw (.metadata "array lacks a canonical value-length constructor")
+    metadata (world.metadata.lookup id)
+
 private def elementLayout (world : World) : Element → Except Error (TyAndLayout TypeId)
   | .u8 => pure world.byteLayout
   | .u16 => pure world.wideLayout
   | .compiler id => do
-    let element ← match world.entries.find? (·.value.ty == id) with
-      | some entry => pure entry.value
-      | none => metadata (world.metadata.lookup id)
+    let element ← layoutAt world id (world.aliases.size + 1)
     unless element.layout.isSized do throw (.metadata "source array element requires a sized type")
     pure element
 
-/-- Seed exact constructor aliases before computing any layouts. Layout failures
-in unrelated compiler catalog entries do not turn World creation into execution
-of those types; requesting their constructors still fails explicitly. -/
+/-- Seed exact constructor aliases without evaluating their layouts. Only the
+primitive element layouts are prepared here. Dependencies, overflow and imported
+layout contradictions are checked when a constructor is requested. -/
 def create (runtime : RuntimeMetadata) : Except Error World := do
   let refs := runtime.source.queries.primitives
   let byte ← primitive runtime refs.u8 "u8" .u8
@@ -110,19 +135,6 @@ def create (runtime : RuntimeMetadata) : Except Error World := do
         if let some (_,prior) := world.aliases.find? (·.1 == key) then
           unless prior == node.id do throw .conflictingCanonicalIdentity
         else world := {world with aliases := world.aliases.push (key,node.id)}
-  -- Arrays may precede their element array in compiler ID order. This bounded
-  -- dependency closure materializes only those with actual sized element data.
-  for _ in [:world.aliases.size] do
-    for (key,id) in world.aliases do
-      unless world.entries.any (·.value.ty == id) do
-        let computed := do calculate runtime.target (← elementLayout world key.element).layout key.count
-        if let .ok computed := computed then
-          if let .ok imported := runtime.lookup id then
-            unless imported.layout == computed do throw (.compilerLayoutMismatch id)
-          world := {world with entries := world.entries.push ⟨key,⟨id,computed⟩,.compiler id⟩}
-  for (_,id) in world.aliases do
-    unless world.entries.any (·.value.ty == id) do
-      world := {world with obligations := world.obligations.push s!"type {id}: canonical array requires unresolved element layout or overflows target bound"}
   pure world
 
 /-- Intern source Ty::new_array(compiler primitive, target-usize value).
@@ -138,7 +150,10 @@ def intern (world : World) (element : Element) (count : UInt64) :
   if let some prior := world.entries.find? (·.key == key) then return (prior.value,world)
   let layout ← calculate world.metadata.target (← elementLayout world element).layout count
   let (id,origin,next) ← match world.aliases.find? (·.1 == key) with
-    | some (_,id) => pure (id,Origin.compiler id,world.nextId)
+    | some (_,id) => do
+      if let .ok imported := world.metadata.lookup id then
+        unless imported.layout == layout do throw (.compilerLayoutMismatch id)
+      pure (id,Origin.compiler id,world.nextId)
     | none => do
       unless !(world.metadata.source.types.any (·.id == world.nextId)) &&
           !(world.entries.any (·.value.ty == world.nextId)) do throw .conflictingCanonicalIdentity
@@ -161,11 +176,16 @@ def osStringArray (world : World) (wide : Bool) (count : UInt64) :
 
 def lookup (world : World) (id : TypeId) : Except Error (TyAndLayout TypeId) := do
   if let some entry := world.entries.find? (·.value.ty == id) then return entry.value
-  metadata (world.metadata.lookup id)
+  layoutAt world id (world.aliases.size + 1)
 
 def arrayInfo (world : World) (id : TypeId) : Except Error (Key × TyAndLayout TypeId) := do
-  let some entry := world.entries.find? (·.value.ty == id) | throw (.missingRuntimeType id)
-  pure (entry.key,← elementLayout world entry.key.element)
+  let key ← match world.entries.find? (·.value.ty == id) with
+    | some entry => pure entry.key
+    | none => match world.aliases.find? (·.2 == id) with
+      | some (key,_) => pure key
+      | none => throw (.missingRuntimeType id)
+  let _ ← lookup world id
+  pure (key,← elementLayout world key.element)
 
 def fieldLayout (world : World) (id index : Nat) : Except Error (TyAndLayout TypeId) := do
   let (key,element) ← arrayInfo world id
