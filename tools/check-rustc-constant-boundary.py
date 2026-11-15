@@ -26,8 +26,8 @@ def main():
     args = parser.parse_args()
     document = json.loads(args.document.read_text())
     assert document["schema"] == "lean-miri-rustc-mir"
-    assert not document["ctfe_scalar_sources"], "raw CTFE source catalogue remains populated"
-    assert not document["mir_templates"], "runtime source templates remain populated"
+    assert "ctfe_scalar_sources" not in document
+    assert "mir_templates" not in document
     bodies = [body for body in document["bodies"] if body["body_kind"] == "material"]
     assert bodies, "no concrete executable body was exported"
     counts = collections.Counter(constant["kind"] for body in bodies for constant in constants(body))
