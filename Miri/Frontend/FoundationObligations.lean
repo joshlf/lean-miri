@@ -1,5 +1,6 @@
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationTraitClaims
+import Miri.Frontend.FoundationOutlives
 
 /-! Pure checks for the small set of obligations understood by the restricted
 foundation fixture evaluator. Unknown traits and forms remain errors. -/
@@ -72,6 +73,9 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
         unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"
       else
         unless (← localTraitClaim row ty) do throw s!"unsatisfied local trait obligation {path}"
+    | "type_outlives" =>
+      let ty ← instantiate typeArgs constArgs (← typeExpr d (← num clause "type"))
+      checkStaticOutlives ty (← str clause "region")
     | "const_has_type" =>
       let ty ← instantiate typeArgs constArgs (← typeExpr d (← num clause "type"))
       let .primitive "uint" "usize" := ty | throw "unsupported const parameter type"

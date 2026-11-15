@@ -205,6 +205,8 @@ impl<'tcx> Material<'tcx> {
                     }
                     json!({"kind":"trait","definition":definition,"arguments":self.args(tcx,t.trait_ref.args)?})
                 },
+                ty::ClauseKind::TypeOutlives(outlives) if matches!(outlives.1.kind(),ty::ReStatic) =>
+                    json!({"kind":"type_outlives","type":self.ty(tcx,outlives.0)?,"region":"static"}),
                 ty::ClauseKind::ConstArgHasType(c,t) => json!({"kind":"const_has_type","value":self.constant(tcx,c)?,"type":self.ty(tcx,t)?}),
                 other => return unsupported("predicate",other),
             })
@@ -231,10 +233,17 @@ impl<'tcx> Material<'tcx> {
     fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
-        // Pinned queries.rs: promoted_mir is the complete table owned by the
-        // containing DefId, including unused promoteds. Our selected local HIR
-        // items own that table; do not infer emptiness from body references.
-        if !super::has_local_hir_body(tcx, def) {
+        // Pinned queries.rs: retain the complete promoted table, including
+        // unused promoteds. metadata/encoder.rs::encode_mir records this table
+        // alongside available optimized MIR for ordinary non-const functions.
+        // Permit only the explicitly selected actual external start Fn here;
+        // do not infer an empty table from a lack of body references.
+        let external_start = !def.is_local()
+            && tcx.lang_items().start_fn() == Some(def)
+            && matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn)
+            && !tcx.is_const_fn(def)
+            && tcx.is_mir_available(def);
+        if !super::has_local_hir_body(tcx, def) && !external_start {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -308,14 +317,23 @@ impl<'tcx> Material<'tcx> {
 fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[String]) -> Result<Value> {
     let mut m = Material::default();
     let items = tcx.hir_crate_items(());
-    let mut selected = items.definitions().chain(items.nested_bodies()).filter(|d| tcx.is_mir_available(d.to_def_id()) && !super::is_required_trait_method(tcx,d.to_def_id())).collect::<Vec<_>>();
-    selected.sort_by_key(|d|tcx.def_path_str(d.to_def_id()));
+    let mut selected = items.definitions().chain(items.nested_bodies()).map(|d|d.to_def_id()).filter(|d| tcx.is_mir_available(*d) && !super::is_required_trait_method(tcx,*d)).collect::<Vec<_>>();
+    // An explicitly named actual start language item can reside in an encoded
+    // dependency. Select only that finite generic template; do not enumerate
+    // monomorphic instances, callees or compiler query-answer closure.
+    if let Some(start) = tcx.lang_items().start_fn() {
+        if roots.iter().any(|root| *root == tcx.def_path_str(start)) {
+            if !tcx.is_mir_available(start) { return unsupported("selected start MIR unavailable", start); }
+            selected.push(start);
+        }
+    }
+    selected.sort_by_key(|d|tcx.def_path_str(*d));
     selected.dedup();
     for root in roots {
-        if !selected.iter().any(|d|tcx.def_path_str(d.to_def_id()) == *root) { return Err(format!("foundation: missing MIR root {root:?}")); }
+        if !selected.iter().any(|d|tcx.def_path_str(*d) == *root) { return Err(format!("foundation: missing MIR root {root:?}")); }
     }
-    if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(d.to_def_id()))); }
-    let bodies = selected.into_iter().map(|d|m.body(tcx,d.to_def_id())).collect::<Result<Vec<_>>>()?;
+    if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(*d))); }
+    let bodies = selected.into_iter().map(|d|m.body(tcx,d)).collect::<Result<Vec<_>>>()?;
     let startup_material = super::foundation_startup::capture(tcx, |def|m.definition(tcx,def))?;
     // Finite source selection/configuration only. No lang_start instance or
     // function allocation is resolved or enumerated here.
