@@ -87,6 +87,7 @@ inductive TypeExpr where
   | array (element : TypeExpr) (length : ConstExpr)
   | tuple (elements : Array TypeExpr)
   | pointer (kind : String) (pointee : TypeExpr)
+  | patternNotNull (base : TypeExpr)
   | dynamicObject (source : ExistentialType TypeExpr)
   | functionPointer (inputs : Array TypeExpr) (output : TypeExpr) (safety abi : String) (cVariadic : Bool)
   deriving Repr
@@ -123,6 +124,10 @@ where
       for entry in (← array shape "elements") do
         elements := elements.push (← go remaining seen (← entry.getNat?))
       return .tuple elements
+    | "pattern_type" =>
+      let pattern ← field shape "pattern"
+      unless (← string pattern "kind") == "not_null" do throw "unsupported source type pattern"
+      return .patternNotNull (← go remaining seen (← nat shape "base"))
     | "raw_pointer" =>
       let mutable ← shape.getObjValAs? Bool "mutable"
       let tag := if mutable then "raw_pointer_mut" else "raw_pointer_const"
@@ -166,6 +171,7 @@ inductive ConcreteType where
   | array (element : ConcreteType) (length : Nat)
   | tuple (elements : Array ConcreteType)
   | pointer (kind : String) (pointee : ConcreteType)
+  | patternNotNull (base : ConcreteType)
   | dynamicObject (source : ExistentialType ConcreteType)
   | functionPointer (inputs : Array ConcreteType) (output : ConcreteType) (safety abi : String) (cVariadic : Bool)
   deriving Repr
@@ -188,6 +194,7 @@ where
     | .tuple elements =>
       return .tuple (← elements.mapM (go remaining))
     | .pointer kind pointee => return .pointer kind (← go remaining pointee)
+    | .patternNotNull base => return .patternNotNull (← go remaining base)
     | .dynamicObject source => return .dynamicObject (← mapExistentialM (go remaining) source)
     | .functionPointer inputs output safety abi variadic =>
       return .functionPointer (← inputs.mapM (go remaining)) (← go remaining output) safety abi variadic

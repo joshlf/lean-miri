@@ -68,6 +68,11 @@ private def eraseType (document : Document) (variables : Array MIR.BoundVariable
   | "raw_pointer" => children rows #[← shape.getObjValAs? Nat "pointee"]
   | "array" => children rows #[← shape.getObjValAs? Nat "element"]
   | "tuple" => children rows (← shape.getObjValAs? (Array Nat) "elements")
+  | "pattern_type" =>
+    let pattern ← shape.getObjVal? "pattern"
+    unless (← pattern.getObjValAs? String "kind") == "not_null" do
+      throw "signature constrained type pattern unsupported"
+    children rows #[← shape.getObjValAs? Nat "base"]
   | "reference" =>
     let region ← erasedRegion document variables (← shape.getObjVal? "region")
     let rewritten := row.setObjVal! "shape" (shape.setObjVal! "region" region)

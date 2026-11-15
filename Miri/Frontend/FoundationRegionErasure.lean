@@ -12,6 +12,7 @@ where
     let .succ fuel := fuel | throw "region erasure recursion exhausted"
     match ty with
     | .primitive k n => return .primitive k n
+    | .patternNotNull base => return .patternNotNull (← go fuel base)
     | .array element count => return .array (← go fuel element) count
     | .tuple fields => return .tuple (← fields.mapM (go fuel))
     | .pointer kind pointee =>
@@ -35,6 +36,7 @@ where
     let .succ fuel := fuel | throw "region flag recursion exhausted"
     match ty with
     | .primitive .. => return false
+    | .patternNotNull base => go fuel base
     | .array element _ => go fuel element
     | .tuple fields => return (← fields.mapM (go fuel)).any id
     | .pointer kind pointee =>
