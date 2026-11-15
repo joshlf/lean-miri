@@ -51,13 +51,7 @@ impl<'tcx> Material<'tcx> {
                 }
             }
             let required_consts = self.required_constants(tcx,body)?;
-            struct ConstantSpans { values: Vec<rustc_span::Span> }
-            impl<'tcx> mir::visit::Visitor<'tcx> for ConstantSpans {
-                fn visit_const_operand(&mut self,constant:&mir::ConstOperand<'tcx>,_:mir::Location) { self.values.push(constant.span); }
-            }
-            let mut constant_spans = ConstantSpans {values:Vec::new()};
-            mir::visit::Visitor::visit_body(&mut constant_spans,body);
-            let source_metadata = source_material::capture_with_additional_spans(tcx,body,&constant_spans.values);
+            let source_metadata = source_material::capture(tcx,body);
             let locals = body.local_decls.iter().map(|l|self.ty(tcx,l.ty)).collect::<Result<Vec<_>>>()?;
             let blocks = body.basic_blocks.iter().map(|block| {
                 let statements = block.statements.iter().map(|statement|Ok(match &statement.kind {

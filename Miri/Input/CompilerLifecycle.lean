@@ -1,9 +1,11 @@
+import Miri.Input.SourceCompilerConstantRequests
 import Miri.Input.SourceCompilerWorld
 import Miri.Input.CompilerInstance
 import Miri.Interpreter.CallMachine
 
 /-! The resolved body identifies its concrete callee and preamble span.
-Required constants are evaluated before export; frame identity remains checked at entry. -/
+Concrete legacy constants were evaluated before export. Source required constants
+resolve compiler witnesses at frame entry through the same World as operands. -/
 namespace Miri.Input.CompilerLifecycle
 open Lean Miri.Interpreter
 structure Entry where
@@ -100,8 +102,28 @@ def liveRequiredConstants (p : Prepared)
   let frame ← MachineHooks.currentFrame
   unless frame.bodyIdentity == body.identity && frame.functionInstance == actual.instanceId do
     throw (.invalidProgram "required-constant current frame identity/instance mismatch")
-  unless actual.requiredConsts.isEmpty do
-    throw (.unsupported "compiler lifecycle: source required-constant evaluation unavailable")
+  for constant in actual.requiredConsts do
+    let _ ← SourceCompilerConstantRequests.consume access constant
+
+/-- Legacy delegation is pointwise and still requires the actual World. -/
+theorem livePreambleSpan_legacy_at (p : Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User)) (body : LoadedBody)
+    (before : MachineHooks.State K User) (world : SourceCompilerWorld.World)
+    (present : access.get before = some world) (legacy : world.canonical.sourceMaterial = none) :
+    livePreambleSpan p access body before = preambleSpan p body before := by
+  simp [livePreambleSpan, currentWorld, present, legacy,
+    get, getThe, MonadStateOf.get, EStateM.get, bind, Bind.bind, EStateM.bind,
+    pure, Pure.pure, EStateM.pure]
+
+/-- The legacy constant action retains its exact result and resulting state. -/
+theorem liveRequiredConstants_legacy_at (p : Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User)) (body : LoadedBody)
+    (before : MachineHooks.State K User) (world : SourceCompilerWorld.World)
+    (present : access.get before = some world) (legacy : world.canonical.sourceMaterial = none) :
+    liveRequiredConstants p access body before = requiredConstants p body before := by
+  simp [liveRequiredConstants, currentWorld, present, legacy,
+    get, getThe, MonadStateOf.get, EStateM.get, bind, Bind.bind, EStateM.bind,
+    pure, Pure.pure, EStateM.pure]
 
 /-- Source mode uses live canonical metadata. Legacy schema12 keeps its checked
 prepared path and the associated theorems below. -/
@@ -145,3 +167,11 @@ theorem preamble_known (p : Prepared) (body : LoadedBody) (actual : LoweredBody)
     get,getThe,MonadStateOf.get,EStateM.get,bind,EStateM.bind,pure,EStateM.pure,
     Except.bind,Except.pure]
 end Miri.Input.CompilerLifecycle
+
+open Lean Elab Command in
+run_cmd do
+  for name in #[``Miri.Input.CompilerLifecycle.livePreambleSpan_legacy_at,
+      ``Miri.Input.CompilerLifecycle.liveRequiredConstants_legacy_at] do
+    for dependency in (← collectAxioms name) do
+      unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
+        throwError "unapproved lifecycle pointwise axiom {dependency} in {name}"

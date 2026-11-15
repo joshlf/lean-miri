@@ -65,6 +65,7 @@ def sourceItemDeclaration (document : Document) (definition : Nat) :
     let kind ← match ← parameter.getObjValAs? String "kind" with
       | "type" => pure Input.SourceSymbols.ParameterKind.typeParameter
       | "const" => pure .constParameter
+      | "region" => pure .region
       | _ => throw "Item source generic slot unsupported"
     parameters := parameters.push kind
   let raw : Input.DefinitionId := ⟨← row.getObjValAs? Nat "crate_index",← row.getObjValAs? Nat "index"⟩

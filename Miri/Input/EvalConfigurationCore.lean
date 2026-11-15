@@ -1,3 +1,4 @@
+import Miri.Input.SourceCompilerConstantRequests
 import Miri.Input.EvalConfiguration
 import Miri.Input.SourceCompilerAllocations
 import Miri.Interpreter.NativeAllocationLifecycle
@@ -60,6 +61,42 @@ abbrev User := EvalCoreMachine.User
 abbrev State := EvalCoreMachine.State
 abbrev Stored := EvalCoreMachine.Stored
 abbrev M Os R P H D O Aff B Host A := MachineHooks.M MiriMemoryKind (User Os R P H D O Aff B Host) A
+/-- Constant operands use the same evaluation-local compiler World as body and
+ABI demands. Source allocation imports retain their actual memory/error effects. -/
+def constantOperand [DecidableEq K] (runtime : RuntimeMetadata) (sourceRequired : Bool)
+    (worldAccess : SourceCompilerWorld.Access (MachineHooks.State K U))
+    (functions : FunctionPointers.Hooks K U Other) (arithmetic : PointerArithmetic)
+    (external : DefId → MachineHooks.M K U (Pointer Provenance))
+    (constant : ConstOperand) (known : Option LocalLayout)
+    (checkKnown : Option (LocalLayout → LocalLayout → MachineHooks.M K U Bool)) :
+    MachineHooks.M K U (OpTy Provenance) := do
+  let constant ← SourceCompilerConstantRequests.consume worldAccess constant
+  let state ← get
+  let runtime ← match worldAccess.get state with
+    | some world => do
+      if world.canonical.sourceMaterial.isSome then
+        let root := match constant.value with
+          | .Val (.Slice allocation _) _ | .Val (.Indirect allocation _) _ => some allocation
+          | .Val (.Scalar (.Ptr (.Allocation allocation _ _ _))) _ => some allocation
+          | _ => none
+        if let some root := root then
+          let imported ← match SourceCompilerAllocations.importDemanded runtime.target world root state.machine.memory with
+            | .ok result => pure result
+            | .error reason => throw (.unsupported reason)
+          set {state with machine := {state.machine with memory := imported.memory}}
+          match imported.outcome with
+          | .ok _ => pure ()
+          | .error reason => throw (.unsupported reason)
+        pure {runtime with source := world.canonical}
+      else pure runtime
+    | none => do
+      if sourceRequired then
+        throw (.unsupported "constant query requires the shared source compiler World")
+      pure runtime
+  ConstantMachine.evalOperandWithLayout runtime functions arithmetic external
+    MemoryErrors.constant constant known checkKnown
+
+
 structure PlaceOptions where
   debugAssertions : Bool
   dynamicFuel : Nat
@@ -483,33 +520,9 @@ def makeWithForeignContext {Assembly : Type}
       dereference
       runtimeChecks := CompilerScalarLeaves.runtimeChecks p
       boolLayout := CompilerScalarLeaves.boolLayout p
-      constant := fun _ constant known => do
-        let state ← get
-        let runtime ← match EvalCoreMachine.sourceCompilerAccess.get state with
-          | some world => do
-            if world.canonical.sourceMaterial.isSome then
-              let root := match constant.value with
-                | .Val (.Slice allocation _) _ | .Val (.Indirect allocation _) _ => some allocation
-                | .Val (.Scalar (.Ptr (.Allocation allocation _ _ _))) _ => some allocation
-                | _ => none
-              if let some root := root then
-                let imported ← match SourceCompilerAllocations.importDemanded p.runtime.target world root state.machine.memory with
-                  | .ok result => pure result
-                  | .error reason => throw (.unsupported reason)
-                set {state with machine := {state.machine with memory := imported.memory}}
-                match imported.outcome with
-                | .ok _ => pure ()
-                | .error reason => throw (.unsupported reason)
-              -- Target evidence is fixed at initialization; typed physical
-              -- demands extend only the canonical source rows in this World.
-              pure {p.runtime with source := world.canonical}
-            else pure p.runtime
-          | none => do
-            if p.program.input.sourceMaterial.isSome then
-              throw (.unsupported "constant query requires the shared source compiler World")
-            pure p.runtime
-        ConstantMachine.evalOperandWithLayout runtime functions pointers.arithmetic
-          externStatic MemoryErrors.constant constant known
+      constant := fun _ constant known =>
+        constantOperand p.runtime p.program.input.sourceMaterial.isSome EvalCoreMachine.sourceCompilerAccess
+          functions pointers.arithmetic externStatic constant known
           (if options.place.debugAssertions then some (fun computed expected => physical (compatibility computed expected)) else none) }
     let callBackend : CallDispatchMachine.Backend (State Os R P H D O Aff B Host) := {
       selection := fun state => do
@@ -538,7 +551,7 @@ def makeWithForeignContext {Assembly : Type}
     let validity := EvalValidityMachine.hooks facts p.lifecycle.calls.runtime EvalCoreMachine.sourceCompilerAccess
       (CompilerValidityLeaves.make p image EvalProjectionMachine.arrays projection pointers)
       access allocation compiler projection (FunctionPointerConsumers.vtable functions table) discr pointers retag options.limits.retag
-    let copy := CompilerCopy.hooks p.runtime options.place.debugAssertions compatibility access
+    let copy := CompilerCopy.hooks p.runtime EvalCoreMachine.sourceCompilerAccess options.place.debugAssertions compatibility access
       PointerMachine.User.addresses pointers.arithmetic validity options.limits.validation
     let castQueries := CompilerCastLeaves.make p EvalCoreMachine.sourceCompilerAccess (CompilerCastQueries.required p EvalCoreMachine.sourceCompilerAccess) table
       (fun _ provenance => PointerMachine.exposeProvenance pointers provenance)

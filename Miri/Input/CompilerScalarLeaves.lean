@@ -49,8 +49,9 @@ def discriminant (p : CompilerProviders.Prepared) (world : SourceCompilerWorld.A
       let runtime ← current
       lift (SourceCompilerDiscriminants.value runtime ty index)
     else lift (CompilerDiscriminantFacts.discriminantValue context ty index)
-    variantForDiscriminant := fun _ ty bits => if sourceMode then
-      throw (.unsupported "source tagged discriminant selection requires enum/coroutine source evaluation")
+    variantForDiscriminant := fun _ ty bits => if sourceMode then do
+      let runtime ← current
+      lift (SourceCompilerDiscriminants.variantForDiscriminant runtime ty bits)
     else lift (CompilerDiscriminantFacts.variantForDiscriminant context ty bits)
     adtVariantCount := fun _ ty => if sourceMode then do
       let runtime ← current

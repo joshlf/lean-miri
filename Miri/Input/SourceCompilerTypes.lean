@@ -31,6 +31,10 @@ private def shapePresent (world : World) (shape : TypeShape) : Except String Uni
   | .bool | .char | .int _ | .uint _ | .float _ | .str | .never => pure ()
   | .tuple elements => for id in elements do typePresent world id
   | .rawPointer id _ | .reference id _ _ | .patternType id .notNull => typePresent world id
+  | .patternType id (.range lower upper) =>
+    typePresent world id
+    unless lower < world.canonical.typeConstants.size && upper < world.canonical.typeConstants.size do
+      throw "physical pattern range constant identity absent"
   | .array id length constructor =>
     typePresent world id
     unless length < world.canonical.typeConstants.size && constructor.canonicalValueConstructor do
@@ -46,7 +50,11 @@ private def shapePresent (world : World) (shape : TypeShape) : Except String Uni
       | .Region _ => pure ()
       | _ => throw "physical function-item non-region binder unsupported"
   | .functionPointer signature bound =>
-    unless bound.isEmpty do throw "physical bound function pointer unsupported"
+    for entry in bound do
+      match entry with
+      | .Region (.Named id) => definitionPresent world id
+      | .Region _ => pure ()
+      | _ => throw "physical function-pointer non-region binder unsupported"
     for id in signature.inputs do typePresent world id
     typePresent world signature.output
   | .adt data =>
@@ -72,6 +80,7 @@ private def sameIdentity : TypeShape → TypeShape → Bool
   | .reference a am ar,.reference b bm br => a == b && am == bm && ar == br
   | .tuple a,.tuple b => a == b
   | .patternType a .notNull,.patternType b .notNull => a == b
+  | .patternType a (.range al au),.patternType b (.range bl bu) => a == b && al == bl && au == bu
   | .array a al _,.array b bl _ => a == b && al == bl
   | .adt a,.adt b => a.definition == b.definition && a.args == b.args
   | .closure a args _,.closure b args' _ => a == b && args == args'

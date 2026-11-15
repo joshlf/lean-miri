@@ -25,6 +25,7 @@ private structure Context where
   localTypes : Array Nat
   definitions : Array (Option Nat)
   allocations : Array (Nat × Nat)
+  requests : Array (SourceMir.Constant × Nat)
 
 private def span (c : Context) (id : Nat) : Except String Nat := do
   let some id := c.spans[id]? | throw "Invalid source MIR span reference"
@@ -41,6 +42,10 @@ private def constant (c : Context) (value : SourceMir.Constant) : Except String 
     let some (_,id) := c.allocations.find? (·.1 == source)
       | throw "source constant allocation demand missing"
     pure id
+  if let .unevaluated .. := value.value then
+    let some (_,token) := c.requests.find? (·.1 == value)
+      | throw "Invalid source constant request was not registered"
+    return ⟨⟨← span c sourceSpan.identity⟩,value.userType,.SourceRequest token type⟩
   let value' ← match value.value with
     | .zeroSized => pure MIR.ConstValue.ZeroSized
     | .scalar bits bytes => pure (.Scalar (.Int bits bytes))
@@ -68,6 +73,9 @@ private def statement (c : Context) (s : SourceMir.Statement) : Except String (M
       pure (MIR.StatementKind.Assign destination value,#[p] ++ places)
     | .storageLive id => pure (.StorageLive id,#[])
     | .storageDead id => pure (.StorageDead id,#[])
+    | .placeMention place => do
+      let (place,fact) ← SourceMirRvalues.place (rvalueContext c) place
+      pure (.PlaceMention place,#[fact])
     | .nop => pure (.Nop,#[])
     | .unsupported tag => throw s!"Unsupported source MIR statement {tag}"
   return (⟨← info c s.source,kind⟩,← facts places)
@@ -87,6 +95,10 @@ private def terminator (c : Context) (t : SourceMir.Terminator) : Except String 
     | .switchInt op values otherwise => do
       let (op,_,places) ← SourceMirRvalues.operand (rvalueContext c) op
       pure (.SwitchInt op ⟨values.map (fun (v,b) => .Case v b),otherwise⟩,places)
+    | .assert condition expected message target action => do
+      let (condition,_,a) ← SourceMirRvalues.operand (rvalueContext c) condition
+      let (message,b) ← SourceMirRvalues.assertion (rvalueContext c) message
+      pure (.Assert condition expected message target (← unwind action),a ++ b)
     | .call function arguments destination target action source functionSpan => do
       let (function,_,places) ← SourceMirRvalues.operand (rvalueContext c) function
       let mut places := places
@@ -154,6 +166,14 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
       world := updated
       allocations := allocations.push (source,id)
   let typeMap := referencePool.types
+  let mut requests := #[]
+  for value in referencePool.constants do
+    if let .unevaluated definition arguments promoted := value.value then
+      let some expected := typeMap[value.type]?.join | throw "Invalid source constant request type absent"
+      let (updated,token) ← SourceCompilerWorld.internConstantRequest world callee definition arguments
+        promoted typeArguments constArguments expected
+      world := updated
+      requests := requests.push (value,token)
   for source in body.locals do
     let some id := typeMap[source.type]?.join | throw "Invalid source MIR local type absent"
     types := types.push id
@@ -178,7 +198,7 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
         canonical := {world.canonical with files,spans := world.canonical.spans.push row}}
       pure id
     spanIds := spanIds.push id
-  let c : Context := ⟨body,typeMap,spanIds,world,types,referencePool.definitions,allocations⟩
+  let c : Context := ⟨body,typeMap,spanIds,world,types,referencePool.definitions,allocations,requests⟩
   let mut blocks := #[]
   let mut nodeFacts := #[]
   for b in body.blocks do

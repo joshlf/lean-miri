@@ -172,6 +172,31 @@ def resolvedRank (localCrate definitionCrate : Nat) (relevant : Array Nat) : UIn
   vaList := frame.vaList
   trackCallerArg := frame.trackCallerArg
   location := frame.location }
+/-- The live frame constructor at its actual World/state. Caller attributes
+and crate identity are pure queries against that same canonical source. -/
+theorem initFrame_live_at
+    (access : SourceCompilerWorld.Access (MachineHooks.State K U)) (relevant : Array Nat)
+    (frame : Frame Provenance LocalLayout Unit) (world : SourceCompilerWorld.World)
+    (state : MachineHooks.State K U) (localCrate definitionCrate : Nat)
+    (present : access.get state = some world)
+    (caller : requiresCallerLocation world frame.functionInstance = .ok false)
+    (crate : SourceCompilerFrame.definitionCrate world frame.functionInstance = .ok definitionCrate)
+    (localAt : world.canonical.queries.frameMetadata.localCrate = localCrate) :
+    MachineHooks.initFrame (FrameMetadata.userRelevance (liveHooks access relevant)) frame state =
+      .ok (resolvedFrame frame state.machine (resolvedRank localCrate definitionCrate relevant)) state := by
+  have rank : FrameMetadata.userRelevance (liveHooks access relevant) frame state =
+      .ok (resolvedRank localCrate definitionCrate relevant) state := by
+    simp [FrameMetadata.userRelevance, liveHooks, lift, Id.run, present, caller, crate, localAt,
+      resolvedRank, get, getThe, MonadStateOf.get, EStateM.get, bind, Bind.bind, EStateM.bind,
+      pure, Pure.pure, EStateM.pure]
+    split <;> simp_all [lift, get, getThe, MonadStateOf.get, EStateM.get,
+      bind, Bind.bind, EStateM.bind, pure, Pure.pure, EStateM.pure]
+    all_goals split <;> rfl
+  unfold MachineHooks.initFrame
+  simp only [get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure]
+  rw [rank]
+  rfl
+
  theorem initFrame_explicit (p : Prepared) (relevant : Array Nat)
     (frame : Frame Provenance LocalLayout Unit) (definition : DefinitionId) (definitionIndex : Nat)
     (inline : CompilerVirtualFacts.inlineAttribute p.calls.scopes frame.functionInstance = none ∨
@@ -190,7 +215,8 @@ def resolvedRank (localCrate definitionCrate : Nat) (relevant : Array Nat) : UIn
 end Miri.Input.CompilerFrameMetadata
 open Lean Elab Command in
 run_cmd do
-  for name in #[``Miri.Input.CompilerFrameMetadata.userRelevance_resolved,
+  for name in #[``Miri.Input.CompilerFrameMetadata.initFrame_live_at,
+      ``Miri.Input.CompilerFrameMetadata.userRelevance_resolved,
       ``Miri.Input.CompilerFrameMetadata.initFrame_resolved] do
     for dependency in (← collectAxioms name) do
       unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do

@@ -51,6 +51,7 @@ def signature (j : Json) : Except String Signature := do
 
 def constant (j : Json) : Except String ConstExpr := do
   match ← string j "kind" with
+  | "alias" => return .alias (← nat j "reference")
   | "param" => return .parameter (← nat j "index") (← optionalNat j "type")
   | "value" =>
     let bits ← string j "bits"
@@ -65,6 +66,21 @@ def argument (j : Json) : Except String Argument := do
   | _ => throw "Invalid source generic argument kind"
 private def arguments (j : Json) : Except String (Array Argument) :=
   (j.getObjValAs? (Array Json) "arguments") >>= fun xs => xs.mapM argument
+private def patternBound (j : Json) : Except String PatternBound := do
+  if (← string j "kind") == "alias" then
+    let kind ← match ← string j "alias_kind" with
+      | "projection" => pure MIR.ConstAliasKind.Projection
+      | "inherent_self" => pure .InherentSelf
+      | "inherent_impl" => pure .InherentImpl
+      | "free" => pure .Free
+      | "anonymous" => pure .Anon
+      | tag => throw s!"Invalid pattern bound const alias kind {tag}"
+    let rigid ← match ← string j "rigidity" with
+      | "rigid" => pure true
+      | "not_rigid" => pure false
+      | tag => throw s!"Invalid pattern bound const rigidity {tag}"
+    return .alias rigid kind (← nat j "definition") (← arguments j)
+  return .constant (← constant j)
 private def mutable (j : Json) : Except String MIR.Mutability := do
   return if ← j.getObjValAs? Bool "mutable" then .Mut else .Not
 private def existential (j : Json) : Except String ExistentialPredicate := do
@@ -90,8 +106,14 @@ def expression (j : Json) : Except String Input.SourceTypes.Expr := do
   | "raw_pointer" => return .rawPointer (← nat j "pointee") (← mutable j)
   | "reference" => return .reference (← nat j "pointee") (← mutable j) (← region (← field j "region"))
   | "pattern_type" =>
-    if (← string (← field j "pattern") "kind") == "not_null" then return .patternNotNull (← nat j "base")
-    return .unsupported "constrained pattern"
+    let pattern ← field j "pattern"
+    match ← string pattern "kind" with
+    | "not_null" => return .patternNotNull (← nat j "base")
+    | "range" =>
+      let lower ← patternBound (← field pattern "start")
+      let upper ← patternBound (← field pattern "end")
+      return .patternRange (← nat j "base") lower upper
+    | _ => return .unsupported "constrained pattern"
   | "adt" => return .nominal (← nat j "definition") (← arguments j)
   | "dynamic" => return .dynamicObject (← region (← field j "region")) (← (← array j "predicates").mapM existential)
   | "function_pointer" => return .functionPointer (← signature (← field j "signature"))
@@ -186,10 +208,25 @@ def material (root : Json) : Except String Material := do
   let types ← (← array root "types").mapIdxM fun i j => do
     unless (← nat j "type_id") == i do throw "Invalid source type index/order"
     expression (← field j "shape")
+  let aliases ← match root.getObjVal? "constant_aliases" with
+    | .error _ => pure #[]
+    | .ok rows => (← rows.getArr?).mapM fun row => do
+      let kind ← match ← string row "kind" with
+        | "projection" => pure MIR.ConstAliasKind.Projection
+        | "inherent_self" => pure .InherentSelf
+        | "inherent_impl" => pure .InherentImpl
+        | "free" => pure .Free
+        | "anonymous" => pure .Anon
+        | tag => throw s!"Invalid source const alias kind {tag}"
+      let rigid ← row.getObjValAs? Bool "rigid"
+      let definition ← nat row "definition"
+      let typeRef ← nat row "type"
+      let args ← arguments row
+      return (⟨rigid,kind,definition,typeRef,args,none⟩ : ConstantAlias)
   let metadata ← match root.getObjVal? "dyn_metadata_source" with
     | .error _ | .ok .null => pure none
     | .ok value => do pure (some (← dynMetadata value))
-  let result : Material := ⟨types,definitions,metadata⟩
+  let result : Material := {types,definitions,dynMetadata := metadata,constantAliases := aliases}
   result.validate
   return result
 end Miri.Frontend.Foundation.SourceTypesParser

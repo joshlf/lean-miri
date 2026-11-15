@@ -172,6 +172,24 @@ private def nonnullPair (l : Input.Layout) : Except String Input.Layout := do
     backendRepresentation := some { b with first := some a },
     largestNiche := some ⟨0, a.primitive, (1, 2^(w*8)-1)⟩ }
 
+/-- Range patterns clone the scalar layout, replacing validity and niche only.
+The pinned rule retains base seed/size and exposes the base as field zero. -/
+private def rangeLayout (layout : Layout) (lower upper : Nat) : Except String Layout := do
+  let some backend := layout.backendRepresentation | throw "pattern range backend absent"
+  let some scalar := backend.scalar | throw "Unsupported non-scalar pattern range"
+  unless backend.kind == .scalar && scalar.kind == .initialized && scalar.primitive.kind == .integer do
+    throw "Unsupported pattern range scalar representation"
+  let bits := scalar.primitive.sizeBytes*8
+  unless bits > 0 && lower < 2^bits && upper < 2^bits do throw "Invalid pattern range bound width"
+  let signed := fun value => if value < 2^(bits-1) then (Int.ofNat value) else (Int.ofNat value - Int.ofNat (2^bits))
+  unless (if scalar.primitive.signed == some true then signed lower ≤ signed upper else lower ≤ upper) do
+    throw "Invalid wrapping pattern range"
+  return {layout with
+    fields := some (fieldsAt #[0])
+    fieldOffsetsBytes := .explicit #[0]
+    backendRepresentation := some {backend with scalar := some {scalar with validRange := some (lower,upper)}}
+    largestNiche := some ⟨0,scalar.primitive,(lower,upper)⟩}
+
 private def wrapperLayout (empty : Input.Layout) (seed : Nat)
     (fs : Array Input.Layout) : Except String Input.Layout := do
   let combined := fs.foldl (fun s f => addSeed s f.randomizationSeed) seed
@@ -218,6 +236,44 @@ private def nicheResult (seed : Nat) (ok err : Input.Layout) : Except String Inp
     variantsKind := some .multiple, backendRepresentation := some mem,
     backendReprKind := some .memory, largestNiche := none, randomizationSeed := combined }
 
+/-- The pinned direct-tag rule for two variants with one equal-width, fully
+valid integer scalar each. The tag grows to the payload alignment and the
+common payload occupies the second scalar of the pair. -/
+private def directScalarEnum (seed : Nat) (first second : Layout) : Except String Layout := do
+  let some a := first.backendRepresentation.bind (·.scalar) | throw "Unsupported direct enum first payload"
+  let some b := second.backendRepresentation.bind (·.scalar) | throw "Unsupported direct enum second payload"
+  let w := a.primitive.sizeBytes
+  unless first.backendReprKind == some .scalar && second.backendReprKind == some .scalar &&
+      a.kind == .initialized && b.kind == .initialized &&
+      a.primitive.kind == .integer && b.primitive.kind == .integer &&
+      a.primitive.integerKind == b.primitive.integerKind && w > 0 && w ≤ 16 &&
+      first.sizeBytes == some w && second.sizeBytes == some w &&
+      first.abiAlignBytes == some w && second.abiAlignBytes == some w &&
+      first.unadjustedAbiAlignBytes == some w && second.unadjustedAbiAlignBytes == some w &&
+      a.validRange == some (0, 2^(w*8)-1) && b.validRange == some (0, 2^(w*8)-1) &&
+      !first.uninhabited && !second.uninhabited do
+    throw "Unsupported direct enum scalar payloads"
+  let tagPrimitive := {a.primitive with signed := some false}
+  let tag : ScalarLayout := ⟨.initialized,tagPrimitive,some (0,1)⟩
+  let pair : BackendRepr := ⟨.scalarPair,none,none,some tag,some a,some w,none,none,none⟩
+  let variant : Nat → Input.LayoutVariant := fun i =>
+    ⟨fieldsAt #[w],none,i,2*w,pair,#[w],false⟩
+  let combined := addSeed seed (addSeed (addSeed seed first.randomizationSeed)
+    (addSeed seed second.randomizationSeed))
+  let row := base (2*w) w combined (fieldsAt #[0]) #[0] pair
+    (some ⟨0,tagPrimitive,(0,1)⟩)
+  let variants : VariantsLayout := ⟨.multiple,none,some tag,
+    some ⟨.direct,none,none,none⟩,some 0,#[variant 0,variant 1]⟩
+  return {row with variantsLayout := some variants, variantsKind := some .multiple}
+
+
+/-- Pinned FnPtr layout depends only on the instruction pointer specification,
+not on invented argument types or erased binder identities. -/
+def functionPointerLayout (target : ABI.RuntimeTargetDataLayout) : Except String Layout := do
+  let spec ← target.pointerSpecIn target.instructionAddressSpace |>.mapError toString
+  let size := spec.pointerSize.bytes.toNat
+  let align := (← spec.pointerAlign.bytes.mapError toString).toNat
+  scalar size align ⟨.pointer,size,none,none,none,some target.instructionAddressSpace.value.toNat⟩ 1 (2^(size*8)-1) 4 |> pure
 
 def calculate (source : Material) (target : ABI.RuntimeTargetDataLayout) (ty : Concrete) : Except String Layout :=
   go 1024 ty
@@ -229,6 +285,12 @@ where
       let row := base 0 (← integerAlign target 8) 0xc1325f37d127be22
         ⟨.array,0,none,some 1,#[],#[]⟩ #[] {memory with sized := some false} none
       return {row with fieldOffsetsBytes := .arrayFormula 1 0}
+    | .primitive "never" "" =>
+      let align := (← target.i8Align.bytes.mapError toString).toNat
+      let row := base 0 align 0 ⟨.primitive,0,none,none,#[],#[]⟩ #[] memory none
+      let row := {row with uninhabited := true}
+      let row := {row with variantsLayout := some ⟨.empty,none,none,none,none,#[]⟩}
+      return {row with variantsKind := some .empty}
     | .primitive kind name =>
       let bits ← if kind == "bool" && name == "" then pure 8 else if kind == "char" && name == "" then pure 32
         else if kind == "int" || kind == "uint" then width target name else throw "Unsupported typed primitive layout"
@@ -257,10 +319,7 @@ where
       let some (.tuple fields) := args.back? | throw "Unsupported closure upvar source"
       aggregate fuel fields false
     | .functionPointer .. =>
-      let spec ← target.pointerSpecIn target.instructionAddressSpace |>.mapError toString
-      let size := spec.pointerSize.bytes.toNat
-      let align := (← spec.pointerAlign.bytes.mapError toString).toNat
-      scalar size align ⟨.pointer,size,none,none,none,some target.instructionAddressSpace.value.toNat⟩ 1 (2^(size*8)-1) 4 |> pure
+      functionPointerLayout target
     | .pointer kind pointee =>
       let (_,region) ← pointerInfo kind
       let child ← go fuel pointee
@@ -326,7 +385,9 @@ where
           rows := rows.push (← go fuel field)
         let some a := rows[0]? | throw "Invalid enum success field"
         let some b := rows[1]? | throw "Invalid enum error field"
-        nicheResult adt.representation.fieldShuffleSeed a b
+        match directScalarEnum adt.representation.fieldShuffleSeed a b with
+        | .ok row => pure row
+        | .error _ => nicheResult adt.representation.fieldShuffleSeed a b
       | .unionKind =>
         let some fields := variants[0]? | throw "Invalid union source fields"
         unless variants.size == 1 do throw "Invalid union source variants"
@@ -334,6 +395,7 @@ where
     | .dynamicObject _ =>
       return base 0 (← integerAlign target 8) 0 (fieldsAt #[]) #[] {memory with sized := some false} none
     | .patternNotNull base => nonnullPair (← go fuel base)
+    | .patternRange base lower upper => rangeLayout (← go fuel base) lower upper
   aggregate (fuel : Nat) (fields : Array Concrete) (tupleTail : Bool) : Except String Layout := do
     let align := (← target.aggregateAlign.bytes.mapError toString).toNat
     if fields.isEmpty then return base 0 align 0 ⟨.arbitrary,0,none,none,#[],#[]⟩ #[] memory none
@@ -368,6 +430,7 @@ where
       | .primitive "bool" "" => pure (world,TypeShape.bool,"bool")
       | .primitive "char" "" => pure (world,TypeShape.char,"char")
       | .primitive "str" "" => pure (world,TypeShape.str,"str")
+      | .primitive "never" "" => pure (world,TypeShape.never,"!")
       | .primitive kind name =>
         let tag ← integerKind name
         if kind == "int" then pure (world,.int (.known tag),name)
@@ -414,6 +477,12 @@ where
       | .patternNotNull base => do
         let (next,id) ← go source target fuel world base
         pure (next,.patternType id .notNull,"source nonnull pattern")
+      | .patternRange base lower upper => do
+        let (next,id) ← go source target fuel world base
+        let some bytes := row.sizeBytes | throw "pattern range scalar size absent"
+        let (next,lower) ← SourceCompilerWorld.internScalarConstant next id lower bytes
+        let (next,upper) ← SourceCompilerWorld.internScalarConstant next id upper bytes
+        pure (next,.patternType id (.range lower upper),"source range pattern")
       | .nominal definition args => do
         let some declared := source.definitions[definition]? | throw "Invalid nominal source declaration"
         let some adt := declared.adt | throw "Unsupported nominal source fields unavailable"

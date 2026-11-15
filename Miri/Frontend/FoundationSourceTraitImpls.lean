@@ -62,6 +62,10 @@ private def scopedClauses (physical : SourceTypes.Material) (parameters : Array 
       for argument in arguments do scopedType physical parameters argument
       scopedType physical parameters term
     | .typeOutlives type _ => scopedType physical parameters type
+    | .regionOutlives longer shorter =>
+      for region in #[longer,shorter] do
+        if let .earlyParameter index := region then
+          unless parameters[index]? == some .region do throw "trait impl region parameter slot mismatch"
     | .constHasType index type =>
       unless parameters[index]? == some .constParameter do throw "trait impl const parameter slot mismatch"
       scopedType physical parameters type

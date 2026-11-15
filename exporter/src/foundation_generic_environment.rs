@@ -20,8 +20,11 @@ impl<'tcx> Material<'tcx> {
                     json!({"kind":"trait","definition":definition,"lang_item":role,"pinned_core_builtin":role.is_some() && !trait_def.is_local() && tcx.crate_name(trait_def.krate).as_str()=="core" && !rustc_attr_ir::find_attr!(tcx, crate, NoCore),"arguments":self.args(tcx,reference.trait_ref.args)?})
                 },
                 ty::ClauseKind::Projection(projection) => self.projection_clause(tcx,projection)?,
-                ty::ClauseKind::TypeOutlives(outlives) if matches!(outlives.1.kind(),ty::ReStatic) =>
-                    json!({"kind":"type_outlives","type":self.ty(tcx,outlives.0)?,"region":"static"}),
+                ty::ClauseKind::TypeOutlives(outlives) =>
+                    json!({"kind":"type_outlives","type":self.ty(tcx,outlives.0)?,
+                        "region":self.signature_region(tcx,outlives.1)?}),
+                ty::ClauseKind::RegionOutlives(outlives) => json!({"kind":"region_outlives",
+                    "longer":self.signature_region(tcx,outlives.0)?,"shorter":self.signature_region(tcx,outlives.1)?}),
                 ty::ClauseKind::ConstArgHasType(value,ty) => json!({"kind":"const_has_type","value":self.constant(tcx,value)?,"type":self.ty(tcx,ty)?}),
                 other => return unsupported("predicate",other),
             })

@@ -68,6 +68,10 @@ impl<'tcx> Material<'tcx> {
                 mir::TerminatorKind::UnwindResume => json!({"kind":"unwind_resume"}),
                 mir::TerminatorKind::Unreachable => json!({"kind":"unreachable"}),
                 mir::TerminatorKind::Goto {target,..} => json!({"kind":"goto","target":target.as_u32()}),
+                mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int",
+                    "operand":self.operand(tcx,discr)?,
+                    "targets":targets.iter().map(|(value,target)|json!({"value":value.to_string(),"target":target.as_u32()})).collect::<Vec<_>>(),
+                    "otherwise":targets.otherwise().as_u32()}),
                 mir::TerminatorKind::Call {func,args,destination,target,unwind,call_source,..} => json!({
                     "kind":"call","function":self.operand(tcx,func)?,
                     "arguments":args.iter().map(|arg|self.operand(tcx,&arg.node)).collect::<Result<Vec<_>>>()?,

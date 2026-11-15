@@ -1,6 +1,7 @@
 import Miri.Input.Model.SourceAllocationIdentity
 import Miri.Input.Model.SourceAllocations
 import Miri.Input.Model.SourceMir
+import Miri.Input.Model.SourceConstValues
 import Miri.Input.Model.SourceDeclarations
 import Miri.Input.Model.SourceMirUses
 import Miri.Input.Model.SourceTraitImpls
@@ -48,6 +49,7 @@ structure SourceMaterial where
   abi : Option SourceAbi.Material := none
   genericMir : Option SourceMir.Material := none
   physical : Option SourceTypes.Material := none
+  constantValues : Option SourceConstValues.Material := none
   allocations : Option SourceAllocations.Material := none
   allocationIdentity : Option SourceAllocationIdentity.Material := none
   constraints : SourceMaterial.Unavailable := .unsupported

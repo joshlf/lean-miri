@@ -18,6 +18,7 @@ private def head (physical : SourceTypes.Material) : Concrete → Except String 
   | .nominal definition _ => AutoSelfHead.adt <$> raw physical definition
   | .closure definition _ => AutoSelfHead.closure <$> raw physical definition
   | .patternNotNull base => head physical base
+  | .patternRange .. => throw "Unsupported range-pattern trait head"
 
 private def disjoint : AutoSelfHead → AutoSelfHead → Bool
   | .pattern base _, goal => disjoint base goal
@@ -60,7 +61,7 @@ where
         current := next
       return some current
     | .patternNotNull child,.patternNotNull base => go fuel child base bindings
-    | .unsupported _,_ | .projectionAlias ..,_ => throw "trait impl type pattern unsupported"
+    | .unsupported _,_ | .projectionAlias ..,_ | .patternRange ..,_ => throw "trait impl type pattern unsupported"
     | .nominal ..,_ | .functionPointer ..,_ | .closure ..,_ | .dynamicObject ..,_ | .array ..,_ |
         .functionDefinition ..,_ => throw "trait impl nontrivial type pattern unsupported"
     | _,_ => return none

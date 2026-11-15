@@ -55,6 +55,53 @@ def computeLocalLayout (p : CompilerProviders.Prepared)
   let ty ← lift (localType world (← MachineHooks.currentFrame) id)
   lift (({p.runtime with source := world.canonical}.lookup ty).mapError toString)
 
+/-- Exact query boundary, including absent World or canonical row failures.
+No frame/local query effects are hidden in a success premise. -/
+theorem computeLocalLayout_result_at (p : CompilerProviders.Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User)) (id : MIR.LocalId)
+    (before : MachineHooks.State K User) (frame : ActualFrame)
+    (active : before.stack.currentFrame? = some frame) :
+    computeLocalLayout p access id before =
+      match access.get before with
+      | none => .error (.unsupported "compiler frame query: source compiler World unavailable") before
+      | some world =>
+        let result : Except String LocalLayout := do
+          let ty ← localType world frame id
+          ({p.runtime with source := world.canonical} : RuntimeMetadata).lookup ty |>.mapError toString
+        match result with
+        | .ok layout => .ok layout before
+        | .error reason => .error (.unsupported s!"compiler frame query: {reason}") before := by
+  cases present : access.get before with
+  | none =>
+    simp [computeLocalLayout, currentWorld, present, get, getThe, MonadStateOf.get,
+      EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+  | some world =>
+    cases localTypeAt : localType world frame id with
+    | error reason =>
+      simp [computeLocalLayout, currentWorld, MachineHooks.currentFrame, lift,
+        present, active, localTypeAt, get, getThe, MonadStateOf.get, EStateM.get,
+        bind, EStateM.bind, pure, EStateM.pure, Except.bind] <;> rfl
+    | ok ty =>
+      cases lookup : ({p.runtime with source := world.canonical} : RuntimeMetadata).lookup ty <;>
+        simp [computeLocalLayout, currentWorld, MachineHooks.currentFrame, lift,
+          present, active, localTypeAt, lookup, Except.mapError, get, getThe,
+          MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure, Except.bind] <;> rfl
+
+/-- Pointwise local-layout law at an actual current frame and canonical World.
+All hypotheses are source/state data; the query's effects are derived here. -/
+theorem computeLocalLayout_at (p : CompilerProviders.Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User)) (id : MIR.LocalId)
+    (before : MachineHooks.State K User) (world : SourceCompilerWorld.World)
+    (frame : ActualFrame) (ty : MIR.TyId) (layout : LocalLayout)
+    (present : access.get before = some world)
+    (active : before.stack.currentFrame? = some frame)
+    (localTypeAt : localType world frame id = .ok ty)
+    (lookup : ({p.runtime with source := world.canonical} : RuntimeMetadata).lookup ty = .ok layout) :
+    computeLocalLayout p access id before = .ok layout before := by
+  simp [computeLocalLayout, currentWorld, MachineHooks.currentFrame, lift,
+    present, active, localTypeAt, lookup, Except.mapError, get, getThe, MonadStateOf.get, EStateM.get,
+    bind, EStateM.bind, pure, EStateM.pure]
+
 /-- Complete source layout_of_local for the actual current frame: a cached
 layout bypasses lookup; debug compatibility runs before cache mutation. -/
 def layoutOfLocal (p : CompilerProviders.Prepared)
@@ -106,6 +153,23 @@ def liveLocalSpan (access : SourceCompilerWorld.Access (MachineHooks.State K Use
   unless declaration.spanId < world.canonical.spans.size do
     throw (.unsupported "exact local source span is absent from canonical span table")
   return ⟨declaration.spanId⟩
+
+/-- The local declaration span is read from the body owned by the actual
+current World/frame. Coordinates or saved diagnostic spans do not select it. -/
+theorem liveLocalSpan_at (access : SourceCompilerWorld.Access (MachineHooks.State K User))
+    (supplied : MIR.Body) (id : MIR.LocalId) (before : MachineHooks.State K User)
+    (world : SourceCompilerWorld.World) (frame : ActualFrame) (actual : Body) (declaration : SourceInfo)
+    (present : access.get before = some world)
+    (active : before.stack.currentFrame? = some frame)
+    (sameBody : supplied = frame.body)
+    (owned : worldBodyOfFrame world frame = .ok actual)
+    (localAt : actual.localSources[id]? = some declaration)
+    (bounded : declaration.spanId < world.canonical.spans.size) :
+    liveLocalSpan access supplied id before = .ok ⟨declaration.spanId⟩ before := by
+  simp [liveLocalSpan, currentWorld, MachineHooks.currentFrame, lift,
+    present, active, sameBody, owned, localAt, bounded,
+    get, getThe, MonadStateOf.get, EStateM.get, bind, Bind.bind, EStateM.bind,
+    pure, Pure.pure, EStateM.pure]
 
 /-- Return the actual existing MIR node; no second executable instruction IR. -/
 def instruction (access : SourceCompilerWorld.Access (MachineHooks.State K User)) :
@@ -213,3 +277,9 @@ variable {K U : Type}
     row,contents,loader,declaration,indexed,bounded,identity,function,frameBody,
     get,getThe,MonadStateOf.get,EStateM.get,bind,EStateM.bind,pure,EStateM.pure,Except.bind,Except.pure]
 end Miri.Input.CompilerFrameContext
+
+open Lean Elab Command in
+run_cmd do
+  for dependency in (← collectAxioms ``Miri.Input.CompilerFrameContext.liveLocalSpan_at) do
+    unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
+      throwError "unapproved current local span axiom {dependency}"

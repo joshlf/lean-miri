@@ -38,9 +38,14 @@ fn backtraces(ids: &mut SpanIds, tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Vec<V
     }).collect()
 }
 pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
-    capture_with_additional_spans(tcx,body,&[])
-}
-pub(super) fn capture_with_additional_spans(tcx: TyCtxt<'_>, body: &mir::Body<'_>, additional: &[rustc_span::Span]) -> Value {
+    struct ConstantSpans { values: Vec<rustc_span::Span> }
+    impl<'tcx> mir::visit::Visitor<'tcx> for ConstantSpans {
+        fn visit_const_operand(&mut self, constant: &mir::ConstOperand<'tcx>, _: mir::Location) {
+            self.values.push(constant.span);
+        }
+    }
+    let mut constant_spans = ConstantSpans { values: Vec::new() };
+    mir::visit::Visitor::visit_body(&mut constant_spans, body);
     let mut ids = SpanIds::new();
     // Storage markers remain executable MIR. Whether a local is always live
     // can be derived from their absence, as in pinned interpret/stack.rs.
@@ -68,7 +73,7 @@ pub(super) fn capture_with_additional_spans(tcx: TyCtxt<'_>, body: &mir::Body<'_
         }),
         _ => Value::Null,
     }).collect::<Vec<_>>();
-    let additional_spans = additional.iter().map(|value|span(&mut ids,tcx,*value)).collect::<Vec<_>>();
+    let additional_spans = constant_spans.values.iter().map(|value|span(&mut ids,tcx,*value)).collect::<Vec<_>>();
     json!({"span":body_span,"additional_spans":additional_spans,
         "backtrace_spans":backtrace_spans,
         "definition_span":definition_span,

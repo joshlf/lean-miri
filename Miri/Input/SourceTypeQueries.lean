@@ -17,9 +17,9 @@ private def regionValue (material : Material) (contexts : Array (Array BoundVari
 
 /-- Instantiate source references without compiler queries. A binder supplied by
 an actual source signature permits checked lifetime erasure at this boundary. -/
-def instantiate (material : Material) (types : Array (Option Concrete)) (constants : Array (Option Nat))
-    (id : TypeRef) (binder : Array BoundVariable := #[]) : Except String Concrete :=
-  go 1024 #[] #[binder] id
+private def instantiateCore (material : Material) (types : Array (Option Concrete)) (constants : Array (Option Nat))
+    (id : TypeRef) (contexts : Array (Array BoundVariable)) : Except String Concrete :=
+  go 1024 #[] contexts id
 where
   go (fuel : Nat) (seen : Array Nat) (contexts : Array (Array BoundVariable)) (id : Nat) : Except String Concrete := do
     let .succ fuel := fuel | throw "Unsupported source type recursion exhausted"
@@ -41,6 +41,10 @@ where
         | .parameter index _ =>
           let some value := constants[index]?.join | throw "Unsupported unbound source const parameter"
           pure value
+        | .alias reference => do
+          let some alias := material.constantAliases[reference]? | throw "Invalid source const alias reference"
+          let some value := alias.usizeValue | throw "Unsupported source array const alias compiler value unavailable"
+          pure value
         | .unsupported tag => throw s!"Unsupported source array constant {tag}"
       return .array (← go fuel seen contexts element) count
     | .tuple elements => return .tuple (← elements.mapM (go fuel seen contexts))
@@ -51,6 +55,15 @@ where
       return .pointer s!"reference_{if region == .Static then "static" else "erased"}_{if mutable == .Mut then "mut" else "const"}"
         (← go fuel seen contexts pointee)
     | .patternNotNull base => return .patternNotNull (← go fuel seen contexts base)
+    | .patternRange base lower upper =>
+      let bound : PatternBound → Except String Nat := fun value => do
+        match value with
+        | .constant (.value _ bits _) => pure bits
+        | .constant (.parameter index _) =>
+          let some value := constants[index]?.join | throw "Unsupported unbound source pattern range parameter"
+          pure value
+        | _ => throw "Unsupported source pattern range bound witness unavailable"
+      return .patternRange (← go fuel seen contexts base) (← bound lower) (← bound upper)
     | .nominal definition arguments =>
       return .nominal definition (← argumentTypes fuel seen contexts arguments)
     | .closure source =>
@@ -105,6 +118,18 @@ where
       result := result.push (← go fuel seen contexts id)
     return result
 
+/-- Instantiate only supported concrete identities. A bound FnPtr must use the
+original signature factory; erasing its binder would change type identity. -/
+def instantiate (material : Material) (types : Array (Option Concrete)) (constants : Array (Option Nat))
+    (id : TypeRef) (binder : Array BoundVariable := #[]) : Except String Concrete :=
+  instantiateCore material types constants id #[binder]
+
+/-- Context stack for original nested signatures. Bound references may be
+instantiated for their layout while the signature factory retains their identity. -/
+def instantiateInContext (material : Material) (types : Array (Option Concrete)) (constants : Array (Option Nat))
+    (id : TypeRef) (contexts : Array (Array BoundVariable)) : Except String Concrete :=
+  instantiateCore material types constants id contexts
+
 /-- Runtime normalization erases source regions while preserving every other
 structural identity. It does not solve aliases or trait obligations. -/
 def eraseRegions (ty : Concrete) : Except String Concrete := go 1024 ty
@@ -118,6 +143,7 @@ where
     | .nominal d ts => return .nominal d (← ts.mapM (go fuel))
     | .closure d ts => return .closure d (← ts.mapM (go fuel))
     | .patternNotNull t => return .patternNotNull (← go fuel t)
+    | .patternRange t lower upper => return .patternRange (← go fuel t) lower upper
     | .pointer kind t =>
       let kind := match kind with
         | "reference_static_const" => "reference_erased_const"
@@ -147,6 +173,7 @@ def Material.validate (material : Material) : Except String Unit := do
       t id
       unless size > 0 do throw "Invalid zero-width source scalar constant"
     | .parameter _ (some id) => t id
+    | .alias id => unless id < material.constantAliases.size do throw "Invalid source constant alias reference"
     | _ => pure ()
   let args : Array Argument → Except String Unit := fun values => do
     for value in values do
@@ -157,12 +184,22 @@ def Material.validate (material : Material) : Except String Unit := do
   let bound : Array BoundVariable → Except String Unit := fun values => do
     for value in values do
       if let BoundVariable.region (.named id) := value then d id
+  for alias in material.constantAliases do
+    d alias.definition
+    t alias.typeRef
+    args alias.arguments
   for expr in material.types do
     match expr with
     | .primitive .. | .parameter .. | .unsupported _ => pure ()
     | .array id length => t id; c length
     | .tuple ids => for id in ids do t id
     | .rawPointer id _ | .patternNotNull id => t id
+    | .patternRange id lower upper =>
+      t id
+      for value in #[lower,upper] do
+        match value with
+        | .constant value => c value
+        | .alias _ _ definition values => d definition; args values
     | .reference id _ region => t id; r region
     | .nominal id values | .functionDefinition id values => d id; args values
     | .projectionAlias definition parent values =>

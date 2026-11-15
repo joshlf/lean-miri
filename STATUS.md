@@ -13,100 +13,57 @@ the ability to verify arbitrary Rust are not claimed.
 
 ## Finite-material compiler query migration
 
-The experimental `--foundation` export begins a replacement for schema-12's
-eager compiler-query closure. It retains generic MIR templates, structural
-types and definitions, complete target data, source metadata, signatures,
-compilation settings, required constants and generic predicates as finite material;
-it does not enumerate monomorphic substitutions or emit query-answer catalogs.
-The new Lean reader computes type expansion, generic substitution, a restricted
-`Sized`/`Copy`/`usize` obligation check, finite local primitive marker impl
-matching, supported required-constant and unsigned scalar const-MIR evaluation,
-primitive/array layouts and partial ABI components as pure on-demand queries.
-It also derives source span identities, producer/session evidence, primitive
-and foreign catalogs, ordinary item instances and frames, and a restricted
-`BodyCore`. The existing fixed interpreter separately computes nested array
-layouts on demand from imported material.
+This branch is replacing precomputed compiler-query answers with finite,
+typed source material in one evaluation-local Lean World. The exporter retains
+uninstantiated MIR bodies, exact definition and generic identities, target
+data and other primitive facts. The normal runner derives supported body,
+type, layout, ABI and call facts on demand through pure Lean functions before
+the fixed interpreter consumes them. It does not launch rustc during execution
+or share a cache between runs. The old snapshot route still exists while this
+migration is incomplete.
 
-Fresh generic Rust `u8` identity and scalar const-item sources now pass finite
-end-to-end execution through source-derived assembly, canonical compiler
-provider preparation, real direct frames and the fixed interpreter's assignment
-and Return steps. Identity returns 42; the source `const VALUE: u8 = 37`
-returns 37. A branch-derived scalar const evaluates to 36 and returns through
-another fixed frame. All empty the frame stack under explicit fixed scheduling and
-finite address choices. Every required constant is retained and checked before
-the const frame executes. Missing producer input, unsupported type, cyclic
-constant and out-of-domain body controls reject. These are bounded direct-frame
-observations, not Rust main startup or Rust safety theorems.
+Concrete constants used by a run are a deliberate trusted-input exception:
+the producing rustc evaluates syntactically observed, fully concrete scalar
+or unit constants and exports the result with its full source key. Lean parses
+that into typed rows, substitutes the caller key on demand and rejects missing
+results. The exporter rejects the whole document if constant evaluation
+changes its allocation identity snapshot. It does not enumerate generic
+substitutions; dynamic keys, promoted constants and aggregate or pointer
+results remain unsupported. The scalar witness and compiler's CTFE are in the
+trust boundary, and allocation/provenance equivalence for broader results is
+unproved.
 
-The finite document now also retains Call MIR with exact argument/function
-spans, function-pointer types, and compiler allocation images/raw identities.
-Lean derives direct FnDef callee/ABI evidence and imports source memory graphs
-through the existing checked importer. A genuine two-function `calls(42_u8)`
-now enters the fixed interpreter's callee frame, executes both Returns and
-observes 42 with an empty stack. The same checked two-body path preserves
-u16 `0xBEEF` and usize `0x123456789ABCDEF0` across real callee/return frames;
-independent schema-12 fixed runs agree on the full-width values.
+A genuine no_std program using `<u64 as SizedTypeProperties>::SIZE` now passes
+the normal runner through typed decode, World construction, demand-time value
+lookup and the fixed interpreter to `finalized_exit` code 1 (choice cursor
+305). Removing that witness makes the same program stop at the actual demand
+with Unsupported. This is finite execution evidence, not a proof of safety or
+general completeness. Ordinary std main still cannot be exported and run
+end-to-end: its latest genuine producer export passes bound function-pointer,
+outlives, type-level constant source, `UbChecks` and `Assert`, then stops at an
+`assume` statement. The matching Lean consumers are still under integration. A
+genuine `Result<u64, u64>` run has passed constant-span, pure discriminant
+lookup and synthetic tag-field projection, and currently stops at unsupported
+nominal enum validity classification. Further physical/ABI coverage remains in
+progress. The examples proof
+closure is being updated to carry the actual World and query evidence. Its
+current frame evidence assumes `sourceMaterial = none`, so it covers the legacy
+fixture only; it does not prove the new source-material execution route. Local
+kernel lemmas do not yet establish a whole-program theorem. In six alternating
+fixed-CPU trials of this same Rust program, frozen old-main/schema-12 and
+current work-in-progress foundation runners had identical exits and choice
+tapes. Median wall time was 237.93 ms versus 267.55 ms, concentrated in
+typed decode (26.25 versus 62.07 ms); ranges overlapped. The payloads and
+binaries differ, so this is a whole-route comparison, not a same-input
+algorithm speedup. The work-in-progress binary is identified by its artifact
+hash in ignored measurement output, not by a source commit. The measured
+foundation decoder made a redundant pass through the old decoder; its dispatch
+has been changed after that measurement and has not yet been remeasured.
 
-Pure demand closure also assembles an acyclic three-frame scalar chain and two
-sequential calls to one callee with complete-key deduplication. Their fixed runs
-match independent schema-12 runs. Missing or duplicate templates, missing call
-evidence, self-recursion and mutual recursion reject before execution.
+## Existing schema-12 input coverage
 
-A separate no_std custom `#[lang=start]`
-executable reaches the fixed compiler-selected process entry, constructs the
-main function pointer, runs the custom start MIR and exits zero after TLS
-cleanup. That start returns `argc` without invoking main; ordinary std main
-remains unsupported. A byte-array literal direct frame reads `Miri` through
-its imported provenance pointer and returns. A Unicode `&str` direct frame
-reads the actual wide-pointer metadata length 8 for `Lean🦀` and the fixed
-memory machine reads its eight UTF-8 bytes; a wrong metadata length triggers
-the fixed bounds UB. Byte-interner reservation remains
-explicitly unavailable and rejects both known and unknown byte demands. The fixed interpreter still
-consumes schema 11/12 for general programs, including precomputed query tables.
-Full migration requires wider physical types/MIR, indirect and broader call
-ABIs, general trait/const queries, byte-interner identity and provenance semantics,
-ordinary Rust main/startup and external effects from finite source material. Current
-foundation export and assembly fail closed on many MIR, type, lifetime,
-allocation and call forms. Neither the foundation path nor the old query
-closure proves correctness for arbitrary programs. The precise architecture,
-trust boundary and export-only performance comparison are in
-[foundation-architecture](docs/foundation-architecture.md).
-
-The normal `tools/run.sh` route now carries a source-header-derived,
-evaluation-local compiler World through the existing lowerer, preparation,
-runner and finalizer. It keeps typed target, declaration and lexical generic
-material and uses the exported Rust source path as `argv0`. Original FnDef
-calls resolve from that World rather than per-site precomputed answers; the
-three-frame and repeated-call checks pass through the fixed evaluator even
-with absent or forged call-answer rows. Finite linked declaration source
-matches independent exported-candidate order and attributes for 231 custom
-entry and 244 ordinary std candidates. Fresh custom and std inputs now pass
-decoding and enter the interpreter. At the last independently run `c78f097a`
-boundary, custom stops because an executable source body has not yet been
-derived, and std stops at a missing link-section answer. Subsequent commits
-retain typed link-section declarations and foreign callable headers;
-unsupported initializer data remains unavailable. Demand-time typed MIR body
-installation, broader ABI/type/const queries, lifecycle hooks and std startup
-are still being integrated. These runs do not establish successful custom or
-std execution through this route.
-
-For ordinary std main, the external `std::rt::lang_start`, its closure template,
-and `std::rt::lang_start_internal` are available as finite material. The latter
-calls `std::panic::catch_unwind` and `Result::unwrap_or_else`; source demand
-continues through those definitions. Generic declarations use ordered lexical
-layers, including inherited parameters. The captured closure's RustCall
-signature, upvars and five-block MIR match an independent compiler export. The
-actual `dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` type is retained
-structurally; Lean checks explicit bounds and the Fn/FnMut/FnOnce supertrait
-chain. Finite metadata declarations produce supported `dyn` and `&dyn` layouts,
-and nominal source rules derive the genuine `Result<isize, Box<dyn Any + Send>>`
-local's layout. Fn declarations produce candidate vtable slot order and
-symbolic closure shim MIR/ABI. Checked executable identities, complete ABI and
-MIR, vtable allocation identities, trait impl selection, and the fixed
-interpreter's std startup effects remain incomplete. Ordinary std main has not
-executed through the new path.
-
-## Exported input coverage
+This section describes the retained concrete-instance snapshot route. Its
+query tables and completeness claims do not apply to finite source material.
 
 Each concrete instance and promoted index has one executable MIR body. The
 exporter substitutes generic arguments, normalizes types, and evaluates MIR

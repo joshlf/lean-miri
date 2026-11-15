@@ -177,4 +177,32 @@ theorem hooks_unit_at (prepared : CompilerFactAdapters.Prepared)
       get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind,
       pure, EStateM.pure, Except.bind, Except.pure] <;> rfl
 
+/-- Legacy compiler facts are used only under the actual World/runtime guard.
+The hypotheses identify pure compiler data; no machine callback is assumed
+successful, and a missing source World is not silently treated as legacy. -/
+theorem hooks_legacy_at (prepared : CompilerFactAdapters.Prepared)
+    (access : SourceCompilerWorld.Access S)
+    (base : ValidityVisitor.Hooks P S C E Fn Abi Pad) (choice : C)
+    (before : S) (id : TypeId) (value : TypeNode)
+    (kindValue : ValidityVisitor.TypeKind) (inhabitedValue : Bool)
+    (mode : match access.get before with
+      | some world => world.canonical.sourceMaterial.isSome = false
+      | none => prepared.context.runtime.source.sourceMaterial.isSome = false)
+    (kind : CompilerFactAdapters.validityKind prepared id = .ok kindValue)
+    (name : prepared.context.runtime.node id = .ok value)
+    (inhabited : CompilerFacts.boolean prepared.context id "opsem_inhabited" = .ok inhabitedValue) :
+    (hooks prepared access base).classify choice id before = .ok kindValue before ∧
+    (hooks prepared access base).typeName choice id before = .ok value.display before ∧
+    (hooks prepared access base).opsemInhabited choice id before = .ok inhabitedValue before := by
+  cases present : access.get before <;> simp only [present] at mode
+  all_goals
+    constructor
+    · simp [hooks, query, present, mode, kind, get, getThe, MonadStateOf.get,
+        EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+    constructor
+    · simp [hooks, query, present, mode, name, Except.map, Except.mapError,
+        get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+    · simp [hooks, query, present, mode, inhabited, get, getThe, MonadStateOf.get,
+        EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+
 end Miri.Input.CompilerValidityWorld

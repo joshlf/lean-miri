@@ -22,6 +22,7 @@ inductive Clause where
   | projection (definition parentTrait : DefinitionId) (arguments : Array SourceTypes.TypeRef) (term : SourceTypes.TypeRef)
   | constHasType (parameter : Nat) (type : SourceTypes.TypeRef)
   | typeOutlives (type : SourceTypes.TypeRef) (region : SourceTypes.Region)
+  | regionOutlives (longer shorter : SourceTypes.Region)
   | unsupported (kind : String)
   deriving Repr, DecidableEq
 

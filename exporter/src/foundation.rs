@@ -17,6 +17,8 @@ mod auto_trait_material;
 mod trait_impl_material;
 #[path = "foundation_mir_uses.rs"]
 mod mir_use_material;
+#[path = "foundation_const_values.rs"]
+mod const_values_material;
 #[path = "foundation_enum.rs"]
 mod enum_material;
 #[path = "foundation_generic_parameters.rs"]
@@ -92,6 +94,9 @@ struct Material<'tcx> {
     definitions: Vec<Value>,
     def_ids: HashMap<DefId, usize>,
     allocations: Vec<Value>,
+    observed_constants: Vec<mir::UnevaluatedConst<'tcx>>,
+    constant_aliases: Vec<Value>,
+    constant_alias_ids: HashMap<ty::Const<'tcx>, usize>,
     allocation_ids: HashMap<rustc_middle::mir::interpret::AllocId, usize>,
 }
 fn unsupported<T>(kind: &str, value: impl std::fmt::Debug) -> Result<T> {
@@ -112,6 +117,7 @@ impl<'tcx> Material<'tcx> {
                 let leaf = v.valtree.try_to_leaf().ok_or("foundation: non-scalar type constant")?;
                 json!({"kind":"value","type":self.ty(tcx,v.ty)?,"bits":leaf.to_bits(leaf.size()).to_string(),"size_bytes":leaf.size().bytes()})
             }
+            ty::ConstKind::Alias(rigidity,alias) => self.constant_alias(tcx,c,rigidity,alias)?,
             other => return unsupported("type constant", other),
         })
     }
@@ -121,8 +127,7 @@ impl<'tcx> Material<'tcx> {
             ty::GenericArgKind::Const(c) => json!({"kind":"const","value":self.constant(tcx,c)?}),
             ty::GenericArgKind::Lifetime(r) => {
                 // Region identities affect validity/proofs; never silently erase.
-                if !matches!(r.kind(), ty::ReErased | ty::ReStatic) { return unsupported("region", r); }
-                json!({"kind":"region","region":if matches!(r.kind(), ty::ReStatic) {"static"} else {"erased"}})
+                json!({"kind":"region","region":self.signature_region(tcx,r)?})
             }
         })).collect()
     }
@@ -149,12 +154,10 @@ impl<'tcx> Material<'tcx> {
             }
             ty::FnPtr(signature, header) => {
                 let signature = signature.with(header);
-                if !signature.bound_vars().is_empty() {
-                    return unsupported("bound function-pointer signature", signature);
-                }
+                let bound_variables = self.signature_binders(tcx,signature.bound_vars())?;
                 let signature = signature.skip_binder();
                 json!({"kind":"function_pointer","signature":{
-                    "bound_variables":[],
+                    "bound_variables":bound_variables,
                     "inputs":signature.inputs().iter().map(|t|self.ty(tcx,*t)).collect::<Result<Vec<_>>>()?,
                     "output":self.ty(tcx,signature.output())?,
                     "safety":match signature.safety() {rustc_hir::Safety::Safe=>"safe",rustc_hir::Safety::Unsafe=>"unsafe"},
@@ -199,6 +202,8 @@ impl<'tcx> Material<'tcx> {
             mir::ProjectionElem::Deref => json!({"kind":"deref"}),
             mir::ProjectionElem::Field(f,t) => json!({"kind":"field","index":f.as_u32(),"type":self.ty(tcx,t)?}),
             mir::ProjectionElem::Index(i) => json!({"kind":"index","local":i.as_u32()}),
+            mir::ProjectionElem::Downcast(name, variant) => json!({"kind":"downcast",
+                "name":name.map(|name|name.as_str().to_string()),"variant":variant.as_u32()}),
             other => return unsupported("projection",other),
         })).collect::<Result<Vec<_>>>()?;
         Ok(json!({"local":p.local.as_u32(),"projection":projections}))
@@ -207,6 +212,10 @@ impl<'tcx> Material<'tcx> {
         Ok(match o {
             mir::Operand::Copy(p) => json!({"kind":"copy","place":self.place(tcx,*p)?}),
             mir::Operand::Move(p) => json!({"kind":"move","place":self.place(tcx,*p)?}),
+            mir::Operand::RuntimeChecks(check) => json!({"kind":"runtime_checks",
+                "check":match check {mir::RuntimeChecks::UbChecks=>"ub_checks",
+                    mir::RuntimeChecks::ContractChecks=>"contract_checks",mir::RuntimeChecks::OverflowChecks=>"overflow_checks"},
+                "type":self.ty(tcx,tcx.types.bool)?}),
             mir::Operand::Constant(c) => {
                 let value = match c.const_ {
                     mir::Const::Unevaluated(value,_) => self.constant_definition(tcx,value)?,
@@ -229,11 +238,25 @@ impl<'tcx> Material<'tcx> {
     fn rvalue(&mut self, tcx: TyCtxt<'tcx>, r: &mir::Rvalue<'tcx>) -> Result<Value> {
         Ok(match r {
             mir::Rvalue::Use(o,retag) => json!({"kind":"use","operand":self.operand(tcx,o)?,"retag":retag.yes()}),
-            mir::Rvalue::Ref(region,mir::BorrowKind::Shared,place) => {
+            mir::Rvalue::Ref(region,borrow,place) => {
                 if !matches!(region.kind(),ty::ReErased|ty::ReStatic) { return unsupported("MIR borrow region",region); }
-                json!({"kind":"ref","region":if matches!(region.kind(),ty::ReStatic){"static"}else{"erased"},"borrow_kind":"shared","place":self.place(tcx,*place)?})
+                let borrow_kind = match borrow {
+                    mir::BorrowKind::Shared => "shared",
+                    mir::BorrowKind::Mut {kind:mir::MutBorrowKind::Default} => "mut_default",
+                    mir::BorrowKind::Mut {kind:mir::MutBorrowKind::TwoPhaseBorrow} => "mut_two_phase",
+                    mir::BorrowKind::Mut {kind:mir::MutBorrowKind::ClosureCapture} => "mut_closure_capture",
+                    other => return unsupported("MIR borrow kind",other),
+                };
+                json!({"kind":"ref","region":if matches!(region.kind(),ty::ReStatic){"static"}else{"erased"},"borrow_kind":borrow_kind,"place":self.place(tcx,*place)?})
             },
+            mir::Rvalue::RawPtr(kind,place) => json!({"kind":"raw_ptr",
+                "pointer_kind":match kind {
+                    mir::RawPtrKind::Const=>"const",mir::RawPtrKind::Mut=>"mut",
+                    mir::RawPtrKind::FakeForPtrMetadata=>"fake_for_ptr_metadata"},
+                "place":self.place(tcx,*place)?}),
             mir::Rvalue::Aggregate(kind,operands) => match &**kind {
+                mir::AggregateKind::Array(element) => json!({"kind":"aggregate_array","element_type":self.ty(tcx,*element)?,
+                    "operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
                 mir::AggregateKind::Adt(def,variant,args,user_type,active_field) => {
                     let _ = self.ty(tcx,ty::Ty::new_adt(tcx,tcx.adt_def(*def),args))?;
                     json!({"kind":"aggregate_adt","definition":self.definition(tcx,*def),"variant":variant.as_usize(),
@@ -255,6 +278,23 @@ impl<'tcx> Material<'tcx> {
                 json!({"kind":"pointer_coercion","coercion":coercion,
                     "source":match source {mir::CoercionSource::AsCast=>"as_cast",mir::CoercionSource::Implicit=>"implicit"},
                     "operand":self.operand(tcx,operand)?,"target":self.ty(tcx,*target)?})
+            },
+            mir::Rvalue::Cast(kind,operand,target) => {
+                let cast_kind = match kind {
+                    mir::CastKind::PointerExposeProvenance => "pointer_expose_provenance",
+                    mir::CastKind::PointerWithExposedProvenance => "pointer_with_exposed_provenance",
+                    mir::CastKind::IntToInt => "int_to_int",
+                    mir::CastKind::FloatToInt => "float_to_int",
+                    mir::CastKind::FloatToFloat => "float_to_float",
+                    mir::CastKind::IntToFloat => "int_to_float",
+                    mir::CastKind::PtrToPtr => "ptr_to_ptr",
+                    mir::CastKind::FnPtrToPtr => "fn_ptr_to_ptr",
+                    mir::CastKind::Transmute => "transmute",
+                    mir::CastKind::BoxDerefTransmute => "box_deref_transmute",
+                    mir::CastKind::Subtype => "subtype",
+                    mir::CastKind::PointerCoercion(..) => unreachable!(),
+                };
+                json!({"kind":"cast","cast_kind":cast_kind,"operand":self.operand(tcx,operand)?,"target":self.ty(tcx,*target)?})
             },
             mir::Rvalue::BinaryOp(op,p) => json!({"kind":"binary","operator":super::binop_name(*op),"left":self.operand(tcx,&p.0)?,"right":self.operand(tcx,&p.1)?}),
             mir::Rvalue::UnaryOp(op,o) => json!({"kind":"unary","operator":super::unop_name(*op),"operand":self.operand(tcx,o)?}),
@@ -332,6 +372,7 @@ impl<'tcx> Material<'tcx> {
                 mir::StatementKind::Assign(p) => json!({"kind":"assign","place":self.place(tcx,p.0)?,"value":self.rvalue(tcx,&p.1)?}),
                 mir::StatementKind::StorageLive(l) => json!({"kind":"storage_live","local":l.as_u32()}),
                 mir::StatementKind::StorageDead(l) => json!({"kind":"storage_dead","local":l.as_u32()}),
+                mir::StatementKind::PlaceMention(place) => json!({"kind":"place_mention","place":self.place(tcx,**place)?}),
                 mir::StatementKind::Nop => json!({"kind":"nop"}),
                 other => return unsupported("statement",other),
             })).collect::<Result<Vec<_>>>()?;
@@ -346,6 +387,25 @@ impl<'tcx> Material<'tcx> {
                     "unwind":super::unwind_json(*unwind),"replace":replace,
                     "async_drop":drop.map(|block|block.as_u32())}),
                 mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int","operand":self.operand(tcx,discr)?,"targets":targets.iter().map(|(v,b)|json!({"value":v.to_string(),"target":b.as_u32()})).collect::<Vec<_>>(),"otherwise":targets.otherwise().as_u32()}),
+                mir::TerminatorKind::Assert {cond,expected,msg,target,unwind} => {
+                    let message = match &**msg {
+                        mir::AssertKind::BoundsCheck {len,index} => json!({"kind":"bounds_check","length":self.operand(tcx,len)?,"index":self.operand(tcx,index)?}),
+                        mir::AssertKind::Overflow(op,left,right) => json!({"kind":"overflow","operator":crate::binop_name(*op),"left":self.operand(tcx,left)?,"right":self.operand(tcx,right)?}),
+                        mir::AssertKind::OverflowNeg(op) => json!({"kind":"overflow_neg","operand":self.operand(tcx,op)?}),
+                        mir::AssertKind::DivisionByZero(op) => json!({"kind":"division_by_zero","operand":self.operand(tcx,op)?}),
+                        mir::AssertKind::RemainderByZero(op) => json!({"kind":"remainder_by_zero","operand":self.operand(tcx,op)?}),
+                        mir::AssertKind::ResumedAfterReturn(kind) => json!({"kind":"resumed_after_return","coroutine":super::coroutine_kind_json(*kind)}),
+                        mir::AssertKind::ResumedAfterPanic(kind) => json!({"kind":"resumed_after_panic","coroutine":super::coroutine_kind_json(*kind)}),
+                        mir::AssertKind::ResumedAfterDrop(kind) => json!({"kind":"resumed_after_drop","coroutine":super::coroutine_kind_json(*kind)}),
+                        mir::AssertKind::MisalignedPointerDereference {required,found} => json!({"kind":"misaligned_pointer_dereference","required":self.operand(tcx,required)?,"found":self.operand(tcx,found)?}),
+                        mir::AssertKind::NullPointerDereference => json!({"kind":"null_pointer_dereference"}),
+                        mir::AssertKind::NullReferenceConstructed => json!({"kind":"null_reference_constructed"}),
+                        mir::AssertKind::InvalidEnumConstruction(op) => json!({"kind":"invalid_enum_construction","operand":self.operand(tcx,op)?}),
+                        other => return unsupported("assert message",other),
+                    };
+                    json!({"kind":"assert","condition":self.operand(tcx,cond)?,"expected":expected,
+                        "message":message,"target":target.as_u32(),"unwind":super::unwind_json(*unwind)})
+                },
                 mir::TerminatorKind::Call {func,args,destination,target,unwind,call_source,..} => json!({
                     "kind":"call",
                     "function":self.operand(tcx,func)?,
@@ -409,10 +469,12 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let foreign_symbol_material = foreign_symbol_material::export(tcx)?;
     let runtime_data_layout = super::foundation_target::export(tcx)?;
     let symbol_name_source = m.symbol_name_source(tcx)?;
+    let evaluated_const_values = m.evaluated_const_values(tcx)?;
     let allocation_identity_source = m.allocation_identity_source(tcx)?;
     Ok(json!({
         "symbol_name_source":symbol_name_source,
         "allocation_identity_source":allocation_identity_source,
+        "evaluated_const_values":evaluated_const_values,
         "closure_auto_source":closure_auto_source,
         "trait_impl_source":trait_impl_source,
         "mir_use_source":mir_use_source,
@@ -428,7 +490,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         "session":session,
         "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"},"opt_level":format!("{:?}",tcx.sess.opts.optimize),"incremental":tcx.sess.opts.incremental.is_some()},
         "target":{"runtime_data_layout":runtime_data_layout,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
-        "definitions":m.definitions,"types":m.types,"bodies":bodies,
+        "definitions":m.definitions,"types":m.types,"constant_aliases":m.constant_aliases,"bodies":bodies,
         "closure_templates":closure_templates,
         "source_allocations":m.allocations,
         "dyn_metadata_source":dyn_metadata_source,

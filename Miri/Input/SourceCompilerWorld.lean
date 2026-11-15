@@ -22,6 +22,19 @@ structure InstanceKey where
   arguments : Array MIR.GenericArg
   deriving Repr, DecidableEq
 
+/-- A deferred generic constant occurrence retains its full caller identity.
+The token indexes this table only; it is unrelated to compiler allocation IDs. -/
+structure ConstantRequest where
+  caller : CallInstance
+  callerArguments : Array MIR.GenericArg
+  definition : SourceTypes.DefinitionRef
+  arguments : Array SourceTypes.Argument
+  promoted : Option Nat
+  types : Array (Option SourceTypes.Concrete)
+  constants : Array (Option Nat)
+  expectedType : TypeId
+  deriving Repr
+
 structure World where
   canonical : ImportDocument
   private keys : Array (InstanceKey × CallInstance) := #[]
@@ -33,6 +46,7 @@ structure World where
   /-- Initial existing vtable keys are canonicalized once on the first demand. -/
   initialVTableIdentities : Option (Array SourceAllocationIdentity.CanonicalVTable) := none
   derivedVTableIdentities : Array SourceAllocationIdentity.CanonicalVTable := #[]
+  private constantRequests : Array ConstantRequest := #[]
 
 structure Access (S : Type) where
   get : S → Option World
@@ -53,6 +67,24 @@ def keyOf (world : World) (id : CallInstance) : Except String InstanceKey := do
   let .Item definition := value.instanceKind | throw "source Item key requested for non-Item instance"
   let some raw := world.canonical.definitions[definition]? | throw "source instance DefId reference absent"
   return ⟨raw,value.genericArgs⟩
+
+/-- Register syntax without evaluating it. Equal requests in one caller keep
+one token, independent of how many operands reference that same constant. -/
+def internConstantRequest (world : World) (caller : CallInstance)
+    (definition : SourceTypes.DefinitionRef) (arguments : Array SourceTypes.Argument)
+    (promoted : Option Nat) (types : Array (Option SourceTypes.Concrete))
+    (constants : Array (Option Nat)) (expectedType : TypeId) : Except String (World × Nat) := do
+  let key ← keyOf world caller
+  if let some token := world.constantRequests.findIdx? (fun row => row.caller == caller &&
+      row.definition == definition && row.arguments == arguments && row.promoted == promoted &&
+      row.expectedType == expectedType) then return (world,token)
+  let token := world.constantRequests.size
+  let row := ConstantRequest.mk caller key.arguments definition arguments promoted types constants expectedType
+  return ({world with constantRequests := world.constantRequests.push row},token)
+
+def constantRequest (world : World) (token : Nat) : Except String ConstantRequest := do
+  let some row := world.constantRequests[token]? | throw "source constant request token unavailable"
+  return row
 
 /-- Seed existing canonical handles without enumerating any new substitution. -/
 def create (canonical : ImportDocument) : Except String World := do

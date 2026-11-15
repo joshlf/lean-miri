@@ -48,6 +48,7 @@ inductive Projection where
   | deref
   | field (index : Nat) (type : TypeRef)
   | index (localId : Nat)
+  | downcast (name : Option String) (variant : Nat)
   | unsupported (kind : String)
   deriving Repr, DecidableEq
 structure Place where
@@ -74,6 +75,7 @@ inductive Operand where
   | copy (place : Place)
   | move (place : Place)
   | constant (value : Constant)
+  | runtimeChecks (check : MIR.RuntimeChecks) (boolType : TypeRef)
   | unsupported (kind : String)
   deriving Repr, DecidableEq
 inductive Operator (α : Type) where
@@ -83,21 +85,25 @@ inductive Operator (α : Type) where
 inductive Rvalue where
   | use (operand : Operand) (retag : Bool)
   | reference (region : SourceTypes.Region) (borrow : Operator MIR.BorrowKind) (place : Place)
+  | rawPointer (kind : Operator MIR.RawPtrKind) (place : Place)
   | binary (operator : Operator MIR.BinOp) (left right : Operand)
   | unary (operator : Operator MIR.UnOp) (operand : Operand)
   | repeat (operand : Operand) (count : SourceTypes.ConstExpr)
   | discriminant (place : Place)
   | aggregateTuple (operands : Array Operand)
+  | aggregateArray (element : TypeRef) (operands : Array Operand)
   | aggregateAdt (definition : DefinitionRef) (variant : Nat) (arguments : Array SourceTypes.Argument)
       (userType activeField : Option Nat) (operands : Array Operand)
   | aggregateClosure (definition : DefinitionRef) (arguments : Array SourceTypes.Argument) (operands : Array Operand)
   | pointerCoercion (kind : Operator MIR.PointerCoercion) (operand : Operand) (target : TypeRef) (source : Operator MIR.CoercionSource)
+  | cast (kind : Operator MIR.CastKind) (operand : Operand) (target : TypeRef)
   | unsupported (kind : String)
   deriving Repr, DecidableEq
 inductive StatementKind where
   | assign (destination : Place) (value : Rvalue)
   | storageLive (localId : Nat)
   | storageDead (localId : Nat)
+  | placeMention (place : Place)
   | nop
   | unsupported (kind : String)
   deriving Repr, DecidableEq
@@ -114,6 +120,21 @@ structure SpannedOperand where
   operand : Operand
   span : Nat
   deriving Repr, DecidableEq
+inductive AssertKind where
+  | boundsCheck (length index : Operand)
+  | overflow (operator : Operator MIR.BinOp) (left right : Operand)
+  | overflowNeg (operand : Operand)
+  | divisionByZero (operand : Operand)
+  | remainderByZero (operand : Operand)
+  | resumedAfterReturn (coroutine : Operator MIR.CoroutineKind)
+  | resumedAfterPanic (coroutine : Operator MIR.CoroutineKind)
+  | resumedAfterDrop (coroutine : Operator MIR.CoroutineKind)
+  | misalignedPointerDereference (required found : Operand)
+  | nullPointerDereference
+  | nullReferenceConstructed
+  | invalidEnumConstruction (operand : Operand)
+  | unsupported (kind : String)
+  deriving Repr, DecidableEq
 inductive TerminatorKind where
   | returnValue
   | terminateUnwind (reason : Operator MIR.UnwindTerminateReason)
@@ -124,6 +145,7 @@ inductive TerminatorKind where
       (target : Option Nat) (unwind : Unwind) (source : Operator MIR.CallSource) (functionSpan : Nat)
   | drop (place : Place) (target : Nat) (unwind : Unwind) (replace : Bool) (asyncDrop : Option Nat)
   | switchInt (discriminant : Operand) (values : Array (Nat × Nat)) (otherwise : Nat)
+  | assert (condition : Operand) (expected : Bool) (message : AssertKind) (target : Nat) (unwind : Unwind)
   | unsupported (kind : String)
   deriving Repr, DecidableEq
 structure Terminator where

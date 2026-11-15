@@ -47,6 +47,9 @@ private def constantExpr (c : Context) (j : Json) : Except String Input.SourceTy
   | .value ty bits bytes =>
     let _ ← typeRef c ty
     unless bytes ≤ 16 && bits < 2^(8*bytes) do throw "source MIR type constant bits/width invalid"
+  | .alias id =>
+    let some physical := c.physical | throw "source MIR const alias universe unavailable"
+    unless id < physical.constantAliases.size do throw "source MIR const alias reference absent"
   | .unsupported _ => pure ()
   return result
 private def arguments (c : Context) (j : Json) : Except String (Array Input.SourceTypes.Argument) := do
@@ -66,6 +69,7 @@ private def place (c : Context) (j : Json) : Except String Place := do
     | "deref" => pure Projection.deref
     | "field" => return .field (← p.getObjValAs? Nat "index") (← typeRef c (← p.getObjValAs? Nat "type"))
     | "index" => return .index (← localRef c (← p.getObjValAs? Nat "local"))
+    | "downcast" => return .downcast (← p.getObjValAs? (Option String) "name") (← p.getObjValAs? Nat "variant")
     | tag => pure (.unsupported tag)
   return ⟨localId,projection⟩
 def constant (c : Context) (j : Json) : Except String Constant := do
@@ -93,11 +97,7 @@ def constant (c : Context) (j : Json) : Except String Constant := do
     | "value" | "param" => pure (ConstantValue.typeConstant (← constantExpr c value))
     | "unevaluated" => do
       let definition ← definitionRef c (← value.getObjValAs? Nat "definition")
-      -- Schema1's nonpromoted const-item source omits this field because the
-      -- producer explicitly rejects promoted UnevaluatedConst in this form.
-      let promoted ← match value.getObjVal? "promoted" with
-        | .error _ => pure none
-        | .ok value => fromJson? value
+      let promoted ← value.getObjValAs? (Option Nat) "promoted"
       pure (ConstantValue.unevaluated definition (← arguments c (← value.getObjVal? "arguments")) promoted)
     | tag => pure (.unsupported tag)
   return ⟨type,value,← spanKey (← j.getObjVal? "source_span_key"),← optionalNat j "user_type"⟩
@@ -106,6 +106,17 @@ private def operand (c : Context) (j : Json) : Except String Operand := do
   | "copy" => return .copy (← place c (← j.getObjVal? "place"))
   | "move" => return .move (← place c (← j.getObjVal? "place"))
   | "constant" => return .constant (← constant c j)
+  | "runtime_checks" =>
+    let tag ← j.getObjValAs? String "check"
+    let check : Option MIR.RuntimeChecks := match tag with
+      | "ub_checks" => some .UbChecks | "contract_checks" => some .ContractChecks
+      | "overflow_checks" => some .OverflowChecks | _ => none
+    let some check := check | return .unsupported s!"runtime_checks:{tag}"
+    let reference ← typeRef c (← j.getObjValAs? Nat "type")
+    let some physical := c.physical | throw "runtime-check bool source universe unavailable"
+    let some (.primitive "bool" _) := physical.types[reference]? | throw "runtime-check operand type is not bool"
+    return .runtimeChecks check reference
+
   | tag => pure (.unsupported tag)
 private def binary (tag : String) : Operator MIR.BinOp :=
   match tag with
@@ -124,8 +135,20 @@ private def rvalue (c : Context) (j : Json) : Except String Rvalue := do
   | "use" => return .use (← operand c (← j.getObjVal? "operand")) (← j.getObjValAs? Bool "retag")
   | "ref" =>
     let kind ← j.getObjValAs? String "borrow_kind"
-    let borrow := if kind == "shared" then Operator.known MIR.BorrowKind.Shared else .unsupported kind
+    let borrow := match kind with
+      | "shared" => Operator.known MIR.BorrowKind.Shared
+      | "mut_default" => .known (.Mut .Default)
+      | "mut_two_phase" => .known (.Mut .TwoPhaseBorrow)
+      | "mut_closure_capture" => .known (.Mut .ClosureCapture)
+      | _ => .unsupported kind
     return .reference (← SourceTypesParser.region (← j.getObjVal? "region")) borrow (← place c (← j.getObjVal? "place"))
+  | "raw_ptr" =>
+    let kind : Operator MIR.RawPtrKind := match ← j.getObjValAs? String "pointer_kind" with
+      | "const" => .known .Const
+      | "mut" => .known .Mut
+      | "fake_for_ptr_metadata" => .known .FakeForPtrMetadata
+      | tag => .unsupported tag
+    return .rawPointer kind (← place c (← j.getObjVal? "place"))
   | "binary" =>
     return .binary (binary (← j.getObjValAs? String "operator"))
       (← operand c (← j.getObjVal? "left")) (← operand c (← j.getObjVal? "right"))
@@ -162,6 +185,10 @@ private def rvalue (c : Context) (j : Json) : Except String Rvalue := do
       unless activeField.isNone && values.size == selected.fields.size do throw "source ADT aggregate field/operand mismatch"
     return .aggregateAdt definition variant args userType activeField values
   | "aggregate_tuple" => return .aggregateTuple (← (← j.getObjValAs? (Array Json) "operands").mapM (operand c))
+  | "aggregate_array" =>
+    let element ← typeRef c (← j.getObjValAs? Nat "element_type")
+    let values ← (← j.getObjValAs? (Array Json) "operands").mapM (operand c)
+    return .aggregateArray element values
   | "pointer_coercion" =>
     let coercion ← j.getObjVal? "coercion"
     let kind : Operator MIR.PointerCoercion ← match ← coercion.getObjValAs? String "kind" with
@@ -178,6 +205,21 @@ private def rvalue (c : Context) (j : Json) : Except String Rvalue := do
       | "implicit" => .known .Implicit
       | _ => .unsupported tag
     return .pointerCoercion kind (← operand c (← j.getObjVal? "operand")) (← typeRef c (← j.getObjValAs? Nat "target")) source
+  | "cast" =>
+    let kind : Operator MIR.CastKind ← match ← j.getObjValAs? String "cast_kind" with
+      | "pointer_expose_provenance" => pure (.known .PointerExposeProvenance)
+      | "pointer_with_exposed_provenance" => pure (.known .PointerWithExposedProvenance)
+      | "int_to_int" => pure (.known .IntToInt)
+      | "float_to_int" => pure (.known .FloatToInt)
+      | "float_to_float" => pure (.known .FloatToFloat)
+      | "int_to_float" => pure (.known .IntToFloat)
+      | "fn_ptr_to_ptr" => pure (.known .FnPtrToPtr)
+      | "box_deref_transmute" => pure (.known .BoxDerefTransmute)
+      | "subtype" => pure (.known .Subtype)
+      | "transmute" => pure (.known .Transmute)
+      | "ptr_to_ptr" => pure (.known .PtrToPtr)
+      | tag => pure (.unsupported tag)
+    return .cast kind (← operand c (← j.getObjVal? "operand")) (← typeRef c (← j.getObjValAs? Nat "target"))
   | tag => pure (.unsupported tag)
 private def reason (j : Json) : Except String (Operator MIR.UnwindTerminateReason) := do
   match ← j.getObjValAs? String "kind" with
@@ -198,6 +240,43 @@ private def info (c : Context) (j : Json) : Except String Input.SourceMir.Source
   let scope ← j.getObjValAs? Nat "scope"
   unless scope < c.scopes do throw "source MIR source scope reference out of bounds"
   return ⟨source.identity,scope⟩
+private def coroutine (j : Json) : Except String (Operator MIR.CoroutineKind) := do
+  match ← j.getObjValAs? String "kind" with
+  | "coroutine" =>
+    match ← j.getObjValAs? String "movability" with
+    | "static" => return .known (.Coroutine .Static)
+    | "movable" => return .known (.Coroutine .Movable)
+    | tag => return .unsupported tag
+  | "desugared" =>
+    let tag ← j.getObjValAs? String "desugaring"
+    let kind : Option MIR.CoroutineDesugaring := match tag with
+      | "async" => some .Async | "gen" => some .Gen | "async_gen" => some .AsyncGen | _ => none
+    let some kind := kind | return .unsupported tag
+    let tag ← j.getObjValAs? String "source"
+    let source : Option MIR.CoroutineSource := match tag with
+      | "block" => some .Block | "closure" => some .Closure | "function" => some .Fn | _ => none
+    let some source := source | return .unsupported tag
+    return .known (.Desugared kind source)
+  | tag => return .unsupported tag
+private def assertKind (c : Context) (j : Json) : Except String Input.SourceMir.AssertKind := do
+  match ← j.getObjValAs? String "kind" with
+  | "bounds_check" => return .boundsCheck (← operand c (← j.getObjVal? "length")) (← operand c (← j.getObjVal? "index"))
+  | "overflow" =>
+    return .overflow (binary (← j.getObjValAs? String "operator"))
+      (← operand c (← j.getObjVal? "left")) (← operand c (← j.getObjVal? "right"))
+  | "overflow_neg" => return .overflowNeg (← operand c (← j.getObjVal? "operand"))
+  | "division_by_zero" => return .divisionByZero (← operand c (← j.getObjVal? "operand"))
+  | "remainder_by_zero" => return .remainderByZero (← operand c (← j.getObjVal? "operand"))
+  | "resumed_after_return" => return .resumedAfterReturn (← coroutine (← j.getObjVal? "coroutine"))
+  | "resumed_after_panic" => return .resumedAfterPanic (← coroutine (← j.getObjVal? "coroutine"))
+  | "resumed_after_drop" => return .resumedAfterDrop (← coroutine (← j.getObjVal? "coroutine"))
+  | "misaligned_pointer_dereference" =>
+    return .misalignedPointerDereference
+      (← operand c (← j.getObjVal? "required")) (← operand c (← j.getObjVal? "found"))
+  | "null_pointer_dereference" => pure .nullPointerDereference
+  | "null_reference_constructed" => pure .nullReferenceConstructed
+  | "invalid_enum_construction" => return .invalidEnumConstruction (← operand c (← j.getObjVal? "operand"))
+  | tag => pure (.unsupported tag)
 def terminator (c : Context) (j : Json) (call : Option Json) : Except String TerminatorKind := do
   match ← j.getObjValAs? String "kind" with
   | "return" => pure .returnValue | "unwind_resume" => pure .resumeUnwind | "unreachable" => pure .unreachable
@@ -207,6 +286,10 @@ def terminator (c : Context) (j : Json) (call : Option Json) : Except String Ter
     let asyncDrop ← (← optionalNat j "async_drop").mapM (blockRef c)
     return .drop (← place c (← j.getObjVal? "place")) (← blockRef c (← j.getObjValAs? Nat "target"))
       (← unwind c (← j.getObjVal? "unwind")) (← j.getObjValAs? Bool "replace") asyncDrop
+  | "assert" =>
+    return .assert (← operand c (← j.getObjVal? "condition")) (← j.getObjValAs? Bool "expected")
+      (← assertKind c (← j.getObjVal? "message")) (← blockRef c (← j.getObjValAs? Nat "target"))
+      (← unwind c (← j.getObjVal? "unwind"))
   | "switch_int" =>
     let values ← (← j.getObjValAs? (Array Json) "targets").mapM fun t => do
       let some value := (← t.getObjValAs? String "value").toNat? | throw "source MIR switch bits invalid"
@@ -232,6 +315,7 @@ def statementKind (c : Context) (statement : Json) : Except String StatementKind
   | "assign" => pure (StatementKind.assign (← place c (← statement.getObjVal? "place")) (← rvalue c (← statement.getObjVal? "value")))
   | "storage_live" => pure (StatementKind.storageLive (← localRef c (← statement.getObjValAs? Nat "local")))
   | "storage_dead" => pure (StatementKind.storageDead (← localRef c (← statement.getObjValAs? Nat "local")))
+  | "place_mention" => pure (StatementKind.placeMention (← place c (← statement.getObjVal? "place")))
   | "nop" => pure .nop
   | tag => pure (.unsupported tag)
 private def phase (j : Json) : Except String Phase := do

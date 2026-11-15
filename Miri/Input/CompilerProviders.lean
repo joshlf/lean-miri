@@ -165,8 +165,7 @@ def resolveCurrent (access : SourceCompilerWorld.Access (MachineHooks.State K Us
     | _ => throw (.invalidProgram "callee resolution current source is not a call")
   let typeId ← match function with
     | .Constant constant =>
-      let .Val _ typeId := constant.value
-      pure typeId
+      pure constant.value.typeId
     | .Copy place | .Move place =>
       if place.projection.isEmpty then
         let some typeId := body.body.locals[place.localId]? | throw (.unsupported "source function local type absent")

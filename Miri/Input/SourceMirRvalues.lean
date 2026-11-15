@@ -29,9 +29,45 @@ def operand (c : Context) (op : SourceMir.Operand) : Except String (MIR.Operand 
     return (.Move p,fact.typeId,#[fact])
   | .constant value =>
     let value ← c.constant value
-    let .Val _ type := value.value
-    return (.Constant value,type,#[])
+    return (.Constant value,value.value.typeId,#[])
+  | .runtimeChecks check reference =>
+    let some type := c.types[reference]?.join | throw "source runtime-check bool type unavailable"
+    return (.RuntimeChecks check,type,#[])
   | .unsupported tag => throw s!"Unsupported source MIR operand {tag}"
+/-- Assertion messages retain operand identities and are interpreted by the
+fixed Assert implementation; lowering does not evaluate failure operands. -/
+def assertion (c : Context) (message : SourceMir.AssertKind) : Except String (MIR.AssertKind × Array PlaceFact) := do
+  match message with
+  | .boundsCheck length index =>
+    let (length,_,a) ← operand c length
+    let (index,_,b) ← operand c index
+    return (.BoundsCheck length index,a ++ b)
+  | .overflow operator left right =>
+    let (left,_,a) ← operand c left
+    let (right,_,b) ← operand c right
+    return (.Overflow (← known operator) left right,a ++ b)
+  | .overflowNeg value =>
+    let (value,_,facts) ← operand c value
+    return (.OverflowNeg value,facts)
+  | .divisionByZero value =>
+    let (value,_,facts) ← operand c value
+    return (.DivisionByZero value,facts)
+  | .remainderByZero value =>
+    let (value,_,facts) ← operand c value
+    return (.RemainderByZero value,facts)
+  | .invalidEnumConstruction value =>
+    let (value,_,facts) ← operand c value
+    return (.InvalidEnumConstruction value,facts)
+  | .resumedAfterReturn kind => return (.ResumedAfterReturn (← known kind),#[])
+  | .resumedAfterPanic kind => return (.ResumedAfterPanic (← known kind),#[])
+  | .resumedAfterDrop kind => return (.ResumedAfterDrop (← known kind),#[])
+  | .misalignedPointerDereference required found =>
+    let (required,_,a) ← operand c required
+    let (found,_,b) ← operand c found
+    return (.MisalignedPointerDereference required found,a ++ b)
+  | .nullPointerDereference => return (.NullPointerDereference,#[])
+  | .nullReferenceConstructed => return (.NullReferenceConstructed,#[])
+  | .unsupported tag => throw s!"Unsupported source MIR assertion {tag}"
 private def operands (c : Context) (values : Array SourceMir.Operand) :
     Except String (Array MIR.Operand × Array Nat × Array PlaceFact) := do
   let mut result := #[]
@@ -66,20 +102,41 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
   | .reference region borrow p =>
     let (p,fact) ← place c p
     let borrow ← known borrow
-    unless borrow == .Shared do throw "Unsupported source mutable borrow recipe"
+    let mutable ← match borrow with
+      | .Shared => pure MIR.Mutability.Not
+      | .Mut _ => pure .Mut
+      | .Fake _ => throw "Unsupported source fake borrow recipe"
     match region with
     | .erased | .static => pure ()
     | _ => throw "Unsupported source reference region binder"
-    let .reference pointee .Not .Erased ← shape c expected | throw "Invalid source reference destination type"
+    let .reference pointee actual .Erased ← shape c expected | throw "Invalid source reference destination type"
+    unless actual == mutable do throw "Invalid source reference mutability mismatch"
     unless pointee == fact.typeId do throw "Invalid source reference pointee type mismatch"
     -- Instance::instantiate_mir_and_normalize_erasing_regions erases the
     -- region, including a source static region, in the executable instance.
     return (.Ref .Erased borrow p,#[fact])
+  | .rawPointer kind p =>
+    let (p,fact) ← place c p
+    let kind ← known kind
+    let expectedMutability := match kind with
+      | .Const => MIR.Mutability.Not
+      | .Mut | .FakeForPtrMetadata => .Mut
+    let .rawPointer pointee actual ← shape c expected | throw "Invalid source raw-pointer destination type"
+    unless pointee == fact.typeId && actual == expectedMutability do
+      throw "Invalid source raw-pointer pointee/mutability mismatch"
+    return (.RawPtr kind p,#[fact])
   | .aggregateTuple values =>
     let (values,types,facts) ← operands c values
     let .tuple fields ← shape c expected | throw "Invalid source tuple destination type"
     unless fields == types do throw "Invalid source tuple field types"
     return (.Aggregate .Tuple values,facts)
+  | .aggregateArray element values =>
+    let some element := c.types[element]?.join | throw "Invalid source array element type not prepared"
+    let (values,types,facts) ← operands c values
+    let .array actual _ count ← shape c expected | throw "Invalid source array aggregate destination type"
+    unless actual == element && count.count == values.size && types.all (· == element) do
+      throw "Invalid source array aggregate element type/count"
+    return (.Aggregate (.Array element) values,facts)
   | .aggregateClosure definition args values =>
     let some definition := c.definitions[definition]?.join | throw "Invalid source closure definition not prepared"
     let args ← arguments c args
@@ -135,6 +192,11 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
         throw "Unsupported source reification signature normalization"
     | _ => throw "Unsupported source pointer coercion"
     return (.Cast (.PointerCoercion coercion (← known source)) value target,facts)
+  | .cast kind value target =>
+    let (value,_,facts) ← operand c value
+    let some target := c.types[target]?.join | throw "Invalid source cast target not prepared"
+    unless target == expected do throw "Invalid source cast target/destination type mismatch"
+    return (.Cast (← known kind) value target,facts)
   | .discriminant p =>
     let (p,fact) ← place c p
     return (.Discriminant p,#[fact])

@@ -38,8 +38,9 @@ private def normalized (world : Input.SourceCompilerWorld.World)
   let op := fun operand => do
     match operand with
     | .Constant c =>
-      let .Val value ty := c.value
-      pure (MIR.Operand.Constant {c with span := ⟨0⟩,value := .Val value (← typeId ty)})
+      match c.value with
+      | .Val value ty => pure (MIR.Operand.Constant {c with span := ⟨0⟩,value := .Val value (← typeId ty)})
+      | .SourceRequest .. => throw "oracle comparison requires the actual evaluated constant witness"
     | .Copy p => pure (.Copy p)
     | .Move p => pure (.Move p)
     | _ => throw "oracle operand outside exercised domain"

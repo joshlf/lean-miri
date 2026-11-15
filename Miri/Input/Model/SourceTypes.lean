@@ -34,12 +34,29 @@ structure Signature where
 inductive ConstExpr where
   | parameter (index : Nat) (typeRef : Option TypeRef)
   | value (typeRef : TypeRef) (bits sizeBytes : Nat)
+  | alias (reference : Nat)
   | unsupported (tag : String)
   deriving Repr, DecidableEq
 inductive Argument where
   | type (typeRef : TypeRef)
   | lifetime (region : Region)
   | constant (value : ConstExpr)
+  deriving Repr, DecidableEq
+/-- A source const alias remains unevaluated syntax. References use this same
+immutable type/definition universe, not canonical runtime handles. -/
+structure ConstantAlias where
+  rigid : Bool
+  kind : MIR.ConstAliasKind
+  definition : DefinitionRef
+  typeRef : TypeRef
+  arguments : Array Argument
+  /-- Target-usize result joined from a validated exact ground compiler key. -/
+  usizeValue : Option Nat := none
+  deriving Repr, DecidableEq
+/-- Original range-bound syntax. An unevaluated bound is not its value. -/
+inductive PatternBound where
+  | constant (expression : ConstExpr)
+  | alias (rigid : Bool) (kind : MIR.ConstAliasKind) (definition : DefinitionRef) (arguments : Array Argument)
   deriving Repr, DecidableEq
 inductive ExistentialPredicate where
   | trait (definition : DefinitionRef) (arguments : Array Argument) (boundVariables : Array BoundVariable)
@@ -66,6 +83,7 @@ inductive Expr where
   | rawPointer (pointee : TypeRef) (mutability : MIR.Mutability)
   | reference (pointee : TypeRef) (mutability : MIR.Mutability) (region : Region)
   | patternNotNull (base : TypeRef)
+  | patternRange (base : TypeRef) (start end_ : PatternBound)
   | nominal (definition : DefinitionRef) (arguments : Array Argument)
   | dynamicObject (region : Region) (predicates : Array ExistentialPredicate)
   | functionPointer (signature : Signature)
@@ -150,6 +168,7 @@ structure Material where
   types : Array Expr
   definitions : Array Definition
   dynMetadata : Option DynMetadata
+  constantAliases : Array ConstantAlias := #[]
   deriving Repr, DecidableEq
 
 structure Projection (α : Type) where
@@ -174,6 +193,7 @@ inductive Concrete where
   | tuple (elements : Array Concrete)
   | pointer (kind : String) (pointee : Concrete)
   | patternNotNull (base : Concrete)
+  | patternRange (base : Concrete) (start finish : Nat)
   | nominal (definition : DefinitionRef) (arguments : Array Concrete)
   | dynamicObject (source : Existential Concrete)
   | functionPointer (inputs : Array Concrete) (output : Concrete)

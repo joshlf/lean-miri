@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationSourceConstValues
 import Miri.Frontend.FoundationSourceMirUses
 import Miri.Frontend.FoundationSourceTraitImpls
 import Miri.Frontend.FoundationSourceAllocationIdentity
@@ -100,6 +101,8 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     runtimeDataLayout := some (← evidenceOfTarget document.target) }
   let linkSections ← (← sourceLinkSections document.source).mapM sectionDeclaration
   let physical ← SourceTypesParser.material document.source
+  let constantValues ← SourceConstValuesParser.material document.source physical document.target.pointerSizeBits
+  let physical ← SourceConstValuesParser.attachAliasValues physical constantValues
   let material : Input.SourceMaterial := {
     target,declarations,genericLayers := layers,
     genericMir := some (← SourceMirParser.material document (some physical)),
@@ -107,6 +110,7 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     allocations := some (← sourceAllocationMaterial document),
     allocationIdentity := ← SourceAllocationIdentityParser.material document.source document.types.size,
     physical := some physical,
+    constantValues,
     mirUses := ← SourceMirUsesParser.material document,
     traitImpls := ← SourceTraitImplsParser.material document physical,
     abi := some (← SourceAbiParser.material document)}

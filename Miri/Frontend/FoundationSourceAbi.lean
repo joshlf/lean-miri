@@ -47,6 +47,9 @@ def declaration (document : Document) (clause : Json) : Except String (Clause ×
       (← raw document (← clause.getObjValAs? Nat "parent_trait")) arguments (← term.getObjValAs? Nat "type"),none)
   | "type_outlives" =>
     return (.typeOutlives (← clause.getObjValAs? Nat "type") (← SourceTypesParser.region (← clause.getObjVal? "region")),none)
+  | "region_outlives" =>
+    return (.regionOutlives (← SourceTypesParser.region (← clause.getObjVal? "longer"))
+      (← SourceTypesParser.region (← clause.getObjVal? "shorter")),none)
   | "const_has_type" =>
     let value ← clause.getObjVal? "value"
     if (← value.getObjValAs? String "kind") != "param" then return (.unsupported "non-parameter const typing clause",none)

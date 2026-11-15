@@ -122,8 +122,8 @@ where
       if aSafety != bs || aa != ba || av != bv || ai.size != bi.size then return false
       for (a,b) in ai.zip bi do unless (← go fuel a b) do return false
       go fuel ao bo
-    | .nominal ..,_ | .dynamicObject ..,_ | .closure ..,_ | .patternNotNull ..,_ |
-      _,.nominal .. | _,.dynamicObject .. | _,.closure .. | _,.patternNotNull .. =>
+    | .nominal ..,_ | .dynamicObject ..,_ | .closure ..,_ | .patternNotNull ..,_ | .patternRange ..,_ |
+      _,.nominal .. | _,.dynamicObject .. | _,.closure .. | _,.patternNotNull .. | _,.patternRange .. =>
       throw "typed ABI callable nominal/dyn/closure equality unsupported"
     | _,_ => pure false
 
@@ -158,6 +158,18 @@ private def callableOutput (physical : SourceTypes.Material) (target : ABI.Runti
     throw "typed ABI callable input tuple mismatch"
   unless (← builtin physical target .sized output) do throw "typed ABI callable output is not Sized"
   return output
+
+/-- Reflexive early-region constraints add no rustc region constraint. A raw
+late-bound goal requires binder instantiation first and is not discharged here. -/
+def checkRegionOutlives (source : Input.SourceMaterial) (owner : DefinitionId)
+    (longer shorter : SourceTypes.Region) : Except String Unit := do
+  unless longer == shorter do throw "typed region outlives relation unsupported"
+  match longer with
+  | .static => pure ()
+  | .earlyParameter index =>
+    let parameters ← SourceDeclarations.fullParameters source.genericLayers owner
+    unless parameters[index]? == some .region do throw "typed outlives early-region slot absent or wrong kind"
+  | _ => throw "typed outlives requires retained early/static reflexivity; bound/erased relation unsupported"
 
 private def checkClauses (source : Input.SourceMaterial) (abi : Material) (physical : SourceTypes.Material)
     (types : Array (Option SourceTypes.Concrete)) (constants : Array (Option Nat)) (target : ABI.RuntimeTargetDataLayout) (owner : DefinitionId) : Except String Unit :=
@@ -209,7 +221,11 @@ where
           (← SourceTypes.instantiate physical types constants args)
         unless (← callableTypeEqual output (← SourceTypes.instantiate physical types constants term)) do
           throw "typed ABI callable Output mismatch"
-      | .typeOutlives type .static =>
+      | .regionOutlives longer shorter => checkRegionOutlives source owner longer shorter
+      | .typeOutlives type region =>
+        -- A concrete type with no non-static region outlives every retained
+        -- early region. Unknown/erased references do not establish this.
+        checkRegionOutlives source owner region region
         staticOutlives (← SourceTypes.instantiate physical types constants type)
       | .constHasType parameter type =>
         let some _ := constants[parameter]?.bind id | throw "typed ABI const clause argument absent"
@@ -321,7 +337,7 @@ private def passMode (world : World) (physical : SourceTypes.Material) (optimiza
   if layout.backendRepresentation.bind (·.sized) == some false then
     throw "typed ABI unsized value pass mode unsupported"
   match type with
-  | .dynamicObject .. | .patternNotNull .. => throw "typed ABI dyn/constrained type unsupported"
+  | .dynamicObject .. | .patternNotNull .. | .patternRange .. => throw "typed ABI dyn/constrained type unsupported"
   | _ => pure ()
   let empty : AbiPassMode := ⟨.ignore,#[],none,none,none,none⟩
   if bytes == 0 then return empty
@@ -427,6 +443,8 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
       unless actual == id do throw "typed ABI canonical const identity mismatch"
       world := updated
       types := types.push none; constants := constants.push (some bits)
+    | .region,.Lifetime .Erased | .region,.Lifetime .Static =>
+      types := types.push none; constants := constants.push none
     | _,_ => throw "typed ABI generic argument kind/region unsupported"
   -- Source parameter types remain obligations even if no body reads them.
   let mut owners : Array DefinitionId := #[]
