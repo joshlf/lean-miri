@@ -125,7 +125,9 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat :=
     throw s!"fixture target differs from this source runner setup: triple={targetTriple}, arch={arch}, pointer_bits={targetBits}"
   let geometry ← (Input.InitialMachine.geometry targetBits arch false none).mapError reprStr
   let dummySpan := dummy
+  let sourceCompiler ← Input.SourceCompilerWorld.create prepared.program.input
   let machineConfig : Input.InitialMachine.Configuration Unit Unit := {
+    sourceCompiler := some sourceCompiler
     geometry, dummySpan, provenance := .default, addressMode := .managed
     addressStop := 18446744073709551615, addressReuse := ⟨0.5, 0.1⟩
     fixedScheduling := true, trackOutdatedLoads := false, weakMemory := true

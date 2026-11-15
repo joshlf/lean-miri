@@ -175,6 +175,7 @@ def resolveCurrent (p : Prepared) (definition : MIR.DefId) (args : Array MIR.Gen
 canonical target convention. All full-callee hooks use the final shared tables.
 The explicit base config retains physical memory/host/platform capabilities. -/
 def executionHooks (p : Prepared) (image : AllocationImage.Imported)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K User))
     (vtableEngine : VTableMachine.Hooks K User Other) (userRelevantCrates : Array Nat)
     (base : ExecutionMachine.Config K User C Other ABI.ExternAbi Host) :
     ExecutionMachine.Config K User C Other ABI.ExternAbi Host :=
@@ -191,9 +192,9 @@ def executionHooks (p : Prepared) (image : AllocationImage.Imported)
       match CompilerInstanceAbi.abiOfInstance p.lifecycle.instances callee extra with
       | .ok abi => pure abi
       | .error error => throw (.invalidProgram error)}
-  let dispatch := {base.calls.dispatch with loadMir := fun _ callee => CompilerCallPipeline.loadMir p.lifecycle.calls callee}
+  let dispatch := {base.calls.dispatch with loadMir := fun _ callee => CompilerCallPipeline.loadMir world callee}
   let calls := {base.calls with compiler := callCompiler, dispatch}
-  let helpers := {base.helpers with loadMir := fun _ callee => CompilerCallPipeline.loadMir p.lifecycle.calls callee}
+  let helpers := {base.helpers with loadMir := fun _ callee => CompilerCallPipeline.loadMir world callee}
   let facts := p.lifecycle.calls.symbols.facts.context
   CompilerExecutionFacts.hooks p.intrinsics {base with
     functions, calls, helpers

@@ -19,6 +19,7 @@ def compiler (p : CompilerProviders.Prepared) (budget : Nat) :
 /-- Foreign emulation and real backend hooks are actual source interpreters;
 MIR loading is the same exact LoadedBody provider used by helper/root calls. -/
 def dispatch (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U))
     (foreign : Option (MachineHooks.M K U (ForeignItems.Hooks Provenance
       (MachineHooks.State K U) (RuntimePlace Provenance) (RuntimePlace Provenance)
       (Pointer (Option Provenance)) LoadedBody CallInstance)))
@@ -33,16 +34,17 @@ def dispatch (p : CompilerProviders.Prepared)
   foreignScope := fun action => action
   isForeignItem := fun callee => lift (CompilerCallFacts.isForeignItem p.intrinsics callee)
   symbolName := fun callee => lift (CompilerCallFacts.symbolName p.intrinsics callee)
-  loadMir := fun _ callee => CompilerCallPipeline.loadMir p.lifecycle.calls callee
+  loadMir := fun _ callee => CompilerCallPipeline.loadMir world callee
 
-def leaves (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
+def leaves (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U)) (compatibilityBudget : Nat)
     (foreign : Option (MachineHooks.M K U (ForeignItems.Hooks Provenance
       (MachineHooks.State K U) (RuntimePlace Provenance) (RuntimePlace Provenance)
       (Pointer (Option Provenance)) LoadedBody CallInstance)))
     (backend : CallDispatchMachine.Backend (MachineHooks.State K U)) (dynSymName : Other → String)
     (llvm : CallInstance → MachineHooks.M K U (IntrinsicArchitecture.DispatchHooks Provenance (MachineHooks.State K U) C (RuntimePlace Provenance))) :
     ExecutionCallLeaves.Hooks (MachineHooks.State K U) C Other ABI.ExternAbi :=
-  ⟨compiler p compatibilityBudget,dispatch p foreign backend dynSymName,llvm⟩
+  ⟨compiler p compatibilityBudget,dispatch p world foreign backend dynSymName,llvm⟩
 /-- Shared canonical vtable queries plus the exact compiler virtual leaves;
 receiver reads, projections and pointer construction are not caller callbacks. -/
 def virtual (p : CompilerProviders.Prepared)
@@ -71,12 +73,13 @@ def threadIdentity : ExecutionCallLeaves.IdentityAccess (ThreadStacks.Storage U)
 
 /-- Actual source helper metadata plus the genuine dummy-signature compiler
 query. Stack/origin operations are built by ExecutionCalls.helpers. -/
-def helpers (p : CompilerProviders.Prepared) (dummySpan : MIR.SpanRef)
+def helpers (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U)) (dummySpan : MIR.SpanRef)
     (fnAbiOfSignature : C → FunctionCalls.SignatureRequest ABI.ExternAbi → MachineHooks.M K U (FnAbi MIR.TyId)) :
     Except String (ExecutionCallLeaves.Helpers (MachineHooks.State K U) C ABI.ExternAbi) := do
   let unit ← p.primitiveLayout "unit"
   return {
-    loadMir := fun _ callee => CompilerCallPipeline.loadMir p.lifecycle.calls callee
+    loadMir := fun _ callee => CompilerCallPipeline.loadMir world callee
     unitLayout := unit
     fnAbiOfSignature := fnAbiOfSignature
     callerLocationType := lift p.callerLocationType

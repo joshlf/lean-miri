@@ -70,10 +70,11 @@ def backtraceHooks (p : Prepared) (image : AllocationImage.Imported)
 /-- Root/direct/virtual/drop calls share exact full-instance/extra-argument ABI
 queries and exact LoadedBody identities from this same final table. -/
 def functionHooks (p : Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K User))
     (base : FunctionCalls.Hooks Provenance (MachineHooks.State K User) C MachineHooks.FrameExtra
       Other Extern (FnAbi MIR.TyId) (ArgAbi MIR.TyId)) :
     FunctionCalls.Hooks Provenance (MachineHooks.State K User) C MachineHooks.FrameExtra
       Other Extern (FnAbi MIR.TyId) (ArgAbi MIR.TyId) :=
-  CompilerCallPipeline.bindFunctionCalls p.calls
+  CompilerCallPipeline.bindFunctionCalls world
     {base with call := CompilerInstanceAbi.hooks p.instances base.call}
 end Miri.Input.CompilerLifecyclePipeline
