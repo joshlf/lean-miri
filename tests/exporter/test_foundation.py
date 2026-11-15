@@ -27,6 +27,8 @@ class FoundationExport(unittest.TestCase):
                 self.assertEqual(doc["target"]["architecture"], "x86_64")
                 self.assertEqual(len(doc["bodies"]), 1)
                 self.assertEqual(doc["bodies"][0]["required_consts"], [])
+                self.assertEqual(doc["bodies"][0]["promoted_count"], 0)
+                self.assertEqual(doc["definitions"][doc["bodies"][0]["definition"]]["kind"], "fn")
                 self.assertFalse(any(key.startswith("compiler_") for key in doc))
                 shapes = [node["shape"] for node in doc["types"]]
                 if root == "identity":
@@ -47,6 +49,33 @@ class FoundationExport(unittest.TestCase):
                     self.assertEqual(len(definitions[0]["adt"]["variants"][0]["fields"]), 2)
                     self.assertLess(len(doc["types"]), 10)
                     self.assertNotIn(None, doc["types"])
+
+    def test_backtraces_match_schema12_body_hygiene_collapse(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-backtrace-") as directory:
+            source = Path(directory) / "macro.rs"
+            source.write_text('macro_rules! value { () => {{ 7_u32 }} }\npub fn item() -> u32 { value!() }\n')
+            documents = []
+            for mode in ("foundation", "schema12"):
+                output = Path(directory) / f"{mode}.json"
+                result = subprocess.run([
+                    "bash", "tools/export-mir.sh", "--output", str(output),
+                    *(["--foundation"] if mode == "foundation" else []),
+                    "--root", "item", "--", str(source),
+                    "--crate-type=lib", "--crate-name", "macro_source",
+                ], cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                documents.append(json.loads(output.read_text()))
+            foundation, legacy = documents
+            expected = []
+            for record in legacy["backtrace_spans"][legacy["bodies"][0]["backtrace_spans"]]:
+                raw = dict(legacy["spans"][record["span"]])
+                raw["file"] = legacy["files"][raw["file"]]
+                position = dict(record["source_position"])
+                position["filename"] = legacy["files"][position["filename"]]
+                expected.append({"span":raw,"source_position":position})
+            actual = foundation["bodies"][0]["source_metadata"]["backtrace_spans"]
+            self.assertEqual(actual, expected)
+            self.assertTrue(any(row["span"]["ctxt"] != "#0" for row in actual))
 
     def test_source_signatures_preserve_generic_safety_and_abi(self):
         with tempfile.TemporaryDirectory(prefix="foundation-signature-") as directory:
@@ -87,6 +116,27 @@ class FoundationExport(unittest.TestCase):
                 shape = doc["types"][signature["output"]]["shape"]
                 self.assertEqual(shape, {"kind":"param","index":0,"name":"T"}
                                  if root == "generic" else {"kind":"uint","name":"u32"})
+
+    def test_promoted_tables_and_inherited_associated_environment_abort(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-promoted-") as directory:
+            source = Path(directory) / "promoted.rs"
+            source.write_text('pub struct S; impl S { pub fn identity(x: u8) -> u8 { x } }\n'
+                              'pub fn promoted() -> *const u8 { &42u8 as *const u8 }\n')
+            for root in ("S::identity", "promoted"):
+                output = Path(directory) / f"{root.replace('::', '_')}.json"
+                result = subprocess.run([
+                    "bash", "tools/export-mir.sh", "--output", str(output),
+                    "--foundation", "--root", root, "--", str(source),
+                    "--crate-type=lib", "--crate-name", "promoted",
+                ], cwd=ROOT, capture_output=True, text=True)
+                if root == "promoted":
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("unsupported promoted bodies: 1", result.stderr)
+                    self.assertFalse(output.exists())
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("unsupported inherited generic environment", result.stderr)
+                    self.assertFalse(output.exists())
 
     def test_variadic_frame_remains_fail_closed(self):
         with tempfile.TemporaryDirectory(prefix="foundation-variadic-") as directory:

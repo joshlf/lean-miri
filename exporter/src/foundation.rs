@@ -46,7 +46,7 @@ impl<'tcx> Material<'tcx> {
         if let Some(id) = self.def_ids.get(&def) { return *id; }
         let id = self.definitions.len();
         self.def_ids.insert(def, id);
-        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def)}));
+        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def),"kind":match tcx.def_kind(def) {rustc_hir::def::DefKind::Fn=>"fn".to_string(),rustc_hir::def::DefKind::AssocFn=>"assoc_fn".to_string(),other=>format!("{other:?}")}}));
         id
     }
     fn constant(&mut self, tcx: TyCtxt<'tcx>, c: ty::Const<'tcx>) -> Result<Value> {
@@ -193,6 +193,14 @@ impl<'tcx> Material<'tcx> {
     fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
+        // Pinned queries.rs: promoted_mir is the complete table owned by the
+        // containing DefId, including unused promoteds. Our selected local HIR
+        // items own that table; do not infer emptiness from body references.
+        if !super::has_local_hir_body(tcx, def) {
+            return unsupported("non-local promoted table owner", def);
+        }
+        let promoted_count = tcx.promoted_mir(def).len();
+        if promoted_count != 0 { return unsupported("promoted bodies", promoted_count); }
         // Pinned stack.rs evaluates every required constant on frame entry,
         // including constants in unreachable blocks. Preserve the full list.
         let required_consts = self.required_constants(tcx, b)?;
@@ -247,7 +255,7 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
+        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"promoted_count":promoted_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
     }
 }
 fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
