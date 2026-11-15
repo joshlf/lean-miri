@@ -3,7 +3,7 @@ import Miri.Input.CompilerContextSpan
 import Lean
 
 /-! Field equations extracted from the canonical factory. Construction facts
-are pure compiler queries; none depends on a runtime state or memory operation. -/
+remain pure compiler queries. Field equations expose live World reads explicitly. -/
 namespace EmptyFunction.CanonicalDictionaries
 open Miri Miri.ABI Miri.Input Miri.Interpreter Miri.Memory
 open EmptyFunction.Configuration
@@ -36,6 +36,7 @@ structure Fields (p : CompilerProviders.Prepared) (options : EvalConfigurationCo
     (config : Config) : Prop where
   construction : ∃ (pointers : Pointers) (table : Table) (globals : Globals),
     config.retag = EvalRetagMachine.hooks p.lifecycle.calls.symbols.facts p.lifecycle.calls.runtime
+      EvalCoreMachine.sourceCompilerAccess
       (CompilerRetagOptions.make p options.retag) config.access config.projection table pointers () ∧
     config.access.resolvePointer = TypedMemoryProviders.resolvePointer pointers ∧
     pointers.ensureTreeExtra = GlobalAllocationMachine.ensure .global globals ∧
@@ -53,13 +54,17 @@ structure Fields (p : CompilerProviders.Prepared) (options : EvalConfigurationCo
   validation : config.compiler.validationInProgress = ValidityMachine.validationInProgress
   debug : config.compiler.debugAssertions = options.place.debugAssertions
   debugAbi : options.place.debugAssertions = false → config.compiler.debugAbiCheck = fun _ _ => pure ()
-  layout : config.compiler.layout = fun (_ : Unit) id => CompilerFrameContext.computeLocalLayout p id
-  frameCompiler : config.lifecycle.compiler = CompilerFrameMetadata.hooks p.lifecycle.frames options.userRelevantCrates
-  preambleSpan : config.lifecycle.preambleSpan = CompilerLifecycle.preambleSpan p.lifecycle.lifecycle
-  requiredConstants : config.lifecycle.requiredConstants = CompilerLifecycle.requiredConstants p.lifecycle.lifecycle
-  storageSized : config.lifecycle.storage.veryTriviallySized = CompilerStorage.veryTriviallySized p.runtime
-  storageLayout : config.lifecycle.storage.layout = CompilerFrameContext.computeLocalLayout p
-  callsCompiler : config.calls.compiler = CompilerExecutionCallLeaves.make p options.compatibilityBudget
+  layout : config.compiler.layout = fun (_ : Unit) id => CompilerFrameContext.computeLocalLayout p EvalCoreMachine.sourceCompilerAccess id
+  frameCompiler : config.lifecycle.compiler = CompilerFrameMetadata.liveHooks EvalCoreMachine.sourceCompilerAccess options.userRelevantCrates
+  preambleSpan : config.lifecycle.preambleSpan = CompilerLifecycle.livePreambleSpan p.lifecycle.lifecycle EvalCoreMachine.sourceCompilerAccess
+  requiredConstants : config.lifecycle.requiredConstants = CompilerLifecycle.liveRequiredConstants p.lifecycle.lifecycle EvalCoreMachine.sourceCompilerAccess
+  storageSized : config.lifecycle.storage.veryTriviallySized = fun ty => do
+    let runtime ← SourceCompilerRuntime.current p.runtime.target EvalCoreMachine.sourceCompilerAccess
+    match CompilerStorage.veryTriviallySized runtime ty with
+    | .ok value => pure value
+    | .error error => throw error
+  storageLayout : config.lifecycle.storage.layout = CompilerFrameContext.computeLocalLayout p EvalCoreMachine.sourceCompilerAccess
+  callsCompiler : config.calls.compiler = CompilerExecutionCallLeaves.make p options.compatibilityBudget EvalCoreMachine.sourceCompilerAccess
   virtualCompiler : config.virtual.compiler = CompilerVirtualLeaves.make p.lifecycle.calls
   freshLocalsIdentity : config.lifecycle.freshLocalsIdentity = fun machine =>
     let (supply, label) := (EvalConfiguration.identity.get machine.user).allocate
@@ -101,6 +106,31 @@ theorem fields_of_make (p : CompilerProviders.Prepared) (image : AllocationImage
   obtain ⟨actual, equal, fields⟩ := make_fields p image bytes options leaves remaining contract
   have same : actual = config := Except.ok.inj (equal.symm.trans built)
   simpa only [same] using fields
+
+/-- Transfer an immutable sizedness fact only when the actual current World
+retains that compiler document. This is a data invariant, not an assumed
+successful runtime query; callers must establish the World relation. -/
+theorem Fields.storageSized_at_source {p options config} (fields : Fields p options config)
+    (state : MachineHooks.State MiriMemoryKind RootUser) (world : SourceCompilerWorld.World)
+    (present : EvalCoreMachine.sourceCompilerAccess.get state = some world)
+    (source : world.canonical = p.runtime.source) (ty : MIR.TyId)
+    (sized : CompilerStorage.veryTriviallySized p.runtime ty = .ok true) :
+    config.lifecycle.storage.veryTriviallySized ty state = .ok true state := by
+  rw [fields.storageSized]
+  simp [SourceCompilerRuntime.current, get, getThe, MonadStateOf.get, EStateM.get,
+    bind, EStateM.bind, present, source, sized, pure, EStateM.pure]
+
+/-- An unseeded caller is an actual Unsupported result. Metadata in the old
+array cache alone cannot establish availability of the live compiler World. -/
+theorem Fields.storageSized_world_unavailable {p options config} (fields : Fields p options config)
+    (state : MachineHooks.State MiriMemoryKind RootUser)
+    (absent : EvalCoreMachine.sourceCompilerAccess.get state = none) (ty : MIR.TyId) :
+    config.lifecycle.storage.veryTriviallySized ty state =
+      .error (.unsupported "source compiler runtime: World unavailable") state := by
+  rw [fields.storageSized]
+  simp [SourceCompilerRuntime.current, get, getThe, MonadStateOf.get, EStateM.get,
+    bind, EStateM.bind, absent, pure, EStateM.pure, throw, EStateM.throw]
+  rfl
 
 /-- Sized layouts take the query-free dynamic-layout fast path. -/
 theorem Fields.sizeAndAlign {p options config} (fields : Fields p options config)
