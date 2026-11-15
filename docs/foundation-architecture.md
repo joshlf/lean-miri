@@ -65,14 +65,14 @@ unsupported forms must stop with errors rather than successful execution.
 
 ## Measured export cost
 
-For one 134-byte concrete `[u16; 3]` source, three alternating sequential trials
+For one 134-byte concrete `[u16; 3]` source, five alternating sequential trials
 used the same pinned release exporter binary, CPU 2 and one Lean thread. The
-ordinary schema-12 export had median wall/CPU time 0.141958/0.134849 s and a
+ordinary schema-12 export had median wall/CPU time 0.136176/0.131818 s and a
 137,397-byte output. Foundation v1 had median wall/CPU time
-0.037632/0.028979 s and a 7,822-byte output. Wall ranges were 0.136678–0.234222
-and 0.035744–0.038428 s respectively. One ordinary trial saw 0.01 s selected
+0.133546/0.132906 s and a 23,058-byte output. Wall ranges were 0.131504–0.224531
+and 0.123980–0.166751 s respectively. Two trials per format saw 0.01 s selected
 CPU steal; cgroup throttling deltas were zero. Raw timings, hashes and counters
-are in ignored `scratch/performance/` in the measuring workspace. The ordinary
+are in ignored `scratch/performance/export-e0f5f3f3/` in the measuring workspace. The ordinary
 measurements vary substantially and these formats support different operations,
 so this is an export-only comparison, not a claim of equivalent executions or
 interpreter speedup.
