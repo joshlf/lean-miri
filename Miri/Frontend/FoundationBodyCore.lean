@@ -71,9 +71,11 @@ private def phase (j : Json) : Except String MIR.MirPhase := do
 BodyCore. Metadata and instructions are read afresh from the prepared item,
 so a caller cannot smuggle an arbitrary mutated candidate into this boundary.
 This is a partial join, not a whole-document compiler-evidence validator. -/
-def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings) :
+def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
+    (constantOperand : Json → Except String (MIR.ConstOperand × ConcreteType) :=
+      fun _ => .error "foundation scalar constant query is unavailable") :
     Except String Input.BodyCore := do
-  let candidate ← lowerPreparedMIR prepared
+  let candidate ← lowerPreparedMIR prepared constantOperand
   unless (← prepared.item.source.getObjValAs? (Array Json) "required_consts").isEmpty &&
       bindings.requiredConsts.isEmpty do
     throw "foundation BodyCore requires a required-constant operand join"
@@ -126,6 +128,14 @@ def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings) :
   for block in candidate.body.basicBlocks do
     let mut statements := #[]
     for statement in block.statements do
+      match statement.kind with
+      | .Assign destination (.Use (.Constant constant) _) =>
+        let .Val _ typeId := constant.value
+        unless localIds[destination.localId]? == some typeId do
+          throw "foundation constant physical type differs from assignment destination"
+        unless constant.span.id < bindings.spans.size do
+          throw "foundation constant physical span is absent"
+      | _ => pure ()
       let some info := locations[statement.sourceInfo.span.id]?
         | throw "foundation body instruction source is missing"
       statements := statements.push { statement with sourceInfo := ⟨⟨info.spanId⟩, info.scope⟩ }

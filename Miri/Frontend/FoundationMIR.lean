@@ -50,7 +50,9 @@ Span references use candidate-local indices into `sourceLocations`. Type IDs
 use candidate-local local ordinals. These are explicitly unresolved identities,
 so this value is not `Input.BodyCore` and cannot enter the fixed interpreter.
 No successful no-op replaces an unsupported source instruction. -/
-def lowerPreparedMIR (prepared : PreparedItem) : Except String MIRCandidate := do
+def lowerPreparedMIR (prepared : PreparedItem)
+    (constantOperand : Json → Except String (MIR.ConstOperand × ConcreteType) :=
+      fun _ => .error "foundation scalar constant query is unavailable") : Except String MIRCandidate := do
   let item := prepared.item
   validateSourceMetadata item.source
   let metadata ← item.source.getObjVal? "source_metadata"
@@ -71,11 +73,17 @@ def lowerPreparedMIR (prepared : PreparedItem) : Except String MIRCandidate := d
     let value ← statement.getObjVal? "value"
     unless (← value.getObjValAs? String "kind") == "use" do
       throw "foundation MIR rvalue is unsupported"
-    let op ← operand item.localTypes.size (← value.getObjVal? "operand")
-    let sourceLocal ← match op with
-      | .Copy p | .Move p => pure p.localId
-      | _ => throw "foundation MIR operand invariant"
-    let some sourceType := item.localTypes[sourceLocal]? | throw "missing source local type"
+    let sourceOperand ← value.getObjVal? "operand"
+    let (op, sourceType) ← if (← sourceOperand.getObjValAs? String "kind") == "constant" then do
+      let (constant, type) ← constantOperand sourceOperand
+      pure (MIR.Operand.Constant constant, type)
+    else do
+      let op ← operand item.localTypes.size sourceOperand
+      let sourceLocal ← match op with
+        | .Copy p | .Move p => pure p.localId
+        | _ => throw "foundation MIR operand invariant"
+      let some sourceType := item.localTypes[sourceLocal]? | throw "missing source local type"
+      pure (op, sourceType)
     let some destinationType := item.localTypes[destination.localId]? | throw "missing destination type"
     unless sameConcrete 1024 sourceType destinationType do
       throw "foundation MIR assignment type mismatch"
