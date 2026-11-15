@@ -48,6 +48,8 @@ mod dynamic_material;
 mod dyn_metadata_material;
 #[path = "foundation_function_headers.rs"]
 mod function_header_material;
+#[path = "foundation_named_type_source.rs"]
+mod named_type_material;
 
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
@@ -390,6 +392,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let mut link_sections = link_section_material::export(tcx);
     m.attach_link_initializers(tcx,&mut link_sections)?;
     let termination_source = m.termination_source(tcx)?;
+    let named_type_source = if compiler_entry.is_some() { m.named_type_source(tcx)? } else { Value::Null };
     Ok(json!({
         "closure_auto_source":closure_auto_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
@@ -398,6 +401,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         "frame_metadata":super::foundation_runtime_instances::frames(tcx),
         "startup_material":startup_material,
         "link_section_material":link_sections,"termination_source":termination_source,
+        "named_type_source":named_type_source,
         "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,
