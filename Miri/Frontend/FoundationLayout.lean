@@ -65,6 +65,11 @@ where
         let align ← target.aggregateAlign.bytes.mapError toString
         return ⟨0, align.toNat⟩
       throw "nonempty Rust tuple layout is unsupported"
+    | .functionPointer _ _ safety abi variadic =>
+      unless (safety == "safe" || safety == "unsafe") && abi == "rust" && !variadic do
+        throw "unsupported physical function-pointer signature"
+      let spec ← (target.pointerSpecIn target.instructionAddressSpace).mapError toString
+      return ⟨spec.pointerSize.bytes.toNat, (← spec.pointerAlign.bytes.mapError toString).toNat⟩
     | .pointer kind pointee =>
       let _ ← pointerKindInfo kind
       -- Every supported pointee is Sized; unknown/unsized cases fail recursively.

@@ -24,7 +24,10 @@ def rustPassMode (target : Target) (architecture : String) (isReturn : Bool)
   match shape with
   | .ignore => return empty
   | .direct extendBool =>
-    return { empty with kind := .direct, attributes := #[attributes 128
+    -- Raw pointers have no dereferenceable pointee and retain the full valid
+    -- range. FnPtr excludes null in its scalar layout: NoUndef | NonNull.
+    let bits := match ty with | .functionPointer .. => 144 | _ => 128
+    return { empty with kind := .direct, attributes := #[attributes bits
       (if extendBool then .zeroExtend else .none)] }
   | .integerCast size =>
     let register : Input.AbiRegister := ⟨.integer, size * 8, none⟩

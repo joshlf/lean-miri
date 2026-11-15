@@ -86,6 +86,7 @@ inductive TypeExpr where
   | array (element : TypeExpr) (length : ConstExpr)
   | tuple (elements : Array TypeExpr)
   | pointer (kind : String) (pointee : TypeExpr)
+  | functionPointer (inputs : Array TypeExpr) (output : TypeExpr) (safety abi : String) (cVariadic : Bool)
   deriving Repr
 
 private def constant (j : Json) : Except String ConstExpr := do
@@ -131,6 +132,21 @@ where
         throw "unsupported reference region"
       let tag := s!"reference_{region}_{if mutable then "mut" else "const"}"
       return .pointer tag (← go remaining seen (← nat shape "pointee"))
+    | "function_pointer" =>
+      let signature ← field shape "signature"
+      unless (← array signature "bound_variables").isEmpty do
+        throw "bound function-pointer signature unsupported"
+      let safety ← string signature "safety"
+      unless safety == "safe" || safety == "unsafe" do throw "invalid function-pointer safety"
+      let abi ← field signature "abi"
+      unless (← string abi "kind") == "rust" && (← field abi "unwind") == Json.null do
+        throw "function-pointer ABI unsupported"
+      let variadic ← signature.getObjValAs? Bool "c_variadic"
+      unless !variadic do throw "variadic function pointer unsupported"
+      let mut inputs := #[]
+      for input in (← array signature "inputs") do
+        inputs := inputs.push (← go remaining seen (← input.getNat?))
+      return .functionPointer inputs (← go remaining seen (← nat signature "output")) safety "rust" variadic
     | "bool" | "char" | "never" | "str" => return .primitive kind ""
     | "int" | "uint" | "float" => return .primitive kind (← string shape "name")
     | other => throw s!"unsupported demand-time foundation type {other}"
@@ -147,6 +163,7 @@ inductive ConcreteType where
   | array (element : ConcreteType) (length : Nat)
   | tuple (elements : Array ConcreteType)
   | pointer (kind : String) (pointee : ConcreteType)
+  | functionPointer (inputs : Array ConcreteType) (output : ConcreteType) (safety abi : String) (cVariadic : Bool)
   deriving Repr
 
 /-- Substitute a demand's generic arguments in Lean.  Both arrays use rustc's
@@ -167,5 +184,7 @@ where
     | .tuple elements =>
       return .tuple (← elements.mapM (go remaining))
     | .pointer kind pointee => return .pointer kind (← go remaining pointee)
+    | .functionPointer inputs output safety abi variadic =>
+      return .functionPointer (← inputs.mapM (go remaining)) (← go remaining output) safety abi variadic
 
 end Miri.Frontend.Foundation

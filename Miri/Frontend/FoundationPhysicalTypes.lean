@@ -88,6 +88,18 @@ where
       let align ← target.aggregateAlign.bytes.mapError toString
       return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
         (.explicit #[]) memoryBackend none
+    | .functionPointer .. =>
+      -- rustc_ty_utils::layout_of_uncached uses the instruction address space
+      -- and excludes null, independent of the source signature.
+      let primitive : Input.PrimitiveLayout :=
+        ⟨.pointer, basic.size, none, none, none, some target.instructionAddressSpace.value.toNat⟩
+      let last := 2 ^ (basic.size * 8) - 1
+      let scalar : Input.ScalarLayout := ⟨.initialized, primitive, some (1, last)⟩
+      let rotate (n : Nat) := UInt64.ofNat ((n % 2^64) / 2^16 + (n % 2^16) * 2^48)
+      let seed := (UInt64.ofNat basic.size + UInt64.ofNat (4 * 2^32) + rotate 1 + rotate last).toNat
+      return baseLayout basic.size basic.align seed ⟨.primitive, 0, none, none, #[], #[]⟩
+        (.explicit #[]) ⟨.scalar, none, some scalar, none, none, none, none, none, none⟩
+        (some (Input.NicheLayout.mk 0 primitive (1, last)))
     | .pointer kind pointee =>
       let info ← pointerKindInfo kind
       let first := if info.region.isSome then 1 else 0
@@ -127,7 +139,8 @@ def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input
 must bind those IDs in its document-local pools; no compiler facts are invented. -/
 def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     (arrayReferences : Option (Nat × Nat) := none)
-    (pointeeReference : Option Nat := none) : Except String Input.TypeNode := do
+    (pointeeReference : Option Nat := none)
+    (functionReferences : Option (Array Nat × Nat) := none) : Except String Input.TypeNode := do
   let (shape, display) ← match ty with
     | .primitive "bool" "" => pure (Input.TypeShape.bool, "bool")
     | .primitive "char" "" => pure (Input.TypeShape.char, "char")
@@ -146,6 +159,15 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     | .tuple elements =>
       unless elements.isEmpty do throw "nonempty physical tuple unsupported"
       pure (.tuple #[], "()")
+    | .functionPointer _ _ safety abi variadic =>
+      unless abi == "rust" && !variadic do throw "physical function-pointer ABI unsupported"
+      let safety ← match safety with
+        | "safe" => pure MIR.Safety.Safe
+        | "unsafe" => pure MIR.Safety.Unsafe
+        | _ => throw "physical function-pointer safety unsupported"
+      let some (inputs, output) := functionReferences | throw "function-pointer signature identities absent"
+      let signature : Input.FunctionSignature := ⟨inputs, output, safety, .Rust, variadic⟩
+      pure (.functionPointer signature #[], s!"foundation-function-pointer-{id}")
     | .pointer kind _ =>
       let info ← pointerKindInfo kind
       let some pointee := pointeeReference | throw "pointer pointee identity absent"

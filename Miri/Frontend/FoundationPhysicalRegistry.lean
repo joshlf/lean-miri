@@ -59,10 +59,21 @@ where
         let (r, pointeeId) ← go fuel r pointee
         pure (r, some pointeeId)
       | _ => pure (r, none)
+    let (r, functionReferences) ← match ty with
+      | .functionPointer inputs output _ _ _ => do
+        let mut next := r
+        let mut inputIds := #[]
+        for input in inputs do
+          let (updated, inputId) ← go fuel next input
+          next := updated
+          inputIds := inputIds.push inputId
+        let (finished, outputId) ← go fuel next output
+        pure (finished, some (inputIds, outputId))
+      | _ => pure (r, none)
     let (registry, id) ← r.registry.intern ty
     unless id == r.types.size && id == r.layouts.size do
       throw "physical registry pool identity mismatch"
-    let node ← physicalTypeNode ty id id references pointeeReference
+    let node ← physicalTypeNode ty id id references pointeeReference functionReferences
     return ({ r with registry, types := r.types.push node, layouts := r.layouts.push layout }, id)
 
 /-- Resolve source types without changing the identity scheme. -/

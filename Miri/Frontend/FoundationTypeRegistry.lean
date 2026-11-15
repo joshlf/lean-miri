@@ -16,6 +16,11 @@ def sameConcrete : Nat → ConcreteType → ConcreteType → Bool
       (elements.zip elements').all (fun (left, right) => sameConcrete f left right)
   | f+1, .pointer kind pointee, .pointer kind' pointee' =>
     kind == kind' && sameConcrete f pointee pointee'
+  | f+1, .functionPointer inputs output safety abi variadic,
+      .functionPointer inputs' output' safety' abi' variadic' =>
+    safety == safety' && abi == abi' && variadic == variadic' &&
+      inputs.size == inputs'.size && sameConcrete f output output' &&
+      (inputs.zip inputs').all (fun (a,b) => sameConcrete f a b)
   | _, _, _ => false
 
 structure MaterializedType where

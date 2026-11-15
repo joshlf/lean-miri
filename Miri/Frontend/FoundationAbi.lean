@@ -89,7 +89,13 @@ def rustModeShape (target : Target) (architecture : String)
     if layout.size <= target.pointerSizeBits / 8 then return .integerCast layout.size
     return .indirect
   | .tuple _ => throw "nonzero tuple Rust ABI mode shape is unsupported"
-  | .pointer _ _ => throw "pointer Rust ABI mode shape is unsupported"
+  | .pointer kind pointee =>
+    unless kind == "raw_pointer_const" || kind == "raw_pointer_mut" do
+      throw "reference Rust ABI attributes require unsupported pointee/optimization facts"
+    if let .primitive "str" "" := pointee then
+      throw "wide raw-pointer Rust ABI mode shape is unsupported"
+    return .direct false
+  | .functionPointer .. => return .direct false
 
 /-- Instantiate the requested finite type before computing its mode projection. -/
 def rustModeShapeOfType (d : Document) (architecture : String) (isReturn : Bool)
