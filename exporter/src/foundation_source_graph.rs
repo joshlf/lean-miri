@@ -5,6 +5,7 @@ use super::*;
 
 pub(super) struct Graph {
     pub selected: Vec<DefId>,
+    pub call_declarations: Vec<DefId>,
     declarations: Vec<DefId>,
 }
 impl Graph {
@@ -20,7 +21,7 @@ impl Graph {
     }
 }
 
-fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<Vec<DefId>> {
+fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)> {
     if !tcx.is_mir_available(owner) { return unsupported("selected source MIR unavailable",owner); }
     let body = tcx.instance_mir(ty::InstanceKind::Item(owner));
     super::super::ensure_untainted_mir(body)?;
@@ -29,9 +30,12 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<Vec<DefId>> {
         return unsupported("source graph body identity",body.source);
     }
     let mut result = Vec::new();
+    let mut calls = Vec::new();
     for block in body.basic_blocks.iter() {
         if let mir::TerminatorKind::Call {func,..} = &block.terminator().kind {
-            if let ty::FnDef(definition,_) = *func.ty(body,tcx).kind() { result.push(definition); }
+            if let ty::FnDef(definition,_) = *func.ty(body,tcx).kind() {
+                result.push(definition); calls.push(definition);
+            }
         }
         for statement in &block.statements {
             if let mir::StatementKind::Assign(assignment) = &statement.kind {
@@ -43,7 +47,9 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<Vec<DefId>> {
     }
     result.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
     result.dedup();
-    Ok(result)
+    calls.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
+    calls.dedup();
+    Ok((result,calls))
 }
 
 pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String]) -> Result<Graph> {
@@ -69,10 +75,13 @@ pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String])
         }
     }
     let mut visited = Vec::new();
+    let mut call_declarations = Vec::new();
     while let Some(owner) = pending.pop() {
         if visited.contains(&owner) { continue; }
         visited.push(owner);
-        for definition in syntax_edges(tcx,owner)? {
+        let (edges,calls) = syntax_edges(tcx,owner)?;
+        if selected.contains(&owner) { call_declarations.extend(calls); }
+        for definition in edges {
             if !declarations.contains(&definition) { declarations.push(definition); }
             if roots.contains(&tcx.def_path_str(definition)) && !selected.contains(&definition) {
                 if !matches!(tcx.def_kind(definition), rustc_hir::def::DefKind::Fn
@@ -91,5 +100,7 @@ pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String])
             return Err(format!("foundation: missing MIR root {root:?}"));
         }
     }
-    Ok(Graph {selected,declarations})
+    call_declarations.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
+    call_declarations.dedup();
+    Ok(Graph {selected,declarations,call_declarations})
 }

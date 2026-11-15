@@ -156,6 +156,13 @@ impl<'tcx> Material<'tcx> {
                     "c_variadic":signature.c_variadic(),
                 }})
             },
+            ty::Alias(_,alias) => match alias.kind {
+                ty::AliasTyKind::Projection {def_id} => json!({"kind":"projection_alias",
+                    "definition":self.definition(tcx,def_id),
+                    "parent_trait":self.definition(tcx,tcx.parent(def_id)),
+                    "arguments":self.args(tcx,alias.args)?}),
+                other => return unsupported("type alias declaration",other),
+            },
             ty::Dynamic(predicates,region) => self.dynamic_type(tcx,predicates,region)?,
             ty::Pat(base,pattern) => self.pattern_type(tcx,base,pattern)?,
             ty::Closure(d,a) => self.closure_type(tcx,d,a)?,

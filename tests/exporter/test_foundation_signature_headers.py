@@ -75,8 +75,21 @@ class FoundationSignatureHeaders(unittest.TestCase):
                 "std::rt::lang_start::{closure#0}", requested)
             self.assertEqual(result.returncode, 0, result.stderr)
             document = json.loads(output.read_text())
-            self.assertEqual(len(document["source_function_signatures"]), 1)
-            header = document["source_function_signatures"][0]
+            headers = document["source_function_signatures"]
+            requested_headers = [row for row in headers if document["definitions"][row["definition"]]["path"] ==
+                                 "std::process::ExitCode::to_i32"]
+            self.assertEqual(len(requested_headers), 1)
+            header = requested_headers[0]
+            self.assertEqual(len({row["definition"] for row in headers}), len(headers))
+            direct_calls = set()
+            for body in document["bodies"] + document["closure_templates"]:
+                for block in body["blocks"]:
+                    term = block["terminator"]
+                    if term["kind"] == "call" and term["function"]["kind"] == "constant":
+                        shape = document["types"][term["function"]["type"]]["shape"]
+                        if shape["kind"] == "function_definition":
+                            direct_calls.add(shape["definition"])
+            self.assertEqual({row["definition"] for row in headers}, direct_calls | {header["definition"]})
             owner = header["owner_declaration"]
             self.assertEqual(owner["kind"], "inherent_method")
             implementation = document["definitions"][owner["impl_definition"]]

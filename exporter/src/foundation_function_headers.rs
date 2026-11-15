@@ -6,17 +6,22 @@ use super::*;
 
 impl<'tcx> Material<'tcx> {
     pub(super) fn function_header(&mut self, tcx: TyCtxt<'tcx>, definition: DefId) -> Result<Value> {
-        if tcx.is_foreign_item(definition) { return unsupported("foreign function header owner",definition); }
         let owner = match tcx.def_kind(definition) {
-            rustc_hir::def::DefKind::Fn => json!({"kind":"free_function"}),
+            rustc_hir::def::DefKind::Fn => if tcx.is_foreign_item(definition) {
+                json!({"kind":"foreign_function","foreign_module":self.definition(tcx,tcx.parent(definition))})
+            } else { json!({"kind":"free_function"}) },
             rustc_hir::def::DefKind::AssocFn => {
                 let parent = tcx.parent(definition);
-                if !matches!(tcx.def_kind(parent),rustc_hir::def::DefKind::Impl {of_trait:false}) {
-                    return unsupported("non-inherent method source header",definition);
+                match tcx.def_kind(parent) {
+                    rustc_hir::def::DefKind::Trait => json!({"kind":"trait_method",
+                        "trait_definition":self.definition(tcx,parent)}),
+                    rustc_hir::def::DefKind::Impl {of_trait:false} => {
+                        let self_ty = tcx.type_of(parent).instantiate_identity().skip_normalization();
+                        json!({"kind":"inherent_method","impl_definition":self.definition(tcx,parent),
+                            "self_type":self.ty(tcx,self_ty)?})
+                    }
+                    _ => return unsupported("associated method source header owner",definition),
                 }
-                let self_ty = tcx.type_of(parent).instantiate_identity().skip_normalization();
-                json!({"kind":"inherent_method","impl_definition":self.definition(tcx,parent),
-                    "self_type":self.ty(tcx,self_ty)?})
             }
             _ => return unsupported("function header owner",definition),
         };
@@ -39,10 +44,15 @@ pub(super) fn capture_for_roots<'tcx>(tcx: TyCtxt<'tcx>, material: &mut Material
     roots: &[String], graph: &source_graph_material::Graph) -> Result<Vec<Value>> {
     let mut result = Vec::new();
     let mut seen = Vec::new();
+    let mut definitions = Vec::new();
     for root in roots {
         if seen.contains(root) { return unsupported("duplicate function signature source demand",root); }
         seen.push(root.clone());
-        result.push(material.function_header(tcx,graph.declaration(tcx,root)?)?);
+        definitions.push(graph.declaration(tcx,root)?);
     }
+    for &definition in &graph.call_declarations {
+        if !definitions.contains(&definition) { definitions.push(definition); }
+    }
+    for definition in definitions { result.push(material.function_header(tcx,definition)?); }
     Ok(result)
 }
