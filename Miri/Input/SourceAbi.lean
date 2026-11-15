@@ -6,6 +6,7 @@ import Miri.Input.SourcePhysical
 import Miri.Input.SourceSignatureTypes
 import Miri.Input.SourceTraitSelection
 import Miri.Input.SourceParamAttrs
+import Miri.Input.SourceCompilerAutoTraits
 
 /-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
 MIR execution, compiler process, query catalog or private pool participates.
@@ -271,17 +272,19 @@ where
             cursor := cursor + bytes
         return layout.sizeBytes == some cursor
 
-/-- Return default indirect attributes only when all possible deduction gates
-agree. Unknown defining-crate gates never inherit the caller's optimization. -/
-private def indirectBits (world : World) (optimizationDisabled : Bool)
-    (definition : DefinitionId) (parameter : Nat) : Except String Nat := do
-  if definition.crateIndex == 0 && optimizationDisabled then return 670
+/-- Mirror the public FnAbi caller gate before consulting defining-crate
+MIR. Unknown gates only permit results independent of whether deduction runs. -/
+private def indirectBits (world : World) (optimizationDisabled : Bool) (callerIncremental : Option Bool)
+    (definition : DefinitionId) (parameter typeId : Nat) : Except String Nat := do
+  if optimizationDisabled || callerIncremental == some true then return 670
   let some source := world.canonical.sourceMaterial | throw "typed ABI indirect source unavailable"
   let some material := source.mirUses | throw s!"typed ABI indirect parameter {parameter} requires defining-crate MIR deduction evidence"
   let [declaration] := (material.declarations.filter (·.definition == definition)).toList
     | throw "typed ABI indirect MIR-use declaration absent/ambiguous"
   if let some compilation := declaration.compilation then
-    if compilation.optimization == .no || compilation.incremental then return 670
+    if compilation.optimization == .no || compilation.incremental ||
+        compilation.freezeLangItemPresent == some false then return 670
+  if declaration.alwaysConst == some true then return 670
   -- Consumer-side absence of external MIR only means it was not encoded;
   -- deduced attributes may still have been encoded by the defining crate.
   let some body := declaration.body | do
@@ -290,12 +293,28 @@ private def indirectBits (world : World) (optimizationDisabled : Bool)
   if body.spreadArgument.isSome then return 670
   let usage ← SourceParamAttrs.parameterUsage body parameter
   if usage.mutated && usage.captured then return 670
-  let some _ := declaration.compilation
+  unless callerIncremental == some false do
+    throw s!"typed ABI indirect parameter {parameter} requires caller incremental source"
+  let some compilation := declaration.compilation
     | throw s!"typed ABI indirect parameter {parameter} requires defining-crate compilation options"
-  throw s!"typed ABI indirect parameter {parameter} requires defining Freeze/comptime deduction prerequisites"
+  unless compilation.freezeLangItemPresent == some true && declaration.alwaysConst == some false do
+    throw s!"typed ABI indirect parameter {parameter} requires defining Freeze/comptime deduction prerequisites"
+  if definition.crateIndex != 0 then
+    throw s!"typed ABI indirect parameter {parameter} requires defining output-options evidence"
+  -- These are the pinned DeducedParamAttrs::read_only/captures_none tests.
+  -- NeedsDrop is only demanded when an actual root Drop use can affect a flag.
+  let readOnly ← if usage.mutated then pure false else do
+    if usage.dropped then throw "typed ABI deduced readonly requires source NeedsDrop evidence"
+    if usage.sharedBorrowed then SourceCompilerAutoTraits.check world .freeze typeId
+    else pure true
+  let capturesNone ← if usage.captured then pure false else do
+    if usage.dropped then throw "typed ABI deduced capture requires source NeedsDrop evidence"
+    pure true
+  let bits := if readOnly then 670 ||| 32 else 670
+  return if capturesNone then bits ||| 7 else bits
 
 private def passMode (world : World) (physical : SourceTypes.Material) (optimizationDisabled : Bool)
-    (definition : DefinitionId) (parameter : Nat) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
+    (callerIncremental : Option Bool) (definition : DefinitionId) (parameter : Nat) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
   let some node := world.canonical.types[id]? | throw "typed ABI physical type absent"
   let some layout := world.canonical.layouts[node.layoutId]? | throw "typed ABI physical layout absent"
   let some bytes := layout.sizeBytes | throw "typed ABI unsized layout unsupported"
@@ -323,7 +342,7 @@ private def passMode (world : World) (physical : SourceTypes.Material) (optimiza
       let register : AbiRegister := ⟨.integer,bytes*8,none⟩
       let cast : AbiCastTarget := ⟨#[],none,register,bytes,false,attrs (if initialized && castSize == bytes then 128 else 0)⟩
       return {empty with kind := .cast,castTarget := some cast,padI32Count := some 0}
-    let bits ← indirectBits world optimizationDisabled definition parameter
+    let bits ← indirectBits world optimizationDisabled callerIncremental definition parameter id
     let some align := layout.abiAlignBytes | throw "typed ABI indirect alignment unavailable"
     return {empty with kind := .indirect,attributes := #[⟨bits,bytes,some align,.none⟩],indirectMode := some .pointer}
   match type with
@@ -436,14 +455,14 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
   let (updated,result) ← SourcePhysical.intern world output
   world := updated
   let some resultNode := world.canonical.types[result]? | throw "typed ABI result type absent"
-  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world physical material.optimizationDisabled key.definition 0 output result⟩
+  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world physical material.optimizationDisabled material.callerIncremental key.definition 0 output result⟩
   let mut inputs := #[]
   for (sourceType,index) in signature.inputs.zipIdx do
     let type ← SourceTypes.instantiate physical types constants sourceType signature.boundVariables
     let (updated,id) ← SourcePhysical.intern world type
     world := updated
     let some node := world.canonical.types[id]? | throw "typed ABI input type absent"
-    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world physical material.optimizationDisabled key.definition (index+1) type id))
+    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world physical material.optimizationDisabled material.callerIncremental key.definition (index+1) type id))
   let abi : FunctionAbi := {
     arguments := inputs,returnValue := result,callingConvention := ⟨.rust,none,none,none⟩,
     canUnwind := !attrs.neverUnwind && material.panicUnwinds,cVariadic := false,fixedCount := inputs.size }

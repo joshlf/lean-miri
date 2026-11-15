@@ -68,8 +68,7 @@ def main (args : List String) : IO Unit := do
   unless abi.returnValue.mode == expectedReturn && abi.arguments.map (·.mode) == #[expectedInput] do
     throw (IO.userError "genuine Result/closure memory indirect modes differ")
   let (world,isize) ← IO.ofExcept (SourcePhysical.intern world (.primitive "int" "isize"))
-  match mode world "std::panic::catch_unwind" #[.Type closure,.Type isize] with
-  | .error message =>
-    unless message.startsWith "typed ABI indirect parameter" do throw (IO.userError message)
-  | .ok _ => throw (IO.userError "external indirect attrs accepted without defining-crate evidence")
-  IO.println "local optNo aggregate/Result/closure ABI modes and external missing-evidence rejection passed"
+  let (_,externalAbi) ← IO.ofExcept (mode world "std::panic::catch_unwind" #[.Type closure,.Type isize])
+  unless externalAbi.returnValue.mode == expectedReturn && externalAbi.arguments.map (·.mode) == #[expectedInput] do
+    throw (IO.userError "caller optNo external no-deduction modes differ")
+  IO.println "local aggregate/Result/closure ABI modes and caller optNo external baseline passed"
