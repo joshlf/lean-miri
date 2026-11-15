@@ -106,12 +106,6 @@ private def arg (args : Array A) (index : Nat) : M S A :=
   match args[index]? with | some value => pure value | none => throw (.invalidProgram "checked filesystem argument missing")
 private def checked (h : Hooks S F D P HM T E K H R Ent) (request : Request) (name : String)
     (caller : FnAbi Miri.MIR.TyId) (args : Array (OpTy Provenance)) : M S (Array (OpTy Provenance)) := do
-  if request.legacy then
-    h.checkSymbolClash name
-    if caller.conv != .C then throw (.undefinedBehavior "filesystem calling convention mismatch")
-    if caller.cVariadic then throw (.undefinedBehavior "filesystem non-variadic function called variadic")
-    if args.size != request.signature.args.size then throw (.undefinedBehavior "filesystem argument count mismatch")
-    return args
   let callee ← h.expectedAbi name request.signature
   if callee.conv != .C || callee.cVariadic || callee.args.size != request.signature.args.size ||
       callee.fixedCount.toNat != request.signature.args.size then throw (.invalidProgram "compiler filesystem signature mismatch")

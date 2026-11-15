@@ -46,10 +46,10 @@ def readUmtxTime (h : Hooks S R) (place : MPlaceTy Provenance) : M S (Option Umt
   let some clock ← h.parseClockId clock | throw (.unsupported "unsupported _umtx_time clock")
   if clock == .realTime then h.noIsolation "`_umtx_op` with `CLOCK_REALTIME`"
   return some ⟨duration,isAbsolute,clock⟩
-private def futex (h : Hooks S R) (pointer : Pointer (Option Provenance)) : M S (Option R) := do
-  let object ← SyncObject.getOrInitMetadata h.metadata pointer do
+private def futex (h : Hooks S R) (pointer : Pointer (Option Provenance)) (size : Size) : M S R := do
+  let object ← SyncObject.getOrInitMetadata h.metadata pointer size do
     return {payload := ← h.newFutex, deleteOnWrite := false, onAccess := fun _ => pure ()}
-  return object.map (·.payload)
+  return object.payload
 
 def operation (h : Hooks S R) (obj op value uaddr uaddr2 : OpTy Provenance) (dest : MPlaceTy Provenance) : M S Unit := do
   let obj ← h.readPointer obj
@@ -73,7 +73,7 @@ def operation (h : Hooks S R) (obj op value uaddr uaddr2 : OpTy Provenance) (des
     if actual.toNat != value.toNat then
       h.writeInt 0 dest
       return
-    let some ref ← futex h obj | throw (.invalidProgram "acquire-read mutable futex lost allocation")
+    let ref ← futex h obj layout.layout.size
     let deadline ← if ← h.isNull uaddr2 then pure (some none) else do
       if uaddr == umtxTime.layout.size.bytes then
         let some time ← readUmtxTime h (← h.place uaddr2 umtxTime) | pure none
@@ -91,11 +91,12 @@ def operation (h : Hooks S R) (obj op value uaddr uaddr2 : OpTy Provenance) (des
       | .Ready => h.writeInt 0 dest
       | .TimedOut => h.errnoNegOne "ETIMEDOUT" dest) (some (.futexErrno dest))
   else if op == wake || op == wakePrivate then
-    let some ref ← futex h obj |
-      h.errnoNegOne "EFAULT" dest
-      return
     let count := min value.toNat (2^h.hostUsizeBits-1)
     h.seqCstFence
+    let ref ← match ← SyncObject.tryGetMetadata h.metadata obj with
+      | .ok object => pure object.payload
+      | .error .noMem => h.errnoNegOne "EFAULT" dest; return
+      | .error .noObj => h.writeInt 0 dest; return
     let _ ← SyncRuntime.futexWake h.runtime ref 0xffffffff count
     h.writeInt 0 dest
   else throw (.unsupported "unsupported _umtx_op operation")

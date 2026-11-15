@@ -6,8 +6,8 @@ import Miri.Memory.AllocRange
 
 This module ports the local `StoreBuffer` state and operations in the pinned
 `upstream/miri-source/src/concurrency/weak_memory.rs` (Miri revision
-`7fa591d7d4dd9af8154becbc8332f8096f8323b1`, Git blob
-`4838144d1d8625379f28ead9864bcfea72a16cc0`). It preserves modification-order
+`93c45edea8b148a6b6f05ec9384449a04217143f`, Git blob
+`8bcbf843c56046b87fa7ed28f761ed2360527ca5`). It preserves modification-order
 entries, their per-store synchronization clocks, SC marks, values, and
 first-load metadata, plus Miri's 128-entry limit and all `fetch_store`
 candidate restrictions.

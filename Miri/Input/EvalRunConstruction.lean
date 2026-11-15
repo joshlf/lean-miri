@@ -358,8 +358,8 @@ private def progressLabel
     | none => "absent"
     | some data => match data.tls with
       | .init => "init" | .initForExit => "initForExit"
-      | .pthread _ => "pthread" | .afterPthread => "afterPthread"
-      | .threadAtexit => "threadAtexit" | .windows .. => "windows" | .done => "done"
+      | .pthread _ => "pthread"
+      | .threadAtexit _ => "threadAtexit" | .windows .. => "windows" | .done => "done"
   let frame := match state.stack.frames.back? with
     | none => "empty"
     | some frame => s!"instance_{frame.functionInstance}.body_{frame.bodyIdentity.index}.loc_{repr frame.location}"

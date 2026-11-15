@@ -1,6 +1,6 @@
 import Miri.Interpreter.ThreadTls
 
-/-! Pinned shims/tls.rs::TlsDtorsState::on_stack_empty (247-345),
+/-! Upstream 93c45ede shims/tls.rs::TlsDtorsState::on_stack_empty,
 schedule_thread_atexit (392-417), schedule_next_pthread_tls_dtor (423-460),
 schedule_next_windows_fls_dtor (465-531), schedule_windows_tls_dtor (365-389).
 Each call schedules an actual canonical instance call; Pending is not success
@@ -22,8 +22,7 @@ inductive TlsDtorsStage (P : Type) where
   | init
   | initForExit
   | pthread (lastKey : Option TlsKey)
-  | afterPthread
-  | threadAtexit
+  | threadAtexit (forExit : Bool)
   | windows (lastKey : Option TlsKey) (remainingKeys : List TlsKey)
       (callbacks : Array (TlsImmediate P × MIR.SpanRef))
   | done
@@ -143,34 +142,36 @@ def tlsOnStackEmpty [PointerProvenance P] (platform : TlsPlatform) (target : Run
   let state ← EStateM.get
   match state.stage with
   | .init =>
-    setStage (if platform.unix then .pthread none else .afterPthread)
+    setStage (.threadAtexit false)
     pure .Pending
   | .initForExit =>
-    if platform.unix then
-      let roots := state.data.leakAllThreadTls state.exit.tls.manager.activeThread state.exit.staticRoots
-      EStateM.set { state with exit := { state.exit with staticRoots := roots } }
-    setStage .afterPthread
+    setStage (.threadAtexit true)
     pure .Pending
   | .pthread key =>
     match ← schedulePthread target queries key with
     | .Pending => pure .Pending
-    | .Ready => setStage .afterPthread; pure .Pending
-  | .afterPthread =>
-    match platform.os with
-    | .linux | .macos => setStage .threadAtexit
-    | .windows =>
-      let callbacks ← queries.lookupLinkSection ".CRT$XLB"
-      let after ← EStateM.get
-      -- The source BTreeMap's ascending numeric key order is explicit.
-      let keys := (after.data.keys.filter (·.destructor.isSome)).map (·.key)
-      let keys := keys.toList.mergeSort (fun a b => a.toNat ≤ b.toNat)
-      setStage (.windows none keys callbacks)
-    | .other _ => setStage .done
-    pure .Pending
-  | .threadAtexit =>
+    | .Ready => setStage .done; pure .Pending
+  | .threadAtexit forExit =>
     match ← scheduleAtexit queries with
     | .Pending => pure .Pending
-    | .Ready => setStage .done; pure .Pending
+    | .Ready =>
+      if platform.unix then
+        if forExit then
+          let after ← EStateM.get
+          let roots := after.data.leakAllThreadTls after.exit.tls.manager.activeThread after.exit.staticRoots
+          EStateM.set { after with exit := { after.exit with staticRoots := roots } }
+          setStage .done
+        else setStage (.pthread none)
+      else
+        match platform.os with
+        | .windows =>
+          let callbacks ← queries.lookupLinkSection ".CRT$XLB"
+          let after ← EStateM.get
+          let keys := (after.data.keys.filter (·.destructor.isSome)).map (·.key)
+          let keys := keys.toList.mergeSort (fun a b => a.toNat ≤ b.toNat)
+          setStage (.windows none keys callbacks)
+        | _ => setStage .done
+      pure .Pending
   | .windows lastKey remaining callbacks =>
     match ← scheduleWindowsFls target queries lastKey remaining callbacks with
     | .Pending => pure .Pending

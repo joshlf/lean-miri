@@ -14,7 +14,7 @@ if [[ $# != 0 ]]; then
 fi
 export RUSTUP_HOME="${LEAN_MIRI_RUSTUP_HOME:-$repo_root/.rustup}"
 export CARGO_HOME="${LEAN_MIRI_CARGO_HOME:-$repo_root/.cargo}"
-toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d"
+toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8eb778d04094"
 export PATH="$toolchain/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$toolchain/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 python3 tools/prepare-source-audit.py
@@ -41,7 +41,7 @@ cat > scratch/cargo-offline.sh <<'WRAPPER'
 #!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d/bin/cargo" \
+exec "$RUSTUP_HOME/toolchains/miri-exporter-8eb778d04094/bin/cargo" \
   --config "$repo_root/scratch/cargo-vendor.toml" "$@"
 WRAPPER
 chmod +x scratch/cargo-offline.sh

@@ -317,7 +317,7 @@ impl Layout {
         };
         Self {
             size_bytes: layout.size.bytes(),
-            abi_align_bytes: layout.align.abi.bytes(),
+            abi_align_bytes: layout.align.bytes(),
             unadjusted_abi_align_bytes: layout.unadjusted_abi_align.bytes(),
             max_repr_align_bytes: layout.max_repr_align.map(|x| x.bytes()),
             repr_c: layout.repr_c,

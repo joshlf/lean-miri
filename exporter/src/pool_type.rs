@@ -204,6 +204,7 @@ pub(super) struct CompilerFacts {
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct BooleanQueries {
+    pub is_x87_f80_raw: bool,
     pub is_unsafe_cell: bool,
     pub has_erasable_regions: bool,
     pub is_c_void: bool,
@@ -237,6 +238,7 @@ pub(super) struct TypeQueries {
 pub(super) struct AdtFacts {
     pub definition: u64,
     pub item_name: String,
+    pub cfi_encoding: Option<String>,
     pub nonnull_optimization_guaranteed: bool,
 }
 #[derive(Clone, Debug, Serialize)]

@@ -14,10 +14,10 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_MACHINE = "b1f816c92e6f99e47a73c774dcf043d89bb0d909"
-EXPECTED_TRACKER = "65660956220eac0d8270b273ac1074454f1c6f75"
-EXPECTED_TREE_MOD = "bf38ca356df45e5f365c0ae64bfe7738a0d43e1e"
-EXPECTED_TREE_RS = "b58a7cfeba92ece2dab1977f65f9070fd8cd71ad"
+EXPECTED_MACHINE = "f82134332a85b1ff6561646d4192f55b0894582b"
+EXPECTED_TRACKER = "89736bdadf6bf2e71953d5ab5cb1f0fbeb332046"
+EXPECTED_TREE_MOD = "086430ad06cd17bb22d77f3baa9a7ec2ae24da6f"
+EXPECTED_TREE_RS = "91cc25f2f9b88239225a2a3d32a4fd98262a6fc0"
 ORDER = "diagnostic>data-race>tree-borrows>sync>delete-or-free"
 
 
@@ -69,16 +69,16 @@ def main() -> None:
     dealloc = body(machine, "    fn before_memory_deallocation(\n", "    fn retag_ptr_value(\n")
     order("machine before_memory_read", read, [
         "machine.emit_diagnostic", "match &machine.data_race",
-        "borrow_tracker.before_memory_read", "alloc_extra.sync_objs.range", "obj.on_access",
+        "borrow_tracker.before_memory_read", "alloc_extra.meta_objs.range", "obj.on_access",
     ])
     order("machine before_memory_write", write, [
         "machine.emit_diagnostic", "match &machine.data_race",
-        "borrow_tracker.before_memory_write", "alloc_extra.sync_objs.range",
-        "obj.on_access", "obj.delete_on_write()", "alloc_extra.sync_objs.remove",
+        "borrow_tracker.before_memory_write", "alloc_extra.meta_objs.range",
+        "obj.on_access", "alloc_extra.meta_objs.remove_range_if", "obj.opaque()",
     ])
     order("machine before_memory_deallocation", dealloc, [
         "machine.emit_diagnostic", "match &machine.data_race",
-        "borrow_tracker.before_memory_deallocation", "alloc_extra.sync_objs.values()",
+        "borrow_tracker.before_memory_deallocation", "alloc_extra.meta_objs.range(AllocRange { start: Size::ZERO, size })",
         "obj.on_access", "allocation_spans.borrow_mut()", "machine.free_alloc_id",
     ])
 

@@ -154,14 +154,20 @@ def fromSource [DecidableEq MiriMemoryKind]
   let readSocklen := fun operand => do
     let immediate ← PlaceMachine.readImmediate access operand
     let scalar ← lift (immediate.imm.toScalar.mapError ScalarOps.immediateError)
-    let socklen ← layout "socklen_t"
-    let value ← lift (scalar.toInt socklen.layout.size |>.mapError ScalarOps.scalarError)
-    if value < 0 || value > 18446744073709551615 then
-      throw (.invalidProgram "socklen does not fit u64")
-    pure (UInt64.ofNat value.toNat)
+    let signed ← match operand.layout.layout.backendRepr.isSigned with
+      | .ok value => pure value
+      | .error _ => throw (.invalidProgram "socklen operand is not scalar")
+    let value ← if signed then
+        lift (scalar.toInt operand.layout.layout.size |>.mapError ScalarOps.scalarError)
+      else do
+        let value ← lift (scalar.toUInt operand.layout.layout.size |>.mapError ScalarOps.scalarError)
+        pure (Int.ofNat value.toNat)
+    pure (if value < 0 || value > 18446744073709551615 then none else some (UInt64.ofNat value.toNat))
   let hooks : SocketAddress.Hooks (RuntimeState (ValidityMachine.Control Stored)) E Iterator := {
     errors
     gnu := target.env == "gnu"
+    os := target.os
+    checkAccess := fun pointer size => ValidityMachine.checkPointerAccess access pointer size
     readPointer
     isLiteralNull := fun pointer => pointer.provenance.isNone && pointer.offset.bytes == 0
     readCString

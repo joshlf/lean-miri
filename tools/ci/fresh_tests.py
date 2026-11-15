@@ -20,7 +20,7 @@ FOCUSED = {
 
 def environment():
     env = os.environ.copy()
-    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8144389c895d'
+    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8eb778d04094'
     env.update(ELAN_HOME=env.get('ELAN_HOME', str(ROOT / '.elan')),
                MIRI_SYSROOT=env.get('MIRI_SYSROOT', str(ROOT / 'scratch/miri-sysroot')),
                PATH=str(toolchain / 'bin') + ':' + env.get('PATH', ''),

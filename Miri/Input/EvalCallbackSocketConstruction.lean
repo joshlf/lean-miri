@@ -455,13 +455,9 @@ def socketFromSource [DecidableEq MiriMemoryKind]
     insert := fun _ => throw (.invalidProgram "unbound socket descriptor insertion")
     writeInt := address.writeInt
     readLengthPlace := fun value => do
-      let scalar ← address.readScalar value
-      let result ← match scalar.toInt value.layout.layout.size with
-        | .ok result => pure result
-        | .error error => throw (ScalarOps.scalarError error)
-      if result < 0 || result >= 2^64 then
-        throw (.invalidProgram "socket option length does not fit host usize")
-      pure result.toNat }
+      let result ← address.readSocklen ⟨.indirect value.mplace,value.layout⟩
+      pure (result.map UInt64.toNat) }
+
   pure (SocketMachine.bindSocket seed.readiness SourceOther.sockets
     EvalSocketStorage.sockets budget asUnix virtual tcp options base)
 

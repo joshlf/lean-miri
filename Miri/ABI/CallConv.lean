@@ -73,13 +73,8 @@ structure ArgAbi (Ty : Type) where
   deriving DecidableEq, Repr
 namespace ArgAbi
 
-def eqAbi [DecidableEq Ty] (left right : ArgAbi Ty) : Bool :=
-  left.layout.layout.eqAbi right.layout.layout && left.mode.eqAbi right.mode &&
-  (if left.mode.isDirect then
-    match left.layout.layout.backendRepr with
-    | .Memory => left.layout.ty == right.layout.ty
-    | _ => true
-   else true)
+def eqAbi (left right : ArgAbi Ty) : Bool :=
+  left.layout.layout.eqAbi right.layout.layout && left.mode.eqAbi right.mode
 
 def isIgnore (arg : ArgAbi Ty) : Bool := arg.mode.isIgnore
 def isUnsizedIndirect (arg : ArgAbi Ty) : Bool := arg.mode.isUnsizedIndirect

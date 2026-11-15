@@ -31,8 +31,9 @@ def guardAccess [Monad m] [MonadExceptOf StepError m]
     (getObject : Ref → m TypedSyncRuntime.Object) (payload : Payload) (_ : SyncObject.AccessKind) : m Unit := do
   match payload with
   | .pthread payload =>
-    let ref := match payload with
-      | .mutex ref _ | .rwlock ref | .condvar ref _ | .semaphore ref => ref
+    let ref ← match payload with
+      | .mutex ref _ | .rwlock ref | .condvar ref _ | .semaphore ref => pure ref
+      | .mutexAttr _ | .condAttr _ => return ()
     if ← queued getObject ref then
       throw (.undefinedBehavior "access of pthread synchronization storage forbidden while queue non-empty")
   | .windows (.initOnce ref) =>

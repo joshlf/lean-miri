@@ -66,10 +66,16 @@ def main : IO Unit := do
   | other => throw (IO.userError s!"all-uninitialized copy did not clear destination init bits: {other}")
 
   let uninitSelf ← uninitAllocation 6
-  let repeatedUninitSelf ← runMutation "all-uninitialized repeated self-copy"
-    (Allocation.copyRepeatedly uninitSelf (range 0 2) (size 1) 2 (size 8) true false)
-    uninitSelf
-  if (← actualBytes repeatedUninitSelf 6) != Array.replicate 6 0 then
+  -- The new pin checks repeated-copy restrictions before the uninit fast path.
+  match Allocation.copyRepeatedly uninitSelf (range 0 2) (size 1) 2 (size 8) true false uninitSelf with
+  | .error .repeatedCopyRequiresNonoverlapping _ => pure ()
+  | _ => throw (IO.userError "uninitialized repeated copy bypassed nonoverlapping requirement")
+  match Allocation.copyRepeatedly uninitSelf (range 0 2) (size 1) 2 (size 8) true true uninitSelf with
+  | .error .copyRangesOverlap _ => pure ()
+  | _ => throw (IO.userError "uninitialized repeated copy bypassed overlap check")
+  let uninitSingle ← runMutation "all-uninitialized single self-copy"
+    (Allocation.copyRepeatedly uninitSelf (range 0 2) (size 1) 1 (size 8) true false) uninitSelf
+  if (← actualBytes uninitSingle 6) != Array.replicate 6 0 then
     throw (IO.userError "all-uninitialized self-copy changed arbitrary destination bytes")
 
   let id ← match AllocId.ofUInt64 7 with

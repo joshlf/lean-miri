@@ -15,7 +15,7 @@ structure Hooks (S F D MD B I : Type) where
 structure SourceHooks (S F : Type) where
   event : EventFd.Hooks S F
   os : String
-  checkSymbolClash : String → M S Unit
+  checkSignature : String → FnAbi TyId → Array (OpTy Provenance) → M S (Array (OpTy Provenance))
   writeI32 : Int32 → MPlaceTy Provenance → M S Unit
 
 def emulateSource (h : SourceHooks S F) (name : String) (abi : FnAbi TyId)
@@ -23,10 +23,7 @@ def emulateSource (h : SourceHooks S F) (name : String) (abi : FnAbi TyId)
     M S (Option ForeignItems.EmulateItemResult) := do
   if name != "eventfd" then return none
   unless h.os == "linux" || h.os == "android" || h.os == "illumos" do return none
-  h.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "eventfd calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "eventfd variadic signature")
-  if args.size != 2 then throw (.undefinedBehavior "eventfd argument count mismatch")
+  let args ← h.checkSignature name abi args
   let some value := args[0]? | throw (.invalidProgram "eventfd checked initial value absent")
   let some flags := args[1]? | throw (.invalidProgram "eventfd checked flags absent")
   h.writeI32 (← EventFd.create h.event value flags) dest
@@ -36,10 +33,7 @@ def emulate (h : Hooks S F D MD B I) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy Provenance)) (dest : MD) : M S (Option ForeignItems.EmulateItemResult) := do
   if name != "eventfd" then return none
   unless h.foreign.os == "linux" || h.foreign.os == "android" do return none
-  h.foreign.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "eventfd calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "eventfd variadic signature")
-  if args.size != 2 then throw (.undefinedBehavior "eventfd argument count mismatch")
+  let args ← ForeignItems.checkSignature h.foreign name ⟨.C,#[.u32,.i32],.i32⟩ abi args
   let some value := args[0]? | throw (.invalidProgram "eventfd checked initial value absent")
   let some flags := args[1]? | throw (.invalidProgram "eventfd checked flags absent")
   h.writeI32 (← EventFd.create h.event value flags) dest

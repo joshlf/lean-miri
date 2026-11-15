@@ -14,6 +14,13 @@ abbrev State Os R P H D O Aff B Host := ThreadStacks.State MiriMemoryKind (User 
 all callback/entry/runtime fields are read from their canonical World owners. -/
 def startSource (spans : AllocationDriver.SpanHooks) (code : Int32) :
     EStateM StepError (State Os R P H D O Aff B Host) Unit := do
+  let before ← get
+  let world := before.machine.user.user.payload.payload
+  let alreadyCalled := world.exitCalled
+  set {before with machine := {before.machine with user := {before.machine.user with user :=
+    {before.machine.user.user with payload := {before.machine.user.user.payload with payload :=
+      {world with exitCalled := true}}}}}}
+  if alreadyCalled then throw (.undefinedBehavior "`exit` called more than once")
   let span ← AllocationDriver.currentUserRelevantSpan spans
   let state : State Os R P H D O Aff B Host ← get
   let manager := state.machine.threads

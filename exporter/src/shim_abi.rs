@@ -115,6 +115,13 @@ fn named_type<'tcx>(tcx: TyCtxt<'tcx>, path: &[&str]) -> Result<ty::Ty<'tcx>, St
 pub(super) fn descriptor<'tcx>(tcx: TyCtxt<'tcx>, key: &str) -> Result<ty::Ty<'tcx>, String> {
     Ok(match key {
         "unit" => tcx.types.unit,
+        "f32" => tcx.types.f32,
+        "f64" => tcx.types.f64,
+        "usizePointer" => ty::Ty::new_mut_ptr(tcx, tcx.types.usize),
+        "voidPointerPointer" => ty::Ty::new_mut_ptr(tcx, descriptor(tcx, "pointer")?),
+        "u32Pointer" => ty::Ty::new_mut_ptr(tcx, tcx.types.u32),
+        "u64Pointer" => ty::Ty::new_mut_ptr(tcx, tcx.types.u64),
+        "i32Pointer" => ty::Ty::new_mut_ptr(tcx, tcx.types.i32),
         "usize" => tcx.types.usize,
         "isize" => tcx.types.isize,
         "i32" => tcx.types.i32,
@@ -126,6 +133,8 @@ pub(super) fn descriptor<'tcx>(tcx: TyCtxt<'tcx>, key: &str) -> Result<ty::Ty<'t
         "bool" => tcx.types.bool,
         "never" => tcx.types.never,
         "unitPointer" => ty::Ty::new_mut_ptr(tcx, tcx.types.unit),
+        "unitPointerPointer" => ty::Ty::new_mut_ptr(tcx, ty::Ty::new_mut_ptr(tcx, tcx.types.unit)),
+        "miriFrame" => named_type(tcx, &["std", "backtrace_rs", "backtrace", "miri", "MiriFrame"])? ,
         "pointer" => {
             // PrimitiveLayouts::new source fallback is explicit, including no_core.
             let pointee = match tcx.lang_items().c_void() {
@@ -183,6 +192,14 @@ pub(super) fn descriptor<'tcx>(tcx: TyCtxt<'tcx>, key: &str) -> Result<ty::Ty<'t
                 ),
             ),
         ),
+        _ if key.starts_with("libc::") => {
+            let name = &key["libc::".len()..];
+            if let Some(name) = name.strip_suffix("_pointer") {
+                ty::Ty::new_mut_ptr(tcx, named_type(tcx, &["libc", name])?)
+            } else {
+                named_type(tcx, &["libc", name])?
+            }
+        }
         _ if key.starts_with("winapi::") => {
             let name = &key["winapi::".len()..];
             named_type(tcx, &["std", "sys", "pal", "windows", "c", name])?
@@ -269,7 +286,15 @@ pub(super) fn export<'tcx>(
     portable_only: bool,
     allocator_required: bool,
 ) -> Result<Vec<Recipe>, String> {
+    let frame_required = demanded_symbols(tcx, context).contains("miri_resolve_frame");
     let recipes: &[(&str, &[&str], &str)] = &[
+        ("C", &["f32"], "f32"),
+        ("C", &["f64"], "f64"),
+        ("C", &["f32", "f32"], "f32"),
+        ("C", &["f64", "f64"], "f64"),
+        ("C", &["f64", "i32"], "f64"),
+        ("C", &["f32", "i32Pointer"], "f32"),
+        ("C", &["f64", "i32Pointer"], "f64"),
         ("Rust", &[], "unit"),
         ("Rust", &["usize", "alignment"], "unitPointer"),
         ("Rust", &["unitPointer", "usize", "alignment"], "unit"),
@@ -311,10 +336,10 @@ pub(super) fn export<'tcx>(
         ("Rust", &["byteSlice"], "unit"),
         ("Rust", &["unitPointer", "usize"], "unit"),
         ("Rust", &["bool"], "unit"),
-        // shims/backtrace.rs strict APIs; deprecated resolve_frame intentionally
-        // has no guessed full return-structure signature.
+        // shims/backtrace.rs uses the compiler-owned std MiriFrame type.
         ("Rust", &["u64"], "usize"),
-        ("Rust", &["u64", "unitPointer"], "unit"),
+        ("Rust", &["u64", "unitPointerPointer"], "unit"),
+        ("Rust", &["pointer", "u64"], "miriFrame"),
         (
             "Rust",
             &["unitPointer", "u64", "unitPointer", "unitPointer"],
@@ -324,7 +349,8 @@ pub(super) fn export<'tcx>(
     Ok::<_, String>(
         recipes
             .iter()
-            .filter(|(abi, args, _)| {
+            .filter(|(abi, args, ret)| {
+                (*ret != "miriFrame" || frame_required) &&
                 (!portable_only || *abi == "C")
                     && (allocator_required || !args.contains(&"alignment"))
             })
@@ -393,7 +419,7 @@ fn is_dynamic_symbol(target: &rustc_target::spec::Target, name: &str) -> bool {
         match target.os {
             Os::Android => name == "gettid",
             Os::Linux => {
-                matches!(name, "gettid" | "statx")
+                matches!(name, "copy_file_range" | "gettid" | "statx")
                     || (target.env == Env::Gnu && name == "__cxa_thread_atexit_impl")
             }
             Os::MacOs => matches!(
@@ -460,6 +486,36 @@ pub(super) fn named_signatures<'tcx>(
         names.contains(name) || (dynamic_lookup && is_dynamic_symbol(&tcx.sess.target, name))
     };
     let recipes: &[(&str, &[&str], &str)] = &[
+        ("pthread_attr_getguardsize", &["pointer", "usizePointer"], "i32"),
+        ("pthread_attr_init", &["pointer"], "i32"),
+        ("pthread_attr_destroy", &["pointer"], "i32"),
+        ("pthread_attr_setstacksize", &["pointer", "usize"], "i32"),
+        ("pthread_attr_getstack", &["libc::pthread_attr_t_pointer", "usizePointer", "usizePointer"], "i32"),
+        ("pthread_getattr_np", &["libc::pthread_t", "pointer"], "i32"),
+        ("pthread_attr_get_np", &["libc::pthread_t", "pointer"], "i32"),
+        ("gnu_get_libc_version", &[], "pointer"),
+        ("signal", &["i32", "libc::sighandler_t"], "libc::sighandler_t"),
+        ("sigaltstack", &["pointer", "pointer"], "i32"),
+        ("sigaction", &["i32", "pointer", "pointer"], "i32"),
+        ("getpwuid_r", &["libc::uid_t", "libc::passwd_pointer", "pointer", "usize", "voidPointerPointer"], "i32"),
+        ("__posix_getpwuid_r", &["libc::uid_t", "libc::passwd_pointer", "pointer", "usize", "voidPointerPointer"], "i32"),
+        ("__error", &[], "pointer"),
+        ("___errno", &[], "pointer"),
+        ("__errno", &[], "pointer"),
+        ("__errno_location", &[], "pointer"),
+        ("__libc_current_sigrtmin", &[], "i32"),
+        ("__libc_current_sigrtmax", &[], "i32"),
+        ("gettid", &[], "libc::pid_t"),
+        ("pthread_getthreadid_np", &[], "i32"),
+        ("stack_getbounds", &["libc::stack_t_pointer"], "i32"),
+        ("pset_info", &["i32", "pointer", "u32Pointer", "pointer"], "i32"),
+        ("mmap64", &["pointer", "usize", "i32", "i32", "i32", "libc::off64_t"], "pointer"),
+        ("_umtx_op", &["pointer", "i32", "usize", "pointer", "pointer"], "i32"),
+        ("mach_absolute_time", &[], "u64"),
+        ("mach_timebase_info", &["libc::mach_timebase_info_pointer"], "i32"),
+        ("mach_wait_until", &["u64"], "i32"),
+        ("cpuset_getaffinity", &["i32", "i32", "i64", "usize", "pointer"], "i32"),
+        ("copy_file_range", &["i32", "libc::off_t_pointer", "i32", "libc::off_t_pointer", "libc::size_t", "u32"], "libc::ssize_t"),
         // Unix environment/system-information checks from
         // shims/unix/foreign_items.rs. The libc aliases stay type queries: we
         // never substitute a host-sized or target-triple-derived integer.
@@ -532,6 +588,7 @@ pub(super) fn named_signatures<'tcx>(
         ("pthread_detach", &["libc::pthread_t"], "i32"),
         ("pthread_self", &[], "libc::pthread_t"),
         ("sched_yield", &[], "i32"),
+        ("pause", &[], "i32"),
         ("poll", &["pointer", "libc::nfds_t", "i32"], "i32"),
         // Strict time and synchronization shim signatures from pinned
         // shims/unix/foreign_items.rs. Typed libc pointer slots use exact
@@ -747,6 +804,20 @@ pub(super) fn named_signatures<'tcx>(
             ))
         })
         .collect::<Result<Vec<_>, String>>()?;
+    if is_unix_target(tcx) {
+        use rustc_target::spec::Os;
+        let os = &tcx.sess.target.os;
+        let platform_recipes: Vec<(&str, Vec<&str>, &str)> = vec![
+            ("pthread_setname_np", if os == &Os::MacOs {vec!["pointer"]} else {vec!["libc::pthread_t", "pointer"]}, "i32"),
+            ("pthread_getname_np", vec!["libc::pthread_t", "pointer", "usize"], "i32"),
+            ("pthread_threadid_np", vec!["libc::pthread_t", "u64Pointer"], "i32"),
+        ];
+        for (name, args, ret) in platform_recipes {
+            if required(name) {
+                result.push(NamedSignature::new(name, query(tcx, context, "C", &args, ret)?));
+            }
+        }
+    }
     // Linux GNU TLS destructor registration is strict in
     // shims/unix/linux/foreign_items.rs. Preserve the source's three wildcard
     // pointer arguments and int result, and emit the record only for the GNU

@@ -8,7 +8,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 cd "$repo_root"
 
 sha256sum --check <<'EOF'
-cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94  upstream/rustc-source/compiler/rustc_abi/src/lib.rs
+ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954  upstream/rustc-source/compiler/rustc_abi/src/lib.rs
 32a3be9c253af1e346e10ca76cf1074ec25a9dcda5723b470c6c30a0a12009ba  upstream/rustc-source/compiler/rustc_abi/src/wrapping_range.rs
 EOF
 

@@ -13,6 +13,7 @@ structure Hooks (S R F D B I : Type) where
   signature : String → M S (FnAbi TyId)
   argumentTypes : Array LinuxFutex.ArgType → M S (Array TyId)
   typeBudget : Nat
+  arch : String
   libcUsize : String → M S UInt64
   libcI32 : String → M S Int32
   readUsize : OpTy Provenance → M S UInt64
@@ -25,6 +26,7 @@ structure Hooks (S R F D B I : Type) where
   futex : LinuxFutex.Hooks S R
   event : EventFd.Hooks S F
   unixGettid : String → M S UInt32
+  copyFileRange : ShimSignatures.Varargs Provenance → MPlaceTy Provenance → M S Unit
   accept4 : OpTy Provenance → OpTy Provenance → OpTy Provenance → OpTy Provenance → MPlaceTy Provenance → M S Unit
   thread : UnixThread.Hooks S
   checkAccess : Pointer (Option Provenance) → Size → M S Unit
@@ -38,6 +40,7 @@ structure SyscallHooks (S D MD Ptr B I F : Type) where
   signature : String → M S (FnAbi TyId)
   argumentTypes : Array LinuxFutex.ArgType → M S (Array TyId)
   typeBudget : Nat
+  arch : String
   libcUsize : String → M S UInt64
   readUsize : OpTy Provenance → M S UInt64
   readI32 : OpTy Provenance → M S Int32
@@ -49,6 +52,8 @@ structure SyscallHooks (S D MD Ptr B I F : Type) where
   event : EventFd.Hooks S F
   unixGettid : String → M S UInt32
   futex : ShimSignatures.Varargs Provenance → MPlaceTy Provenance → M S Unit
+  errnoNegOne : String → MPlaceTy Provenance → M S Unit
+  copyFileRange : ShimSignatures.Varargs Provenance → MPlaceTy Provenance → M S Unit
   accept4 : Array (OpTy Provenance) → MPlaceTy Provenance → M S Unit
 
 structure PrctlHooks (S D MD Ptr B I : Type) where
@@ -77,10 +82,11 @@ def syscallCore (h : SyscallHooks S D MD Ptr B I F) (name : String) (abi : FnAbi
     (args : Array (OpTy Provenance)) (dest : MPlaceTy Provenance) : M S Unit := do
   let (fixed,rest) ← ShimSignatures.variadic h.signatures name (h.signature "syscall") 1 abi args
   let random ← h.libcUsize "SYS_getrandom"
-  let futex ← h.libcUsize "SYS_futex"
+  let futex ← h.libcUsize (if h.arch == "riscv32" then "SYS_futex_time64" else "SYS_futex")
   let event ← h.libcUsize "SYS_eventfd2"
   let tid ← h.libcUsize "SYS_gettid"
   let accept ← h.libcUsize "SYS_accept4"
+  let copy ← h.libcUsize "SYS_copy_file_range"
   let op ← h.readUsize (← arg fixed 0)
   if op == random then
     let args ← checked h.signatures h.typeBudget h.argumentTypes #[.voidPointer,.usize,.i32] rest
@@ -102,7 +108,8 @@ def syscallCore (h : SyscallHooks S D MD Ptr B I F) (name : String) (abi : FnAbi
   else if op == accept then
     let args ← checked h.signatures h.typeBudget h.argumentTypes #[.i32,.sockaddrPointer,.socklenPointer,.i32] rest
     h.accept4 args dest
-  else throw (.unsupported s!"unsupported syscall number {op}")
+  else if op == copy then h.copyFileRange rest dest
+  else h.errnoNegOne "ENOSYS" dest
 
 def prctlCore (h : PrctlHooks S D MD Ptr B I) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy Provenance)) (dest : MPlaceTy Provenance) : M S Unit := do
@@ -157,6 +164,7 @@ def syscall (h : Hooks S R F D B I) (name : String) (abi : FnAbi TyId)
     signature := h.signature
     argumentTypes := h.argumentTypes
     typeBudget := h.typeBudget
+    arch := h.arch
     libcUsize := h.libcUsize
     readUsize := h.readUsize
     readI32 := h.readI32
@@ -172,6 +180,8 @@ def syscall (h : Hooks S R F D B I) (name : String) (abi : FnAbi TyId)
         checked h.signatures h.typeBudget h.argumentTypes types args
       let futexHooks := {h.futex with takeArgs := takeArgs}
       LinuxFutex.syscall futexHooks rest dest
+    errnoNegOne := h.futex.errnoNegOne
+    copyFileRange := h.copyFileRange
     accept4 := fun args dest => do
       h.accept4 (← arg args 0) (← arg args 1) (← arg args 2) (← arg args 3) dest }
   syscallCore core name abi args dest

@@ -17,7 +17,7 @@ def isDynamic (os env name : String) : Bool :=
   if #["strlen","signal","getentropy","getrandom","futimens"].contains name then true
   else if (name == "preadv" || name == "pwritev") && os != "solaris" then true
   else if os == "android" then name == "gettid"
-  else if os == "linux" then name == "gettid" || name == "statx" ||
+  else if os == "linux" then name == "copy_file_range" || name == "gettid" || name == "statx" ||
     (env == "gnu" && name == "__cxa_thread_atexit_impl")
   else if os == "solaris" || os == "illumos" then name == "pthread_setname_np"
   else if os == "macos" then #["os_sync_wait_on_address","os_sync_wait_on_address_with_deadline",

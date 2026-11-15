@@ -3,7 +3,7 @@
 
 This module ports the timestamp and vector-clock operations from the pinned
 `upstream/miri-source/src/concurrency/vector_clock.rs` (Miri revision
-`7fa591d7d4dd9af8154becbc8332f8096f8323b1`, blob
+`93c45edea8b148a6b6f05ec9384449a04217143f`, blob
 `723dfd29651525198b7590553f1ef5e72b952eba`). The stored representation keeps
 the complete packed 32-bit timestamp word, including the low read/retag bit.
 Clock comparisons and timestamp equality intentionally inspect time only, as

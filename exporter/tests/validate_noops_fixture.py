@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 doc = load_mir_document(sys.argv[1])
-assert doc["producer"]["rustc_commit"] == "8144389c895da997dbdecaa635e41d6a50be6ffd"
+assert doc["producer"]["rustc_commit"] == "8eb778d04094d3af4b26580cab327e0413eb1e02"
 assert "completeness" not in doc
 assert doc["selected_scope"]["semantics"] == "structural_export_closure_only"
 assert "status" not in doc["selected_scope"]

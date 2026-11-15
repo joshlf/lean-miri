@@ -15,7 +15,7 @@ structure Hooks (S H D O E Meta : Type) where
   startArray : MPlaceTy Provenance → M S ArrayProjection.Iterator
   index : ArrayProjection.Iterator → Nat → M S (MPlaceTy Provenance)
   field : MPlaceTy Provenance → String → M S (MPlaceTy Provenance)
-  readFieldSigned : MPlaceTy Provenance → M S Int
+  readFieldUnsigned : MPlaceTy Provenance → M S UInt64
   readFieldPointer : MPlaceTy Provenance → M S (Pointer (Option Provenance))
   allocateStack : Size → M S (Pointer (Option Provenance))
   deallocateStack : Pointer (Option Provenance) → M S Unit
@@ -34,48 +34,44 @@ private def onError (action : M S A) (cleanup : M S Unit) : M S A := fun state =
     match cleanup state with
     | .ok _ state => .error error state
     | .error next state => .error next state
-private def u64 (value : Int) : M S UInt64 := do
-  if value < 0 || value >= 2^64 then throw (.invalidProgram "source vectored IO u64 conversion panic")
-  return UInt64.ofNat value.toNat
 private def offset (value : Nat) : M S Int64 := do
   if value >= 2^63 then throw (.invalidProgram "source vectored IO i64 offset conversion panic")
   return Int64.ofInt (Int.ofNat value)
 private def buffers (h : Hooks S H D O E Meta) (pointer : Pointer (Option Provenance))
-    (count : UInt64) : M S (Array (Pointer (Option Provenance) × UInt64)) := do
+    (count : UInt64) : M S (Option (Array (Pointer (Option Provenance) × UInt64) × UInt64)) := do
   let place ← h.arrayPlace pointer count
   let iterator ← h.startArray place
   let mut result := #[]
+  let mut total : Nat := 0
   for index in [:iterator.length.toNat] do
     let iovec ← h.index iterator index
-    let length ← u64 (← h.readFieldSigned (← h.field iovec "iov_len"))
+    let length ← h.readFieldUnsigned (← h.field iovec "iov_len")
     let pointer ← h.readFieldPointer (← h.field iovec "iov_base")
+    total := total + length.toNat
+    if total > h.fd.targetIsizeMax.toNat then return none
     result := result.push (pointer,length)
-  return result
-private def total (h : Hooks S H D O E Meta)
-    (buffers : Array (Pointer (Option Provenance) × UInt64)) : M S UInt64 := do
-  let mut result : UInt64 := 0
-  for (_,length) in buffers do
-    if h.checkedSum && result.toNat+length.toNat >= 2^64 then
-      throw (.invalidProgram "source vectored IO ordinary u64 sum overflow panic")
-    result := result+length
-  return result
+  for (pointer,length) in result do h.fd.checkAccess pointer (Size.ofBytes length)
+  return some (result,UInt64.ofNat total)
 
 def execute (h : Hooks S H D O E Meta) (fd iov count : OpTy Provenance)
     (position : Option (OpTy Provenance)) (write : Bool) (dest : MPlaceTy Provenance) : M S Unit := do
   let number ← h.readI32 fd
   let pointer ← h.readPointer iov
-  let count ← u64 (← h.readI32 count).toInt
+  let count ← h.readI32 count
   let position ← match position with
     | none => pure none
     | some value => do
       if h.fd.os == "solaris" then throw (.unsupported "Solaris positional vectored IO")
       pure (some (← h.readSigned value))
+  if count < 0 then IoError.setErrnoAndReturnNeg1 h.fd.errors (.libc "EINVAL") dest; return
+  let count := UInt64.ofNat count.toInt.toNat
   let some reference := (← h.fd.table).get number
     | IoError.setErrnoAndReturnNeg1 h.fd.errors (.libc "EBADF") dest; return
   let reference ← h.fd.cloneRef reference
+  let parsed ← onError (buffers h pointer count) (h.fd.dropRef reference)
+  let some (buffers,size) := parsed
+    | h.fd.dropRef reference; IoError.setErrnoAndReturnNeg1 h.fd.errors (.libc "EINVAL") dest; return
   let (buffers,temporary,size) ← onError (do
-    let buffers ← buffers h pointer count
-    let size ← total h buffers
     let temporary ← h.allocateStack (Size.ofBytes size)
     if write then
       let mut copied : Nat := 0

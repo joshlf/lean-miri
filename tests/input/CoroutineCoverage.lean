@@ -159,7 +159,8 @@ def main : IO Unit := do
   check newDecoded.document.coroutineCoverage.isSome "schema 12 failed to retain typed coverage"
   rejected (← must (setField legacy "compiler_coroutine_coverage" catalog)) "schema 11 forbids"
   rejected newVersion "schema 12 requires"
-  rejected (← must (setField valid "schema_version" "13")) "unsupported schema version"
+  rejected (← must (setField valid "schema_version" "14")) "unsupported schema version"
+  rejected (← must (setField valid "schema_version" "13")) "schema 13 requires x87_f80_align_bytes"
   rejected (← must (setField valid "compiler_coroutine_coverage" (object [("auxiliary_bodies", "[]"), ("coroutines", "[]")]))) "body_coroutines"
   let badMarkers ← must (setField catalog "body_coroutines" "[]")
   rejected (← must (setField valid "compiler_coroutine_coverage" badMarkers)) "incomplete body markers"

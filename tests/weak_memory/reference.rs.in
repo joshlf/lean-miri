@@ -95,6 +95,8 @@ struct RangeObjectMap<T> { v: Vec<RangeElem<T>> }
 
 impl<T> RangeObjectMap<T> {
     fn new() -> Self { Self { v: Vec::new() } }
+    fn get_pos(&self, position: usize) -> Option<&T> { self.v.get(position).map(|elem| &elem.data) }
+    fn get_mut_pos(&mut self, position: usize) -> Option<&mut T> { self.v.get_mut(position).map(|elem| &mut elem.data) }
     fn find_offset(&self, offset: u64) -> Result<usize, usize> {
         for (index, elem) in self.v.iter().enumerate() {
             if offset < elem.range.start { return Err(index); }

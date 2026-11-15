@@ -4,7 +4,7 @@ struct MiriFrame {
     filename_len: usize,
     lineno: u32,
     colno: u32,
-    fn_ptr: *mut (),
+    fn_ptr: *mut std::ffi::c_void,
 }
 
 extern "Rust" {

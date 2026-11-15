@@ -32,6 +32,7 @@ def hooks (len : UInt64) (fail : Option String := none) (zstMeta : Bool := true)
     copyOpNoValidate := fun _ _ _ transmute => do
       event s!"copy-raw:{transmute}"
       if fail == some "copy" then throw (.callback "copy failed")
+    writeUninit := fun _ _ => event "uninit"
     writeDiscriminant := fun _ variant _ => event s!"discriminant:{variant}"
     enforceValidity := fun _ _ => do event "enforce"; return true
     validate := fun _ _ => event "validate-reset"
@@ -54,7 +55,7 @@ def logOf (action : RvalueM Log Unit) : Log :=
     throw (IO.userError "aggregate source order mismatch") : IO Unit)
 #eval (do
   unless logOf (writeAggregate (hooks 0) () (.Adt 0 3 #[] none (some 7)) #[operand 1] 0) ==
-  #["downcast:3", "field:7", "eval:1:true", "copy-raw:false", "discriminant:3", "enforce", "validate-reset"] do
+  #["downcast:3", "uninit", "field:7", "eval:1:true", "copy-raw:false", "discriminant:3", "enforce", "validate-reset"] do
     throw (IO.userError "aggregate source order mismatch") : IO Unit)
 #eval (do
   unless logOf (writeAggregate (hooks 0 (some "copy")) () .Tuple #[operand 1, operand 2] 0) ==

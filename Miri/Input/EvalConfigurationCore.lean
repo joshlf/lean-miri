@@ -1208,7 +1208,7 @@ def makeFromSourcePackage [DecidableEq Os]
               (EvalCallbackMachine.FD H D (SourceOther Raw Listener TcpStream Error)) := {
             event := callbacks.io.event
             os := assembly.foreign.os
-            checkSymbolClash := baseCore.checkSymbolClash
+            checkSignature := fun name abi args => ForeignItems.Core.checkSignature baseCore name ⟨.C,#[.u32,.i32],.i32⟩ abi args
             writeI32 := fun value destination => do
               let scalar ← match Scalar.fromInt value.toInt (Size.ofBytes 4) with
                 | .ok scalar => pure scalar
@@ -1403,6 +1403,9 @@ def makeFromSourcePackage [DecidableEq Os]
                 | .ok value => pure value
                 | .error reason => throw (.unsupported s!"compiler syscall varargs: {reason}")
               typeBudget := sourceLeaves.foreignSource.varArgsBudget
+              arch := baseCore.arch
+              errnoNegOne := fun name destination => IoError.setErrnoAndReturnNeg1 seed.errors (.libc name) destination
+              copyFileRange := fun _ _ => throw (.unsupported "source copy_file_range host capability is unavailable")
               libcUsize := CompilerLinuxSyscall.libcUsize p.namedConstants
               readUsize := fun operand => do
                 match (← syscallSignatureHooks.readScalar operand).toTargetUsize memory.access.runtime.pointerSize with
@@ -1539,7 +1542,7 @@ def makeFromSourcePackage [DecidableEq Os]
                     context.validityAccess context.projection selectedChoice strings
                     fsCapability.pathFromOs seed.errors seed.registry.readiness files
                     (fun other => do return .inl (← files.hostMetadata (.other other)))
-                    fsHost assembly.foreign.os
+                    fsHost assembly.foreign.os sourceLeaves.hostConfiguration.communicate
                     sourceLeaves.foreignSource.host.unixConfig.isolatedOp with
                   | .ok hooks => pure hooks
                   | .error error => throw error

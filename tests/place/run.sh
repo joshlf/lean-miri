@@ -7,7 +7,7 @@ export RUSTUP_HOME="${LEAN_MIRI_RUSTUP_HOME:-$repo_root/.rustup}"
 export CARGO_HOME="${LEAN_MIRI_CARGO_HOME:-$repo_root/.cargo}"
 export PATH="$ELAN_HOME/bin:$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu/bin:$CARGO_HOME/bin:$PATH"
 sha256sum -c <<'HASH'
-dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc  upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs
+4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16  upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs
 HASH
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT

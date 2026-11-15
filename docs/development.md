@@ -9,8 +9,17 @@ The main execution and reference checks require Linux x86_64, Python 3, bash,
 flock, a C compiler and Rustup/Cargo. Install Rustup/Cargo under `.cargo/bin/`
 (for example, install Rustup with `CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup"`).
 Lean is pinned to `leanprover/lean4:v4.35.0` in `lean-toolchain`, Miri to
-`7fa591d7d4dd9af8154becbc8332f8096f8323b1`, and rustc to
-`8144389c895da997dbdecaa635e41d6a50be6ffd`.
+`93c45edea8b148a6b6f05ec9384449a04217143f`, and rustc to
+`8eb778d04094d3af4b26580cab327e0413eb1e02`.
+Fresh exports use schema 13; saved schema-11/12 fixtures keep their original pins.
+`tools/check-upstream-sync.sh --skip-build --output scratch/upstream-sync`
+runs original upstream Rust controls for the changed semantics with same-TyCtxt
+references. `python3 tests/upstream_sync/check.py --output scratch/sync-controls`
+adds target-restricted pthread attributes, TLS destructor order, generic
+intrinsics and negative CFI controls. Both require
+the reference-feature exporter, matching Miri sysroot and native runner built
+below; failures and Unsupported outcomes are failures, not successful checks.
+
 `upstream/.pins/` and the source lock are authoritative. Reading the parent
 repository's Git HEAD from an upstream directory does not verify the upstream
 version. The pinned rustc sources cover a selected investigation scope, not a
@@ -24,7 +33,7 @@ bash tools/setup-rustc-exporter.sh
 export ELAN_HOME="$PWD/.elan" CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup"
 export PATH="$ELAN_HOME/bin:$CARGO_HOME/bin:$PATH"
 cargo fetch --locked --manifest-path tools/source-analysis/Cargo.toml
-cargo +miri-exporter-8144389c895d fetch --locked --manifest-path exporter/Cargo.toml
+cargo +miri-exporter-8eb778d04094 fetch --locked --manifest-path exporter/Cargo.toml
 ```
 
 Fresh comparisons with Miri require a standard library containing MIR from the
@@ -232,3 +241,8 @@ The input API remains experimental. `bash tools/check-lowering-reader.sh
 [INPUT.json ...]` checks body paths, MIR, identity tables and source spans. Its
 default input is the fixed empty-function fixture. Run `bash tools/check-empty-function.sh` for its
 UB-freedom proof and axiom audit.
+
+The coroutine metadata suite also requires `lake build coroutine_native_queries`.
+It compiles the existing `tests/input/CoroutineNativeQueries.lean` assertions;
+the original 180-second provider-query guard and all mutation controls remain.
+This provider check is an executable assertion, not a kernel proof.

@@ -12,13 +12,13 @@ EXPECTED = {
     "perms": "0dd4712b85c7d660eb0a4395223335b2b766062b",
     "foreign_access_skipping": "90df05d36d965927eef11a4c1c8387349c87aa44",
     "wildcard": "a3f7d6176555d193163f909fbd48b08118294f8b",
-    "tree": "b58a7cfeba92ece2dab1977f65f9070fd8cd71ad",
+    "tree": "91cc25f2f9b88239225a2a3d32a4fd98262a6fc0",
     "diagnostics": "79c182f5b02a2d9d17b46195908bf28aa31032b3",
-    "tree_visitor": "ab3a19ad9e17c7fc3d61d06c93273c7c5a8f7d3e",
-    "borrow_tracker": "65660956220eac0d8270b273ac1074454f1c6f75",
+    "tree_visitor": "2bdb0caba6906f3b420b56107a8be8e7ad71bac6",
+    "borrow_tracker": "89736bdadf6bf2e71953d5ab5cb1f0fbeb332046",
     "dedup_range_map": "56e9883b1caaf65a3f769cd5c91fbdbb81547f1b",
     "unimap": "6400a62f444f0a3ec481747e05fa90f2fb1cd40c",
-    "tree_borrows_mod": "bf38ca356df45e5f365c0ae64bfe7738a0d43e1e",
+    "tree_borrows_mod": "086430ad06cd17bb22d77f3baa9a7ec2ae24da6f",
 }
 MARKERS = {
     "perms": "// @PINNED_PERMISSION_IMPLS@",

@@ -62,6 +62,7 @@ inductive UserCapture (R D : Type) where
   | macAddress (ref : R) (dest : D)
   | macSemaphore (dest : D)
   | sleep
+  | pause
 inductive Capture (R V D : Type) where
   | mutex (ref : R) (result : Option (V × D))
   | reader (ref : R) (value : V) (dest : D)

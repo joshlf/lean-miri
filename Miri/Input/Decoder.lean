@@ -324,15 +324,27 @@ private def validateParsedDocument (parsed : ParsedDocument) (profile : Options)
   let compilerAllocIdWorld := d.compilerAllocIdWorld
   let selectedScope := d.selectedScope
   if schema != expectedSchema then throw s!"$.schema: expected `{expectedSchema}`"
-  unless schemaVersion == 11 || schemaVersion == expectedSchemaVersion do
+  unless schemaVersion == 11 || schemaVersion == 12 || schemaVersion == expectedSchemaVersion do
     throw "$.schema_version: unsupported schema version"
   match schemaVersion, d.coroutineCoverage with
   | 11, some _ => throw "schema 11 forbids compiler_coroutine_coverage"
   | 12, none => throw "schema 12 requires compiler_coroutine_coverage"
-  | 12, some coverage => CoroutineCoverageCodec.validate d coverage
+  | 13, none => throw "schema 13 requires compiler_coroutine_coverage"
+  | 12, some coverage | 13, some coverage => CoroutineCoverageCodec.validate d coverage
   | _, _ => pure ()
-  if producer.miriCommit != expectedMiriCommit then throw "$.producer.miri_commit: input is from the wrong pinned Miri revision"
-  if producer.rustcCommit != expectedRustcCommit then throw "$.producer.rustc_commit: input is from the wrong pinned rustc revision"
+  if let some target := d.runtimeTargetDataLayout then
+    if schemaVersion == 13 && target.x87F80AlignBytes.isNone then
+      throw "schema 13 requires x87_f80_align_bytes"
+    if schemaVersion != 13 && target.x87F80AlignBytes.isSome then
+      throw "legacy schema forbids x87_f80_align_bytes"
+  for ty in types do
+    if let some adt := ty.compilerFacts.bind (·.adt) then
+      if schemaVersion == 13 && adt.cfiEncoding.isNone then
+        throw "schema 13 requires explicit ADT cfi_encoding metadata"
+      if schemaVersion != 13 && adt.cfiEncoding.isSome then
+        throw "legacy schema forbids ADT cfi_encoding metadata"
+  if producer.miriCommit != (if schemaVersion == 13 then expectedMiriCommit else legacyMiriCommit) then throw "$.producer.miri_commit: input is from the wrong pinned Miri revision"
+  if producer.rustcCommit != (if schemaVersion == 13 then expectedRustcCommit else legacyRustcCommit) then throw "$.producer.rustc_commit: input is from the wrong pinned rustc revision"
   unless compilerAbiLayoutSchema == some expectedCompilerAbiLayoutSchema do
     throw s!"$.compiler_abi_layout_schema: unsupported schema `{compilerAbiLayoutSchema}`"
   if types.isEmpty then throw "$.types: input has no type graph; refusing an empty import"

@@ -50,7 +50,7 @@ private def futexObject (ref : R) : SyncObject.Object S (Payload R) := {
 
 def initOnceData (h : Hooks S R) (op : OpTy Provenance) : M S R := do
   let object ← h.derefInitOnce op
-  let value ← SyncObject.getImmovableWithStaticInit (typed h true) object Size.ZERO 0 1 do
+  let value ← SyncObject.getOrInsert (typed h true) object do
     if (← h.readInitPointerFieldZero object) != 0 then
       throw (.undefinedBehavior "INIT_ONCE not properly initialized at this location or overwritten")
     return initOnceObject h (← h.once.new)
@@ -97,14 +97,11 @@ def complete (h : Hooks S R) (op flags context : OpTy Provenance) : M S Int32 :=
     throw (.undefinedBehavior "InitOnceComplete called before beginning or after completion")
   if success then InitOnce.complete h.once ref else InitOnce.fail h.once ref
   h.constantBool .trueValue
-private def futexData (h : Hooks S R) (pointer : Pointer (Option Provenance)) : M S (Option R) := do
-  let value ← SyncObject.getOrInit (typed h false) pointer do
+private def futexData (h : Hooks S R) (pointer : Pointer (Option Provenance)) (size : Size) : M S R := do
+  let value ← SyncObject.getOrInitMetadata (typed h false).toMetadataHooks pointer size do
     return futexObject (← h.newFutex)
-  match value with
-  | none => return none
-  | some value =>
-    let .futex ref := value.payload | throw (.invalidProgram "Windows futex metadata type mismatch")
-    return some ref
+  let .futex ref := value.payload | throw (.invalidProgram "Windows futex metadata type mismatch")
+  return ref
 
 def waitOnAddress (h : Hooks S R) (pointer compare size timeout : OpTy Provenance)
     (dest : MPlaceTy Provenance) : M S Unit := do
@@ -122,7 +119,7 @@ def waitOnAddress (h : Hooks S R) (pointer compare size timeout : OpTy Provenanc
   let value ← h.readAtomicAcquire pointer (Size.ofBytes size)
   let comparison ← h.readScalar compare (Size.ofBytes size)
   if value == comparison then
-    let some ref ← futexData h pointer | throw (.invalidProgram "atomic-readable Windows futex has no mutable data byte")
+    let ref ← futexData h pointer (Size.ofBytes size)
     SyncRuntime.futexWait (rt h) ref (UInt32.ofNat (2^32 - 1)) deadline (fun kind => do
       match kind with
       | .Ready => (rt h).writeScalar 1 dest
@@ -133,7 +130,8 @@ def waitOnAddress (h : Hooks S R) (pointer compare size timeout : OpTy Provenanc
 def wakeByAddress (h : Hooks S R) (pointer : OpTy Provenance) (all : Bool) : M S Unit := do
   let pointer ← h.readPointer pointer
   h.seqCstFence
-  let some ref ← futexData h pointer | return
+  let .ok value ← SyncObject.tryGetMetadata (typed h false).toMetadataHooks pointer | return
+  let .futex ref := value.payload | throw (.invalidProgram "Windows futex metadata type mismatch")
   let count := if all then 2^(rt h).usizeBits - 1 else 1
   let _ ← SyncRuntime.futexWake (rt h) ref (UInt32.ofNat (2^32 - 1)) count
 end Miri.Interpreter.WindowsSync

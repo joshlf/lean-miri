@@ -63,7 +63,7 @@ struct Extra{data_race:Handler}
 struct Layout{ty:()}struct Place{layout:Layout}struct NewPerm{outside_perm:()}
 fn interp_ok<T>(x:T)->Result<T,&'static str>{Ok(x)}
 macro_rules! throw_ub{($($t:tt)*)=>{return Err("readonly")}}
-fn run_loop(this:&Cx,tree_borrows:&mut Tree,alloc_extra:&Extra,write:bool)->Result<Option<()>,&'static str>{
+fn run_loop(ecx:&Cx,tree_borrows:&mut Tree,alloc_extra:&Extra,write:bool)->Result<Option<()>,&'static str>{
 let inside_perms=Inside(write);let alloc_id=1;let base_offset=Size::from_bytes(0);let parent_prov=();let new_tag=2;let protected=false;let new_perm=NewPerm{outside_perm:()};let new_prov=();let place=Place{layout:Layout{ty:()}};
 LOOP
 }

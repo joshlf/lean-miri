@@ -16,6 +16,6 @@ p=Path(sys.argv[1]);p.write_text(p.read_text().replace('../upstream/miri-source'
 PY
 patch --batch "$profile_dir/src/main.rs" < tests/connected/reference/preemption-rate-zero.patch
 export CARGO_TARGET_DIR="$PWD/scratch/reference-profile-target"
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d build --locked --offline \
+"$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 build --locked --offline \
   --manifest-path "$profile_dir/Cargo.toml" --features miri-reference
 printf 'Reference binary: %s/debug/lean-miri-mir-exporter\n' "$CARGO_TARGET_DIR"

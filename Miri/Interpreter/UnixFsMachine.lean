@@ -13,6 +13,7 @@ private def lift (value : Except StepError A) : MachineHooks.M K U A :=
 
 def bindMetadata (h : ReadinessMachine.Hooks K U H D O)
     (files : Files.Hooks (MachineHooks.State K U) H D O E HM)
+    (communicate : Bool)
     (otherMetadata : O → MachineHooks.M K U (Sum (Except (IoError.HostError E) HM) String))
     (base : UnixFsMetadata.Hooks (MachineHooks.State K U) (Ref H D O) D P HM T E) :
     UnixFsMetadata.Hooks (MachineHooks.State K U) (Ref H D O) D P HM T E := {
@@ -26,7 +27,9 @@ def bindMetadata (h : ReadinessMachine.Hooks K U H D O)
     match ref.value with
     | .file .. | .directory .. => return .inl (← files.hostMetadata ref.value)
     | .other value => otherMetadata value
-    | _ => throw (.unsupported "obtaining metadata requires file-backed description") }
+    | .stdin | .stdout | .stderr =>
+      return .inr (if ← Files.isTty files communicate ref.value then "S_IFCHR" else "S_IFIFO")
+    | .nullOutput => return .inr "S_IFIFO" }
 
 /-- Entire actual owned handle insertion, with stable source descriptor identity. -/
 def insertDescription (h : ReadinessMachine.Hooks K U H D O) (description : Description H D O) :
@@ -90,7 +93,7 @@ def bindAll (h : ReadinessMachine.Hooks K U H D O)
     (base : UnixFsDispatch.Hooks (MachineHooks.State K U) (Ref H D O) D P HM T E Kind H R Ent) :
     UnixFsDispatch.Hooks (MachineHooks.State K U) (Ref H D O) D P HM T E Kind H R Ent :=
   let paths := { base.directories.paths with
-    metadata := bindMetadata h files otherMetadata base.directories.paths.metadata }
+    metadata := bindMetadata h files fd.communicate otherMetadata base.directories.paths.metadata }
   let directories := bindDirectories h store readiness fd { base.directories with paths := paths }
   let file := bindFd h files { base.times.fd with paths := paths }
   let times := { base.times with fd := file }

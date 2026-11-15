@@ -3260,16 +3260,9 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/miri-source/src/meta_obj.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs"
       ],
       "source_refs": [
-        {
-          "line": 17,
-          "path": "upstream/miri-source/src/meta_obj.rs",
-          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
-          "symbol": "trait MetaObj::on_access"
-        },
         {
           "line": 12,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs",

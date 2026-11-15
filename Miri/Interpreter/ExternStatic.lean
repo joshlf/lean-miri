@@ -53,7 +53,8 @@ def initExternStatics (h : InitHooks S) : M S Unit := do
     add h "environ" environ
     addWeak h "environ" environ
   if h.os == "linux" then
-    weakFunctions h #["getrandom","gettid","statx","strlen"]
+    weakFunctions h #["copy_file_range","getrandom","gettid","statx","strlen"]
+    if ← h.isDynSym "__futimens64" then weakFunctions h #["__futimens64"]
     if h.gnu then
       weakFunctions h #["__cxa_thread_atexit_impl"]
       let pointer ← h.allocateValue .zeroByte

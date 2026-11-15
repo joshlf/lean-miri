@@ -11,6 +11,7 @@ abbrev M := EStateM StepError
 def dynamicSymbol (name : String) : Bool := name == "pthread_setname_np"
 structure Hooks (S F Iter D E B I : Type) where
   foreign : ForeignItems.Hooks Provenance S D (MPlaceTy Provenance) (Pointer (Option Provenance)) B I
+  signature : String → M S (FnAbi Miri.MIR.TyId)
   errors : IoError.Hooks S E
   epoll : EpollShims.Hooks S F Iter
   event : EventFd.Hooks S F
@@ -33,6 +34,7 @@ build a platform arm must not fabricate unrelated math/Unix/Windows dispatch
 callbacks just to provide symbol checking and pointer writes. -/
 structure CoreHooks (S F Iter D E B I : Type) where
   foreign : ForeignItems.Core Provenance S D (MPlaceTy Provenance) (Pointer (Option Provenance)) B I
+  signature : String → M S (FnAbi Miri.MIR.TyId)
   errors : IoError.Hooks S E
   epoll : EpollShims.Hooks S F Iter
   event : EventFd.Hooks S F
@@ -60,10 +62,7 @@ def emulateCore (h : CoreHooks S F Iter D E B I) (name : String) (abi : FnAbi Mi
   let some count := count | return none
   if #["epoll_create1","epoll_ctl","epoll_wait","eventfd"].contains name && h.foreign.os != "illumos" then
     throw (.invalidProgram "Illumos-only synchronization shim on Solaris")
-  h.foreign.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "solarish legacy calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "solarish legacy variadic signature")
-  if args.size != count then throw (.undefinedBehavior "solarish legacy argument count mismatch")
+  let args ← ShimSignatures.fixedCore ⟨h.foreign⟩ name (h.signature name) count abi args
   let write32 := fun (value : Int32) => h.writeInt value.toInt dest
   if name == "___errno" then h.foreign.writePointer (← IoError.lastErrorPlace h.errors).mplace.ptr dest
   else if name == "epoll_create1" then write32 (← EpollShims.create h.epoll (← arg args 0))
@@ -93,6 +92,7 @@ def emulate (h : Hooks S F Iter D E B I) (name : String) (abi : FnAbi Miri.MIR.T
     (args : Array (OpTy Provenance)) (dest : MPlaceTy Provenance) : M S (Option ForeignItems.EmulateItemResult) := do
   let core : CoreHooks S F Iter D E B I := {
     foreign := h.foreign.toCore
+    signature := h.signature
     errors := h.errors
     epoll := h.epoll
     event := h.event

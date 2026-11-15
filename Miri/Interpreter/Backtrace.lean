@@ -77,13 +77,6 @@ private def targetUsize (h : CoreHooks P S D MD B I E Loc) (value : Nat) : M S (
   if value >= 2^64 then invalid "backtrace host length exceeds u64"
   scalar value h.arithmetic.pointerSize
 
-private def checkDeprecated (h : CoreHooks P S D MD B I E Loc) (name : String)
-    (abi : FnAbi TyId) (args : Array (OpTy P)) : M S Unit := do
-  h.foreign.checkSymbolClash name
-  if abi.conv != .Rust then throw (.undefinedBehavior "backtrace shim calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "nonvariadic backtrace shim called c-variadic")
-  if args.size != 2 then throw (.undefinedBehavior "incorrect argument count for miri_resolve_frame")
-
 /-- No symbol or stack query occurs on the invalid-flags path. -/
 def size (h : CoreHooks P S D MD B I E Loc) (abi : FnAbi TyId)
     (args : Array (OpTy P)) (dest : MD) : M S Unit := do
@@ -100,7 +93,7 @@ def get (h : CoreHooks P S D MD B I E Loc) (abi : FnAbi TyId)
     (args : Array (OpTy P)) : M S Unit := do
   let pointerLayout ← h.unitPointerLayout
   let args ← ForeignItems.Core.checkSignature h.foreign "miri_get_backtrace"
-    ⟨.Rust,#[.u64,.unitPointer],.unit⟩ abi args
+    ⟨.Rust,#[.u64,.unitPointerPointer],.unit⟩ abi args
   let flags ← h.readU64 (← arg args 0)
   let pointer ← h.foreign.readPointer (← arg args 1)
   if !pointerLayout.layout.isSized then invalid "backtrace buffer element layout unsized"
@@ -145,13 +138,13 @@ def resolvePointer (h : CoreHooks P S D MD B I E Loc) (operand : OpTy P) :
 def resolveFrame (h : CoreHooks P S D MD B I E Loc) (abi : FnAbi TyId)
     (args : Array (OpTy P)) (dest : MD)
     (adtReprC : TyId → M S (Option Bool)) : M S Unit := do
-  checkDeprecated h "miri_resolve_frame" abi args
+  let args ← ForeignItems.Core.checkSignature h.foreign "miri_resolve_frame" ⟨.Rust,#[.pointer,.u64],.miriFrame⟩ abi args
   let flags ← h.readU64 (← arg args 1)
   let (fnInstance,location,name,filename) ← resolvePointer h (← arg args 0)
   let fnPointer ← h.functionPointer fnInstance
   let layout := h.layout dest
   let count := layout.layout.fields.count
-  if count < 4 || count > 5 then
+  if count != 5 then
     throw (.undefinedBehavior "miri_resolve_frame must return a struct with 5 fields")
   let line := h.line location
   let column := h.column location
@@ -171,7 +164,7 @@ def resolveFrame (h : CoreHooks P S D MD B I E Loc) (abi : FnAbi TyId)
   h.writeScalar value (← h.projectField dest 2)
   let value ← scalar column (Size.ofBytes 4)
   h.writeScalar value (← h.projectField dest 3)
-  if count == 5 then h.foreign.writePointer fnPointer (← h.projectField dest 4)
+  h.foreign.writePointer fnPointer (← h.projectField dest 4)
 
 def resolveNames (h : CoreHooks P S D MD B I E Loc) (abi : FnAbi TyId)
     (args : Array (OpTy P)) : M S Unit := do

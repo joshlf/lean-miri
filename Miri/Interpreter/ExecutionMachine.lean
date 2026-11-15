@@ -180,6 +180,9 @@ def rvalueHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     projectField := PlaceDynamic.field (projectionHooks h)
     copyOp := fun c op dest => copyRuntimePlace place h.copy c op dest false
     copyOpNoValidate := copyRuntimePlaceNoValidate place h.copy
+    writeUninit := fun c dest => do
+      let allocated ← forceAllocation place c dest
+      PlaceMachine.writeUninitMemory h.access allocated
     writeDiscriminant := Discriminant.writeDiscriminant discr
     enforceValidity := h.compiler.enforceValidity
     validate := h.compiler.validate

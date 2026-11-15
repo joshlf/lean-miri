@@ -112,6 +112,8 @@ def readiness (h : Hooks S F E) (socket : F) : M S Files.Readiness := do
 
 /-- Called by actual last-FD drop before dropping its ReadinessWatched field. -/
 def dropSocketWith (h : DropHooks S F) (value : State) : M S Unit := do
+  unless value.blockedRead.isEmpty && value.blockedWrite.isEmpty do
+    throw (.invalidProgram "last virtual socket reference has blocked threads")
   if let some other ← h.upgrade (← peer value) then
     onError (do
       if value.readbuf.any (fun buffer => !buffer.bytes.isEmpty) then

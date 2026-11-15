@@ -15,9 +15,9 @@ TEMPLATE = ROOT / "tests/abi/runtime_layout_reference.rs.in"
 WRAPPING = ROOT / "upstream/rustc-source/compiler/rustc_abi/src/wrapping_range.rs"
 
 EXPECTED = {
-    LIB: "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94",
+    LIB: "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954",
     WRAPPING: "32a3be9c253af1e346e10ca76cf1074ec25a9dcda5723b470c6c30a0a12009ba",
-    REG: "57c26608b68555d63ec74e4f6bbe2019ecb101406ad054285aa5ec5e25a77688",
+    REG: "2ad24d1d84d5bc771cbc8b50b89e62287d503e0cc1ae62b0d163e220efc69baf",
 }
 
 
@@ -141,7 +141,7 @@ def main() -> None:
         block(lib, "impl NumScalableVectors {"),
         block(lib, "impl BackendRepr {"),
         block(reg, "impl RegKind {"),
-        "impl Reg {\n" + method(reg, "align") + "\n}",
+        "impl Reg {\n" + method(reg, "scratch_align") + "\n}",
     ]
     target_methods = "\n\n".join(
         method(lib, name)

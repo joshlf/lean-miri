@@ -6,7 +6,7 @@ export CARGO_HOME="${CARGO_HOME:-$ROOT/.cargo}"
 export PATH="$CARGO_HOME/bin:$PATH"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/exporter/target}"
 PIN_FILE="$ROOT/upstream/miri-source/rust-version"
-EXPECTED_COMMIT=8144389c895da997dbdecaa635e41d6a50be6ffd
+EXPECTED_COMMIT=8eb778d04094d3af4b26580cab327e0413eb1e02
 TOOLCHAIN="miri-exporter-${EXPECTED_COMMIT:0:12}"
 if [[ ! -f "$PIN_FILE" || "$(tr -d '\r\n' < "$PIN_FILE")" != "$EXPECTED_COMMIT" ]]; then
   printf 'Miri rust-version does not match exporter-pinned compiler commit\n' >&2

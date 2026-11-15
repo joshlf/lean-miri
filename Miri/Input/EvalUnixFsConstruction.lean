@@ -141,7 +141,7 @@ def metadataFromSource [DecidableEq MiriMemoryKind]
       (Sum (Except (IoError.HostError E) HM) String))
     (host : HostEffects
       (MachineHooks.State MiriMemoryKind (ValidityMachine.UserState U)) H D O Path HM Time E ReadDir Entry)
-    (os : String) (isolatedOp : EvalUnixConstruction.IsolatedOp) :
+    (os : String) (communicate : Bool) (isolatedOp : EvalUnixConstruction.IsolatedOp) :
     Except StepError (UnixFsMetadata.Hooks
       (MachineHooks.State MiriMemoryKind (ValidityMachine.UserState U))
       (Files.Ref (Files.Description H D O)) D Path HM Time E) := do
@@ -245,7 +245,7 @@ def metadataFromSource [DecidableEq MiriMemoryKind]
       | .memory memory => pure (MPlaceTy.mk memory place.layout)
       | .local .. => throw (.invalidProgram "filesystem array field projection became local")
     writeInt }
-  let metadata := UnixFsMachine.bindMetadata registry files otherMetadata result
+  let metadata := UnixFsMachine.bindMetadata registry files communicate otherMetadata result
   pure metadata
 
 /-- Build the path string codec over the same EvalWorld memory, but expose

@@ -79,9 +79,9 @@ fn export_failure<T>(context: &str, details: impl std::fmt::Display) -> Result<T
     Err(format!("{context}: {details}"))
 }
 
-const EXPECTED_RUSTC_COMMIT: &str = "8144389c895da997dbdecaa635e41d6a50be6ffd";
-const MIRI_COMMIT: &str = "7fa591d7d4dd9af8154becbc8332f8096f8323b1";
-const ROOT_SCHEMA_VERSION: u64 = 12;
+const EXPECTED_RUSTC_COMMIT: &str = "8eb778d04094d3af4b26580cab327e0413eb1e02";
+const MIRI_COMMIT: &str = "93c45edea8b148a6b6f05ec9384449a04217143f";
+const ROOT_SCHEMA_VERSION: u64 = 13;
 
 struct Options {
     output: PathBuf,
@@ -1080,6 +1080,7 @@ fn runtime_target_data_layout_json(tcx: TyCtxt<'_>) -> Result<producer::TargetDa
         i64_align_bytes: dl.i64_align.bytes(),i128_align_bytes: dl.i128_align.bytes(),
         f16_align_bytes: dl.f16_align.bytes(),f32_align_bytes: dl.f32_align.bytes(),
         f64_align_bytes: dl.f64_align.bytes(),f128_align_bytes: dl.f128_align.bytes(),
+        x87_f80_align_bytes: dl.x87_f80_align.bytes(),
         aggregate_align_bytes: dl.aggregate_align.bytes(),
         vector_align: dl.vector_align.iter().map(|(size,align)|producer::VectorAlign {size_bytes: size.bytes(),align_bytes: align.bytes()}).collect::<Vec<_>>(),
         default_address_space: dl.default_address_space.0,
@@ -2106,7 +2107,7 @@ fn run_cargo(args: &[String]) -> Result<(), String> {
     let target_base = env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| cwd.join("target"));
-    let export_target_dir = target_base.join("lean-miri-exporter-8144389c895d");
+    let export_target_dir = target_base.join("lean-miri-exporter-8eb778d04094");
     let mut command = Command::new(&cargo);
     command.args(&cargo_args);
     // Match cargo-miri's two-layer dispatch: Cargo invokes the same executable
@@ -2789,6 +2790,7 @@ fn type_compiler_facts_json<'tcx>(
         return Err(missing());
     };
     let boolean_queries = BooleanQueries {
+        is_x87_f80_raw: matches!(input.kind(), ty::Adt(def, _) if tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::X87F80Raw)),
         is_unsafe_cell: matches!(input.kind(),ty::Adt(d,_) if d.is_unsafe_cell()),
         has_erasable_regions: input.has_erasable_regions(),
         is_c_void: input.is_c_void(tcx),
@@ -2883,6 +2885,7 @@ fn type_compiler_facts_json<'tcx>(
         Some(AdtFacts {
             definition: def_json(context, def.did()),
             item_name: tcx.item_name(def.did()).as_str().to_owned(),
+            cfi_encoding: rustc_attr_ir::find_attr!(tcx, def.did(), CfiEncoding { encoding } => encoding.as_str().to_owned()),
             nonnull_optimization_guaranteed: rustc_attr_ir::find_attr!(
                 tcx,
                 def.did(),
@@ -3219,8 +3222,8 @@ fn repr_options_json(repr: &rustc_abi::ReprOptions) -> pool_type::Representation
 }
 
 
-fn generic_args_json<'tcx>(context: &mut ExportContext<'tcx>, tcx: TyCtxt<'tcx>, args: ty::GenericArgsRef<'tcx>) -> Result<Vec<pool_values::GenericArgument>, String> { generic_args_json_inner(context,tcx,args) }
-fn generic_args_json_inner<'tcx>(context: &mut ExportContext<'tcx>, tcx: TyCtxt<'tcx>, args: ty::GenericArgsRef<'tcx>) -> Result<Vec<pool_values::GenericArgument>, String> {
+fn generic_args_json<'tcx>(context: &mut ExportContext<'tcx>, tcx: TyCtxt<'tcx>, args: ty::GenericArgs<'tcx>) -> Result<Vec<pool_values::GenericArgument>, String> { generic_args_json_inner(context,tcx,args) }
+fn generic_args_json_inner<'tcx>(context: &mut ExportContext<'tcx>, tcx: TyCtxt<'tcx>, args: ty::GenericArgs<'tcx>) -> Result<Vec<pool_values::GenericArgument>, String> {
     args.iter().map(|arg| Ok(match arg.kind() {
         ty::GenericArgKind::Type(ty)=>pool_values::GenericArgument::Type(type_json(context,tcx,ty)?),
         ty::GenericArgKind::Lifetime(region)=>pool_values::GenericArgument::Lifetime(region_json(context,tcx,region)?),
@@ -5026,7 +5029,7 @@ fn instance_kind_json<'tcx>(context: &mut ExportContext<'tcx>, tcx: TyCtxt<'tcx>
             S::FutureDropPoll(def,p,i)=>H::FutureDropPoll {def_id:def_json(context,def),proxy_coroutine_type:type_json(context,tcx,p)?,implementation_coroutine_type:type_json(context,tcx,i)?},
             S::DropGlue(def,t)=>H::DropGlue {def_id:def_json(context,def),drop_type:t.map(|t|type_json(context,tcx,t)).transpose()?},
             S::Clone(def,t)=>H::Clone {def_id:def_json(context,def),clone_type:type_json(context,tcx,t)?},
-            S::FnPtrAsPtr(def,t)=>H::FnPointerAsPointer {def_id:def_json(context,def),function_type:type_json(context,tcx,t)?},
+            S::FnAddrAsPtr(def,t)=>H::FnPointerAsPointer {def_id:def_json(context,def),function_type:type_json(context,tcx,t)?},
             S::FnPtrFromPtr(def,t)=>H::FnPointerFromPointer {def_id:def_json(context,def),function_type:type_json(context,tcx,t)?},
             S::AsyncDropGlueCtor(def,t)=>H::AsyncDropGlueConstructor {def_id:def_json(context,def),drop_type:type_json(context,tcx,t)?},
             S::AsyncDropGlue(def,t)=>H::AsyncDropGlue {def_id:def_json(context,def),coroutine_type:type_json(context,tcx,t)?},
@@ -5394,7 +5397,7 @@ fn allocation_ref<'tcx>(
             let (size_bytes, align_bytes) = match layout {
                 Ok(layout) => (
                     Some(layout.size.bytes()),
-                    Some(layout.align.abi.bytes()),
+                    Some(layout.align.bytes()),
                 ),
                 Err(error) => export_failure("vtable layout", format!("{error:?}"))?,
             };
@@ -6189,7 +6192,7 @@ fn discriminant_facts_json<'tcx>(
             (values, Some(def.variants().len()))
         }
         ty::Coroutine(def, args) => {
-            if tcx.coroutine_layout(*def, args).is_err() {
+            if tcx.coroutine_layout(*def, *args).is_err() {
                 return export_failure(
                     "discriminants",
                     "compiler coroutine layout unavailable for discriminant range",
@@ -6313,7 +6316,7 @@ fn compiler_vtable_metadata_json<'tcx>(
         match tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(input)) {
             Ok(layout) => (
                 Some(layout.size.bytes()),
-                Some(layout.align.abi.bytes()),
+                Some(layout.align.bytes()),
             ),
             Err(error) => export_failure("vtable layout", format!("{error:?}"))?,
         };
@@ -6471,7 +6474,7 @@ fn finish_vtable_queries(mut facts: Vec<((u64, Vec<u64>, u64, Vec<u64>), (u64, V
 }
 
 fn intrinsic_fallback_is_spec(tcx: TyCtxt<'_>, def: rustc_hir::def_id::DefId) -> bool {
-    tcx.get_attrs_by_path(
+    tcx.tool_attrs(
         def,
         &[
             rustc_span::sym::miri,
@@ -6768,7 +6771,7 @@ mod instance_demand_tests {
                 krate: rustc_hir::def_id::LOCAL_CRATE,
                 index: rustc_hir::def_id::DefIndex::from_u32(0),
             }),
-            args: ty::List::empty(),
+            args: ty::GenericArgs::empty(),
         }
     }
 

@@ -17,6 +17,7 @@ structure AggregateHooks (Prov S C V : Type) where
   projectField : C → V → MIR.FieldIndex → RvalueM S V
   copyOp : C → OpTy Prov → V → RvalueM S Unit
   copyOpNoValidate : C → OpTy Prov → V → Bool → RvalueM S Unit
+  writeUninit : C → V → RvalueM S Unit
   writeDiscriminant : C → MIR.VariantIndex → V → RvalueM S Unit
   enforceValidity : C → LocalLayout → RvalueM S Bool
   /-- Includes recursive validity policy and reset_provenance_and_padding=true. -/
@@ -62,6 +63,8 @@ def writeAggregate (h : AggregateHooks P S C V) (choice : C)
       pure (0, dest, none)
   if activeField.isSome && operands.size != 1 then
     throw (.invalidProgram "union aggregate requires exactly one operand")
+  -- MIR Adt activeField identifies the single initialized union field.
+  if activeField.isSome then h.writeUninit choice dest
   for index in [:operands.size] do
     let some operand := operands[index]? | throw (.invalidProgram "aggregate operand index")
     let field ← h.projectField choice variantDest (activeField.getD index)

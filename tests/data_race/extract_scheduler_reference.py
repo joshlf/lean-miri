@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_BLOB = "6364710fb89051cc0a451424aedfc5c70d6884e6"
+EXPECTED_BLOB = "0b5f563b10f296dfa362bcb8af5b764c3d6a4e0a"
 MARKER = "// @MIRI_SCHEDULER_CANDIDATE_ITERATOR@"
 
 

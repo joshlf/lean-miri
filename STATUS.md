@@ -52,9 +52,9 @@ controls, including same-TyCtxt references, exact catalog joins over 32 salts,
 and canonical Lean guest exit zero. These controls also passed the hosted
 extended/fresh suites at `6a76fcbd`; the overall results and remaining failures
 are described under Hosted regressions and coverage below.
-Coroutine frame layout serialization and foreign TLS initializers remain
-unimplemented and now stop export. This boundary does not establish compiler
-query closure or interpreter correspondence.
+Missing compiler coroutine layouts and foreign TLS initializers stop export.
+The finite coroutine controls below do not establish general compiler query
+closure or interpreter correspondence.
 
 The schema-9 follow-up emitted schema 9 and strictly supported schemas 8 and 9
 at that revision (the later schema-10 baseline is described below).
@@ -179,6 +179,61 @@ reusable, but exploration has no complete capture or established completion boun
 budget of OPEN exploration does not resolve the proofs above.
 
 ## Validation gaps within scope
+
+### November 2026 upstream synchronization
+
+The active source baseline is Miri `93c45edea8b148a6b6f05ec9384449a04217143f`
+with rustc `8eb778d04094d3af4b26580cab327e0413eb1e02`. Archives, selected
+compiler sources, source hashes, AST obligations and active build/comparison
+scripts use that pair. Earlier results elsewhere in this file describe their
+original revisions; rebased source links do not renew those results.
+
+Fresh exports use schema 13, with explicit ADT CFI encoding and target x87
+scratch alignment. Schema 11/12 inputs keep their original compiler and Miri
+pins. Queries requiring uncaptured newer compiler evidence remain Unsupported;
+old fixture bytes and empty-function input hashes are preserved.
+
+The source delta changes full-range synchronization metadata and pthread
+attributes, native-before-pthread TLS destruction, strict shim signatures and
+C ABI equality, delayed socket-close callbacks, socket buffer checks, repeated
+copy/union initialization checks, SSE4.2 string boundaries, AVX512 dispatch,
+generic math intrinsics and raw x87 values. Finite checks are available through
+`tools/check-upstream-sync.sh`, `tests/upstream_sync/check.py`, the registered
+metadata-range checks and the ordinary component/proof check commands. Their
+current Linux x86_64 results include 9 original upstream comparisons, 4 local
+intrinsic/pthread/TLS/CFI controls, and 3 backtrace pointer controls, all with
+same-TyCtxt references and matching runtime profiles. The coroutine suite passes
+6 original/control profile comparisons, native-FnSig/runtime-FnAbi separation
+checks and all 3 malformed-metadata rejection cases. The provider assertions
+in `CoroutineNativeQueries.lean` exceeded the existing 180-second guard under
+`lean --run`; the suite now compiles that unchanged assertion body as
+`coroutine_native_queries`, retaining the guard and negative checks. This does
+not establish JIT query performance. SC seeds 0..11 and all 4 schedule-validator
+negative controls pass; only 3 finite atomic orders were observed. The unchanged `empty_function` inputs
+and all 268 frozen proof roots/dependencies pass their original check, including
+its final UB-freedom theorem for the explicit caller/profile domain. The imported
+library axiom audit passes for 75,490 declarations with only `propext`,
+`Quot.sound` and `Classical.choice`. These checks do not establish a general
+Rust-to-Lean simulation or safety outside that example domain.
+
+The current checkout passes all 66 stages of `tools/check.sh`, the 128-test
+quick/audit suite, structural regressions and connected proof checks. The pinned
+reference Miri's 37 library unit tests also pass. The structural schema control
+uses 14 as the unknown version, retains schema-11/12 controls, and separately
+rejects schema 13 without its new alignment evidence. Native stdio protocol and
+Rust unit checks use the new rustc pin. Vendor diagnostic files retain upstream's
+original trailing blank lines; local source/fixture changes pass whitespace checks.
+
+New upstream facilities outside the existing acceptance scope remain incomplete:
+UDP socket operations, the real-host `copy_file_range` capability and direct
+Linux shim, the 32-bit glibc `__futimens64` path, and Windows host file-length/append
+behavior. Descriptor allocation is bounded by the source FD limit;
+EMFILE translation/cleanup across every peripheral multi-FD factory still needs
+coverage. Existing Unsupported/resource failures in these paths are not counted
+as successful guest execution. Cross-target ABI recipes require target-specific
+comparisons; Linux x86_64 evidence does not establish those targets.
+The full upstream UI inventory, every permitted schedule and all-prefix safety
+remain separate from the finite checks performed for this synchronization.
 
 ### Hosted regressions and coverage
 

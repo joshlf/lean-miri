@@ -84,11 +84,11 @@ requires the pinned Miri sysroot and an exporter with the miri-reference feature
 
 ```bash
 CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup" \
-  .cargo/bin/cargo +miri-exporter-8144389c895d build --locked \
+  .cargo/bin/cargo +miri-exporter-8eb778d04094 build --locked \
   --manifest-path exporter/Cargo.toml --features miri-reference
 # Also build actual libc types and MIR metadata for pthread cases with the same sysroot
 CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup" \
-  .cargo/bin/cargo +miri-exporter-8144389c895d fetch --locked --manifest-path tests/connected/libc/Cargo.toml
+  .cargo/bin/cargo +miri-exporter-8eb778d04094 fetch --locked --manifest-path tests/connected/libc/Cargo.toml
 bash tools/build-connected-libc.sh
 python3 tools/export-connected.py 198-sc-base scratch/exports/new-sc.json \
   --libc scratch/connected-libc-target/x86_64-unknown-linux-gnu/debug/deps/liblibc-HASH.rlib

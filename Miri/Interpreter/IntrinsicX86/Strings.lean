@@ -27,9 +27,9 @@ def deconstructStrings [PointerProvenance P] (h : Hooks P S C V) (choice : C)
   signature h choice full args (if explicit then 5 else 3)
   let imm ← scalarResult ((← read h choice (← arg args (if explicit then 4 else 2))).toUInt8)
   let lengths ← if explicit then do
-    let a ← scalarResult ((← read h choice (← arg args 1)).toUInt32)
-    let b ← scalarResult ((← read h choice (← arg args 3)).toUInt32)
-    pure (some (min a.toNat (stringDefaultLength imm), min b.toNat (stringDefaultLength imm)))
+    let a ← scalarResult ((← read h choice (← arg args 1)).toInt32)
+    let b ← scalarResult ((← read h choice (← arg args 3)).toInt32)
+    pure (some (min a.toInt.natAbs (stringDefaultLength imm), min b.toInt.natAbs (stringDefaultLength imm)))
     else pure none
   let layout ← stringArray h choice imm
   let a ← h.transmuteRead choice (← arg args 0) layout
@@ -80,21 +80,24 @@ def compareStrings [PointerProvenance P] (h : Hooks P S C V) (choice : C)
     if an == 0 then result := 2^defaultLen-1
     else if an <= bn then
       for i in [:bn] do
-        if an <= bn-i then
-          result := result ||| (1 <<< i)
-          let mut stopped := false
-          for j in [:an] do
-            if !stopped then
-              let k := i+j
-              if k >= defaultLen then stopped := true
-              else
-                let ch1 ← readLane h choice a (UInt64.ofNat j)
-                let ch2 ← readLane h choice b (UInt64.ofNat k)
-                if ← compare .Ne ch1 ch2 then
-                  result := result - (result &&& (1 <<< i))
-                  stopped := true
+        let mut hasMatch := true
+        let mut stopped := false
+        for j in [:an] do
+          if !stopped then
+            let k := i+j
+            if k >= defaultLen then stopped := true
+            else if k >= bn then
+              hasMatch := false
+              stopped := true
+            else
+              let ch1 ← readLane h choice a (UInt64.ofNat j)
+              let ch2 ← readLane h choice b (UInt64.ofNat k)
+              if ← compare .Ne ch1 ch2 then
+                hasMatch := false
+                stopped := true
+        if hasMatch then result := result ||| (1 <<< i)
   match (imm.toNat >>> 4) &&& 3 with
-  | 3 => result := result ^^^ (2^an-1)
+  | 3 => result := result ^^^ (2^bn-1)
   | 1 => result := result ^^^ (2^defaultLen-1)
   | _ => pure ()
   pure result
@@ -116,7 +119,7 @@ def stringDispatch [PointerProvenance P] (h : Hooks P S C V) (choice : C)
     signature h choice full args 5
     let length ← scalarResult ((← read h choice (← arg args (if name == "pcmpestris128" then 1 else 3))).toInt32)
     let imm ← scalarResult ((← read h choice (← arg args 4)).toUInt8)
-    writeI32 h choice (if length.toInt < Int.ofNat (stringDefaultLength imm) then 1 else 0) dest
+    writeI32 h choice (if length.toInt.natAbs < stringDefaultLength imm then 1 else 0) dest
   else if ["pcmpistrm128","pcmpestrm128","pcmpistria128","pcmpestria128","pcmpistri128","pcmpestri128",
       "pcmpistrio128","pcmpestrio128","pcmpistric128","pcmpestric128"].contains name then
     let (a,b,lengths,imm) ← deconstructStrings h choice full name args
@@ -137,7 +140,7 @@ def stringDispatch [PointerProvenance P] (h : Hooks P S C V) (choice : C)
       let yes ← if mask != 0 then pure false else do
         match lengths with
         | some (_,n) => pure (n >= stringDefaultLength imm)
-        | none => pure (← implicitLength h choice a imm).isSome
+        | none => pure (← implicitLength h choice b imm).isNone
       writeI32 h choice (if yes then 1 else 0) dest
     else if name == "pcmpistri128" || name == "pcmpestri128" then
       let index := if mask == 0 then stringDefaultLength imm else if imm &&& 64 != 0 then

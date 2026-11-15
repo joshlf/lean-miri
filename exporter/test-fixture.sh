@@ -75,7 +75,7 @@ if env -u RUSTUP_TOOLCHAIN PATH="$CARGO_HOME/bin:/usr/bin:/bin" RUSTUP_HOME="$RU
   echo "exporter unexpectedly accepted a non-pinned rustc" >&2
   exit 1
 fi
-grep -q "expected pinned rustc 8144389c895da997dbdecaa635e41d6a50be6ffd" "$ERR"
+grep -q "expected pinned rustc 8eb778d04094d3af4b26580cab327e0413eb1e02" "$ERR"
 echo "validated fail-closed compiler revision check"
 
 # Exercise rustc-wrapper mode with a path dependency. The application can only
@@ -98,4 +98,4 @@ else
     --manifest-path "$ROOT/exporter/fixtures/cargo-external/Cargo.toml"
 fi
 python3 "$ROOT/exporter/tests/validate_cargo_fixture.py" \
-  "$CARGO_TARGET_BASE/lean-miri-exporter-8144389c895d"
+  "$CARGO_TARGET_BASE/lean-miri-exporter-8eb778d04094"

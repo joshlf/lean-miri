@@ -15,6 +15,7 @@ private def reasonName : BlockReason → String
   | .Eventfd => "Eventfd"
   | .VirtualSocket => "VirtualSocket"
   | .IO => "IO"
+  | .Pause => "Pause"
 
 private def deadlineScenario : Except String (List String) := do
   let initial := ThreadManager.initial false

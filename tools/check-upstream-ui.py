@@ -260,7 +260,7 @@ def main():
     output.mkdir(parents=True)
     (output / 'inventory.json').write_text(json.dumps([c.record() for c in cases], indent=2) + '\n')
     env = os.environ.copy()
-    toolchain = ROOT / '.rustup/toolchains/miri-exporter-8144389c895d'
+    toolchain = ROOT / '.rustup/toolchains/miri-exporter-8eb778d04094'
     env.update(PATH=str(toolchain / 'bin') + ':' + env.get('PATH', ''),
                LD_LIBRARY_PATH=str(toolchain / 'lib') + ':' + env.get('LD_LIBRARY_PATH', ''),
                MIRI_SYSROOT=str(args.sysroot.resolve()), ELAN_HOME=str(ROOT / '.elan'),

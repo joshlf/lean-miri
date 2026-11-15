@@ -54,7 +54,7 @@ def suites(lane):
         raise ValueError(lane)
     result = [
         Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
-        Suite('exporter-build', ('cargo', '+miri-exporter-8144389c895d', 'build', '--locked', '--offline',
+        Suite('exporter-build', ('cargo', '+miri-exporter-8eb778d04094', 'build', '--locked', '--offline',
                                  '--manifest-path', 'exporter/Cargo.toml')),
         Suite('decoder', ('bash', 'tools/check-decoder.sh')),
         Suite('structural', ('bash', 'tools/check-structural-regressions.sh')),

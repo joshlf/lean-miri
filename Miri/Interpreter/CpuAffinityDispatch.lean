@@ -28,10 +28,12 @@ def emulateCore (h : CoreHooks P S D MD B I) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy P)) (dest : MD) : M S (Option ForeignItems.EmulateItemResult) := do
   if name == "cpuset_getaffinity" then
     if h.foreign.os != "freebsd" then return none
+    let callee ← h.expectedAbi name
+    ForeignItems.Core.checkAbi h.foreign abi callee
     h.foreign.checkSymbolClash name
-    if abi.conv != .C then throw (.undefinedBehavior "cpuset_getaffinity calling convention mismatch")
-    if abi.cVariadic then throw (.undefinedBehavior "cpuset_getaffinity variadic signature")
-    if args.size != 5 then throw (.undefinedBehavior "cpuset_getaffinity argument count mismatch")
+    let args ← args.mapIdxM fun index value => do
+      let expected ← arg callee.args index
+      h.foreign.transmute value expected.layout
     CpuAffinity.freeBsdGetAffinity h.affinity (← arg args 0) (← arg args 1)
       (← arg args 2) (← arg args 3) (← arg args 4) dest
     return some .NeedsReturn

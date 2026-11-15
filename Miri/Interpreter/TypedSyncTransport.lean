@@ -16,25 +16,20 @@ def metadata (h : SyncObject.MetadataHooks (Inner K U) A) : SyncObject.MetadataH
   lookup := fun p => do
     let some object ← action (h.lookup p) | return none
     pure (some {payload := object.payload,deleteOnWrite := object.deleteOnWrite,onAccess := fun kind => action (object.onAccess kind)})
-  insert := fun p object => action (h.insert p
+  insert := fun p size object => action (h.insert p size
     {payload := object.payload,deleteOnWrite := object.deleteOnWrite,
      onAccess := fun kind => ExecutionStateTransport.reverseAction (object.onAccess kind)})
+  remove := fun p size => do
+    let some object ← action (h.remove p size) | return none
+    pure (some {payload := object.payload,deleteOnWrite := object.deleteOnWrite,onAccess := fun kind => action (object.onAccess kind)})
+  checkAccess := fun p size => action (h.checkAccess p size)
 
 def full (h : SyncObject.Hooks (Inner K U) A) : SyncObject.Hooks (Outer K U) A :=
-  let data := metadata ⟨h.tryResolve,h.resolve,h.info,h.lookup,h.insert⟩
-  {tryResolve := data.tryResolve, resolve := data.resolve,info := data.info,lookup := data.lookup,insert := data.insert
-   checkAccess := fun p n => action (h.checkAccess p n)
-   offset := fun p n => action (h.offset p n)
-   compareExchangeByteRelaxed := fun p a b => action (h.compareExchangeByteRelaxed p a b)
-   writeZeros := fun p n => action (h.writeZeros p n)
-   writeByte := fun p n => action (h.writeByte p n)}
+  {toMetadataHooks := metadata h.toMetadataHooks,
+   writeBytes := fun p size value => action (h.writeBytes p size value)}
 
 def bytes (h : TypedSyncObjectMachine.Bytes (Inner K U)) : TypedSyncObjectMachine.Bytes (Outer K U) where
-  checkAccess := fun p n => action (h.checkAccess p n)
-  offset := fun p n => action (h.offset p n)
-  compareExchangeByteRelaxed := fun p a b => action (h.compareExchangeByteRelaxed p a b)
-  writeZeros := fun p n => action (h.writeZeros p n)
-  writeByte := fun p n => action (h.writeByte p n)
+  writeBytes := fun p size value => action (h.writeBytes p size value)
 
 /-- Construct the outer production backend directly from the source typed
 factory. No legacy registry is transported or fabricated. -/
@@ -70,9 +65,6 @@ def pthread (v : TypedSyncMachine.Views U) (e : TypedSyncMachine.Effects (Inner 
   deref := fun a b => action (h.deref a b)
   initializer := fun a => action (h.initializer a)
   readBytes := fun a b => action (h.readBytes a b)
-  readInitByte := fun a b => action (h.readInitByte a b)
-  sanity := fun a => action (h.sanity a)
-  putSanity := fun a b => action (h.putSanity a b)
   newMutex := action h.newMutex
   newRwlock := action h.newRwlock
   newCondvar := action h.newCondvar

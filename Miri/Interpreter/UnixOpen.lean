@@ -172,7 +172,8 @@ def openPath (h : Hooks S H D O E Meta P) (dirfd : Option Int32) (path : P) (inp
         h.dropDirectory handle
         return ← fail h "EISDIR"
       let ref ← h.fd.newReference (.directory handle)
-      let (table,number) ← lift ((← h.fd.table).insert ref)
+      let some (table,number) := (← h.fd.table).tryInsertWithMin ref 0
+        | h.fd.dropRef ref; return ← fail h "EMFILE"
       h.fd.putTable table
       return number
     | .ok (.file handle) =>
@@ -186,7 +187,8 @@ def openPath (h : Hooks S H D O E Meta P) (dirfd : Option Int32) (path : P) (inp
         if nofollow then return ← fail h "ELOOP"
         throw (.invalidProgram "unexpected symlink from file open")
       let ref ← h.fd.newReference (.file handle readable writable)
-      let (table,number) ← lift ((← h.fd.table).insert ref)
+      let some (table,number) := (← h.fd.table).tryInsertWithMin ref 0
+        | h.fd.dropRef ref; return ← fail h "EMFILE"
       h.fd.putTable table
       return number
   Files.withDrop action cleanup

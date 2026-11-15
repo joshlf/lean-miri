@@ -24,7 +24,7 @@ def main():
         parser.error('output must be a new file under scratch/ or /tmp/')
     output.parent.mkdir(parents=True, exist_ok=True)
     rustup = Path(os.environ.get('RUSTUP_HOME', ROOT / '.rustup'))
-    toolchain = rustup / 'toolchains/miri-exporter-8144389c895d'
+    toolchain = rustup / 'toolchains/miri-exporter-8eb778d04094'
     sysroot = Path(os.environ.get('MIRI_SYSROOT', ROOT / 'scratch/miri-sysroot'))
     exporter = args.exporter.resolve() if args.exporter else ROOT / 'exporter/target/debug/lean-miri-mir-exporter'
     env = os.environ.copy()
