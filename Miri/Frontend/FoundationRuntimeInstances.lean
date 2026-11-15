@@ -39,7 +39,7 @@ private def scalarArgumentDisplay : ConcreteType → Except String String
 restricted to one primitive type argument, and definition paths to local root
 functions with unambiguous ordinary names. Symbol mangling is not implemented:
 `symbolName = none` retains the genuine absent-query boundary for later demands. -/
-private def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
+def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
     (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
   let some definition := document.definitions[item.definition]? | throw "runtime source definition absent"
   unless node.instanceKind == .Item item.definition &&

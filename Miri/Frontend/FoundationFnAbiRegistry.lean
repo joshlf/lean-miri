@@ -19,12 +19,13 @@ private def internAbiType (registry : PhysicalTypeRegistry) (ty : ConcreteType) 
   let _ ← registry.runtimeLayout id
   return (registry, ⟨ty, node.id, node.layoutId⟩)
 
-/-- Build physical tables and exact supported FunctionAbi from a finite document
-and an explicit item request. A fresh registry guarantees every identity was
-constructed here. This returns component tables, not an executable Program.
+/-- Extend the supplied demand-local physical pool and compute the supported
+FunctionAbi for one explicit item request. Existing pool identities are retained.
+This returns component tables, not an executable Program.
 Foreign, variadic, track_caller and non-Rust signatures fail closed. -/
-def rustFunctionAbiOfItem (document : Document) (definition : Nat)
+def rustFunctionAbiInRegistry (initial : PhysicalTypeRegistry) (definition : Nat)
     (arguments : Array ItemArgument) : Except String (PhysicalTypeRegistry × Input.FunctionAbi) := do
+  let document := initial.registry.document
   let prepared ← prepareItem document definition arguments
   let signature := prepared.signature
   let abi ← signature.getObjVal? "abi"
@@ -41,7 +42,7 @@ def rustFunctionAbiOfItem (document : Document) (definition : Nat)
     throw "foundation FnAbi requires ordinary item without caller-location adjustment"
   let unwind ← rustUnwindFactsOfSource document.source prepared.item.source
   let some resultType := prepared.item.localTypes[0]? | throw "missing ABI return type"
-  let mut registry := PhysicalTypeRegistry.start document
+  let mut registry := initial
   let (next, result) ← internAbiType registry resultType
   registry := next
   let mut bindings := #[]
@@ -55,5 +56,10 @@ def rustFunctionAbiOfItem (document : Document) (definition : Nat)
     if arg.mode.kind == .indirect || arg.mode.kind == .indirectUnsized then
       throw "foundation indirect FnAbi requires unported MIR attribute deduction"
   return (registry, result)
+
+/-- Fresh single-request convenience wrapper for rustFunctionAbiInRegistry. -/
+def rustFunctionAbiOfItem (document : Document) (definition : Nat)
+    (arguments : Array ItemArgument) : Except String (PhysicalTypeRegistry × Input.FunctionAbi) :=
+  rustFunctionAbiInRegistry (PhysicalTypeRegistry.start document) definition arguments
 
 end Miri.Frontend.Foundation
