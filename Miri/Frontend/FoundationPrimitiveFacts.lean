@@ -69,14 +69,15 @@ def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
 
 namespace PhysicalTypeRegistry
 
-/-- Attach derived compiler leaves to all currently demanded rows. The only
-additional demands are the exact unit and u8 query result types. Re-run after
-adding more rows; no answer for an unsupported type is fabricated. -/
-def withPrimitiveFacts (r : PhysicalTypeRegistry) : Except String PhysicalTypeRegistry := do
+/-- Attach derived leaves to explicitly demanded supported rows. Other rows
+retain their existing evidence, including absent facts for unsupported auxiliary
+str/reference material. Each selected row must pass primitiveFactsDomain. The
+only additional demands are the exact unit and u8 query result types. -/
+def withPrimitiveFactsFor (r : PhysicalTypeRegistry) (typeIds : Array Nat) : Except String PhysicalTypeRegistry := do
   let (r, unit) ← r.intern (.tuple #[])
   let (r, u8) ← r.intern (.primitive "uint" "u8")
   let mut nodes := r.types
-  for i in [:r.types.size] do
+  for i in typeIds ++ #[unit, u8] do
     let some entry := r.registry.entries[i]? | throw "compiler fact type identity absent"
     let (node, _) ← r.lookup i
     let rawPointee := match node.shape with
@@ -88,6 +89,11 @@ def withPrimitiveFacts (r : PhysicalTypeRegistry) : Except String PhysicalTypeRe
     else
       throw "compiler fact destination identity absent"
   return { r with types := nodes }
+
+/-- Attach supported compiler leaves to the entire current physical domain.
+Unlike withPrimitiveFactsFor, this rejects any unsupported current row. -/
+def withPrimitiveFacts (r : PhysicalTypeRegistry) : Except String PhysicalTypeRegistry := do
+  r.withPrimitiveFactsFor (List.range r.types.size).toArray
 
 end PhysicalTypeRegistry
 end Miri.Frontend.Foundation
