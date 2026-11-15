@@ -4,6 +4,7 @@ import Miri.Frontend.FoundationStartup
 import Miri.Frontend.FoundationLinkSections
 import Miri.Frontend.FoundationAllocations
 import Miri.Frontend.FoundationNamedTypes
+import Miri.Frontend.FoundationForeignDeclarations
 
 /-! Restricted compiler-selected entry composition. The accepted custom
 lang-start returns its argc argument; it intentionally does not invoke the main
@@ -191,7 +192,8 @@ def restrictedCompilerEntryDocument (document : Document) : Except String Input.
       startup := some (← startupOfDocument document)
       types := #[], virtualQueries := #[]
       instances := #[mainRuntime, startRuntime]
-      foreignSymbols := ← foreignSymbols document.source }
+      foreignSymbols := { (← foreignSymbols document.source) with
+        sourceDeclarations := some (← foreignDeclarations document.source) } }
     frameMetadata := ← frameMetadataOfSource document
     instanceAbis := pool.instanceAbis
     functionFacts := ⟨frozen.facts, #[], #[helper]⟩

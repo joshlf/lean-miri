@@ -426,7 +426,7 @@ def fromSource
   let sourceSymbols ← match p.foreignSymbols with
     | .ok symbols => pure symbols
     | .error reason => throw (.unsupported s!"compiler foreign-symbol query: {reason}")
-  let symbols := CompilerForeignSymbols.hooks sourceSymbols p.lifecycle.calls
+  let symbols := CompilerForeignSymbols.hooks sourceSymbols EvalCoreMachine.sourceCompilerAccess
   let options : EvalForeignConstruction.Options := {
     family := .unix
     os := target.os
@@ -524,7 +524,7 @@ def fromSeedEnvironment [DecidableEq MiriMemoryKind]
   let sourceSymbols ← match p.foreignSymbols with
     | .ok symbols => pure symbols
     | .error reason => throw (.unsupported s!"compiler foreign-symbol query: {reason}")
-  let symbols := CompilerForeignSymbols.hooks sourceSymbols p.lifecycle.calls
+  let symbols := CompilerForeignSymbols.hooks sourceSymbols EvalCoreMachine.sourceCompilerAccess
   let options : EvalForeignConstruction.Options := {
     family := .unix
     os := target.os

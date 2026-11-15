@@ -1,4 +1,5 @@
 import Miri.Input.Model.Types
+import Miri.Input.Model.SourceSymbols
 import Miri.MIR.Syntax
 import Miri.ABI.ExternAbi
 
@@ -158,6 +159,8 @@ structure ForeignSymbols where
   noAllocShimSymbol : String
   allocatorShims : Array (String × AllocatorTarget)
   exportedCandidates : Option (Array ForeignCandidate)
+  /-- Raw finite declarations; symbols/winners/instances are computed by the provider. -/
+  sourceDeclarations : Option SourceSymbols.Material := none
   selectedForeignFallbacks : Option (Array ForeignFallback)
   externDeclarations : Option (Array ExternDeclaration)
   selectedExports : Option (Array SelectedExport)

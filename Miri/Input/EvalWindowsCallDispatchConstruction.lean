@@ -233,7 +233,7 @@ def fromSource [DecidableEq MiriMemoryKind] [DecidableEq Os]
   let sourceSymbols ← match p.foreignSymbols with
     | .ok value => pure value
     | .error reason => throw (.unsupported reason)
-  let symbols := CompilerForeignSymbols.hooks sourceSymbols p.lifecycle.calls
+  let symbols := CompilerForeignSymbols.hooks sourceSymbols EvalCoreMachine.sourceCompilerAccess
   let options : EvalForeignConstruction.Options := {
     family := .windows
     os := target.os
