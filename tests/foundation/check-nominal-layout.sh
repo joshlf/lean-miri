@@ -12,5 +12,7 @@ for mode in source reference; do
   bash tools/export-mir.sh --output "$RUN/$mode.json" "${extra[@]}" --root result_layout -- \
     tests/foundation/fixtures/nominal-layout.rs --crate-type=lib --crate-name=nominal_layout
 done
-flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build Miri.Frontend.FoundationNominalLayout
-"$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationNominalLayout.lean "$RUN/source.json" "$RUN/reference.json"
+bash tools/export-mir.sh --foundation --output "$RUN/std-source.json" --root std::rt::lang_start_internal -- \
+  exporter/fixtures/foundation_signature_main.rs --crate-name=foundation_signature_main
+flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build Miri.Frontend.FoundationNominalLayout Miri.Frontend.FoundationPhysicalRegistry Miri.Frontend.FoundationBridge Miri.Frontend.FoundationPrimitiveFacts
+"$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationNominalLayout.lean "$RUN/source.json" "$RUN/reference.json" "$RUN/std-source.json"

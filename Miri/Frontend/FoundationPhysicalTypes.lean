@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationLayout
+import Miri.Frontend.FoundationNominalRules
 
 /-! Physical rows computed from finite target material. The constructors follow
 pinned rustc_abi/layout/simple.rs::scalar and layout.rs::layout_of_array_like.
@@ -71,6 +72,7 @@ where
     let .succ fuel := fuel | throw "physical layout recursion exhausted"
     let basic ← query ty
     match ty with
+    | .nominal _ _ => throw "nominal layout requires document material"
     | .patternNotNull _ => throw "general constrained-pattern physical layout unsupported"
     | .primitive "str" "" =>
       return baseLayout 0 basic.align 0xc1325f37d127be22
@@ -155,7 +157,8 @@ def physicalLayoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : Concret
     Except String Input.Layout := physicalLayoutCore target (layoutOfRuntime target) ty
 
 def physicalLayoutOfDocument (d : Document) (ty : ConcreteType) : Except String Input.Layout := do
-  physicalLayoutCore (← runtimeTargetOfTarget d.target) (layoutOfDocument d) ty
+  let target ← runtimeTargetOfTarget d.target
+  nominalPhysicalLayout d (physicalLayoutCore target (layoutOfDocument d)) ty
 
 def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input.Layout := do
   physicalLayoutOfRuntime (← runtimeTargetOfTarget target) ty
@@ -201,6 +204,9 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
         | "erased" => pure MIR.Region.Erased
         | _ => throw "unsupported dynamic object region"
       pure (.dynamicTraitObject predicates principal region, s!"foundation-dynamic-{id}")
+    | .patternNotNull _ =>
+      let some base := pointeeReference | throw "pattern base identity absent"
+      pure (.patternType base .notNull, s!"foundation-pattern-{id}")
     | .pointer kind _ =>
       let info ← pointerKindInfo kind
       let some pointee := pointeeReference | throw "pointer pointee identity absent"

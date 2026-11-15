@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationLayout
+import Miri.Frontend.FoundationPhysicalTypes
 
 /-! Document-local type interning from pure foundation queries.  The returned
 IDs are Lean identities for explicitly requested monomorphic types, not rustc
@@ -9,6 +9,9 @@ namespace Miri.Frontend.Foundation
 def sameConcrete : Nat → ConcreteType → ConcreteType → Bool
   | 0, _, _ => false
   | _+1, .primitive k n, .primitive k' n' => k == k' && n == n'
+  | f+1, .nominal d args, .nominal d' args' =>
+    d == d' && args.size == args'.size &&
+      (args.zip args').all (fun (a,b) => sameConcrete f a b)
   | f+1, .array element length, .array element' length' =>
     length == length' && sameConcrete f element element'
   | f+1, .tuple elements, .tuple elements' =>
@@ -39,7 +42,10 @@ def TypeRegistry.start (document : Document) : TypeRegistry := { document }
 supported layout can acquire an ID.  The input and answer are immutable values. -/
 def TypeRegistry.intern (registry : TypeRegistry) (ty : ConcreteType) :
     Except String (TypeRegistry × Nat) := do
-  let layout ← layoutOfDocument registry.document ty
+  let physical ← physicalLayoutOfDocument registry.document ty
+  let some size := physical.sizeBytes | throw "registry physical size absent"
+  let some align := physical.abiAlignBytes | throw "registry physical alignment absent"
+  let layout : FoundationLayout := ⟨size, align⟩
   for i in [:registry.entries.size] do
     let some entry := registry.entries[i]? | throw "type registry index invariant"
     if sameConcrete 1024 entry.type ty then

@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationPhysicalTypes
 import Miri.Frontend.FoundationTypeRegistry
+import Miri.Frontend.FoundationNominalShape
 
 /-! Demand-local physical pools. Every array child and usize length is interned
 before its parent. No input document, compiler-fact catalog or executable entry
@@ -66,7 +67,7 @@ where
         pure (r, some (elementId, constantId))
       | _ => pure (r, none)
     let (r, pointeeReference) ← match ty with
-      | .pointer _ pointee => do
+      | .pointer _ pointee | .patternNotNull pointee => do
         let (r, pointeeId) ← go fuel r pointee
         pure (r, some pointeeId)
       | _ => pure (r, none)
@@ -125,10 +126,31 @@ where
           ids := ids.push id
         pure (next, some (ids, principal))
       | _ => pure (r, none)
+    let (r, nominalReferences) ← match ty with
+      | .nominal definition args => do
+        let mut next := r
+        let mut argIds := #[]
+        for arg in args do
+          let (updated, id) ← go fuel next arg
+          next := updated
+          argIds := argIds.push id
+        let fields ← nominalFields r.registry.document definition args
+        let mut fieldIds := #[]
+        for variant in fields do
+          let mut ids := #[]
+          for field in variant do
+            let (updated, id) ← go fuel next field
+            next := updated
+            ids := ids.push id
+          fieldIds := fieldIds.push ids
+        pure (next, some (definition, argIds, fieldIds))
+      | _ => pure (r, none)
     let (registry, id) ← r.registry.intern ty
     unless id == r.types.size && id == r.layouts.size do
       throw "physical registry pool identity mismatch"
-    let node ← physicalTypeNode ty id id references pointeeReference functionReferences dynamicReferences
+    let node ← match nominalReferences with
+      | some (definition, args, fields) => nominalTypeNode r.registry.document definition id id args fields
+      | none => physicalTypeNode ty id id references pointeeReference functionReferences dynamicReferences
     return ({ r with registry, types := r.types.push node, layouts := r.layouts.push layout }, id)
 
 /-- Resolve source types without changing the identity scheme. -/

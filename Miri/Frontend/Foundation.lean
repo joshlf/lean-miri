@@ -83,6 +83,7 @@ inductive ConstExpr where
 
 inductive TypeExpr where
   | primitive (kind name : String)
+  | nominal (definition : Nat) (arguments : Array TypeExpr)
   | parameter (index : Nat)
   | array (element : TypeExpr) (length : ConstExpr)
   | tuple (elements : Array TypeExpr)
@@ -114,6 +115,12 @@ where
     let .succ remaining := fuel | throw "foundation type resolution exhausted"
     let seen := seen.push id
     match kind with
+    | "adt" =>
+      let mut args := #[]
+      for arg in ← array shape "arguments" do
+        unless (← string arg "kind") == "type" do throw "unsupported nominal generic argument"
+        args := args.push (← go remaining seen (← nat arg "type"))
+      return .nominal (← nat shape "definition") args
     | "param" => return .parameter (← nat shape "index")
     | "array" =>
       let element ← go remaining seen (← nat shape "element")
@@ -168,6 +175,7 @@ def ConstExpr.instantiate (constants : Array (Option Nat)) : ConstExpr → Excep
 
 inductive ConcreteType where
   | primitive (kind name : String)
+  | nominal (definition : Nat) (arguments : Array ConcreteType)
   | array (element : ConcreteType) (length : Nat)
   | tuple (elements : Array ConcreteType)
   | pointer (kind : String) (pointee : ConcreteType)
@@ -185,6 +193,7 @@ where
     let .succ remaining := fuel | throw "foundation instantiation exhausted"
     match expr with
     | .primitive kind name => return .primitive kind name
+    | .nominal definition arguments => return .nominal definition (← arguments.mapM (go remaining))
     | .parameter i =>
       match types[i]?.bind id with
       | some ty => return ty

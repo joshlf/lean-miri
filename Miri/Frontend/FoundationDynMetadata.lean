@@ -78,6 +78,7 @@ where
     let .succ fuel := fuel | throw "dyn metadata traversal exhausted"
     match ty with
     | .primitive .. => return false
+    | .nominal _ _ => throw "nominal component requires document physical query"
     | .patternNotNull _ => throw "general constrained-pattern metadata unsupported"
     | .array element _ => go fuel element
     | .tuple fields => return (← fields.mapM (go fuel)).any id
