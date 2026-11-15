@@ -92,7 +92,6 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
     unless captures == types do throw "Invalid source closure capture types"
     return (.Aggregate (.Closure definition args) values,facts)
   | .aggregateAdt definition variant args userType activeField values =>
-    if userType.isSome then throw "Unsupported source aggregate user-type annotation"
     let some definition := c.definitions[definition]?.join | throw "Invalid source ADT definition not prepared"
     let args ← arguments c args
     let (values,types,facts) ← operands c values
@@ -109,7 +108,7 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
     | none =>
       unless selected.fields.map (·.typeId) == types do
         throw "Invalid source ADT aggregate field types"
-    return (.Aggregate (.Adt definition variant args none activeField) values,facts)
+    return (.Aggregate (.Adt definition variant args userType activeField) values,facts)
   | .pointerCoercion coercion value target source =>
     let (value,sourceType,facts) ← operand c value
     let some target := c.types[target]?.join | throw "Invalid source coercion target not prepared"
