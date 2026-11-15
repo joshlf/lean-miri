@@ -48,7 +48,12 @@ branch-derived scalar const returns 36 through another fixed frame. A genuine
 two-function `calls(42_u8)` run enters a callee frame and returns 42 through
 both fixed interpreter frames. The same checked call path preserves u16
 `0xBEEF` and usize `0x123456789ABCDEF0` through real callee/return frames,
-matching independent schema-12 runs. A byte-array literal returns a provenance
+matching independent schema-12 runs. Pure
+complete-key call-graph closure also assembles a genuine three-frame chain and
+two sequential calls to the same callee. Their fixed runs match independent
+schema-12 runs; missing source/evidence and recursive graphs reject before
+execution. The supported closure is acyclic and restricted to these scalar
+calls. A byte-array literal returns a provenance
 pointer whose four bytes read `Miri` in the fixed memory machine. A Unicode
 `&str` returns a wide pointer whose actual metadata length 8 drives the fixed
 read of `Lean🦀` UTF-8 bytes; length 9 triggers the fixed bounds UB. A separate
@@ -60,12 +65,21 @@ proofs. The schema-12 path
 still supplies general fixed-interpreter programs. The active missing work is
 tracked in [STATUS.md](../STATUS.md).
 
+For an ordinary std executable, the finite export now selects the actual
+`std::rt::lang_start` MIR template and Lean checks its `T: 'static` obligation
+from source. Its body captures the main function pointer in a closure, unsizes a
+reference to `dyn Fn() -> i32 + Sync + RefUnwindSafe`, and calls
+`std::rt::lang_start_internal`. Structural dynamic bounds, closure source,
+wide-reference metadata, vtable construction and their MIR lowering must be
+connected before this path can run. Exporting the selected template does not
+establish an ordinary std startup execution.
+
 Lean rejects demands outside the supported source domain. In particular,
 general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
 byte-interner identity and general provenance, runtime symbol
 identities and broader MIR are not yet supplied by pure foundation queries.
-Finite Call MIR and direct FnDef evidence support the checked two-function
-domain. Source allocation images support the checked array and str literal reads while the
+Finite Call MIR and direct FnDef evidence support the checked acyclic scalar
+call graphs. Source allocation images support the checked array and str literal reads while the
 byte interner is explicitly unavailable; any reservation demand still stops
 Unsupported. Coroutines, inlined
 frames, target features and caller-location tracking also stop. The direct
