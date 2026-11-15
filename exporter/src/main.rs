@@ -1,6 +1,7 @@
 #![feature(rustc_private)]
 
 mod foundation;
+mod foundation_target;
 mod incremental;
 mod cast_queries;
 mod allocator_world;
