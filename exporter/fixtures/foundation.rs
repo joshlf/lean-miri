@@ -2,7 +2,7 @@
 pub fn identity<T: Copy>(value: T) -> T { value }
 pub fn array_identity<T: Copy, const N: usize>(value: [T; N]) -> [T; N] { value }
 pub fn concrete(value: [u16; 3]) -> [u16; 3] { value }
-// Deliberately outside the initial foundation subset: the exporter must fail.
+// A direct call keeps source MIR and leaves callee resolution to Lean.
 pub fn calls(value: u8) -> u8 { identity(value) }
 
 pub struct Link<T> {

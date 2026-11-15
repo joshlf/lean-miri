@@ -41,19 +41,33 @@ pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
     let mut ids = SpanIds::new();
     // Storage markers remain executable MIR. Whether a local is always live
     // can be derived from their absence, as in pinned interpret/stack.rs.
-    json!({"span":span(&mut ids,tcx,body.span),
-        "backtrace_spans":backtraces(&mut ids,tcx,body),
-        "definition_span":span(&mut ids,tcx,tcx.def_span(body.source.def_id())),
+    let body_span = span(&mut ids,tcx,body.span);
+    let backtrace_spans = backtraces(&mut ids,tcx,body);
+    let definition_span = span(&mut ids,tcx,tcx.def_span(body.source.def_id()));
+    let locals = body.local_decls.iter().map(|l|json!({"mutable":l.mutability.is_mut(),
+        "source_info":info(&mut ids,tcx,l.source_info)})).collect::<Vec<_>>();
+    let scopes = body.source_scopes.iter().map(|s|json!({"span":span(&mut ids,tcx,s.span),
+        "parent":s.parent_scope.map(|p|p.as_u32()),
+        "inlined_parent":s.inlined_parent_scope.map(|p|p.as_u32())})).collect::<Vec<_>>();
+    let blocks = body.basic_blocks.iter().map(|b|json!({
+        "statements":b.statements.iter().map(|s|info(&mut ids,tcx,s.source_info)).collect::<Vec<_>>(),
+        "terminator":info(&mut ids,tcx,b.terminator().source_info)})).collect::<Vec<_>>();
+    // Argument and function spans are independent rustc Span identities. They
+    // share this body's exact namespace with ordinary source locations.
+    let call_spans = body.basic_blocks.iter().map(|b|match &b.terminator().kind {
+        mir::TerminatorKind::Call {args,fn_span,..} => json!({
+            "function":span(&mut ids,tcx,*fn_span),
+            "arguments":args.iter().map(|arg|span(&mut ids,tcx,arg.span)).collect::<Vec<_>>()
+        }),
+        _ => Value::Null,
+    }).collect::<Vec<_>>();
+    json!({"span":body_span,
+        "backtrace_spans":backtrace_spans,
+        "definition_span":definition_span,
         "phase":crate::mir_phase_json(body.phase),
         "injection_phase":body.injection_phase.map(crate::mir_phase_json),
-        "locals":body.local_decls.iter().map(|l|json!({"mutable":l.mutability.is_mut(),
-            "source_info":info(&mut ids,tcx,l.source_info)})).collect::<Vec<_>>(),
-        "scopes":body.source_scopes.iter().map(|s|json!({"span":span(&mut ids,tcx,s.span),
-            "parent":s.parent_scope.map(|p|p.as_u32()),
-            "inlined_parent":s.inlined_parent_scope.map(|p|p.as_u32())})).collect::<Vec<_>>(),
-        "blocks":body.basic_blocks.iter().map(|b|json!({
-            "statements":b.statements.iter().map(|s|info(&mut ids,tcx,s.source_info)).collect::<Vec<_>>(),
-            "terminator":info(&mut ids,tcx,b.terminator().source_info)})).collect::<Vec<_>>()})
+        "locals":locals,"scopes":scopes,"blocks":blocks,
+        "call_spans":call_spans})
 }
 
 // eval.rs constructs InterpCx with the actual compiler DUMMY_SP. This uses a

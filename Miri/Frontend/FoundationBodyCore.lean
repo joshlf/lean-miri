@@ -73,12 +73,34 @@ so a caller cannot smuggle an arbitrary mutated candidate into this boundary.
 This is a partial join, not a whole-document compiler-evidence validator. -/
 def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
     (constantOperand : Json → Except String (MIR.ConstOperand × ConcreteType) :=
-      fun _ => .error "foundation scalar constant query is unavailable") :
+      fun _ => .error "foundation scalar constant query is unavailable")
+    (callTerminator : Nat → Json → Json → Except String MIR.TerminatorKind :=
+      fun _ _ _ => .error "foundation call query is unavailable")
+    (callEvidence : Array (Option Input.CallResolutionEvidence) := #[]) :
     Except String Input.BodyCore := do
-  let candidate ← lowerPreparedMIR prepared constantOperand
-  unless (← prepared.item.source.getObjValAs? (Array Json) "required_consts").isEmpty &&
-      bindings.requiredConsts.isEmpty do
-    throw "foundation BodyCore requires a required-constant operand join"
+  let candidate ← lowerPreparedMIR prepared constantOperand callTerminator
+  let callEvidence := if callEvidence.isEmpty then Array.replicate candidate.body.basicBlocks.size none
+    else callEvidence
+  unless callEvidence.size == candidate.body.basicBlocks.size do
+    throw "foundation call evidence block count mismatch"
+  for h : i in [:candidate.body.basicBlocks.size] do
+    let isCall := match candidate.body.basicBlocks[i].terminator.kind with
+      | .Call .. => true
+      | _ => false
+    unless isCall == (callEvidence[i]?.bind id).isSome do
+      throw "foundation call terminator/evidence mismatch"
+  let mut requiredConsts := #[]
+  for source in (← prepared.item.source.getObjValAs? (Array Json) "required_consts") do
+    let (constant, concrete) ← constantOperand source
+    let .Val _ typeId := constant.value
+    unless bindings.physicalTypeIds.contains typeId && constant.span.id < bindings.spans.size do
+      throw "foundation required constant physical reference is absent"
+    let types := bindings.types.filter (fun entry => sameConcrete 1024 entry.concrete concrete)
+    unless types.size == 1 && (types[0]?.map (·.typeId)) == some typeId do
+      throw "foundation required constant physical type mismatch"
+    requiredConsts := requiredConsts.push constant
+  unless requiredConsts == bindings.requiredConsts do
+    throw "foundation required constant source-order join mismatch"
   for backtrace in bindings.backtraceSpans do
     unless backtrace.spanId < bindings.spans.size &&
         backtrace.position.filename < bindings.files.size do
@@ -154,10 +176,10 @@ def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings)
     preambleDefSpanId := ← joinSpan bindings (← metadata.getObjVal? "definition_span")
     injectionPhase, localSources, sourceScopes := scopes
     backtraceSpans := bindings.backtraceSpans
-    callEvidence := #[none]
+    callEvidence
     nodeFacts := blocks.map (fun block => Array.replicate (block.statements.size + 1)
       { places := (localIds.toList.zipIdx.map fun (typeId, index) =>
           { place := ⟨index, #[]⟩, typeId, projectionTypes := #[] } : List Input.PlaceFact).toArray })
-    requiredConsts := bindings.requiredConsts }
+    requiredConsts }
 
 end Miri.Frontend.Foundation

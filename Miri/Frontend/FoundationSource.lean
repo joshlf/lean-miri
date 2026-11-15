@@ -110,6 +110,8 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
   let blocks ← body.getObjValAs? (Array Json) "blocks"
   let locations ← source.getObjValAs? (Array Json) "blocks"
   unless blocks.size == locations.size do throw "source block count mismatch"
+  let callSpans ← source.getObjValAs? (Array Json) "call_spans"
+  unless callSpans.size == blocks.size do throw "source call span count mismatch"
   for (block, location) in blocks.zip locations do
     let statements ← block.getObjValAs? (Array Json) "statements"
     let sources ← location.getObjValAs? (Array Json) "statements"
@@ -117,6 +119,15 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
     for entry in sources do
       required := required.push (← info scopes.size entry).span
     required := required.push (← info scopes.size (← location.getObjVal? "terminator")).span
+  for (block, call) in blocks.zip callSpans do
+    if (← (← block.getObjVal? "terminator").getObjValAs? String "kind") == "call" then
+      let _ ← sourceSpan (← call.getObjVal? "function")
+      let arguments ← (← block.getObjVal? "terminator").getObjValAs? (Array Json) "arguments"
+      let spans ← call.getObjValAs? (Array Json) "arguments"
+      unless spans.size == arguments.size do throw "call argument source span count mismatch"
+      for span in spans do
+        let _ ← sourceSpan span
+    else unless call == Json.null do throw "non-call has call source spans"
   for entry in required do
     unless backtraces.any (fun b => b.span == entry) do
       throw "missing compiler backtrace source span"

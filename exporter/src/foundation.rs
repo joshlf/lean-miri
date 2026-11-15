@@ -3,6 +3,10 @@
 //! This format deliberately has no runtime query answers or successful fallback
 //! rows. Unsupported source forms abort export. A consumer must implement their
 //! semantics from the material; this format is not executable schema12 input.
+#[path = "foundation_allocations.rs"]
+mod allocation_material;
+#[path = "foundation_const_def.rs"]
+mod const_definition_material;
 #[path = "foundation_const.rs"]
 mod const_material;
 #[path = "foundation_source.rs"]
@@ -41,6 +45,8 @@ struct Material<'tcx> {
     type_ids: HashMap<ty::Ty<'tcx>, usize>,
     definitions: Vec<Value>,
     def_ids: HashMap<DefId, usize>,
+    allocations: Vec<Value>,
+    allocation_ids: HashMap<rustc_middle::mir::interpret::AllocId, usize>,
 }
 fn unsupported<T>(kind: &str, value: impl std::fmt::Debug) -> Result<T> {
     Err(format!("foundation: unsupported {kind}: {value:?}"))
@@ -50,7 +56,7 @@ impl<'tcx> Material<'tcx> {
         if let Some(id) = self.def_ids.get(&def) { return *id; }
         let id = self.definitions.len();
         self.def_ids.insert(def, id);
-        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def),"kind":match tcx.def_kind(def) {rustc_hir::def::DefKind::Fn=>"fn".to_string(),rustc_hir::def::DefKind::AssocFn=>"assoc_fn".to_string(),other=>format!("{other:?}")}}));
+        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def),"kind":match tcx.def_kind(def) {rustc_hir::def::DefKind::Fn=>"fn".to_string(),rustc_hir::def::DefKind::AssocFn=>"assoc_fn".to_string(),rustc_hir::def::DefKind::Const=>"const".to_string(),other=>format!("{other:?}")}}));
         id
     }
     fn constant(&mut self, tcx: TyCtxt<'tcx>, c: ty::Const<'tcx>) -> Result<Value> {
@@ -96,6 +102,21 @@ impl<'tcx> Material<'tcx> {
                 if !matches!(r.kind(), ty::ReErased | ty::ReStatic) { return unsupported("reference region",r); }
                 json!({"kind":"reference","pointee":self.ty(tcx,t)?,"mutable":m.is_mut(),"region":if matches!(r.kind(),ty::ReStatic) {"static"} else {"erased"}})
             }
+            ty::FnPtr(signature, header) => {
+                let signature = signature.with(header);
+                if !signature.bound_vars().is_empty() {
+                    return unsupported("bound function-pointer signature", signature);
+                }
+                let signature = signature.skip_binder();
+                json!({"kind":"function_pointer","signature":{
+                    "bound_variables":[],
+                    "inputs":signature.inputs().iter().map(|t|self.ty(tcx,*t)).collect::<Result<Vec<_>>>()?,
+                    "output":self.ty(tcx,signature.output())?,
+                    "safety":match signature.safety() {rustc_hir::Safety::Safe=>"safe",rustc_hir::Safety::Unsafe=>"unsafe"},
+                    "abi":super::extern_abi_json(signature.abi()),
+                    "c_variadic":signature.c_variadic(),
+                }})
+            },
             ty::FnDef(d,a) => {
                 if !a.bound_vars().is_empty() { return unsupported("bound function arguments", a); }
                 json!({"kind":"function_definition","definition":self.definition(tcx,d),"arguments":self.args(tcx,a.skip_binder())?})
@@ -133,15 +154,19 @@ impl<'tcx> Material<'tcx> {
             mir::Operand::Move(p) => json!({"kind":"move","place":self.place(tcx,*p)?}),
             mir::Operand::Constant(c) => {
                 let value = match c.const_ {
+                    mir::Const::Unevaluated(value,_) => self.constant_definition(tcx,value)?,
                     mir::Const::Ty(_,c) => self.constant(tcx,c)?,
                     mir::Const::Val(mir::ConstValue::ZeroSized,_) => json!({"kind":"zero_sized"}),
                     mir::Const::Val(mir::ConstValue::Scalar(s),_) => {
-                        let s = s.try_to_scalar_int().map_err(|_|"foundation: pointer constant requires allocation material")?;
-                        json!({"kind":"scalar","bits":s.to_bits(s.size()).to_string(),"size_bytes":s.size().bytes()})
+                        match s.try_to_scalar_int() {
+                            Ok(s) => json!({"kind":"scalar","bits":s.to_bits(s.size()).to_string(),"size_bytes":s.size().bytes()}),
+                            Err(_) => self.allocation_constant(tcx,mir::ConstValue::Scalar(s))?,
+                        }
                     }
+                    mir::Const::Val(value @ (mir::ConstValue::Slice {..} | mir::ConstValue::Indirect {..}),_) => self.allocation_constant(tcx,value)?,
                     other => return unsupported("MIR constant",other),
                 };
-                json!({"kind":"constant","type":self.ty(tcx,c.const_.ty())?,"value":value})
+                json!({"kind":"constant","type":self.ty(tcx,c.const_.ty())?,"value":value,"source_span_key":{"lo":c.span.lo().0,"hi":c.span.hi().0,"ctxt":format!("{:?}",c.span.ctxt()),"parent_local_definition":c.span.parent().map(|d|d.local_def_index.as_u32())},"user_type":c.user_ty.map(|i|i.as_u32())})
             }
             other => return unsupported("operand",other),
         })
@@ -170,7 +195,14 @@ impl<'tcx> Material<'tcx> {
             let bound = p.kind();
             if !bound.bound_vars().is_empty() { return unsupported("bound predicate",p); }
             Ok(match bound.skip_binder() {
-                ty::ClauseKind::Trait(t) if t.polarity == ty::ClausePolarity::Positive => json!({"kind":"trait","definition":self.definition(tcx,t.trait_ref.def_id),"arguments":self.args(tcx,t.trait_ref.args)?}),
+                ty::ClauseKind::Trait(t) if t.polarity == ty::ClausePolarity::Positive => {
+                    let trait_def = t.trait_ref.def_id;
+                    let definition = self.definition(tcx, trait_def);
+                    if trait_def.is_local() && self.definitions[definition].get("local_trait").is_none() {
+                        self.definitions[definition]["local_trait"] = super::foundation_traits::capture(tcx, trait_def)?;
+                    }
+                    json!({"kind":"trait","definition":definition,"arguments":self.args(tcx,t.trait_ref.args)?})
+                },
                 ty::ClauseKind::ConstArgHasType(c,t) => json!({"kind":"const_has_type","value":self.constant(tcx,c)?,"type":self.ty(tcx,t)?}),
                 other => return unsupported("predicate",other),
             })
@@ -255,6 +287,15 @@ impl<'tcx> Material<'tcx> {
                 mir::TerminatorKind::Goto {target,..} => json!({"kind":"goto","target":target.as_u32()}),
                 mir::TerminatorKind::Unreachable => json!({"kind":"unreachable"}),
                 mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int","operand":self.operand(tcx,discr)?,"targets":targets.iter().map(|(v,b)|json!({"value":v.to_string(),"target":b.as_u32()})).collect::<Vec<_>>(),"otherwise":targets.otherwise().as_u32()}),
+                mir::TerminatorKind::Call {func,args,destination,target,unwind,call_source,..} => json!({
+                    "kind":"call",
+                    "function":self.operand(tcx,func)?,
+                    "arguments":args.iter().map(|arg|self.operand(tcx,&arg.node)).collect::<Result<Vec<_>>>()?,
+                    "destination":self.place(tcx,*destination)?,
+                    "target":target.map(|block|block.as_u32()),
+                    "unwind":super::unwind_json(*unwind),
+                    "call_source":super::call_source_name(*call_source)
+                }),
                 other => return unsupported("terminator",other),
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
@@ -293,6 +334,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
         "session":session,
         "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"}},
         "target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
-        "definitions":m.definitions,"types":m.types,"bodies":bodies
+        "definitions":m.definitions,"types":m.types,"bodies":bodies,
+        "source_allocations":m.allocations
     }))
 }

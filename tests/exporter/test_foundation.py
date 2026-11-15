@@ -192,10 +192,10 @@ class FoundationExport(unittest.TestCase):
             self.assertIn("unsupported bound function signature", result.stderr)
             self.assertFalse(output.exists())
 
-    def test_unsupported_call_and_missing_root_abort(self):
+    def test_unsupported_source_and_missing_root_abort(self):
         with tempfile.TemporaryDirectory(prefix="foundation-") as directory:
-            for root, diagnostic in (("calls", "unsupported terminator"), ("missing", "missing MIR root"),
-                                     ("requires_const", "unsupported MIR constant"),
+            for root, diagnostic in (("missing", "missing MIR root"),
+                                     ("requires_const", "unsupported generic or promoted const definition"),
                                      ("tracked", "unsupported caller location prerequisite"),
                                      ("feature_identity", "unsupported function target features")):
                 output = Path(directory) / f"{root}.json"

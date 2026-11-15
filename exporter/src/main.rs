@@ -5,6 +5,7 @@ mod foundation_target;
 mod foundation_session;
 mod foundation_producer;
 mod foundation_runtime_instances;
+mod foundation_traits;
 mod incremental;
 mod cast_queries;
 mod allocator_world;
