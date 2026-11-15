@@ -4,6 +4,7 @@ namespace Miri.Input.SourceTypes
 private def regionValue (material : Material) (contexts : Array (Array BoundVariable)) : Region → Except String MIR.Region
   | .static => pure .Static
   | .erased => pure .Erased
+  | .earlyParameter _ => throw "Unsupported uninstantiated early source region"
   | .unsupported tag => throw s!"Unsupported source region {tag}"
   | .bound depth slot kind => do
     let some context := contexts[depth]? | throw "Unsupported source region binder depth"

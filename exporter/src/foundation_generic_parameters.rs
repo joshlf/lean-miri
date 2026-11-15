@@ -5,6 +5,8 @@ use super::*;
 impl<'tcx> Material<'tcx> {
     pub(super) fn generic_parameter(&mut self, tcx: TyCtxt<'tcx>, parameter: &ty::GenericParamDef) -> Result<Value> {
         Ok(match parameter.kind {
+            ty::GenericParamDefKind::Lifetime => json!({"kind":"region","index":parameter.index,"name":parameter.name.as_str(),
+                "definition":self.definition(tcx,parameter.def_id),"has_default":false,"default":null}),
             ty::GenericParamDefKind::Type {has_default,..} => {
                 let default = if has_default {
                     Some(self.ty(tcx,tcx.type_of(parameter.def_id).instantiate_identity().skip_normalization())?)

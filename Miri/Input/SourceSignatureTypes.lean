@@ -25,6 +25,7 @@ private def region (material : Material) (binder : Array BoundVariable)
         let (world,id) ← SourceCompilerWorld.internDefinition world row.raw
         pure (world,.Named id)
     return (world,.Bound (.Bound depth) slot kind)
+  | .earlyParameter _ => throw "Unsupported original early signature region"
   | .unsupported tag => throw s!"Unsupported original signature region {tag}"
 
 /-- Translate binder declarations through the same checked raw-definition map

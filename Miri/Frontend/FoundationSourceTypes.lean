@@ -32,6 +32,7 @@ def region (j : Json) : Except String Region := do
   | .str tag => pure (.unsupported tag)
   | _ =>
     match ← string j "kind" with
+    | "early_parameter" => return .earlyParameter (← j.getObjValAs? Nat "index")
     | "bound" => return .bound (← nat j "debruijn") (← nat j "variable") (← boundRegion (← field j "region_kind"))
     | tag => pure (.unsupported tag)
 def boundVariables (j : Json) : Except String (Array BoundVariable) := do

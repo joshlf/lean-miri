@@ -13,6 +13,8 @@ mod promoted_material;
 mod termination_material;
 #[path = "foundation_auto_traits.rs"]
 mod auto_trait_material;
+#[path = "foundation_trait_impls.rs"]
+mod trait_impl_material;
 #[path = "foundation_enum.rs"]
 mod enum_material;
 #[path = "foundation_generic_parameters.rs"]
@@ -374,6 +376,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() || has_fn_pointer || has_callable_declaration {
         m.fn_vtable_source(tcx)?
     } else { Value::Null };
+    let trait_impl_source = m.trait_impl_source(tcx,&source_function_signatures)?;
     let closure_auto_source = m.closure_auto_source(tcx)?;
     let mut link_sections = link_section_material::export(tcx);
     m.attach_link_initializers(tcx,&mut link_sections)?;
@@ -392,6 +395,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         "symbol_name_source":symbol_name_source,
         "allocation_identity_source":allocation_identity_source,
         "closure_auto_source":closure_auto_source,
+        "trait_impl_source":trait_impl_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
         "producer":producer,

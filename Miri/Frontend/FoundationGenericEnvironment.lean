@@ -55,6 +55,7 @@ def flattenEnvironment (document : Document) (source : Json) : Except String Jso
       let expectedKind ← match kind with
         | "type" => pure "TyParam"
         | "const" => pure "ConstParam"
+        | "region" => pure "LifetimeParam"
         | _ => throw "generic parameter kind unsupported"
       let actualKind ← row.getObjValAs? String "kind"
       -- Pinned generics_of.rs:242–252 reuses the trait owner DefId

@@ -16,6 +16,7 @@ impl<'tcx> Material<'tcx> {
         Ok(match region.kind() {
             ty::ReStatic => json!("static"),
             ty::ReErased => json!("erased"),
+            ty::ReEarlyParam(parameter) => json!({"kind":"early_parameter","index":parameter.index}),
             ty::ReBound(ty::BoundVarIndexKind::Bound(depth), bound) => json!({
                 "kind":"bound","debruijn":depth.as_u32(),"variable":bound.var.as_u32(),
                 "region_kind":self.bound_region_source(tcx,bound.kind)?,

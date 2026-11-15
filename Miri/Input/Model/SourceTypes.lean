@@ -14,6 +14,7 @@ inductive BoundRegionKind where
   deriving Repr, DecidableEq
 inductive Region where
   | static | erased
+  | earlyParameter (index : Nat)
   | bound (debruijn slot : Nat) (kind : BoundRegionKind)
   | unsupported (tag : String)
   deriving Repr, DecidableEq

@@ -4,6 +4,7 @@ import Miri.Input.SourceCompilerTypes
 import Miri.Input.SourceTypeQueries
 import Miri.Input.SourcePhysical
 import Miri.Input.SourceSignatureTypes
+import Miri.Input.SourceTraitSelection
 
 /-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
 MIR execution, compiler process, query catalog or private pool participates.
@@ -188,10 +189,15 @@ where
             (← SourceTypes.instantiate physical types constants args)
         else
           let [self] := arguments.toList | throw "typed ABI ordinary trait arguments unsupported"
-          let .tuple fields ← SourceTypes.instantiate physical types constants self
-            | throw "typed ABI ordinary impl matcher supports unit only"
-          unless fields.isEmpty do throw "typed ABI ordinary impl matcher supports unit only"
-          let _ ← unitTraitImpl abi definition
+          let self ← SourceTypes.instantiate physical types constants self
+          if abi.traits.any (·.definition == definition) then
+            let .tuple fields := self | throw "typed ABI ordinary unit impl self mismatch"
+            unless fields.isEmpty do throw "typed ABI ordinary unit impl self mismatch"
+            let _ ← unitTraitImpl abi definition
+          else
+            let some material := source.traitImpls | throw "typed ABI complete trait impl source unavailable"
+            unless (← SourceTraitSelection.check physical abi material (builtin physical target) definition self) do
+              throw "typed ABI ordinary trait obligation unsatisfied"
       | .projection definition parent arguments term =>
         let [declaration] := (abi.callables.filter fun row => row.definition == parent && row.output == some definition).toList
           | throw "typed ABI associated projection declaration unsupported"

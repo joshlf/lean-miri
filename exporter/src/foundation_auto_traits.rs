@@ -5,7 +5,7 @@ use super::*;
 fn raw_definition(definition: DefId) -> Value {
     json!({"crate_index":definition.krate.as_u32(),"index":definition.index.as_u32()})
 }
-fn outer_constructor(ty: ty::Ty<'_>) -> Value {
+pub(super) fn outer_constructor(ty: ty::Ty<'_>) -> Value {
     // Rigid constructors cannot change under substitution. Alias/param/unknown
     // roots are deliberately not certified disjoint from a requested Self.
     match *ty.kind() {

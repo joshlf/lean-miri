@@ -2,6 +2,7 @@ import Miri.Input.Model.SourceAllocationIdentity
 import Miri.Input.Model.SourceAllocations
 import Miri.Input.Model.SourceMir
 import Miri.Input.Model.SourceDeclarations
+import Miri.Input.Model.SourceTraitImpls
 import Miri.Input.Model.SourceAbi
 import Miri.Input.Model.SourceTypes
 import Miri.Input.SourceTypeQueries
@@ -41,6 +42,7 @@ structure SourceMaterial where
   genericLayers : Array SourceMaterial.GenericLayer
   /-- None is unknown coverage; Some retains the complete ordered declaration list. -/
   linkSections : Option (Array SourceMaterial.LinkSectionDeclaration) := none
+  traitImpls : Option SourceTraitImpls.Material := none
   abi : Option SourceAbi.Material := none
   genericMir : Option SourceMir.Material := none
   physical : Option SourceTypes.Material := none

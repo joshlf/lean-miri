@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationSourceTraitImpls
 import Miri.Frontend.FoundationSourceAllocationIdentity
 import Miri.Frontend.FoundationAllocations
 import Miri.Frontend.FoundationSourceMir
@@ -97,13 +98,15 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     endian := document.target.endian
     runtimeDataLayout := some (← evidenceOfTarget document.target) }
   let linkSections ← (← sourceLinkSections document.source).mapM sectionDeclaration
+  let physical ← SourceTypesParser.material document.source
   let material : Input.SourceMaterial := {
     target,declarations,genericLayers := layers,
     genericMir := some (← SourceMirParser.material document),
     linkSections := some linkSections,
     allocations := some (← sourceAllocationMaterial document),
     allocationIdentity := ← SourceAllocationIdentityParser.material document.source document.types.size,
-    physical := some (← SourceTypesParser.material document.source),
+    physical := some physical,
+    traitImpls := ← SourceTraitImplsParser.material document physical,
     abi := some (← SourceAbiParser.material document)}
   material.validate
   return material

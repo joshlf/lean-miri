@@ -16,7 +16,7 @@ private def role (name : String) : Except String BuiltinTrait := do
   match name with
   | "sized" => pure .sized | "copy" => pure .copy | "meta_sized" => pure .metaSized
   | _ => throw "unknown ABI builtin language-item role"
-private def declaration (document : Document) (clause : Json) : Except String (Clause × Option BuiltinDeclaration) := do
+def declaration (document : Document) (clause : Json) : Except String (Clause × Option BuiltinDeclaration) := do
   match ← clause.getObjValAs? String "kind" with
   | "trait" =>
     let definition ← raw document (← clause.getObjValAs? Nat "definition")
