@@ -7,6 +7,20 @@
 mod signature_binder_material;
 #[path = "foundation_start_edge.rs"]
 mod start_edge_material;
+#[path = "foundation_promoted.rs"]
+mod promoted_material;
+#[path = "foundation_auto_traits.rs"]
+mod auto_trait_material;
+#[path = "foundation_enum.rs"]
+mod enum_material;
+#[path = "foundation_generic_parameters.rs"]
+mod generic_parameter_material;
+#[path = "foundation_generic_environment.rs"]
+mod generic_environment_material;
+#[path = "foundation_projection_clauses.rs"]
+mod projection_clause_material;
+#[path = "foundation_patterns.rs"]
+mod pattern_material;
 #[path = "foundation_fn_vtable.rs"]
 mod fn_vtable_material;
 #[path = "foundation_closure.rs"]
@@ -23,6 +37,8 @@ mod source_material;
 mod foreign_symbol_material;
 #[path = "foundation_link_sections.rs"]
 mod link_section_material;
+#[path = "foundation_link_initializers.rs"]
+mod link_initializer_material;
 
 #[path = "foundation_dynamic.rs"]
 mod dynamic_material;
@@ -135,6 +151,7 @@ impl<'tcx> Material<'tcx> {
                 }})
             },
             ty::Dynamic(predicates,region) => self.dynamic_type(tcx,predicates,region)?,
+            ty::Pat(base,pattern) => self.pattern_type(tcx,base,pattern)?,
             ty::Closure(d,a) => self.closure_type(tcx,d,a)?,
             ty::FnDef(d,a) => {
                 if !a.bound_vars().is_empty() { return unsupported("bound function arguments", a); }
@@ -142,7 +159,7 @@ impl<'tcx> Material<'tcx> {
             },
             // Field templates belong to the definition, not every substitution.
             ty::Adt(d,a) => {
-                if d.is_enum() { return unsupported("enum discriminant definitions", d.did()); }
+                if d.is_enum() { self.enum_definition(tcx,d)?; }
                 let definition = self.definition(tcx,d.did());
                 if self.definitions[definition].get("adt").is_none() {
                     self.definitions[definition]["adt"] = json!({"pending":true});
@@ -211,34 +228,7 @@ impl<'tcx> Material<'tcx> {
         })
     }
     fn environment(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
-        let generics = tcx.generics_of(def);
-        if generics.parent.is_some() { return unsupported("inherited generic environment", def); }
-        let parameters = generics.own_params.iter().map(|p| Ok(match p.kind {
-            ty::GenericParamDefKind::Type {has_default:false,..} => json!({"kind":"type","index":p.index,"name":p.name.as_str()}),
-            ty::GenericParamDefKind::Const {has_default:false,..} => json!({"kind":"const","index":p.index,"name":p.name.as_str(),"type":self.ty(tcx,tcx.type_of(p.def_id).instantiate_identity().skip_normalization())?}),
-            _ => return unsupported("generic parameter",p),
-        })).collect::<Result<Vec<_>>>()?;
-        let predicates = tcx.clauses_of(def);
-        if predicates.parent.is_some() { return unsupported("inherited predicates", def); }
-        let clauses = predicates.clauses.iter().map(|(p,_)| {
-            let bound = p.kind();
-            if !bound.bound_vars().is_empty() { return unsupported("bound predicate",p); }
-            Ok(match bound.skip_binder() {
-                ty::ClauseKind::Trait(t) if t.polarity == ty::ClausePolarity::Positive => {
-                    let trait_def = t.trait_ref.def_id;
-                    let definition = self.definition(tcx, trait_def);
-                    if trait_def.is_local() && self.definitions[definition].get("local_trait").is_none() {
-                        self.definitions[definition]["local_trait"] = super::foundation_traits::capture(tcx, trait_def)?;
-                    }
-                    json!({"kind":"trait","definition":definition,"arguments":self.args(tcx,t.trait_ref.args)?})
-                },
-                ty::ClauseKind::TypeOutlives(outlives) if matches!(outlives.1.kind(),ty::ReStatic) =>
-                    json!({"kind":"type_outlives","type":self.ty(tcx,outlives.0)?,"region":"static"}),
-                ty::ClauseKind::ConstArgHasType(c,t) => json!({"kind":"const_has_type","value":self.constant(tcx,c)?,"type":self.ty(tcx,t)?}),
-                other => return unsupported("predicate",other),
-            })
-        }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"parameters":parameters,"clauses":clauses}))
+        self.generic_environment(tcx,def)
     }
     fn signature(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         // Source FnSig is finite generic material, not a normalized FnAbi answer.
@@ -274,7 +264,10 @@ impl<'tcx> Material<'tcx> {
         let external_start_internal = !def.is_local()
             && tcx.def_path_str(def) == "std::rt::lang_start_internal"
             && start_edge_material::start_internal(tcx)? == Some(def);
-        if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal {
+        let external_internal_callee = !def.is_local()
+            && start_edge_material::internal_callees(tcx)?.contains(&def);
+        if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal
+            && !external_internal_callee {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -302,9 +295,6 @@ impl<'tcx> Material<'tcx> {
         if !tcx.codegen_fn_attrs(def).target_features.is_empty() {
             return unsupported("function target features", def);
         }
-        if ty::InstanceKind::Item(def).requires_caller_location(tcx) {
-            return unsupported("caller location prerequisite", def);
-        }
         let environment = self.environment(tcx,def)?;
         let signature = self.signature(tcx,def)?;
         // Inputs to pinned ty::layout::fn_can_unwind; do not cache its answer.
@@ -326,6 +316,7 @@ impl<'tcx> Material<'tcx> {
             })).collect::<Result<Vec<_>>>()?;
             let terminator = match &bb.terminator().kind {
                 mir::TerminatorKind::Return => json!({"kind":"return"}),
+                mir::TerminatorKind::UnwindResume => json!({"kind":"unwind_resume"}),
                 mir::TerminatorKind::Goto {target,..} => json!({"kind":"goto","target":target.as_u32()}),
                 mir::TerminatorKind::Unreachable => json!({"kind":"unreachable"}),
                 mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int","operand":self.operand(tcx,discr)?,"targets":targets.iter().map(|(v,b)|json!({"value":v.to_string(),"target":b.as_u32()})).collect::<Vec<_>>(),"otherwise":targets.otherwise().as_u32()}),
@@ -388,17 +379,22 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     session["root_span"] = source_material::root_span(tcx);
     let source_function_signatures = function_header_material::capture(tcx,&mut m,signature_roots)?;
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
+    let has_fn_pointer = m.types.iter().any(|row| row["shape"]["kind"] == "function_pointer");
     let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
-    let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() {
+    let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() || has_fn_pointer {
         m.fn_vtable_source(tcx)?
     } else { Value::Null };
+    let closure_auto_source = m.closure_auto_source(tcx)?;
+    let mut link_sections = link_section_material::export(tcx);
+    m.attach_link_initializers(tcx,&mut link_sections)?;
     Ok(json!({
+        "closure_auto_source":closure_auto_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
         "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
         "frame_metadata":super::foundation_runtime_instances::frames(tcx),
         "startup_material":startup_material,
-        "link_section_material":link_section_material::export(tcx),
+        "link_section_material":link_sections,
         "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,
