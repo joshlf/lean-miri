@@ -11,7 +11,8 @@ cache shared between runs.
 `--foundation` starts that boundary with the separate `lean-miri-foundation` v1
 input. It exports selected **generic** MIR templates, structural type and
 definition graphs, complete target evidence, source metadata, signatures,
-compilation settings, required-constant source material and generic clauses. IDs name rows
+compilation settings, entry and frame source metadata, producer identity,
+foreign linkage selectors, required-constant source material and generic clauses. IDs name rows
 within the document. Type and const parameters retain rustc's shared parameter
 indices. It does not enumerate substitutions or serialize layout, ABI, predicate,
 instance or interpreter query-answer catalogs. Unsupported source constructs
@@ -28,27 +29,28 @@ fixed interpreter also now computes canonical nested-array layouts on demand
 from its imported type graph, with explicit cycle, overflow and contradiction
 errors.
 
-The restricted foundation evaluator exercises identity and array-body fixtures
-after those checks. It accepts only fully initialized scalar and aggregate
-values with a single straight-line block and whole-local assignments. It is a
-fixture validator, **not** the fixed Miri interpreter and not a safety proof.
-Pure item preparation also joins requested type arguments, target evidence,
-source locations and function signature fields. A separate syntax lowering
-produces an `MIR.Body` candidate for the restricted straight-line subset. The
-current schema-12 input still feeds the fixed interpreter. The migration is
-complete only when the fixed interpreter receives its required data from the
-finite foundation material and Lean computes its remaining compiler queries.
-The active missing work is tracked in [STATUS.md](../STATUS.md).
+The restricted foundation evaluator still exercises identity and array-body
+fixtures as a fixture validator. Separately, Lean derives physical primitive
+types and layouts, a limited direct function ABI, ordinary item and frame
+identities, source spans, session settings, primitive and foreign catalogs, and
+the required input graph from the finite document. For a checked `u8` identity
+body, the canonical compiler provider preparation and the **fixed Miri
+interpreter** execute the actual assignment and Return from a direct call
+frame; the observed return is 42 and the frame stack becomes empty. The run
+uses an explicit fixed scheduling profile and finite address choices. It is a
+bounded observation, not process startup or a safety proof. The schema-12 path
+still supplies general fixed-interpreter programs. The active missing work is
+tracked in [STATUS.md](../STATUS.md).
 
-A direct bridge to the fixed interpreter cannot correctly pad the new document
-with placeholders. It still needs complete physical type/layout identity,
-function ABI, instance and `BodyCore` joins, as well as relevant allocation
-material. Lean computes a limited Rust ABI/unwind component, but its IDs are
-not yet validated against fixed-interpreter physical pools. Foundation supports
-no general trait-resolution or const-MIR evaluation algorithm. It rejects
-coroutines, inlined frames, target features and caller-location tracking, plus
-many MIR forms. The bridge must calculate every remaining answer in Lean before
-claiming fixed-interpreter execution.
+Lean rejects demands outside the supported source domain. In particular,
+general trait resolution, const-MIR evaluation, indirect ABI, calls,
+allocations and provenance from source, runtime symbol identities and broader
+MIR are not yet supplied by pure foundation queries. Coroutines, inlined
+frames, target features and caller-location tracking also stop. The direct
+identity frame needs none of those facts; its effect-domain check excludes
+their use before constructing the limited program. General migration requires
+computing each demanded query from finite source material and expanding the
+supported interpreter domain without invented compiler answers.
 
 ## Proof and trust boundary
 

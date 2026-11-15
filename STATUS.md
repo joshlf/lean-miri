@@ -21,18 +21,25 @@ it does not enumerate monomorphic substitutions or emit query-answer catalogs.
 The new Lean reader computes type expansion, generic substitution, a restricted
 `Sized`/`Copy`/`usize` obligation check, supported required-constant checks,
 primitive/array layouts and partial ABI components as pure on-demand queries.
-It constructs requested item templates and typed MIR syntax candidates. The existing fixed interpreter separately computes nested
-array layouts on demand from imported material. A restricted straight-line
-foundation evaluator checks selected scalar/array fixtures, but it is **not**
-the fixed Miri interpreter and establishes no Rust safety theorem.
+It also derives source span identities, producer/session evidence, primitive
+and foreign catalogs, ordinary item instances and frames, and a restricted
+`BodyCore`. The existing fixed interpreter separately computes nested array
+layouts on demand from imported material. A restricted straight-line fixture
+evaluator remains distinct from the fixed interpreter.
 
-The fixed interpreter still consumes schema 11/12, including precomputed
-layout, ABI, instance and other query tables. Full migration requires validating
-physical type/layout IDs and complete ABI rows against the finite material,
-completing `BodyCore` and instance joins, supporting broader types/MIR and
-trait/const queries, allocation identity and provenance, then feeding the fixed
-interpreter without invented compiler facts. A limited physical-layout constructor
-and parametric ABI constructor do not yet satisfy those joins. Current foundation export fails closed on many MIR, type, lifetime,
+One fresh generic Rust `u8` identity source now passes finite end-to-end
+execution through source-derived assembly, canonical compiler provider
+preparation, a real direct call frame and the fixed interpreter's assignment
+and Return steps. It returns 42 with an empty frame stack under explicit fixed
+scheduling and finite address choices. Missing producer input, unsupported
+type and out-of-domain body controls reject. This is a bounded direct-frame
+observation, not Rust main startup or a Rust safety theorem.
+
+The fixed interpreter still consumes schema 11/12 for general programs,
+including precomputed query tables. Full migration requires broader physical
+types/MIR, indirect and call ABIs, trait/const queries, allocation identity and
+provenance, Rust main/startup and external effects from finite source material.
+Current foundation export and assembly fail closed on many MIR, type, lifetime,
 allocation and call forms. Neither the foundation path nor the old query
 closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
