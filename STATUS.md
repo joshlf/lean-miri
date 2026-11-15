@@ -51,7 +51,10 @@ executable reaches the fixed compiler-selected process entry, constructs the
 main function pointer, runs the custom start MIR and exits zero after TLS
 cleanup. That start returns `argc` without invoking main; ordinary std main
 remains unsupported. A byte-array literal direct frame reads `Miri` through
-its imported provenance pointer and returns; byte-interner reservation remains
+its imported provenance pointer and returns. A Unicode `&str` direct frame
+reads the actual wide-pointer metadata length 8 for `Lean🦀` and the fixed
+memory machine reads its eight UTF-8 bytes; a wrong metadata length triggers
+the fixed bounds UB. Byte-interner reservation remains
 explicitly unavailable and rejects both known and unknown byte demands. The fixed interpreter still
 consumes schema 11/12 for general programs, including precomputed query tables.
 Full migration requires wider physical types/MIR, indirect and broader call

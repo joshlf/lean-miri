@@ -49,7 +49,9 @@ two-function `calls(42_u8)` run enters a callee frame and returns 42 through
 both fixed interpreter frames. The same checked call path preserves u16
 `0xBEEF` and usize `0x123456789ABCDEF0` through real callee/return frames,
 matching independent schema-12 runs. A byte-array literal returns a provenance
-pointer whose four bytes read `Miri` in the fixed memory machine. A separate
+pointer whose four bytes read `Miri` in the fixed memory machine. A Unicode
+`&str` returns a wide pointer whose actual metadata length 8 drives the fixed
+read of `Lean🦀` UTF-8 bytes; length 9 triggers the fixed bounds UB. A separate
 no_std custom `#[lang=start]` executable passes the fixed compiler-selected
 startup path and exits zero after thread/TLS cleanup; its start returns `argc`
 without calling main. These runs use explicit finite scheduling and choice
@@ -63,7 +65,7 @@ general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
 byte-interner identity and general provenance, runtime symbol
 identities and broader MIR are not yet supplied by pure foundation queries.
 Finite Call MIR and direct FnDef evidence support the checked two-function
-domain. Source allocation images support the checked literal read while the
+domain. Source allocation images support the checked array and str literal reads while the
 byte interner is explicitly unavailable; any reservation demand still stops
 Unsupported. Coroutines, inlined
 frames, target features and caller-location tracking also stop. The direct
