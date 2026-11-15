@@ -9,6 +9,8 @@ mod signature_binder_material;
 mod start_edge_material;
 #[path = "foundation_promoted.rs"]
 mod promoted_material;
+#[path = "foundation_termination.rs"]
+mod termination_material;
 #[path = "foundation_auto_traits.rs"]
 mod auto_trait_material;
 #[path = "foundation_enum.rs"]
@@ -387,6 +389,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     let closure_auto_source = m.closure_auto_source(tcx)?;
     let mut link_sections = link_section_material::export(tcx);
     m.attach_link_initializers(tcx,&mut link_sections)?;
+    let termination_source = m.termination_source(tcx)?;
     Ok(json!({
         "closure_auto_source":closure_auto_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
@@ -394,7 +397,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
         "frame_metadata":super::foundation_runtime_instances::frames(tcx),
         "startup_material":startup_material,
-        "link_section_material":link_sections,
+        "link_section_material":link_sections,"termination_source":termination_source,
         "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,

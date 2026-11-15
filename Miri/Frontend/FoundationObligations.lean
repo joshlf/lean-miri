@@ -1,6 +1,7 @@
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationTraitClaims
+import Miri.Frontend.FoundationTermination
 import Miri.Frontend.FoundationExistentialBounds
 import Miri.Frontend.FoundationFnSupertraits
 import Miri.Frontend.FoundationOutlives
@@ -91,6 +92,8 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
       if path == "std::marker::Copy" || path == "std::marker::Sized" ||
           path == "core::marker::Copy" || path == "core::marker::Sized" then
         unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"
+      else if ((d.source.getObjVal? "termination_source" >>= fun s => s.getObjValAs? Nat "definition").toOption == some definition) then
+        let _ ← sourceTerminationUnitSelection d definition ty
       else
         unless (← localTraitClaim row ty) do throw s!"unsatisfied local trait obligation {path}"
     | "projection" => checkProjectionClause d typeArgs constArgs clause
