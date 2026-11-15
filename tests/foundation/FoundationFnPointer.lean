@@ -42,12 +42,14 @@ def main (paths : List String) : IO Unit := do
       (.functionPointer #[] (.tuple #[]) "safe" "c" false) with
   | .error _ => pure ()
   | .ok _ => throw (IO.userError "unsupported C function pointer accepted")
-  let sourceRow := document.types[sourceId]!
+  let some sourceRow := document.types[sourceId]? | throw (IO.userError "source function pointer row absent")
   let shape ← checked (sourceRow.getObjVal? "shape")
   let signatureSource ← checked (shape.getObjVal? "signature")
   let changed := signatureSource.setObjVal! "bound_variables" (toJson #[Json.null])
   let changedRow := sourceRow.setObjVal! "shape" (shape.setObjVal! "signature" changed)
-  let malformed := { document with types := document.types.set! sourceId changedRow }
+  let types := document.types.mapIdx (fun index original =>
+    if index == sourceId then changedRow else original)
+  let malformed := { document with types }
   match typeExpr malformed sourceId with
   | .error "bound function-pointer signature unsupported" => pure ()
   | .error error => throw (IO.userError s!"unexpected binder diagnostic: {error}")

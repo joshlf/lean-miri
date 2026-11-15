@@ -1,3 +1,5 @@
+import Miri.Frontend.FoundationConstOperand
+import Miri.Frontend.FoundationGlobalBytes
 import Miri.Frontend.FoundationBodyCore
 import Miri.Frontend.FoundationInstanceRegistry
 import Miri.Frontend.FoundationFnAbiRegistry
@@ -27,15 +29,27 @@ structure SourceProgramComponents where
   session : Input.Catalog.Session
   primitives : Input.Catalog.Primitives
 
+/-- Lower one scalar through the source evaluator and existing MIR constructor.
+The body pool is closed before instruction/required-constant relocation; a
+constant cannot silently add a physical type or constant identity afterward. -/
+private def lowerClosedScalarConstant (physical : PhysicalTypeRegistry)
+    (source : SpanRegistry) (operand : Json) : Except String (MIR.ConstOperand × ConcreteType) := do
+  let (result, constant) ← lowerScalarConstantOperand physical source operand
+  unless result.types.size == physical.types.size && result.layouts.size == physical.layouts.size &&
+      result.typeConstants.size == physical.typeConstants.size &&
+      result.registry.entries.size == physical.registry.entries.size do
+    throw "foundation scalar constant demands an unclosed physical type"
+  let concrete ← instantiate #[] #[] (← typeExpr physical.registry.document
+    (← operand.getObjValAs? Nat "type"))
+  return (constant, concrete)
+
 /-- Construct all supported local joins afresh from one finite document and one
-explicit ordinary Item request. Supported MIR has only whole-local Copy/Move
-and Return; required constants, promoted bodies and allocation operands reject
+explicit ordinary Item request. Supported MIR has whole-local Copy/Move or
+validated scalar-constant assignments and Return; promoted bodies and allocation operands reject
 upstream of the resulting allocation-free component bundle. -/
 def buildSourceProgramComponents (document : Document) (definition : Nat)
     (arguments : Array ItemArgument) : Except String SourceProgramComponents := do
   let prepared ← prepareItem document definition arguments
-  unless (← prepared.item.source.getObjValAs? (Array Json) "required_consts").isEmpty do
-    throw "foundation BodyCore required-constant operands are not lowered"
   let (physical, abi) ← rustFunctionAbiOfItem document definition arguments
   let registry ← InstanceRegistry.start physical
   let (registry, instanceNode) ← registry.intern definition arguments
@@ -55,13 +69,17 @@ def buildSourceProgramComponents (document : Document) (definition : Nat)
   let some bodyIndex := document.bodies.findIdx? (· == prepared.item.source)
     | throw "foundation program source body absent"
   let sourcePath := s!"$.bodies[{bodyIndex}]"
+  let lowerConstant := lowerClosedScalarConstant physical source
+  let mut requiredConsts := #[]
+  for operand in (← prepared.item.source.getObjValAs? (Array Json) "required_consts") do
+    requiredConsts := requiredConsts.push (← lowerConstant operand).1
   let body ← lowerPreparedBodyCore prepared {
     types := physical.registry.entries.mapIdx (fun id entry => ⟨entry.type, id⟩)
     physicalTypeIds := physical.types.map (·.id)
     spans := source.spans, compilerSpans := source.compilerSpans, files := source.files
     definitionId := definition, instanceNode := instanceNode
     defPath, sourcePath, backtraceSpans := source.backtraces
-    requiredConsts := #[] }
+    requiredConsts } lowerConstant
   unless instanceNode.bodyId == some 0 && body.instanceId == instanceNode.id do
     throw "foundation program single body identity mismatch"
   return ⟨physical, registry.definitions, instanceNode, abi, source, body, session, primitives⟩
@@ -113,7 +131,7 @@ def assembleSourceProgram (document : Document) (definition : Nat)
   Input.lowerProgram document
 
 /-- Exact effect-domain check for the bounded scalar identity call below. There
-are no projections, constants, calls, casts, explicit retags, allocations, drops or
+are no projections, calls, casts, explicit retags, allocation constants, drops or
 intrinsics in this accepted MIR. Scalar argument/return passing adds no
 reference retag demands; Use retag visits only the source-backed u8 leaf. Any broader body is rejected before empty query domains
 are constructed. This is a syntax check, not a compiler-correspondence proof. -/
@@ -130,6 +148,13 @@ def checkU8IdentityEffects (components : SourceProgramComponents) : Except Strin
   | .Assign destination (.Use (.Move operand) _) =>
     unless destination == ⟨0, #[]⟩ && operand == ⟨1, #[]⟩ do
       throw "restricted identity contains projection or different local effects"
+  | .Assign destination (.Use (.Constant constant) _) =>
+    unless destination == ⟨0, #[]⟩ do throw "restricted scalar constant destination unsupported"
+    match constant.value with
+    | .Val (.Scalar (.Int bits 1)) typeId =>
+      unless typeId == components.primitives.u8 && bits < 256 do
+        throw "restricted scalar constant is not a validated u8"
+    | _ => throw "restricted scalar constant kind unsupported"
   | _ => throw "restricted identity contains unsupported effects"
 
 /-- Catalog construction for one direct scalar identity frame. Foreign metadata
@@ -150,8 +175,9 @@ def restrictedLibraryQueries (document : Document) (definition : Nat)
   let selection ← entrySelection document.source
   unless selection.compilerEntry.isNone do
     throw "restricted library runner requires absent compiler process entry"
-  let some strType := components.physical.types.findIdx? (·.shapeKind == .str)
-    | throw "restricted compiler str type absent"
+  let (withBytes, globalBytes) ← globalBytesWithoutCandidates components.physical #[]
+  unless withBytes.types.size == components.physical.types.size do
+    throw "restricted global-byte type identity was not closed"
   return {
     session := components.session
     runtime := {
@@ -169,7 +195,7 @@ def restrictedLibraryQueries (document : Document) (definition : Nat)
     nativeSignatures := #[]
     retag := #[]
     covariance := #[]
-    globalBytes := ⟨32, strType, #[], #[]⟩
+    globalBytes
     callerLocations := #[]
     main := ⟨selection.startLangItem, none, none, #[], none⟩
     primitives := components.primitives

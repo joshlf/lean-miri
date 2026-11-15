@@ -83,7 +83,7 @@ private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
 /-- Execute one direct u8 frame under the explicit fixed-scheduling, shallow
 validation, vclock profile below. Only the observed finite call is asserted;
 startup, process exit and other permitted choices are outside this check. -/
-def runPrepared (prepared : Input.CompilerProviders.Prepared) : Except String String := do
+def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : UInt8 := 42) : Except String String := do
   let dummy ← Input.CompilerContextSpan.rootSpan prepared.program
   let definition ← prepared.program.rootDefinitionId 0
   let some root := prepared.program.input.bodyRoots[0]? | throw "root absent"
@@ -161,13 +161,13 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) : Except String St
     let (_, value) ← checkedState (MachineHooks.run (PlaceMachine.readImmediate config.access localOp) inner)
     let scalar ← (value.imm.toScalar.mapError reprStr)
     let result ← (scalar.toUInt8.mapError reprStr)
-    unless result == 42 do
-      throw s!"actual exported root returned {result}, expected 42"
+    unless result == expected do
+      throw s!"actual exported root returned {result}, expected {expected}"
     unless stepped do throw "source Step.step returned no performed step"
     let (returned, _) ← checkedState
       (Input.EvalConfigurationCore.step prepared image bytes options coreLeaves () after)
     unless returned.stack.frames.isEmpty && returned.stack.currentFrame?.isNone do
-      throw "fixed interpreter Return did not empty identity stack"
-    pure s!"fixed interpreter identity(42_u8)={result}; assignment and Return executed; stack empty"
+      throw "fixed interpreter Return did not empty root stack"
+    pure s!"fixed interpreter {root.defPath}(42_u8)={result}; assignment and Return executed; stack empty"
 
 end Miri.Frontend.Foundation.FixedIdentityRun
