@@ -256,6 +256,25 @@ impl Invocation {
             Self::Direct { rustc_args, .. } | Self::Cargo { rustc_args, .. } => rustc_args,
         }
     }
+    fn source_argv0_lengths(&self) -> Vec<u64> {
+        let mut lengths = Vec::new();
+        if let Some(source) = rustc_source_path(self.rustc_args()) {
+            lengths.push(source.as_bytes().len() as u64 + 1);
+            if let Ok(absolute) = fs::canonicalize(source) {
+                lengths.push(absolute.to_string_lossy().as_bytes().len() as u64 + 1);
+            }
+        }
+        lengths.sort_unstable();
+        lengths.dedup();
+        lengths
+    }
+}
+
+fn rustc_source_path(rustc_args: &[String]) -> Option<&str> {
+    rustc_args
+        .iter()
+        .map(String::as_str)
+        .find(|arg| !arg.starts_with('-') && arg.ends_with(".rs") && Path::new(arg).is_file())
 }
 
 struct ExportCallbacks {
@@ -1439,6 +1458,14 @@ impl ExportCallbacks {
                 type_json(&mut export_context, tcx, ty::Ty::new_array(tcx, element, count))?;
             }
         }
+        // NativeRunner uses the source spelling as argv0; the reference lane
+        // may use its canonical path. Capture both exact rustc array results.
+        if let Some(invocation) = self.invocation.as_ref() {
+            for count in invocation.source_argv0_lengths() {
+                type_json(&mut export_context, tcx,
+                    ty::Ty::new_array(tcx, tcx.types.u8, count))?;
+            }
+        }
         if tcx
             .lang_items()
             .get(rustc_attr_ir::LangItem::PanicLocation)
@@ -2168,7 +2195,7 @@ fn run_as_rustc_wrapper(args: Vec<String>) -> Result<(), String> {
         rustc_commit:EXPECTED_RUSTC_COMMIT,
         rustc_executable:rustc_path.canonicalize().ok().map(|path|path.to_string_lossy().into_owned()).unwrap_or_else(||rustc_path.to_string_lossy().into_owned()),
         working_directory:env::current_dir().ok().map(|path|path.to_string_lossy().into_owned()),
-        crate_name:crate_name.clone(), source_path:rustc_args.iter().find(|arg|arg.ends_with(".rs")).cloned(),
+        crate_name:crate_name.clone(), source_path:rustc_source_path(&rustc_args).map(str::to_owned),
         target_crate, rustc_args:rustc_args.clone(), rustc_args_fingerprint_fnv1a64:args_fingerprint(&rustc_args),
     };
     let mut driver_args = Vec::with_capacity(rustc_args.len() + 1);
