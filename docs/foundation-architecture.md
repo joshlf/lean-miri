@@ -23,8 +23,11 @@ requested type, `instantiate` substitutes a requested type/const argument tuple,
 and `checkEnvironment` checks the known `Sized`, `Copy` and `usize` obligations
 for the restricted structural type domain, and matches complete local primitive
 marker impl headers for a narrower domain. Each is a pure function of the
-document and explicit arguments. Scalar free const-item expressions are
-evaluated on demand and every required constant is checked on frame entry,
+document and explicit arguments. Unsigned scalar free const-item MIR with
+selected arithmetic, comparisons, switches and assertions is evaluated on
+demand. Four genuine values (37, 36, 42 and 600) match independent compiler
+CTFE, and the branch-derived 36 also returns through a fixed frame. Every
+required constant is checked on frame entry,
 including unreachable obligations. Generic/promoted const definitions and
 general const-MIR evaluation remain unsupported. Unknown obligations are errors. The existing
 fixed interpreter also now computes canonical nested-array layouts on demand
@@ -41,6 +44,7 @@ interpreter** execute the actual assignment and Return from a direct call
 frame; the observed return is 42 and the frame stack becomes empty. The same
 source-derived path executes a scalar const-item body using `VALUE: u8 = 37`,
 retaining its required constant before the fixed frame returns 37. A genuine
+branch-derived scalar const returns 36 through another fixed frame. A genuine
 two-function `calls(42_u8)` run enters a callee frame and returns 42 through
 both fixed interpreter frames. The same checked call path preserves u16
 `0xBEEF` and usize `0x123456789ABCDEF0` through real callee/return frames,

@@ -20,7 +20,7 @@ compilation settings, required constants and generic predicates as finite materi
 it does not enumerate monomorphic substitutions or emit query-answer catalogs.
 The new Lean reader computes type expansion, generic substitution, a restricted
 `Sized`/`Copy`/`usize` obligation check, finite local primitive marker impl
-matching, supported required-constant and scalar const-item evaluation,
+matching, supported required-constant and unsigned scalar const-MIR evaluation,
 primitive/array layouts and partial ABI components as pure on-demand queries.
 It also derives source span identities, producer/session evidence, primitive
 and foreign catalogs, ordinary item instances and frames, and a restricted
@@ -32,7 +32,8 @@ Fresh generic Rust `u8` identity and scalar const-item sources now pass finite
 end-to-end execution through source-derived assembly, canonical compiler
 provider preparation, real direct frames and the fixed interpreter's assignment
 and Return steps. Identity returns 42; the source `const VALUE: u8 = 37`
-returns 37. Both empty the frame stack under explicit fixed scheduling and
+returns 37. A branch-derived scalar const evaluates to 36 and returns through
+another fixed frame. All empty the frame stack under explicit fixed scheduling and
 finite address choices. Every required constant is retained and checked before
 the const frame executes. Missing producer input, unsupported type, cyclic
 constant and out-of-domain body controls reject. These are bounded direct-frame
@@ -54,7 +55,7 @@ its imported provenance pointer and returns; byte-interner reservation remains
 explicitly unavailable and rejects both known and unknown byte demands. The fixed interpreter still
 consumes schema 11/12 for general programs, including precomputed query tables.
 Full migration requires wider physical types/MIR, indirect and broader call
-ABIs, trait/const queries, byte-interner identity and provenance semantics,
+ABIs, general trait/const queries, byte-interner identity and provenance semantics,
 ordinary Rust main/startup and external effects from finite source material. Current
 foundation export and assembly fail closed on many MIR, type, lifetime,
 allocation and call forms. Neither the foundation path nor the old query
