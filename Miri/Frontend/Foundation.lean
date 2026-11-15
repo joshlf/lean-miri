@@ -10,6 +10,7 @@ open Lean
 
 structure Target where
   triple : String
+  architecture : String := ""
   dataLayout : String
   pointerSizeBits : Nat
   endian : String
@@ -44,6 +45,7 @@ def decode (j : Json) : Except String Document := do
   let t ← field j "target"
   let target : Target := {
     triple := ← string t "triple"
+    architecture := ← string t "architecture"
     dataLayout := ← string t "data_layout"
     pointerSizeBits := ← nat t "pointer_size_bits"
     endian := ← string t "endian"

@@ -24,6 +24,7 @@ class FoundationExport(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 doc = json.loads(output.read_text())
                 self.assertEqual((doc["schema"], doc["schema_version"]), ("lean-miri-foundation", 1))
+                self.assertEqual(doc["target"]["architecture"], "x86_64")
                 self.assertEqual(len(doc["bodies"]), 1)
                 self.assertEqual(doc["bodies"][0]["required_consts"], [])
                 self.assertFalse(any(key.startswith("compiler_") for key in doc))
