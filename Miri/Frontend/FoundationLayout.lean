@@ -51,8 +51,8 @@ private def integerWidth (target : Target) (kind name : String) : Except String 
   let names := if kind == "int" then #["i8", "i16", "i32", "i64", "i128"]
     else if kind == "uint" then #["u8", "u16", "u32", "u64", "u128"] else #[]
   let widths := #[8, 16, 32, 64, 128]
-  for i in [:names.size] do
-    if names[i]! == name then return widths[i]!
+  for (candidate, width) in names.toList.zip widths.toList do
+    if candidate == name then return width
   throw s!"unsupported foundation integer {kind} {name}"
 
 /-- Compute only requested layouts. Nonempty Rust tuples can reorder fields;
