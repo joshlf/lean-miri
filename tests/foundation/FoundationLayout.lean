@@ -15,7 +15,7 @@ private def fails (r : Except String FoundationLayout) : IO Unit := do
   | .error _ => pure ()
   | .ok v => throw (IO.userError s!"unexpected layout {repr v}")
 
-def main : IO Unit := do
+def main (paths : List String) : IO Unit := do
   expect (layoutOf target (.primitive "bool" "")) 1 1
   expect (layoutOf target (.primitive "char" "")) 4 4
   expect (layoutOf target (.primitive "int" "i128")) 16 16
@@ -32,13 +32,19 @@ def main : IO Unit := do
   fails (layoutOf target (.primitive "float" "f32"))
   fails (layoutOf (target "e-i16:24") (.primitive "uint" "u16"))
   fails (layoutOf (target "e" 128) (.primitive "uint" "u8"))
-  for (path, id, args, consts) in #[
-      ("scratch/foundation-array.json", 2, #[some (ConcreteType.primitive "uint" "u16")], #[none, some 3]),
-      ("scratch/foundation-concrete.json", 0, #[], #[])] do
+  IO.println "foundation layout: 16 self-contained checks passed"
+  let fixtures ← match paths with
+    | [] => pure #[]
+    | [arrayPath, concretePath] => pure #[
+        (arrayPath, 2, #[some (ConcreteType.primitive "uint" "u16")], #[none, some 3]),
+        (concretePath, 0, #[], #[])]
+    | _ => throw (IO.userError "usage: FoundationLayout.lean [ARRAY_EXPORT CONCRETE_EXPORT]")
+  for (path, id, args, consts) in fixtures do
     let raw ← IO.FS.readFile path
     let d ← match Json.parse raw >>= decode with
       | .ok d => pure d
       | .error e => throw (IO.userError e)
     expect (layoutOfType d id args consts) 6 2
     fails (layoutOfType d 999 args consts)
-  IO.println "foundation layout: 20 checks passed (including fresh array/concrete exports)"
+  unless fixtures.isEmpty do
+    IO.println "foundation layout: 4 fresh array/concrete export checks passed"
