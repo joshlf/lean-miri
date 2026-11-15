@@ -48,7 +48,7 @@ impl<'tcx> Material<'tcx> {
                 Some(self.ty(tcx,tcx.type_of(owner).instantiate_identity().skip_normalization())?)
             } else {None};
             self.definitions[owner_id]["generic_declaration"] = json!({"parent":parent,
-                "parent_count":generics.parent_count,"own_parameter_count":generics.own_params.len(),"self_type":self_type});
+                "parent_count":generics.parent_count,"own_parameter_count":generics.own_params.len(),"self_type":self_type,"has_self":generics.has_self});
             let parameters = generics.own_params.iter().map(|parameter| {
                 let value = self.generic_parameter(tcx,parameter)?;
                 let id = self.definition(tcx,parameter.def_id);
@@ -56,7 +56,7 @@ impl<'tcx> Material<'tcx> {
                 Ok(value)
             }).collect::<Result<Vec<_>>>()?;
             layers.push(json!({"owner":owner_id,"parent":parent,"parent_count":generics.parent_count,
-                "parameters":parameters,"clauses":self.own_environment_clauses(tcx,owner)?,"self_type":self_type}));
+                "parameters":parameters,"clauses":self.own_environment_clauses(tcx,owner)?,"self_type":self_type,"has_self":generics.has_self}));
         }
         Ok(json!({"owner":self.definition(tcx,definition),"layers":layers}))
     }

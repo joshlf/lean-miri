@@ -76,6 +76,18 @@ assert not chain['closure_templates']
 assert names(closure,'bodies') == ['closure_caller','graph_dependency::creator']
 assert names(closure,'closure_templates') == ['graph_dependency::creator::{closure#0}']
 assert any(row['owner_declaration']['kind'] == 'trait_method' for row in closure['source_function_signatures'])
+for header in closure['source_function_signatures']:
+    if header['owner_declaration']['kind'] != 'trait_method':
+        continue
+    layer = header['environment']['layers'][0]
+    owner = closure['definitions'][layer['owner']]
+    self_parameter = layer['parameters'][0]
+    assert layer['has_self'] and owner['generic_declaration']['has_self']
+    assert owner['kind'] in ['Trait', 'TraitAlias']
+    assert self_parameter['kind'] == 'type' and self_parameter['index'] == 0
+    assert self_parameter['definition'] == layer['owner']
+    assert self_parameter['has_default'] is False and self_parameter['default'] is None
+
 assert any(row['shape']['kind'] == 'projection_alias' for row in closure['types'])
 print('generic finite source graph: direct dependency chain, header-only and exact frontier controls PASS')
 PY

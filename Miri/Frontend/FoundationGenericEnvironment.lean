@@ -26,6 +26,10 @@ def flattenEnvironment (document : Document) (source : Json) : Except String Jso
     let some row := document.definitions[definition]? | throw "generic source owner absent"
     unless (← row.getObjValAs? Nat "definition_id") == definition do throw "generic source owner identity mismatch"
     let declaration ← row.getObjVal? "generic_declaration"
+    let ownerKind ← row.getObjValAs? String "kind"
+    let hasSelf ← layer.getObjValAs? Bool "has_self"
+    unless hasSelf == (← declaration.getObjValAs? Bool "has_self") do
+      throw "generic declaration/layer Self witness mismatch"
     let parent ← requiredOptionalNat layer "parent"
     unless parent == previous && parent == (← requiredOptionalNat declaration "parent") do
       throw "generic source lexical parent mismatch"
@@ -52,8 +56,18 @@ def flattenEnvironment (document : Document) (source : Json) : Except String Jso
         | "type" => pure "TyParam"
         | "const" => pure "ConstParam"
         | _ => throw "generic parameter kind unsupported"
+      let actualKind ← row.getObjValAs? String "kind"
+      -- Pinned generics_of.rs:242–252 reuses the trait owner DefId
+      -- for the implicit Self type parameter; it is not a synthetic TyParam.
+      let implicitSelf := kind == "type" && ownerKind == "Trait" &&
+        id == definition && expectedIndex == 0 && parentCount == 0 && hasSelf
+      if implicitSelf then
+        unless !(← parameter.getObjValAs? Bool "has_default") &&
+            (← parameter.getObjVal? "default") == Json.null do
+          throw "implicit trait Self has a default"
       unless (← row.getObjValAs? Nat "definition_id") == id &&
-          (← row.getObjValAs? String "kind") == expectedKind do throw "generic parameter identity/kind mismatch"
+          (actualKind == expectedKind || (implicitSelf && actualKind == ownerKind)) do
+        throw "generic parameter identity/kind mismatch"
       let identity ← row.getObjVal? "generic_parameter"
       unless (← identity.getObjValAs? Nat "owner") == definition &&
           (← identity.getObjValAs? Nat "index") == expectedIndex do throw "generic parameter owner/index mismatch"
