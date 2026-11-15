@@ -32,7 +32,8 @@ private def span (c : Context) (id : Nat) : Except String Nat := do
 private def info (c : Context) (source : SourceMir.SourceInfo) : Except String MIR.SourceInfo := do
   return ⟨⟨← span c source.span⟩,source.scope⟩
 private def constant (c : Context) (value : SourceMir.Constant) : Except String MIR.ConstOperand := do
-  unless value.userType.isNone do throw "Unsupported source MIR user type annotation"
+  -- User type annotations are type-checking metadata. The pinned runtime
+  -- evaluates const_ and span only; retain the opaque source index unchanged.
   let some type := c.types[value.type]?.join | throw "Unsupported source MIR constant type not yet instantiated"
   let matching :=  c.source.spans.filter (·.key == value.span)
   let [sourceSpan] := matching.toList | throw "Invalid source MIR constant span identity absent/ambiguous"
@@ -114,7 +115,7 @@ def derive (initial : World) (callee : CallInstance) : Except String World := do
   let some material := initial.canonical.sourceMaterial | throw "Unsupported source MIR material absent"
   let some mir := material.genericMir | throw "Unsupported typed source MIR unavailable"
   let [body] := (mir.bodies.filter fun b => b.definition == key.definition && b.promoted.isNone).toList
-    | throw "Unsupported source MIR body absent/ambiguous"
+    | throw s!"Unsupported source MIR body absent/ambiguous: {reprStr key.definition}; {node.defPath.getD "<unknown>"}"
   unless body.promotedCount == 0 do throw "Unsupported source MIR promoted body installation"
   let some _ := material.physical | throw "Unsupported typed source MIR type expressions unavailable"
   let parameters ← SourceDeclarations.fullParameters material.genericLayers key.definition
