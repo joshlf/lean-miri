@@ -16,6 +16,7 @@ fn outer_constructor(ty: ty::Ty<'_>) -> Value {
         ty::Closure(def,_) => json!({"kind":"closure","definition":raw_definition(def)}),
         ty::CoroutineClosure(def,_) => json!({"kind":"coroutine_closure","definition":raw_definition(def)}),
         ty::FnPtr(..) => json!({"kind":"fn_pointer"}),
+        ty::Dynamic(..) => json!({"kind":"dynamic"}),
         ty::Tuple(elements) => json!({"kind":"tuple","arity":elements.len()}),
         ty::RawPtr(..) => json!({"kind":"raw_pointer"}),
         ty::Ref(..) => json!({"kind":"reference"}),
@@ -43,7 +44,7 @@ impl<'tcx> Material<'tcx> {
         let unpin = tcx.lang_items().unpin_trait();
         let unsafe_unpin = tcx.lang_items().unsafe_unpin_trait();
         let freeze = tcx.lang_items().freeze_trait();
-        if self.type_ids.keys().any(|ty| matches!(ty.kind(),ty::Closure(..))) {
+        if self.type_ids.keys().any(|ty| matches!(ty.kind(),ty::Closure(..)|ty::Dynamic(..))) {
             requested.extend([unpin,unsafe_unpin,freeze].into_iter().flatten());
         }
         requested.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));

@@ -295,7 +295,7 @@ impl<'tcx> Material<'tcx> {
         // Inputs to pinned ty::layout::fn_can_unwind; do not cache its answer.
         let function_attributes = json!({
             "never_unwind":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
-            "track_caller":ty::InstanceKind::Item(def).requires_caller_location(tcx),
+            "track_caller":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),
             "is_foreign":tcx.is_foreign_item(def),
             "is_drop_glue":tcx.is_lang_item(def,rustc_attr_ir::LangItem::DropGlue),
         });

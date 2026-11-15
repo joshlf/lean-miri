@@ -162,6 +162,27 @@ private def callableDeclarations (document : Document) : Except String (Array Ca
     result := result.push ⟨← raw document id,kind,output⟩
   return result
 
+/-- Retain the full declaration graph already captured by the producer. No
+instantiated bound, selected object candidate, or query answer is stored. -/
+private def objectTraitDeclarations (document : Document) : Except String (Array ObjectTraitDeclaration) := do
+  let source ← document.source.getObjVal? "fn_vtable_source"
+  if source == Json.null then return #[]
+  let mut result := #[]
+  for row in (← source.getObjValAs? (Array Json) "declarations") do
+    let definition ← raw document (← row.getObjValAs? Nat "definition")
+    unless !(result.any (fun (old : ObjectTraitDeclaration) => old.definition == definition)) do
+      throw "object trait declaration identity duplicated"
+    let clauses ← row.getObjValAs? (Array Json) "super_clauses"
+    let mut superTraits := #[]
+    let mut unsupported := #[]
+    for clause in clauses do
+      let kind ← clause.getObjValAs? String "kind"
+      if kind == "trait" then
+        superTraits := superTraits.push (← raw document (← clause.getObjValAs? Nat "definition"))
+      else unsupported := unsupported.push kind
+    result := result.push ⟨definition,superTraits,unsupported⟩
+  return result
+
 /-- Preserve every captured source header and lexical clause owner exactly once.
 No concrete substitutions, ABI results or selected implementations are produced. -/
 private def autoTraits (document : Document) : Except String (Option AutoTraits) := do
@@ -215,7 +236,7 @@ private def autoTraits (document : Document) : Except String (Option AutoTraits)
         | "tuple" => AutoSelfHead.tuple <$> head.getObjValAs? Nat "arity"
         | "unknown" => pure AutoSelfHead.unknown
         | tag =>
-          if #["fn_pointer","raw_pointer","reference","array","slice","str","bool","char","int","uint","float","never"].contains tag
+          if #["fn_pointer","raw_pointer","reference","array","slice","str","bool","char","int","uint","float","never","dynamic"].contains tag
           then pure (.rigid tag) else throw "auto impl outer constructor unknown"
       let selfHead ← parseHead 256 head
       let polarity ← header.getObjValAs? String "polarity"
@@ -282,5 +303,5 @@ def material (document : Document) : Except String Material := do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No"⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No",← objectTraitDeclarations document⟩
 end Miri.Frontend.Foundation.SourceAbiParser

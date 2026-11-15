@@ -140,6 +140,15 @@ structure AutoTraits where
   declarations : Array AutoDeclaration
   deriving Repr, DecidableEq
 
+/-- Complete direct super-clause declaration graph for object-bound exclusion.
+Trait identity cannot change during argument normalization. Unsupported clause
+kinds remain unavailable rather than being omitted from the closure proof. -/
+structure ObjectTraitDeclaration where
+  definition : DefinitionId
+  superTraits : Array DefinitionId
+  unsupportedSuperClauses : Array String
+  deriving Repr, DecidableEq
+
 structure Material where
   functions : Array Function
   owners : Array OwnerClauses
@@ -150,6 +159,7 @@ structure Material where
   callables : Array CallableDeclaration := #[]
   autoTraits : Option AutoTraits := none
   optimizationDisabled : Bool := false
+  objectTraits : Array ObjectTraitDeclaration := #[]
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi

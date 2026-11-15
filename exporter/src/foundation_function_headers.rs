@@ -27,7 +27,7 @@ impl<'tcx> Material<'tcx> {
             "environment":self.environment(tcx,definition)?,"signature":self.signature(tcx,definition)?,
             "function_attributes":{
                 "never_unwind":attrs.flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
-                "track_caller":ty::InstanceKind::Item(definition).requires_caller_location(tcx),
+                "track_caller":attrs.flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),
                 "is_foreign":tcx.is_foreign_item(definition),
                 "is_drop_glue":tcx.is_lang_item(definition,rustc_attr_ir::LangItem::DropGlue)}}))
     }

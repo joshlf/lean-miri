@@ -1,4 +1,5 @@
-//! Finite declaration source for Fn-family vtable candidate construction.
+//! Finite object-trait declarations, seeded by observed dyn principals and
+//! callable language items. No monomorphic vtable query closure.
 //! Never calls vtable_entries, object-safety, instance selection or allocation.
 use super::*;
 use std::collections::HashSet;
@@ -8,6 +9,11 @@ impl<'tcx> Material<'tcx> {
     fn fn_vtable_type(&mut self, tcx: TyCtxt<'tcx>, value: ty::Ty<'tcx>) -> Result<Value> {
         Ok(match *value.kind() {
             ty::Param(p) => json!({"kind":"param","index":p.index}),
+            // A method declaration names the nominal type; inspecting its
+            // private fields here would demand unrelated layout/const source.
+            ty::Adt(definition,arguments) => json!({"kind":"nominal",
+                "definition":self.definition(tcx,definition.did()),
+                "arguments":self.fn_vtable_arguments(tcx,arguments)?}),
             ty::Tuple(elements) => json!({"kind":"tuple","elements":elements.iter().map(|t|self.fn_vtable_type(tcx,t)).collect::<Result<Vec<_>>>()?}),
             ty::Ref(source_region,pointee,mutable) => {
                 let region = match source_region.kind() {
@@ -22,7 +28,7 @@ impl<'tcx> Material<'tcx> {
                 ty::AliasTyKind::Projection {def_id} => json!({"kind":"projection","rigid":format!("{rigid:?}"),"definition":self.definition(tcx,def_id),"arguments":self.fn_vtable_arguments(tcx,alias.args)?}),
                 other => return unsupported("Fn declaration alias",other),
             },
-            other => return unsupported("Fn declaration type",other),
+            _ => json!({"kind":"source_type","type":self.ty(tcx,value)?}),
         })
     }
     fn fn_vtable_arguments(&mut self, tcx: TyCtxt<'tcx>, args: ty::GenericArgsRef<'tcx>) -> Result<Vec<Value>> {
@@ -73,13 +79,16 @@ impl<'tcx> Material<'tcx> {
         let roots = [("fn",tcx.lang_items().fn_trait()),("fn_mut",tcx.lang_items().fn_mut_trait()),("fn_once",tcx.lang_items().fn_once_trait())];
         let root_records = roots.iter().map(|(kind,definition)|json!({"kind":kind,"definition":definition.map(|d|self.definition(tcx,d))})).collect::<Vec<_>>();
         let mut pending = roots.iter().filter_map(|(_,d)|*d).collect::<Vec<_>>();
+        let mut principals = self.type_ids.iter().filter_map(|(value,index)| match value.kind() {
+            ty::Dynamic(predicates,_) => predicates.principal().map(|principal|(*index,principal.def_id())),
+            _ => None,
+        }).collect::<Vec<_>>();
+        principals.sort_by_key(|(index,_)|*index);
+        pending.extend(principals.into_iter().map(|(_,definition)|definition));
         let mut seen = HashSet::new();
         let mut declarations = Vec::new();
         while let Some(definition) = pending.pop() {
             if !seen.insert(definition) {continue;}
-            if definition.is_local() || tcx.crate_name(definition.krate).as_str() != "core" {
-                return unsupported("non-pinned core Fn source",definition);
-            }
             let generics = tcx.generics_of(definition);
             let lang_item = roots.iter().find_map(|(kind,d)|(*d == Some(definition)).then_some(*kind))
                 .unwrap_or_else(|| if tcx.is_lang_item(definition,rustc_attr_ir::LangItem::MetaSized) {"meta_sized"}
@@ -122,9 +131,17 @@ impl<'tcx> Material<'tcx> {
                 }
                 associated.push(record);
             }
-            declarations.push(json!({"definition":self.definition(tcx,definition),"core_source":true,"lang_item":lang_item,"has_self":generics.has_self,
+            declarations.push(json!({"definition":self.definition(tcx,definition),"core_source":!definition.is_local() && tcx.crate_name(definition.krate).as_str()=="core","lang_item":lang_item,"has_self":generics.has_self,
                 "parameters":generics.own_params.iter().map(|p|match p.kind {ty::GenericParamDefKind::Type{has_default,..}=>json!({"index":p.index,"kind":"type","has_default":has_default}),_=>json!({"index":p.index,"kind":"unsupported","source":format!("{:?}",p.kind)})}).collect::<Vec<_>>(),
                 "clause_source":self.fn_method_clause_source(tcx,definition)?,"super_clauses":super_clauses,"associated_items":associated}));
+            // Method declaration syntax can introduce additional dyn types.
+            // Their principals are source graph nodes, not vtable answers.
+            let mut principals = self.type_ids.iter().filter_map(|(value,index)| match value.kind() {
+                ty::Dynamic(predicates,_) => predicates.principal().map(|principal|(*index,principal.def_id())),
+                _ => None,
+            }).collect::<Vec<_>>();
+            principals.sort_by_key(|(index,_)|*index);
+            pending.extend(principals.into_iter().map(|(_,definition)|definition).filter(|definition|!seen.contains(definition)));
         }
         Ok(json!({"roots":root_records,"declarations":declarations,"no_trait_vptr":tcx.sess.opts.unstable_opts.no_trait_vptr}))
     }

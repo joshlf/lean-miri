@@ -31,6 +31,20 @@ class FoundationSignatureHeaders(unittest.TestCase):
                 self.assertIsNone(document["dyn_metadata_source"])
                 self.assertFalse(any(row["shape"]["kind"] == "dynamic" for row in document["types"]))
 
+    def test_track_caller_retains_raw_attribute_for_body_and_header(self):
+        with tempfile.TemporaryDirectory(prefix="caller-source-attribute-") as directory:
+            for tracked in [False, True]:
+                source = Path(directory) / f"caller_{tracked}.rs"
+                source.write_text(("#[track_caller]\n" if tracked else "") +
+                                  "pub fn reference(value: u8) -> u8 { value }\n")
+                output = Path(directory) / f"caller_{tracked}.json"
+                result = self.export(output, source, "reference",
+                                     ["--foundation-signature-root", "reference"])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                document = json.loads(output.read_text())
+                self.assertEqual(document["bodies"][0]["function_attributes"]["track_caller"], tracked)
+                self.assertEqual(document["source_function_signatures"][0]["function_attributes"]["track_caller"], tracked)
+
     def test_explicit_std_header_has_no_executable_std_body(self):
         with tempfile.TemporaryDirectory(prefix="signature-demand-") as directory:
             output = Path(directory) / "source.json"
