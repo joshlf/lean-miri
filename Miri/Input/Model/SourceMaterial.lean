@@ -1,3 +1,4 @@
+import Miri.Input.Model.SourceAllocationIdentity
 import Miri.Input.Model.SourceAllocations
 import Miri.Input.Model.SourceMir
 import Miri.Input.Model.SourceDeclarations
@@ -44,6 +45,7 @@ structure SourceMaterial where
   genericMir : Option SourceMir.Material := none
   physical : Option SourceTypes.Material := none
   allocations : Option SourceAllocations.Material := none
+  allocationIdentity : Option SourceAllocationIdentity.Material := none
   constraints : SourceMaterial.Unavailable := .unsupported
   deriving Repr, DecidableEq
 
@@ -51,6 +53,9 @@ namespace SourceMaterial
 
 def validate (material : Input.SourceMaterial) : Except String Unit := do
   if let some allocations := material.allocations then SourceAllocations.validate allocations
+  if let some identity := material.allocationIdentity then
+    let some physical := material.physical | throw "allocation identity source types unavailable"
+    identity.validate physical.types.size
   let target := material.target
   unless !target.triple.isEmpty && !target.architecture.isEmpty &&
       !target.dataLayout.isEmpty && target.pointerSizeBits > 0 && target.pointerSizeBits % 8 == 0 &&

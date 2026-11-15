@@ -1,5 +1,6 @@
 import Miri.Input.SourceCompilerWorld
 import Miri.Input.CompilerGlobals
+import Miri.Input.SourceCompilerAllocationIdentity
 
 /-! Demand existing compiler memory images from the evaluation-local typed
 World. Only the requested reachable graph receives canonical handles. Import
@@ -75,5 +76,10 @@ def importDemanded {P E K : Type} [DecidableEq K] (target : ABI.RuntimeTargetDat
   let pending ← (ids.filter (fun id => (memory.runtimeIdForExport? id).isNone)).mapM fun id => do
     let some node := nodes[id]? | throw "demanded canonical memory image absent"
     pure node
-  return AllocationImage.importGraph target world.canonical.definitions CompilerGlobals.queries pending memory
+  let reserveSource := world.canonical.sourceMaterial.bind (·.allocationIdentity) |>.map fun identity =>
+    fun (memory : MemoryState P E K) (node : AllocationNode) =>
+      match node.sourceAllocId with
+      | none => (memory,.error "demanded source image has no raw allocation identity")
+      | some raw => SourceCompilerAllocationIdentity.importKnown identity raw memory
+  return AllocationImage.importGraph target world.canonical.definitions CompilerGlobals.queries pending memory reserveSource
 end Miri.Input.SourceCompilerAllocations

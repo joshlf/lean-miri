@@ -30,6 +30,9 @@ structure World where
   derivedInstanceAbis : Array Catalog.InstanceAbi := #[]
   /-- Compiler span identity, including parent, is distinct from diagnostic coordinates. -/
   derivedSourceSpans : Array (SourceMir.SpanKey × SpanId) := #[]
+  /-- Initial existing vtable keys are canonicalized once on the first demand. -/
+  initialVTableIdentities : Option (Array SourceAllocationIdentity.CanonicalVTable) := none
+  derivedVTableIdentities : Array SourceAllocationIdentity.CanonicalVTable := #[]
 
 structure Access (S : Type) where
   get : S → Option World

@@ -1,5 +1,6 @@
 import Miri.Input.CompilerProviders
 import Miri.Input.CompilerVirtualLeaves
+import Miri.Input.SourceCompilerAllocationIdentity
 import Miri.Input.SourceCompilerVTables
 import Miri.Input.SourceCompilerRuntime
 
@@ -67,13 +68,36 @@ def make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
       else lift (CompilerVTableQueries.ensureMonomorphicDyn p.vtables.queries token)
     globalSalt := fun _ => return (← engine.functions.chooseSalt).val
     reserveVTable := fun _ ty token salt => do
-      if sourceMode then throw (.unsupported "source vtable allocation identity witness unavailable")
-      if bound : salt < 32 then VTableMachine.reserve engine ty token ⟨salt,bound⟩
+      if bound : salt < 32 then
+        if sourceMode then
+          let state ← get
+          let some world := access.get state | throw (.unsupported "source vtable World unavailable")
+          let align := p.runtime.target.defaultAddressSpacePointerSpec.pointerAlign
+          let result := SourceCompilerAllocationIdentity.demand world state.machine.memory ty token ⟨salt,bound⟩ align
+          let state := access.put state result.world
+          set {state with machine := {state.machine with memory := result.memory}}
+          let id ← lift result.outcome
+          let state ← get
+          let registry := engine.registry state.machine.user
+          if let some old := registry.entries.find? (fun entry => entry.typeId == ty &&
+              entry.dynamicType == token && entry.salt.val == salt) then
+            unless old.allocation == id do throw (.invalidProgram "source vtable registry identity conflict")
+          else
+            unless !(registry.entries.any (·.allocation == id)) do
+              throw (.invalidProgram "source vtable identity assigned to another key")
+            let registry := {registry with entries := registry.entries.push ⟨ty,token,⟨salt,bound⟩,id⟩}
+            modify fun state => {state with machine := {state.machine with
+              user := engine.putRegistry state.machine.user registry}}
+          return id
+        else VTableMachine.reserve engine ty token ⟨salt,bound⟩
       else throw (.invalidProgram "vtable source salt outside 0..32")
     globalRootPointer := fun _ id => do
-      if sourceMode then throw (.unsupported "source vtable allocation root witness unavailable")
+      if sourceMode then
+        unless (engine.registry (← get).machine.user).entries.any (·.allocation == id) do
+          throw (.unsupported "source vtable allocation root witness unavailable")
       return (← FunctionPointers.rootPointer engine.functions id).withOptionalProvenance
-    entries := fun _ principal ty => lift
-      (CompilerVTableRuntime.entries p.lifecycle.calls.symbols principal ty)
+    entries := fun _ principal ty => if sourceMode then
+      throw (.unsupported "source vtable method/contents materialization unavailable")
+      else lift (CompilerVTableRuntime.entries p.lifecycle.calls.symbols principal ty)
     assertVirtualInstanceMatches := VirtualCalls.assertConcrete (CompilerVirtualLeaves.make p.lifecycle.calls) }
 end Miri.Input.CompilerVTableLeaves

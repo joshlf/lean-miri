@@ -29,6 +29,8 @@ mod fn_vtable_material;
 mod closure_material;
 #[path = "foundation_closure_callees.rs"]
 mod closure_callee_material;
+#[path = "foundation_allocation_identity.rs"]
+mod allocation_identity_material;
 #[path = "foundation_allocations.rs"]
 mod allocation_material;
 #[path = "foundation_const_def.rs"]
@@ -409,20 +411,26 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         if !bodies.iter().any(|existing|existing["definition"]==body["definition"]) {bodies.push(body);}
     }
     let named_type_source = if compiler_entry.is_some() { m.named_type_source(tcx)? } else { Value::Null };
+    let producer = super::foundation_producer::capture(tcx, rustc_version, rustc_args)?;
+    let frame_metadata = super::foundation_runtime_instances::frames(tcx);
+    let foreign_symbol_material = foreign_symbol_material::export(tcx)?;
+    let runtime_data_layout = super::foundation_target::export(tcx)?;
+    let allocation_identity_source = m.allocation_identity_source(tcx)?;
     Ok(json!({
+        "allocation_identity_source":allocation_identity_source,
         "closure_auto_source":closure_auto_source,
         "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
-        "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
-        "frame_metadata":super::foundation_runtime_instances::frames(tcx),
+        "producer":producer,
+        "frame_metadata":frame_metadata,
         "startup_material":startup_material,
         "link_section_material":link_sections,"termination_source":termination_source,
         "named_type_source":named_type_source,
-        "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
+        "foreign_symbol_material":foreign_symbol_material,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,
         "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"},"opt_level":format!("{:?}",tcx.sess.opts.optimize)},
-        "target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
+        "target":{"runtime_data_layout":runtime_data_layout,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
         "definitions":m.definitions,"types":m.types,"bodies":bodies,
         "closure_templates":closure_templates,
         "source_allocations":m.allocations,
