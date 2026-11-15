@@ -79,3 +79,18 @@ metadata does not expose that body. It does **not** prove that the defining crat
 had no MIR or skipped attribute deduction: metadata intentionally retains
 deductions for functions whose MIR is not exported. Such a demand needs genuine
 defining compilation skip evidence or remains Unsupported.
+
+Apply `defining-freeze-source.patch` after the defining-compilation patch to also
+retain whether the defining compilation had the Freeze language item. This is
+recorded from that crate's own `TyCtxt` during metadata encoding, rather than
+inferred from the caller. The private metadata version advances from 12 to 13.
+The read-only accessor carries an explicit capability marker; absence of that
+marker remains unknown, never proof that Freeze was missing. The declaration's
+`always_const` syntax comes from its original `tcx.constness` source attribute.
+The typed boundary rejects inconsistent known/unknown compilation records for
+the same crate once. Consumers use those checked fields without rereading JSON.
+
+The snapshot build manifest records the actual driver SHA256. The export wrapper
+checks that identity before loading the exporter, rejecting missing or replaced
+drivers even when bootstrap reuses their filenames. Rebuild the manifest after a
+compiler rebuild; no old-manifest fallback is provided.

@@ -69,7 +69,15 @@ def material (d : Document) : Except String (Option SourceMirUses.Material) := d
         | "No" => pure Optimization.no | "Less" => pure .less | "More" => pure .more
         | "Aggressive" => pure .aggressive | "Size" => pure .size | "SizeMin" => pure .sizeMin
         | _ => throw "MIR defining optimization option unsupported"
-      pure (some (Compilation.mk optimization (← source.getObjValAs? Bool "incremental")))
-    rows := rows.push ⟨raw,body,compilation⟩
+      let freeze ← match source.getObjVal? "freeze_lang_item_present" with
+        | .error _ => pure none | .ok value => fromJson? value
+      pure (some (Compilation.mk optimization (← source.getObjValAs? Bool "incremental") freeze))
+    let alwaysConst ← match row.getObjVal? "always_const" with
+      | .error _ => pure none | .ok value => fromJson? value
+    for previous in rows do
+      if previous.definition.crateIndex == raw.crateIndex then
+        unless previous.compilation == compilation do
+          throw "defining crate compilation source contradicts"
+    rows := rows.push ⟨raw,body,compilation,alwaysConst⟩
   return some ⟨rows⟩
 end Miri.Frontend.Foundation.SourceMirUsesParser

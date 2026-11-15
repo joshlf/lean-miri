@@ -43,11 +43,13 @@ inductive Optimization where
 structure Compilation where
   optimization : Optimization
   incremental : Bool
+  freezeLangItemPresent : Option Bool := none
   deriving Repr, DecidableEq
 structure Declaration where
   definition : DefinitionId
   body : Option Body
   compilation : Option Compilation
+  alwaysConst : Option Bool := none
   deriving Repr, DecidableEq
 structure Material where
   declarations : Array Declaration

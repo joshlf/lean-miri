@@ -410,7 +410,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         "foreign_symbol_material":foreign_symbol_material,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,
-        "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"},"opt_level":format!("{:?}",tcx.sess.opts.optimize)},
+        "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"},"opt_level":format!("{:?}",tcx.sess.opts.optimize),"incremental":tcx.sess.opts.incremental.is_some()},
         "target":{"runtime_data_layout":runtime_data_layout,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
         "definitions":m.definitions,"types":m.types,"bodies":bodies,
         "closure_templates":closure_templates,

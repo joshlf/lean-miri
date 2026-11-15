@@ -176,6 +176,7 @@ structure Material where
   objectTraits : Array ObjectTraitDeclaration := #[]
   symbolNames : Option SourceSymbolNames.Material := none
   targetFeatureDeclarations : Array TargetFeatureDeclaration := #[]
+  callerIncremental : Option Bool := none
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi

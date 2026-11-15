@@ -5,6 +5,7 @@ The compiler is built separately using rustc-patches/allocation-identity-snapsho
 No installed toolchain or normal exporter artifact is replaced.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -57,7 +58,8 @@ env.update(RUSTUP_HOME=str(ROOT / '.rustup'), CARGO_HOME=str(ROOT / '.cargo'),
 subprocess.run([ROOT / '.cargo/bin/cargo', '+miri-exporter-8144389c895d', 'build', '--release',
                 '--locked', '--offline', '--features', 'allocation-identity-snapshot',
                 '--manifest-path', ROOT / 'exporter/Cargo.toml'], env=env, check=True)
-manifest = dict(pin=PIN, compiler_build=str(build), driver=str(driver), flags=flags,
+manifest = dict(pin=PIN, compiler_build=str(build), driver=str(driver),
+                driver_sha256=hashlib.file_digest(driver.open("rb"), "sha256").hexdigest(), flags=flags,
                 binary=str(a.target_dir.resolve() / 'release/lean-miri-mir-exporter'),
                 environment={k: env[k] for k in ['PATH', 'LD_LIBRARY_PATH']},
                 target_sysroot=str(build / 'stage1'))

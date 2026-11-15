@@ -56,7 +56,7 @@ impl<'tcx> Material<'tcx> {
                     "event_count":visitor.events.len(),"events":visitor.events})
             } else {Value::Null};
             let compilation = if definition.is_local() {
-                Some((tcx.sess.opts.optimize,tcx.sess.opts.incremental.is_some()))
+                Some((tcx.sess.opts.optimize,tcx.sess.opts.incremental.is_some(),Some(tcx.lang_items().freeze_trait().is_some())))
             } else {
                 #[cfg(feature = "allocation-identity-snapshot")]
                 {
@@ -65,14 +65,14 @@ impl<'tcx> Material<'tcx> {
                     let optimization=match raw & 7 {0=>OptLevel::No,1=>OptLevel::Less,2=>OptLevel::More,
                         3=>OptLevel::Aggressive,4=>OptLevel::Size,5=>OptLevel::SizeMin,
                         _=>return unsupported("defining optimization source encoding",raw)};
-                    if raw & !15 != 0 {return unsupported("defining option source encoding",raw);}
-                    Some((optimization,raw & 8 != 0))
+                    if raw & !63 != 0 {return unsupported("defining option source encoding",raw);}
+                    Some((optimization,raw & 8 != 0,if raw & 32 != 0 {Some(raw & 16 != 0)} else {None}))
                 }
                 #[cfg(not(feature = "allocation-identity-snapshot"))]
                 {None}
             };
-            let compilation=compilation.map(|(optimization,incremental)|json!({"optimization":format!("{optimization:?}"),"incremental":incremental}));
-            declarations.push(json!({"definition":index,"body":body,"compilation":compilation}));
+            let compilation=compilation.map(|(optimization,incremental,freeze)|json!({"optimization":format!("{optimization:?}"),"incremental":incremental,"freeze_lang_item_present":freeze}));
+            declarations.push(json!({"definition":index,"body":body,"compilation":compilation,"always_const":matches!(tcx.constness(definition),rustc_hir::Constness::Const {always:true})}));
         }
         Ok(json!({"declarations":declarations}))
     }
