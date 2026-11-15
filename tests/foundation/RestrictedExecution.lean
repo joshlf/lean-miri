@@ -5,7 +5,7 @@ open Lean Miri.Frontend.Foundation
 
 private def fixture (operand := "copy") (source := 1) (retag := true)
     (returnKind := "return") (dest := 0) : Except String Document := do
-  let template := "{\"definition\":0,\"argument_count\":1,\"environment\":{\"parameters\":[],\"clauses\":[]},\"locals\":[0,0,0],\"blocks\":[{\"cleanup\":false,\"statements\":[{\"kind\":\"assign\",\"place\":{\"local\":DEST,\"projection\":[]},\"value\":{\"kind\":\"use\",\"retag\":RETAG,\"operand\":{\"kind\":\"OPERAND\",\"place\":{\"local\":SOURCE,\"projection\":[]}}}}],\"terminator\":{\"kind\":\"RETURN\"}}]}"
+  let template := "{\"definition\":0,\"argument_count\":1,\"environment\":{\"parameters\":[],\"clauses\":[]},\"required_consts\":[],\"locals\":[0,0,0],\"blocks\":[{\"cleanup\":false,\"statements\":[{\"kind\":\"assign\",\"place\":{\"local\":DEST,\"projection\":[]},\"value\":{\"kind\":\"use\",\"retag\":RETAG,\"operand\":{\"kind\":\"OPERAND\",\"place\":{\"local\":SOURCE,\"projection\":[]}}}}],\"terminator\":{\"kind\":\"RETURN\"}}]}"
   let body ← Json.parse (template.replace "DEST" (toString dest) |>.replace "SOURCE" (toString source) |>.replace "RETAG" (toString retag) |>.replace "OPERAND" operand |>.replace "RETURN" returnKind)
   let row ← Json.parse "{\"type_id\":0,\"shape\":{\"kind\":\"param\",\"index\":0}}"
   let target : Target := { triple := "x86_64-unknown-linux-gnu", dataLayout := "", pointerSizeBits := 64, endian := "little" }

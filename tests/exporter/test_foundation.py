@@ -119,7 +119,7 @@ class FoundationExport(unittest.TestCase):
     def test_unsupported_call_and_missing_root_abort(self):
         with tempfile.TemporaryDirectory(prefix="foundation-") as directory:
             for root, diagnostic in (("calls", "unsupported terminator"), ("missing", "missing MIR root"),
-                                     ("requires_const", "unsupported required constants"),
+                                     ("requires_const", "unsupported MIR constant"),
                                      ("tracked", "unsupported caller location prerequisite"),
                                      ("feature_identity", "unsupported function target features")):
                 output = Path(directory) / f"{root}.json"

@@ -66,8 +66,7 @@ def decode (j : Json) : Except String Document := do
   for body in bodies do
     unless (← nat body "definition") < definitions.size do
       throw "body definition is out of bounds"
-    unless (← array body "required_consts").isEmpty do
-      throw "unresolved required constant in foundation body"
+    let _ ← array body "required_consts"
     validateSourceMetadata body
     for localType in (← array body "locals") do
       unless (← localType.getNat?) < types.size do

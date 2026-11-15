@@ -3,6 +3,8 @@
 //! This format deliberately has no runtime query answers or successful fallback
 //! rows. Unsupported source forms abort export. A consumer must implement their
 //! semantics from the material; this format is not executable schema12 input.
+#[path = "foundation_const.rs"]
+mod const_material;
 #[path = "foundation_source.rs"]
 mod source_material;
 
@@ -191,15 +193,9 @@ impl<'tcx> Material<'tcx> {
     fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
-        // Pinned mir::Body documents required_consts as soundness-critical;
-        // interpret/stack.rs evaluates the whole list before executing a frame.
-        // This first consumer has no const evaluator, so even an unused or
-        // unreachable required constant must reject the entire capture.
-        match &b.required_consts {
-            Some(constants) if constants.is_empty() => {},
-            Some(constants) => return unsupported("required constants", constants),
-            None => return unsupported("uncomputed required constants", def),
-        }
+        // Pinned stack.rs evaluates every required constant on frame entry,
+        // including constants in unreachable blocks. Preserve the full list.
+        let required_consts = self.required_constants(tcx, b)?;
         // The restricted evaluator initializes ordinary argument locals directly;
         // coroutine/resume frames, rust-call spreading, inlined frames and
         // compiler-generated/promoted source identities require more machinery.
@@ -251,7 +247,7 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":[],"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
+        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
     }
 }
 fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {

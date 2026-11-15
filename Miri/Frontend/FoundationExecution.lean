@@ -1,4 +1,4 @@
-import Miri.Frontend.Foundation
+import Miri.Frontend.FoundationConstBindings
 
 /-! A restricted, pure execution path for foundation MIR. This is separate from
 schema-12 machine execution and is only a structural fixture evaluator: only pointer-free, whole-local values are accepted.
@@ -100,6 +100,7 @@ def evaluateRestrictedBody (d : Document) (definition : Nat)
   unless candidates.size == 1 do throw "missing or duplicate foundation body"
   let some body := candidates[0]? | throw "missing foundation body"
   checkEnvironment (← get body "environment")
+  checkRequiredConstants d body constArguments
   unless (← num body "argument_count") == arguments.size do throw "argument count mismatch"
   let mut types := #[]
   for id in (← arr body "locals") do

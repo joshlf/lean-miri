@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationObligations
+import Miri.Frontend.FoundationConstBindings
 
 /-! Demand-time substitution for explicitly selected item MIR templates.
 Pinned `rustc_middle/src/ty/instance.rs` distinguishes `Instance::new_raw`
@@ -62,10 +63,8 @@ def instantiateItem (d : Document) (definition : Nat)
         | throw "unsupported item const parameter type"
       let some value := constants[index]?.bind id | throw "missing item const argument"
       unless value < 2 ^ d.target.pointerSizeBits do throw "item const argument exceeds usize"
-  -- Required constants are evaluated at frame entry by pinned stack.rs even
-  -- when their instructions are unreachable. No const evaluator exists here.
-  unless (← body.getObjValAs? (Array Json) "required_consts").isEmpty do
-    throw "item template has unresolved required constants"
+  -- Pinned stack.rs checks the full list before the first MIR instruction.
+  checkRequiredConstants d body constants
   let mut localTypes := #[]
   for entry in (← body.getObjValAs? (Array Json) "locals") do
     localTypes := localTypes.push (← instantiate types constants (← typeExpr d (← entry.getNat?)))
