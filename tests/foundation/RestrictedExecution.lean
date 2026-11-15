@@ -9,7 +9,7 @@ private def fixture (operand := "copy") (source := 1) (retag := true)
   let body ← Json.parse (template.replace "DEST" (toString dest) |>.replace "SOURCE" (toString source) |>.replace "RETAG" (toString retag) |>.replace "OPERAND" operand |>.replace "RETURN" returnKind)
   let row ← Json.parse "{\"type_id\":0,\"shape\":{\"kind\":\"param\",\"index\":0}}"
   let target : Target := { triple := "x86_64-unknown-linux-gnu", dataLayout := "", pointerSizeBits := 64, endian := "little" }
-  return ⟨target, #[], #[row], #[body]⟩
+  return { source := Json.null, target, definitions := #[], types := #[row], bodies := #[body] }
 
 private def noObligations (env : Json) : Except String Unit := do
   let clauses ← env.getObjValAs? (Array Json) "clauses"

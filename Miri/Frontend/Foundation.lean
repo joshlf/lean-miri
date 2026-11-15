@@ -1,4 +1,5 @@
 import Lean
+import Miri.Frontend.FoundationSource
 
 /-! Finite, structural rustc material for pure, demand-time Lean queries.  This
 format has no compiler answer table.  It is distinct from executable MIR input:
@@ -12,9 +13,10 @@ structure Target where
   dataLayout : String
   pointerSizeBits : Nat
   endian : String
-  deriving Repr, DecidableEq
+  runtimeDataLayout : Json := Json.null
 
 structure Document where
+  source : Json
   target : Target
   definitions : Array Json
   types : Array Json
@@ -45,6 +47,7 @@ def decode (j : Json) : Except String Document := do
     dataLayout := ← string t "data_layout"
     pointerSizeBits := ← nat t "pointer_size_bits"
     endian := ← string t "endian"
+    runtimeDataLayout := ← field t "runtime_data_layout"
   }
   unless target.pointerSizeBits > 0 && target.pointerSizeBits % 8 == 0 do
     throw "invalid target pointer width"
@@ -65,10 +68,11 @@ def decode (j : Json) : Except String Document := do
       throw "body definition is out of bounds"
     unless (← array body "required_consts").isEmpty do
       throw "unresolved required constant in foundation body"
+    validateSourceMetadata body
     for localType in (← array body "locals") do
       unless (← localType.getNat?) < types.size do
         throw "body local type is out of bounds"
-  return ⟨target, definitions, types, bodies⟩
+  return ⟨j, target, definitions, types, bodies⟩
 
 inductive ConstExpr where
   | parameter (index : Nat)
