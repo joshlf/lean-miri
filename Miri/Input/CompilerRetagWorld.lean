@@ -92,4 +92,20 @@ def hooks (prepared : CompilerFactAdapters.Prepared)
         match (← node world id).shape with
         | .alias .. => pure true
         | _ => pure false } }
+/-- Source-mode Freeze reads the actual World and preserves machine state.
+The premise is the pure trait computation on that World, never a successful
+retag/memory operation or a result borrowed from a prepared dictionary. -/
+theorem typeIsFreeze_at (prepared : CompilerFactAdapters.Prepared)
+    (access : SourceCompilerWorld.Access (ValidityMachine.State K U))
+    (base : TypedRetag.Hooks K (ValidityMachine.UserState U))
+    (state : ValidityMachine.State K U) (world : World) (material : SourceMaterial)
+    (id : Nat) (value : Bool)
+    (mode : prepared.context.runtime.source.sourceMaterial.isSome = true)
+    (present : access.get state = some world)
+    (materialAt : world.canonical.sourceMaterial = some material)
+    (computed : SourceCompilerAutoTraits.check world .freeze id = .ok value) :
+    (hooks prepared access base).typeIsFreeze id state = .ok value state := by
+  simp [hooks, mode, source, present, materialAt, computed, get, getThe,
+    MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure]
+
 end Miri.Input.CompilerRetagWorld

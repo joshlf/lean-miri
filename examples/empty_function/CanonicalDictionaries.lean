@@ -44,10 +44,6 @@ structure Fields (p : CompilerProviders.Prepared) (options : EvalConfigurationCo
   precise : config.retag.preciseInteriorMut = pure options.retag.preciseInteriorMut
   implicit : config.retag.implicitWrites = pure options.retag.implicitWrites
   log : config.retag.logCreation = fun _ _ _ _ _ => pure ()
-  typeFreeze : config.retag.typeIsFreeze = fun ty state =>
-    match CompilerFacts.boolean p.lifecycle.calls.symbols.facts.context ty "is_freeze" with
-    | .ok value => .ok value state
-    | .error reason => .error (.unsupported reason) state
   retainTouched : config.access.retainTouched = fun machine _ => machine
   runtime : config.access.runtime = p.runtime.target
   arithmetic : config.arithmetic = ⟨p.runtime.target.pointerSize⟩
@@ -88,13 +84,13 @@ theorem make_fields (p : CompilerProviders.Prepared) (image : AllocationImage.Im
   constructor
   · with_unfolding_all exact ⟨_, _, _, rfl, rfl, rfl, rfl⟩
   all_goals try with_unfolding_all rfl
-  case typeFreeze =>
-    funext ty state
-    cases h : CompilerFacts.boolean p.lifecycle.calls.symbols.facts.context ty "is_freeze" <;>
-      simp only [EvalRetagMachine.hooks, h] <;> with_unfolding_all rfl
   case debugAbi =>
     intro debugOff
     with_unfolding_all simp only [EvalPlaceConstruction.compiler, debugOff, Bool.false_eq_true, ↓reduceIte]
+  all_goals
+    cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+      with_unfolding_all simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode]
+  all_goals with_unfolding_all rfl
 
 /-- Recover the source dictionary equations for any successful canonical
 factory result. The construction certificate contains only compiler facts. -/
@@ -138,16 +134,48 @@ theorem Fields.sizeAndAlign {p options config} (fields : Fields p options config
     config.retag.sizeAndAlign place = pure (some (place.layout.layout.size, place.layout.layout.align.abi)) := by
   obtain ⟨pointers, table, globals, retag, _⟩ := fields.construction
   rw [retag]
-  simp only [EvalRetagMachine.hooks]
-  unfold DynamicLayout.sizeAndAlignFromMeta
-  rw [sized]
-  rfl
+  cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+    simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode,
+      DynamicLayout.sizeAndAlignFromMeta, sized]
+  all_goals
+    unfold DynamicLayout.sizeAndAlignFromMeta
+    rw [sized]
+    rfl
 
-/-- Unit Freeze is a pure compiler fact, independent of the caller state. -/
+/-- Only a legacy prepared document uses the saved Freeze dictionary. -/
+theorem Fields.typeFreeze_legacy {p options config} (fields : Fields p options config)
+    (legacy : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome = false) :
+    config.retag.typeIsFreeze = fun ty state =>
+      match CompilerFacts.boolean p.lifecycle.calls.symbols.facts.context ty "is_freeze" with
+      | .ok value => .ok value state
+      | .error reason => .error (.unsupported reason) state := by
+  obtain ⟨pointers, table, globals, retag, _⟩ := fields.construction
+  rw [retag]
+  funext ty state
+  cases computed : CompilerFacts.boolean p.lifecycle.calls.symbols.facts.context ty "is_freeze" <;>
+    simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, legacy, computed] <;> rfl
+
+/-- Source-mode Freeze uses the current compiler World and its pure trait
+solver, with the exact original runtime state in the result. -/
+theorem Fields.typeFreeze_at {p options config} (fields : Fields p options config)
+    (state : MachineHooks.State MiriMemoryKind RootUser) (world : SourceCompilerWorld.World)
+    (material : SourceMaterial) (ty : MIR.TyId) (value : Bool)
+    (mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome = true)
+    (present : EvalCoreMachine.sourceCompilerAccess.get state = some world)
+    (materialAt : world.canonical.sourceMaterial = some material)
+    (computed : SourceCompilerAutoTraits.check world .freeze ty = .ok value) :
+    config.retag.typeIsFreeze ty state = .ok value state := by
+  obtain ⟨pointers, table, globals, retag, _⟩ := fields.construction
+  rw [retag]
+  unfold EvalRetagMachine.hooks
+  exact CompilerRetagWorld.typeIsFreeze_at _ _ _ state world material ty value mode present materialAt computed
+
+/-- A saved unit Freeze fact is state-independent only in legacy mode. -/
 theorem Fields.freeze {p options config} (fields : Fields p options config) (ty : MIR.TyId)
+    (legacy : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome = false)
     (metadata : CompilerFacts.boolean p.lifecycle.calls.symbols.facts.context ty "is_freeze" = .ok true) :
     config.retag.typeIsFreeze ty = pure true := by
-  rw [fields.typeFreeze]
+  rw [fields.typeFreeze_legacy legacy]
   funext state
   simp only [metadata]
   rfl
@@ -157,7 +185,8 @@ theorem Fields.checkPtrAccess {p options config} (fields : Fields p options conf
     config.retag.checkPtrAccess = ValidityMachine.checkPointerAccess config.access := by
   obtain ⟨pointers, table, globals, retag, _⟩ := fields.construction
   rw [retag]
-  rfl
+  cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+    simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode]
 
 /-- Resolver/ensure dictionaries and their memory synchronization law share
 one actual source pointer construction. -/
@@ -169,8 +198,12 @@ theorem Fields.pointerDictionaries {p options config} (fields : Fields p options
       globals.synchronizeMemory = fun memory view => {view with machine := {view.machine with memory}} := by
   obtain ⟨pointers, table, globals, retag, resolve, ensure, sync⟩ := fields.construction
   refine ⟨pointers, globals, ?_, resolve, ?_, sync⟩
-  · rw [retag]; rfl
-  · rw [retag]; exact ensure
+  · rw [retag]
+    cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+      simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode]
+  · rw [retag]
+    cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+      simpa [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode] using ensure
 
 /-- Uninitialization uses the real scoped access and memory writer. -/
 theorem Fields.writeUninit {p options config} (fields : Fields p options config)
@@ -180,7 +213,8 @@ theorem Fields.writeUninit {p options config} (fields : Fields p options config)
       PlaceMachine.writeUninitMemory access place) := by
   obtain ⟨pointers, table, globals, retag, _⟩ := fields.construction
   rw [retag]
-  rfl
+  cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+    simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode]
 
 /-- The shared global source is fixed by the same actual factory, including
 its current compiler image and host leaves. No existential global callback is
@@ -224,6 +258,10 @@ theorem make_global_fields (p : CompilerProviders.Prepared) (image : AllocationI
     Except.mapError, Except.map, bind, Except.bind, pure, Except.pure]
   refine ⟨_, rfl, ?_⟩
   constructor
+  all_goals try with_unfolding_all rfl
+  all_goals
+    cases mode : p.lifecycle.calls.symbols.facts.context.runtime.source.sourceMaterial.isSome <;>
+      with_unfolding_all simp [EvalRetagMachine.hooks, CompilerRetagWorld.hooks, mode]
   all_goals with_unfolding_all rfl
 
 theorem global_fields_of_make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
