@@ -6,13 +6,13 @@ open Miri Miri.ABI Miri.Input Miri.Interpreter Miri.Memory
 set_option maxRecDepth 1000000
 set_option maxHeartbeats 16000000
 theorem local0_index :
-    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (AsMutLocals.localSpan ⟨0, by decide⟩) = some 612 := by
+    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (AsMutLocals.localSpan ⟨0, by decide⟩) = some 71 := by
   refine SpanFacts.index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
   · decide +kernel
 
 theorem local1_index :
-    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (AsMutLocals.localSpan ⟨1, by decide⟩) = some 613 := by
+    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (AsMutLocals.localSpan ⟨1, by decide⟩) = some 72 := by
   refine SpanFacts.index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
   · decide +kernel
@@ -25,17 +25,17 @@ theorem local0_span
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler HelperCompilerFacts.asMutPtrBody.body 0
       (Storage.withCurrent framesBefore frame machine) =
-      .ok ⟨612⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 0 < AsMutLocals.inputBody.input.locals.size := by decide +kernel
-  let decl := AsMutLocals.inputBody.input.locals[0]'valid
-  have present : AsMutLocals.inputBody.input.locals[0]? = some decl := by
+      .ok ⟨71⟩ (Storage.withCurrent framesBefore frame machine) := by
+  have valid : 0 < AsMutLocals.inputBody.input.localSources.size := by decide +kernel
+  let decl := AsMutLocals.inputBody.input.localSources[0]'valid
+  have present : AsMutLocals.inputBody.input.localSources[0]? = some decl := by
     simp [decl, valid]
   have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
-      (AsMutLocals.localSpan ⟨0, by decide⟩) = some 612 := by
+      (AsMutLocals.localSpan ⟨0, by decide⟩) = some 71 := by
     rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
     exact local0_index
-  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ AsMutLocals.inputBody decl _ 612 body.symm
-    (AsMutLocals.body_of_frame frame body identity callee) present rfl spanQuery
+  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ AsMutLocals.inputBody decl 71 body.symm
+    (AsMutLocals.body_of_frame frame body identity callee) present (by with_unfolding_all rfl) (by decide +kernel)
 
 theorem local1_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -45,17 +45,17 @@ theorem local1_span
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler HelperCompilerFacts.asMutPtrBody.body 1
       (Storage.withCurrent framesBefore frame machine) =
-      .ok ⟨613⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 1 < AsMutLocals.inputBody.input.locals.size := by decide +kernel
-  let decl := AsMutLocals.inputBody.input.locals[1]'valid
-  have present : AsMutLocals.inputBody.input.locals[1]? = some decl := by
+      .ok ⟨72⟩ (Storage.withCurrent framesBefore frame machine) := by
+  have valid : 1 < AsMutLocals.inputBody.input.localSources.size := by decide +kernel
+  let decl := AsMutLocals.inputBody.input.localSources[1]'valid
+  have present : AsMutLocals.inputBody.input.localSources[1]? = some decl := by
     simp [decl, valid]
   have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
-      (AsMutLocals.localSpan ⟨1, by decide⟩) = some 613 := by
+      (AsMutLocals.localSpan ⟨1, by decide⟩) = some 72 := by
     rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
     exact local1_index
-  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ AsMutLocals.inputBody decl _ 613 body.symm
-    (AsMutLocals.body_of_frame frame body identity callee) present rfl spanQuery
+  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ AsMutLocals.inputBody decl 72 body.symm
+    (AsMutLocals.body_of_frame frame body identity callee) present (by with_unfolding_all rfl) (by decide +kernel)
 
 end
 end DuplicatePrefix.AsMutSpans

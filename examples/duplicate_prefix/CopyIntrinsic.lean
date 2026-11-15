@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CanonicalCopy
 import Miri.Interpreter.Intrinsics
 import Miri.Interpreter.AtomicMachine
@@ -166,8 +167,8 @@ theorem statement_memory_source [DecidableEq K]
     (ExecutionMachine.stepHooks h limits).intrinsic choice intrinsic =
       MachineHooks.run (Intrinsics.evalNondivergingWith
         (statementMemory (ExecutionMachine.withValidation h limits))
-        (fun c path op => OperandMachine.evalOperandAt
-          (ExecutionMachine.operandHooks (ExecutionMachine.withValidation h limits)) c path op none)
+        (fun c op => OperandMachine.evalOperand
+          (ExecutionMachine.operandHooks (ExecutionMachine.withValidation h limits)) c  op none)
         choice intrinsic) := by rfl
 
 theorem statement_memory_byte [DecidableEq K]
@@ -183,12 +184,12 @@ theorem statement_memory_byte [DecidableEq K]
 
 theorem nondiverging_copy_operands
     (hooks : MemoryIntrinsicHooks Provenance S C)
-    (evalOperandAt : C → OperandPath → Miri.MIR.Operand → RvalueM S (OpTy Provenance))
+    (evalOperandAt : C → Miri.MIR.Operand → RvalueM S (OpTy Provenance))
     (choice : C) (state : S) (args : CopyNonOverlapping)
     (source dest count : OpTy Provenance)
-    (sourceRead : evalOperandAt choice (OperandPath.instruction "src") args.source state = .ok source state)
-    (destRead : evalOperandAt choice (OperandPath.instruction "dst") args.destination state = .ok dest state)
-    (countRead : evalOperandAt choice (OperandPath.instruction "count") args.count state = .ok count state) :
+    (sourceRead : evalOperandAt choice args.source state = .ok source state)
+    (destRead : evalOperandAt choice args.destination state = .ok dest state)
+    (countRead : evalOperandAt choice args.count state = .ok count state) :
     Intrinsics.evalNondivergingWith hooks evalOperandAt choice (.CopyNonOverlapping args) state =
       Intrinsics.copyWith hooks choice source dest count true state := by
   unfold Intrinsics.evalNondivergingWith
@@ -223,14 +224,14 @@ theorem statement_copy_reduction [DecidableEq K]
     (addresses : config.addresses = PointerMachine.User.addresses)
     (arithmetic : config.arithmetic = pointers.arithmetic)
     (alignment : config.atomics.checkPointerAlign = fun _ => AtomicMachine.checkAlignment pointers)
-    (sourceRead : OperandMachine.evalOperandAt (ExecutionMachine.operandHooks config) choice
-      (OperandPath.instruction "src") args.source none state =
+    (sourceRead : OperandMachine.evalOperand (ExecutionMachine.operandHooks config) choice
+       args.source none state =
       .ok ⟨.immediate (.scalar (Scalar.fromPointer config.access.runtime.base source)), sourceLayout⟩ state)
-    (destRead : OperandMachine.evalOperandAt (ExecutionMachine.operandHooks config) choice
-      (OperandPath.instruction "dst") args.destination none state =
+    (destRead : OperandMachine.evalOperand (ExecutionMachine.operandHooks config) choice
+       args.destination none state =
       .ok ⟨.immediate (.scalar (Scalar.fromPointer config.access.runtime.base dest)), destLayout⟩ state)
-    (countRead : OperandMachine.evalOperandAt (ExecutionMachine.operandHooks config) choice
-      (OperandPath.instruction "count") args.count none state =
+    (countRead : OperandMachine.evalOperand (ExecutionMachine.operandHooks config) choice
+       args.count none state =
       .ok ⟨.immediate (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n))), countLayout⟩ state) :
     (ExecutionMachine.stepHooks execution limits).intrinsic choice (.CopyNonOverlapping args) state =
       MachineHooks.run (GlobalMemoryCopyMachine.genericCopy config.access PointerMachine.User.addresses
@@ -265,7 +266,7 @@ theorem canonical_byte_intrinsic {Choice Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -339,7 +340,7 @@ theorem canonical_slice_byte_intrinsic {Choice Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -417,7 +418,7 @@ theorem canonical_slice_initialized_intrinsic {Choice Os R P H D O Aff B Host : 
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -495,7 +496,7 @@ theorem canonical_slice_initialized_intrinsic_protected {Choice Os R P H D O Aff
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -574,7 +575,7 @@ theorem canonical_nested_initialized_intrinsic {Choice Os R P H D O Aff B Host :
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)

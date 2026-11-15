@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallEmptyMaterializedSourceFacts
 import duplicate_prefix.CurrentCallMaterializedZeroParents
 import duplicate_prefix.CurrentCallLiveBoolTransport
@@ -401,7 +402,7 @@ theorem physical (post : Before) (family : Family) (root : BorTag)
     (kind : MemoryKind MiriMemoryKind)
     (live : post.memory.live.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨kind,converted.mapExtra (fun _=>tree)⟩))
     (cached : post.user.addresses.baseAddr.find? (fun row=>row.allocId==family.allocation)=some ⟨family.allocation,base⟩)
-    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨none,#[]⟩)) :
+    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (family.allocation) })) :
     ∃P : CandidateCurrentBoolUninitWrite.PhysicalWindow post place,
       P.id=family.allocation ∧P.pointer=family.value ∧P.offset=offset ∧P.entry.allocation=converted.mapExtra (fun _=>tree) ∧
       CandidateCallBindings.WindowBinding post P.pointer P.id offset.toNat 1 ∧
@@ -457,7 +458,7 @@ private theorem install (post : Before) (tracker : MachineHooks.BorrowState) (fa
     (facts : PhysicalData family root converted base offset place) (tree : BorrowTree) (kind : MemoryKind MiriMemoryKind)
     (live : post.memory.live.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨kind,converted.mapExtra (fun _=>tree)⟩))
     (cached : post.user.addresses.baseAddr.find? (fun row=>row.allocId==family.allocation)=some ⟨family.allocation,base⟩)
-    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨none,#[]⟩))
+    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (family.allocation) }))
     (C : Completion) (parents : ParentInterpretation tree C)
     (runtime : DuplicatePrefixBorrowContract.RuntimeFacts tree tracker.global)
     (distinct : tree.roots.toList.Nodup) (short : tree.nodes.size<65536)
@@ -500,7 +501,7 @@ theorem positive (post : Before) (next : MachineHooks.BorrowState) (family : Fam
     (flags : next.global.protectedTags=(GeneralBorrowFnEntryRegistration.registered global frame family.allocation room).1.protectedTags)
     (kind : MemoryKind MiriMemoryKind)
     (cached : post.user.addresses.baseAddr.find? (fun row=>row.allocId==family.allocation)=some ⟨family.allocation,base⟩)
-    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨none,#[]⟩))
+    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (family.allocation) }))
     (cachedRoot : next.global.rootTag? family.allocation=some root) :
     let tree:=PositiveGlobalTypedReborrow.finalTree root global.nextPointerTag converted.byteSize
       (GeneralBorrowFnEntryRegistration.registered global frame family.allocation room).1.protectedTags sourceOffset len
@@ -544,7 +545,7 @@ theorem concrete_zero (post : Before) (next : MachineHooks.BorrowState) (family 
     (live : post.memory.live.find? (fun row=>row.1==family.allocation)=some (family.allocation,
       ⟨kind,converted.mapExtra (fun _=>TypedRetagConcreteEmpty.lazyTree root tag converted.byteSize.bytes)⟩))
     (cached : post.user.addresses.baseAddr.find? (fun row=>row.allocId==family.allocation)=some ⟨family.allocation,base⟩)
-    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨none,#[]⟩))
+    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (family.allocation) }))
     (cachedRoot : next.global.rootTag? family.allocation=some root) :
     Nonempty (Packet post next family converted (TypedRetagConcreteEmpty.lazyTree root tag converted.byteSize.bytes) boolOffset place) := by
   have distinct : root≠tag := by intro same;rw [same] at older;exact Nat.lt_irrefl _ older
@@ -568,7 +569,7 @@ theorem wildcard_zero (post : Before) (next : MachineHooks.BorrowState) (family 
     (live : post.memory.live.find? (fun row=>row.1==family.allocation)=some (family.allocation,
       ⟨kind,converted.mapExtra (fun _=>CurrentCallEmptyMaterializedWildcard.finalTree root tag converted.byteSize)⟩))
     (cached : post.user.addresses.baseAddr.find? (fun row=>row.allocId==family.allocation)=some ⟨family.allocation,base⟩)
-    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,⟨none,#[]⟩))
+    (extra : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==family.allocation)=some (family.allocation,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (family.allocation) }))
     (cachedRoot : next.global.rootTag? family.allocation=some root) :
     Nonempty (Packet post next family converted (CurrentCallEmptyMaterializedWildcard.finalTree root tag converted.byteSize) boolOffset place) := by
   have distinct : root≠tag := by intro same;rw [same] at older;exact Nat.lt_irrefl _ older

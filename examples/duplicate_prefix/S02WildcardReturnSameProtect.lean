@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteArgumentScope
 import duplicate_prefix.S02SameDestinationInput
 import duplicate_prefix.S02SameDestinationReady
@@ -34,7 +35,7 @@ theorem after_argument
           (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
       let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone raw adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) 0).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       (ExecutionMachine.callHooks (config options (remaining+1) span) limits).withRetagMode () .FnEntry
         (RootCallCore.argumentBody (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
@@ -78,7 +79,7 @@ theorem after_argument
       (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
   let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone raw adjusted ({} : FrameState)
     reference.id reference.tracker.global.nextPointerTag) 0).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have binding := reference.binding
   simp only [DuplicatePrefixReferenceInput.Binding,Pointer.new] at binding
@@ -104,7 +105,7 @@ theorem after_argument
       PositiveRootArguments.firstDone,PositiveRootArguments.protectedRoot,
       TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,owned]
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,#[]⟩) := by
+      some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,destId]
     exact input.return_extras

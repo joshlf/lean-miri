@@ -1,3 +1,5 @@
+import duplicate_prefix.ReturnMemoryWrite
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03ReturnProtectionRaw
 import duplicate_prefix.S03UninitWriteMetadata
 
@@ -26,7 +28,7 @@ theorem invoke_concrete
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat) :
     let tree := GeneralBorrowRawFnEntryArgument.finalTree input.entry.allocation.extra input.tracker tag input.offset 1
@@ -62,17 +64,14 @@ theorem invoke_concrete
   have configuredWrite : (config options remaining span).retag.writeUninit
       (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag) current = .ok () after := by
     obtain ⟨ctx⟩ := ActualRetagContext.exists_context options remaining span model.preciseOff model.implicitOff
-    rw [ctx.construction]
-    change (do
-      let access ← ValidityMachine.scopedAccess (config options remaining span).access
-      PlaceMachine.writeMemory access (fun _ => false) .uninit
-        (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag)) current = .ok () after
-    have accessGhost : (config options remaining span).access.ghostMode = false := by
-      rw [(DuplicatePrefixPhysicalContexts.canonical options remaining span).accessEq]
-      rfl
-    have scope := S04ProtectUninitWrite.scopedAccess_of_not_ghost
-      (config options remaining span).access current accessGhost model.ghostOff
-    simp only [bind,EStateM.bind,scope]
+    have fields := CanonicalConfigFacts.actual_fields options () remaining span
+    obtain ⟨context,accessEq,_,_⟩ := fields.canonicalCopy
+    have sized : (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag).layout.layout.backendRepr.isUnsized = false := by
+      change place.layout.layout.backendRepr.isUnsized = false
+      rw [input.layout]
+      decide +kernel
+    rw [ReturnMemoryWrite.actual_uninit_eq options remaining span ctx context accessEq _ current model.ghostOff sized]
+    rw [←accessEq]
     exact write
   refine ⟨updated,?_,extra,bytes,length,mutable,maskWf,maskLen,pointers,afterRuntime,afterOrder,child,?_,afterPositive,afterActive child active⟩
   · unfold TypedRetag.protectInPlaceFunctionArgument TypedRetag.protectPlace

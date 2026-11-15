@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.PositiveRootCanonicalSafety
 import duplicate_prefix.ConcreteEmptyRootSafety
 
@@ -53,7 +54,7 @@ theorem invoke
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -87,7 +88,7 @@ theorem invoke
     (bufferProvenance : (0 : UInt64) < len → ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len)
     (bufferStorageFits : (0 : UInt64) < len → entry.allocation.len+64 < 18446744073709551616)
     (bufferMutable : (0 : UInt64) < len → entry.allocation.mutability = .Mut)
-    (bufferExtras : (0 : UInt64) < len → before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (bufferExtras : (0 : UInt64) < len → before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (statementFuel : limits.validation = validityFuel+1) :
     let config := PreparedContracts.actualConfig options () (remaining+1) span
     let contextSafety : CallSafety.Context MiriMemoryKind Machine.RootUser Unit Unit Miri.ABI.ExternAbi Unit :=

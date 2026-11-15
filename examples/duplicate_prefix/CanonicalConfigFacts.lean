@@ -71,7 +71,6 @@ structure Fields (compiler : CompilerProviders.Prepared) (image : AllocationImag
       | .ok node => pure node
       | .error reason => throw (.unsupported reason)
     match node.shapeKind with
-    | .unknown _ => throw (.unsupported "raw pointer compiler type kind unavailable")
     | kind => pure (kind == .rawPointer)
   accessRuntime : config.access.runtime = compiler.runtime.target
   pointeeLayout : config.pointeeLayout = fun (_ : Unit) ty => pointeeQuery compiler ty
@@ -133,7 +132,6 @@ structure Fields (compiler : CompilerProviders.Prepared) (image : AllocationImag
   debug : config.compiler.debugAssertions = options.place.debugAssertions
   discriminant : config.discriminant = CompilerScalarLeaves.discriminant compiler
     (fun (_ : Unit) => ValidityMachine.scalarMayBeNull)
-  rvalueNormalize : config.rvalues.normalize = fun (_ : Unit) => CompilerFrameContext.normalizeCastTarget compiler
   scalar : config.scalar = CompilerScalarLeaves.scalar compiler
   operandsDeref : ∃ (vtable : RootRawVTable),
     config.operands.dereference = PointerPlaceMachine.dereference config.access
@@ -186,9 +184,8 @@ structure Fields (compiler : CompilerProviders.Prepared) (image : AllocationImag
       | .vclocks _ => pure .vclocks⟩
   callCompiler : config.calls.compiler = CompilerCallConstruction.compiler compiler options.compatibilityBudget
   constantAt : options.place.debugAssertions = false → ∃ externStatic : MIR.DefId → MachineHooks.M MiriMemoryKind Machine.RootUser (Pointer Provenance),
-    config.operands.constantAt = fun (_ : Unit) path constant known => do
-      let site ← CompilerOperandSites.current path
-      CompilerConstantMachine.evalAtBound compiler.constantBinding site config.functions config.arithmetic
+    config.operands.constant = fun (_ : Unit) constant known =>
+      ConstantMachine.evalOperandWithLayout compiler.runtime config.functions config.arithmetic
         externStatic MemoryErrors.constant constant known
         none
   castTypeInfo : config.casts.typeInfo = fun (_ : Unit) ty state =>
@@ -218,7 +215,7 @@ elab "supply_constant_extern" : tactic => withMainContext do
   let equality := body.getAppArgs
   let lhs ← whnf equality[1]!
   let rec find (expression : Expr) : Option Expr :=
-    if expression.isAppOf ``CompilerConstantMachine.evalAtBound then
+    if expression.isAppOf ``ConstantMachine.evalOperandWithLayout then
       let args := expression.getAppArgs
       if args.size ≥ 9 then some args[args.size - 5]! else none
     else match expression with

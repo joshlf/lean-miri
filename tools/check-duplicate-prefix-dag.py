@@ -22,8 +22,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-PIN = '046942e2e019ed73961f4232be907cd270bc214a89e7a49d3d1319592a83c397'
-MIR = '444638d5f40f4e59df584939ed6479272ecea1ca9244de2f9e5152ab7f459f06'
+PIN = '5e27ba80ab0264b3eab893e04b0ac23cd3868250bc127953b2116cdf46f17379'
+MIR = '15a9992e38706a4481d598d86fcfdc89ef48115d97b1a0b8b1cc1d8a7a973143'
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()

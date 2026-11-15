@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GenericCopyHelperCall
 import duplicate_prefix.MetadataOutputFacts
 import duplicate_prefix.CopyHelperReturnDriver
@@ -47,7 +48,7 @@ theorem returns_to_caller_exact
     (noBackend : machine.user.payload.payload.user.backend = .none)
     (tracked : machine.borrowTracker = some tracker)
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (live : machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)

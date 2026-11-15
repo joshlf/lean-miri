@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardZeroCoreSettings
 import duplicate_prefix.PositiveRootInstalledFrame
 import duplicate_prefix.AsMutPushPreserves
@@ -131,7 +132,7 @@ theorem executes
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination packet.destination
       returnTag returnConcrete).1
   have extras : machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) }) := by
     rw [physicalId,rawUser]
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _

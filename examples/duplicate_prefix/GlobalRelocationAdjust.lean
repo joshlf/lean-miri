@@ -41,7 +41,7 @@ theorem adjust_singleton {K U P : Type} [DecidableEq K] (choices : ExecutionChoi
       GlobalAllocationMachine.adjust layout extras
         (GlobalDataOnlyAdjust.leaves (PointerSource.globalRootPointer choices hooks externStatic)) allocationId source before =
         .ok (.owned (converted.mapExtra (fun _ => BorrowTree.new allocationRoot source.byteSize)))
-          (MemoryExtras.putAllocation extras before allocationId ⟨none,#[]⟩) := by
+          (MemoryExtras.putAllocation extras before allocationId { weakMemory := none }) := by
   obtain ⟨converted,encoded,conversion,facts,encoding,encodedSize,bytes,ptrs,fragments⟩ :=
     GlobalRelocationConversion.singleton_zero choices hooks externStatic before tracker provenance base root targetSource source
       layout descriptor enabled rootCached addressCached arithmetic width rawBytes relocation noFragments

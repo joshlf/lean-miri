@@ -53,7 +53,7 @@ theorem span0 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       HelperCompilerFacts.addBody.body 0 (Storage.withCurrent frames frame machine) =
-      .ok ⟨615⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨80⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact AddSpans.local0_span frames frame machine body identity callee
@@ -69,7 +69,7 @@ theorem span1 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       HelperCompilerFacts.addBody.body 1 (Storage.withCurrent frames frame machine) =
-      .ok ⟨616⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨81⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact AddSpans.local1_span frames frame machine body identity callee
@@ -84,7 +84,7 @@ theorem span2 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       HelperCompilerFacts.addBody.body 2 (Storage.withCurrent frames frame machine) =
-      .ok ⟨617⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨82⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact AddSpans.local2_span frames frame machine body identity callee

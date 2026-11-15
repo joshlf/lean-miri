@@ -47,21 +47,21 @@ theorem evalOperand_move_wholeLocal
 
 theorem evalOperandAt_copy_wholeLocal
     (hooks : OperandMachine.Hooks K User Choice) (choice : Choice)
-    (path : OperandPath) (localId : LocalId) (known : Option LocalLayout)
+    (localId : LocalId) (known : Option LocalLayout)
     (before after : MachineHooks.State K User) (op : OpTy Provenance)
     (localRead : OperandMachine.localToOp hooks choice localId known before = .ok op after)
     (typeCheck : hooks.checkPlaceType choice (wholeLocal localId) op after = .ok () after) :
-    OperandMachine.evalOperandAt hooks choice path (.Copy (wholeLocal localId)) known before =
+    OperandMachine.evalOperand hooks choice  (.Copy (wholeLocal localId)) known before =
       .ok op after := by
   exact evalOperand_copy_wholeLocal hooks choice localId known before after op localRead typeCheck
 
 theorem evalOperandAt_move_wholeLocal
     (hooks : OperandMachine.Hooks K User Choice) (choice : Choice)
-    (path : OperandPath) (localId : LocalId) (known : Option LocalLayout)
+    (localId : LocalId) (known : Option LocalLayout)
     (before after : MachineHooks.State K User) (op : OpTy Provenance)
     (localRead : OperandMachine.localToOp hooks choice localId known before = .ok op after)
     (typeCheck : hooks.checkPlaceType choice (wholeLocal localId) op after = .ok () after) :
-    OperandMachine.evalOperandAt hooks choice path (.Move (wholeLocal localId)) known before =
+    OperandMachine.evalOperand hooks choice  (.Move (wholeLocal localId)) known before =
       .ok op after := by
   exact evalOperand_move_wholeLocal hooks choice localId known before after op localRead typeCheck
 

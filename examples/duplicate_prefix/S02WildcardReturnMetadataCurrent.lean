@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSeparateDestinationReady
 import duplicate_prefix.S02SeparateDestinationPhysical
 import duplicate_prefix.S02SeparateDestinationWrittenShape
@@ -40,7 +41,7 @@ theorem current
     let frame := (RootArgumentsTwo.result
       (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) count).frame
-    let changed := {frame with location := .unwinding ⟨601⟩}
+    let changed := {frame with location := .unwinding ⟨2⟩}
     let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
     ∃ (secondFresh : destination.tracker.global.nextPointerTag.value < 18446744073709551615)
       (updated : Allocation Provenance BorrowTree),
@@ -73,7 +74,7 @@ theorem current
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have frameBorrow : changed.extra.borrowTracker = some owned := by
     simp only [changed,frame,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,
@@ -94,7 +95,7 @@ theorem current
     simp only [DuplicatePrefixReferenceInput.Binding,originalConcrete] at binding
     exact binding.1
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destId]
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _

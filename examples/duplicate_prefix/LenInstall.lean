@@ -54,6 +54,9 @@ theorem install_of_copy (options : EvalConfigurationCore.Options) (limits : Exec
       value
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) after := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
   have query := LenLocalStages.span1 options limits (remaining+1) span frames frame machine body identity callee
   have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨LenSpans.span1⟩

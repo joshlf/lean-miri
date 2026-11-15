@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnSameSourceActivityPacket
 import duplicate_prefix.S02WildcardReturnRootNotPrimary
 import duplicate_prefix.S03ReturnWildcardMetadata
@@ -66,7 +67,7 @@ theorem after_current
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame) (owned : FrameState)
     (frameBorrow : frame.extra.borrowTracker = some owned)
     (sync : Array (Size × MemoryExtras.Entry Unit))
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) = some (input.id,⟨none,sync⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) = some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outsideSync : ∀ row ∈ sync,row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat)
     (sourceTag : BorTag) (query selected : UniIndex) (maximum : Option BorTag) (lower width : UInt64) (node : TreeNode)
     (tagged : input.entry.allocation.extra.indexOfTag sourceTag = some query)

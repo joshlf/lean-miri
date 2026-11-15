@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04ActiveSeparateReturnPop
 import duplicate_prefix.S04FinalReturnVariantsDriver
 
@@ -63,7 +64,7 @@ theorem return_effect
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩))
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (value : Bool) (fuel : Nat) (debugOff : options.place.debugAssertions = false)
@@ -139,7 +140,7 @@ theorem return_effect
     rw [congrArg BorrowTree.nodes shape]
     exact short
   have nextExtras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == next.id) = some (next.id,⟨none,sync⟩) := by
+      (fun row => row.1 == next.id) = some (next.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (next.id) }) := by
     change after.machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == destination.id) = _
     rw [fields.1]

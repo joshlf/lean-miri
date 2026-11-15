@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveConcreteWindowAcceptedCompleteInput
 import duplicate_prefix.GeneralBorrowPositiveConcreteWindowEarlyCallResult
 namespace DuplicatePrefix.GeneralBorrowPositiveConcreteWindowAllCountInput
@@ -48,7 +49,7 @@ structure InitialFor (profileMode : ProfileMode) extends toBase : GeneralBorrowP
   bufferProvenance : (0 : UInt64)<count→count≤len/2→ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : (0 : UInt64)<count→count≤len/2→entry.allocation.len+64<18446744073709551616
   bufferMutable : (0 : UInt64)<count→count≤len/2→entry.allocation.mutability=.Mut
-  bufferExtras : (0 : UInt64)<count→count≤len/2→before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,⟨none,#[]⟩)
+  bufferExtras : (0 : UInt64)<count→count≤len/2→before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
 
 /-- Legacy all-allocation profile contract. -/
 abbrev Initial := InitialFor .global

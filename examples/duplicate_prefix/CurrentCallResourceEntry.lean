@@ -21,8 +21,8 @@ def root (before : Before) (frames : Array CompilerFrameContext.ActualFrame)
 def finishedFrame {options remaining span frames root before tracker data owner id offset len W place limits count}
     {C : CurrentCallResourceEntryBody.Conditions options remaining span frames root before tracker data owner id offset len W place}
     (out : CurrentCallResourceEntryBody.Output limits C count) : CompilerFrameContext.ActualFrame :=
-  CallEntryFacts.doneRootFrame {registeredFrame (atSpan out.argsRoot ⟨601⟩).frame out.sourceOutput.frame out.physical.id
-    out.sourceOutput.global.nextPointerTag with location:=.unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {registeredFrame (atSpan out.argsRoot ⟨2⟩).frame out.sourceOutput.frame out.physical.id
+    out.sourceOutput.global.nextPointerTag with location:=.unwinding ⟨0⟩}
 
 /-- Actual full root initialization from normalized current resources. The
 initial state is unchanged: raw push precedes both argument copies, destination
@@ -46,7 +46,7 @@ theorem invoke {options remaining span frames before tracker data owner id offse
   have rawEq : CallEntryFacts.rawPushedState frames before (.memory place)=Storage.withCurrent frames initialRoot.frame machine := rfl
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span frames initialRoot.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span frames initialRoot.frame initialRoot.frame machine
-  have preamble : initialRoot.frame.location=.unwinding ⟨559⟩ := rfl
+  have preamble : initialRoot.frame.location=.unwinding ⟨0⟩ := rfl
   have trackNone : initialRoot.frame.trackCallerArg=none := rfl
   have unchanged : {initialRoot.frame with trackCallerArg:=none}=initialRoot.frame := by rw [←trackNone]
   have arguments : h.withRetagMode () .FnEntry (RootCallCore.argumentBody h

@@ -20,7 +20,7 @@ theorem raw_body (machine : MachineHooks.MachineState MiriMemoryKind Machine.Roo
 
 theorem raw_control (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
     (destination : RuntimeStackPlace Provenance) (identity : LocalsIdentity) :
-    (CallEntryFacts.rawRootFrame machine destination identity).location = .unwinding ⟨559⟩ ∧
+    (CallEntryFacts.rawRootFrame machine destination identity).location = .unwinding ⟨0⟩ ∧
     (CallEntryFacts.rawRootFrame machine destination identity).trackCallerArg = none ∧
     (CallEntryFacts.rawRootFrame machine destination identity).returnContinuation = .stop true ∧
     (CallEntryFacts.rawRootFrame machine destination identity).returnPlace = destination ∧

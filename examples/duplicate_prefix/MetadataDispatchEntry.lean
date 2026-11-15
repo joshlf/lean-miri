@@ -1,3 +1,4 @@
+import duplicate_prefix.MetadataCalleeLeaves
 import duplicate_prefix.MetadataEntry
 import duplicate_prefix.MetadataDispatch
 import duplicate_prefix.CallItemDispatch
@@ -54,8 +55,8 @@ theorem actual_dispatch (options : EvalConfigurationCore.Options) (limits : Exec
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).callCompiler]
     rfl
   apply CallItemDispatch.dispatch_one h _ state _ budget
-  rw [CallItemDispatch.item_step h PtrMetadataHelper.resolved.callee 10 PtrMetadataHelper.abi args false destination
-    (some 1) .Continue .Rust PtrMetadataHelper.callee_kind MetadataCallFacts.abi_flags.2.1 rust]
+  rw [CallItemDispatch.item_step h PtrMetadataHelper.resolved.callee 13 PtrMetadataHelper.abi args false destination
+    (some 1) .Continue .Rust (MetadataCalleeLeaves.instance_kind options limits (remaining+1) span) MetadataCallFacts.abi_flags.2.1 rust]
   unfold CallItemDispatch.itemStage
   simp only [bind,EStateM.bind]
   rw [find]

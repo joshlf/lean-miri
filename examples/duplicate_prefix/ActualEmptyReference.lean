@@ -25,12 +25,15 @@ theorem validate (options : EvalConfigurationCore.Options) (remaining : Nat)
     (mode : tracker.retagMode = .FnEntry)
     (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ValidityMachine.validateRuntime (config options remaining span).validity () (validationFuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) true
       (Storage.withCurrent frames frame machine) =
       .ok () (TypedRetagEmpty.afterTag (Storage.withCurrent frames frame machine) tracker fresh) := by
   obtain ⟨ctx⟩ := exists_context options remaining span precise implicitWrites
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have fields := actual_fields options () remaining span
   obtain ⟨target, tail, inhabit, name, kind⟩ := visitor_metadata options remaining span
   obtain ⟨width, pointerSize⟩ := visitor_target options remaining span

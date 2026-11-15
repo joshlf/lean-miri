@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSeparateDestinationProtect
 import duplicate_prefix.S02PositiveFinishFrame
 import duplicate_prefix.RootEntryFinish
@@ -41,7 +42,7 @@ theorem concrete_after_argument_finish
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits).withRetagMode () .FnEntry
         (RootCallCore.argumentBody (ExecutionMachine.callHooks
@@ -77,7 +78,7 @@ theorem concrete_after_argument_finish
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   refine ⟨reference,output,firstFresh,argument,?_⟩
   intro different
@@ -91,7 +92,7 @@ theorem concrete_after_argument_finish
     S02WildcardSeparateDestinationReady.local_facts_after_argument input reference output firstFresh destination destEntry
   have model := S02WildcardSeparateDestinationReady.model_after_argument input reference output firstFresh
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destId]
     change machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _
@@ -125,7 +126,7 @@ theorem concrete_after_argument_finish
     (dead ⟨14,by decide⟩ (by omega) (Or.inr (Or.inr (Or.inr rfl)))) noClocks
   refine ⟨destination,secondFresh,tree,updated,actual,bytes,length,mutable,?_⟩
   let final := Storage.withCurrent #[]
-    (CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}) after.machine
+    (CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}) after.machine
   refine ⟨final,?_⟩
   change RootEntryFinish.finish
       (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits)

@@ -751,8 +751,8 @@ import duplicate_prefix.CandidateWriteSupportCorrectedAccess
 import duplicate_prefix.WideValidityQueries
 import duplicate_prefix.ZeroReferenceBorrow
 
-/-! Kernel compilation and transitive axiom audit. This checks the imported
-program and component lemmas; it is not a whole-function safety certificate. -/
+/-! Kernel compilation and transitive axiom audit of the imported program,
+component lemmas and complete-call theorems, each within its declared domain. -/
 
 namespace DuplicatePrefix.Program
 
@@ -762,8 +762,12 @@ theorem pinnedTarget : imported.document.producer.targetTriple =
 theorem pinnedMiri : imported.document.producer.miriCommit =
     "7fa591d7d4dd9af8154becbc8332f8096f8323b1" := by rfl
 
-/-- Structural export readiness; this does not assert semantic coverage. -/
-theorem structurallyReady : imported.executionInput.isSome = true := by rfl
+/-- Typed executable data is available for the retained document. The importer
+returns this value directly after accepting the document; this presence fact
+makes no semantic-coverage claim. -/
+theorem structurallyReady :
+    ∃ executable : Miri.Input.ExecutionInput, executable.document = imported.document :=
+  ⟨imported, rfl⟩
 
 end DuplicatePrefix.Program
 

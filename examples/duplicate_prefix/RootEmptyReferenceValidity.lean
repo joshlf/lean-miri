@@ -33,7 +33,9 @@ theorem zero_retag_pointer_from_fields {K U C F A : Type} [DecidableEq K]
     (frameShape : state.stack.frames = frames.push frame)
     (tracker : MachineHooks.BorrowState) (enabled : state.machine.borrowTracker = some tracker)
     (mode : tracker.retagMode = .FnEntry)
-    (fresh : tracker.global.nextPointerTag.value < 18446744073709551615) :
+    (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.machineRetagPtrValue h budget (RetagReferencePlace.integerSliceValue address 0 reference)
       reference.ty state = .ok (some (RetagReferencePlace.integerSliceValue address 0 reference))
         (TypedRetagEmpty.afterTag state tracker fresh) := by
@@ -131,7 +133,9 @@ theorem empty_check_from_fields {K U C F A : Type} [DecidableEq K]
     (retain : access.retainTouched = fun machine _ => machine)
     (tracker : MachineHooks.BorrowState) (enabled : machine.borrowTracker = some tracker)
     (mode : tracker.retagMode = .FnEntry)
-    (fresh : tracker.global.nextPointerTag.value < 18446744073709551615) :
+    (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let state := Storage.withCurrent frames frame machine
     source_check_safe hooks choice (ReferenceValidity.referenceSession name)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) reference.ty (.reference true) state =
@@ -233,7 +237,9 @@ theorem zero_retag_pointer_at_from_fields {K U C F A : Type} [DecidableEq K]
     (mode : tracker.retagMode = .FnEntry)
     (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
     (sizingAt : h.sizeAndAlign (RetagReferencePlace.integerSlicePlace address 0 pointee) state =
-      .ok (some (Size.ZERO, Align.ONE)) state) :
+      .ok (some (Size.ZERO, Align.ONE)) state)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.machineRetagPtrValue h budget (RetagReferencePlace.integerSliceValue address 0 reference)
       reference.ty state = .ok (some (RetagReferencePlace.integerSliceValue address 0 reference))
         (TypedRetagEmpty.afterTag state tracker fresh) := by
@@ -307,7 +313,9 @@ theorem empty_check_at_from_fields {K U C F A : Type} [DecidableEq K]
     (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
     (sizingAt : retag.sizeAndAlign (RetagReferencePlace.integerSlicePlace address 0 pointee)
       (Storage.withCurrent frames frame machine) = .ok (some (Size.ZERO, Align.ONE))
-      (Storage.withCurrent frames frame machine)) :
+      (Storage.withCurrent frames frame machine))
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let state := Storage.withCurrent frames frame machine
     source_check_safe hooks choice (ReferenceValidity.referenceSession name)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) reference.ty (.reference true) state =
@@ -408,7 +416,9 @@ theorem empty_validate_at_from_fields {K U C F A : Type} [DecidableEq K]
     (sizingAt : retag.sizeAndAlign (RetagReferencePlace.integerSlicePlace address 0 pointee)
       (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}) =
       .ok (some (Size.ZERO, Align.ONE))
-      (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}})) :
+      (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}))
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let state := Storage.withCurrent frames frame machine
     ValidityMachine.validateRuntime hooks choice (fuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) true state =

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04ReturnValidWrite
 import duplicate_prefix.S04ReturnAllocationClear
 import duplicate_prefix.S04ReturnActualBoolValidity
@@ -23,7 +24,7 @@ theorem from_input {options : EvalConfigurationCore.Options} {limits : Execution
     (len : UInt64) (resources : Resources options limits remaining state.machine input.tracker len)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (state.machine.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (value : Bool) (fuel : Nat) :

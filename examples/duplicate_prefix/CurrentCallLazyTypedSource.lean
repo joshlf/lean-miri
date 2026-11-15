@@ -147,7 +147,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (remaining : Nat) (span
     {data sourceOwner boolOwner boolId boolOffset}
     (license : CurrentCallLazyCurrentDescriptor.License data id offset len sourceOwner boolOwner boolId boolOffset)
     (B : UniformWindow machine tracker data boolOwner boolId boolOffset 1 .ret)
-    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global) :
+    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ converted : Allocation Provenance Unit,GlobalAllocationAttributes.Attributes source converted ∧
     let post:=PositiveGlobalTypedReborrow.resultState options frames frame borrowFrame machine tracker fresh id root source converted offset len
     let tree:=PositiveGlobalTypedReborrow.finalTree root tracker.global.nextPointerTag source.byteSize

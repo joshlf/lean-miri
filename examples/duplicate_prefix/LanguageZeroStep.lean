@@ -74,10 +74,10 @@ theorem step
   let block := CopyPreconditions.Bodies.copyWrapper.loaded.body.basicBlocks[0]'(by with_unfolding_all decide +kernel)
   have blockAt : original.body.basicBlocks[0]? = some block := by rw [body]; simp [block]
   have noStatement : block.statements[2]? = none := by with_unfolding_all rfl
-  have sourceCall : block.terminator.kind = .Call LanguageZeroCallStep.function #[] ⟨5,#[]⟩ (some 1) .Continue .Normal ⟨65⟩ := by
+  have sourceCall : block.terminator.kind = .Call LanguageZeroCallStep.function #[] ⟨5,#[]⟩ (some 1) .Continue .Normal ⟨95⟩ := by
     with_unfolding_all rfl
   apply GenericCallStages.source_step cfg limits () before nextState _ original ⟨0,2⟩ block
-    LanguageZeroCallStep.function #[] ⟨5,#[]⟩ (some 1) .Continue .Normal ⟨65⟩
+    LanguageZeroCallStep.function #[] ⟨5,#[]⟩ (some 1) .Continue .Normal ⟨95⟩
     (by simp [before,Storage.withCurrent,Stack.currentFrame?]) location blockAt noStatement sourceCall accounting' effect
   simp [Storage.withCurrent,nextState]
 end DuplicatePrefix.LanguageZeroStep

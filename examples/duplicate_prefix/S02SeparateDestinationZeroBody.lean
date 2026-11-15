@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SeparateDestinationZeroCore
 import duplicate_prefix.S02SeparateDestinationZeroExtras
 import duplicate_prefix.S02PositiveZeroFrameSettings
@@ -66,7 +67,7 @@ theorem executes
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination packet.destination
       returnTag returnConcrete).1
   have extras : machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) }) := by
     rw [physicalId,machineEq3]
     exact extras3
   have outside : ∀ row ∈ (#[] : Array (Size × MemoryExtras.Entry Unit)),

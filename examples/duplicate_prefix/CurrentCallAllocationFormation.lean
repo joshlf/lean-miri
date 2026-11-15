@@ -44,7 +44,7 @@ theorem init_extra {K U P : Type} [DecidableEq K]
       .ok (BorrowTree.new tracker.global.nextPointerTag size)
         (MemoryExtras.putAllocation extras
           {before with borrowTracker := some {tracker with global := rootedGlobal tracker.global id next}}
-          id ⟨none,#[]⟩) := by
+          id { weakMemory := none }) := by
   have allocated := root_created tracker.global id next absent room
   simp only [PlaceMachine.initStackExtra,enabled,allocated,race,MemoryExtras.initAllocation,noExtras,
     MemoryExtras.putAllocation,get,getThe,MonadStateOf.get,EStateM.get,set,EStateM.set,

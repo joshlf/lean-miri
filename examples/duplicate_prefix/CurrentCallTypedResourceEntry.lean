@@ -37,7 +37,9 @@ theorem invoke
     (nullComparator : ProjectionMetadataFacts.NullComparator) (dynamicFuel : Nat)
     (fuelEq : options.place.dynamicFuel = dynamicFuel+1)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before)).metadata = PreparedReflection.actual.runtime)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before))) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before)))
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (entry : LocalAllocation Provenance BorrowTree MiriMemoryKind) (output : GeneralBorrowForestFnEntry.Output) (child : UniIndex),
       before.memory.live.find? (fun row => row.1 == id) = some (id,entry) ∧
       entry.allocation = W.allocation ∧
@@ -101,7 +103,9 @@ theorem installed_issuance
     (nullComparator : ProjectionMetadataFacts.NullComparator) (dynamicFuel : Nat)
     (fuelEq : options.place.dynamicFuel = dynamicFuel+1)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before)).metadata = PreparedReflection.actual.runtime)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before))) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame before)))
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (entry : LocalAllocation Provenance BorrowTree MiriMemoryKind) (output : GeneralBorrowForestFnEntry.Output) (child : UniIndex),
       before.memory.live.find? (fun row => row.1 == id) = some (id,entry) ∧
       entry.allocation = W.allocation ∧

@@ -58,7 +58,7 @@ theorem init_current_of_copy (options : EvalConfigurationCore.Options) (limits :
     (room : B.allocation.extra.nodes.size+1<65536)
     (ready : CurrentCallBoolProtection.WindowReady source physical.id physical.offset.toNat 1)
     (sourceBorrow : (atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot
-      (CurrentCallSpatialEntryControl.root initial frames place race) updatedImmediate sourceFrame) count) ⟨601⟩).frame.extra.borrowTracker=some sourceFrame) :
+      (CurrentCallSpatialEntryControl.root initial frames place race) updatedImmediate sourceFrame) count) ⟨2⟩).frame.extra.borrowTracker=some sourceFrame) :
     let root:=CurrentCallSpatialEntryControl.root initial frames place race
     let args:=RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updatedImmediate sourceFrame) count
     ∃ (output : GeneralBorrowForestFnEntry.Output) (child : UniIndex) (machine : Before),
@@ -68,7 +68,7 @@ theorem init_current_of_copy (options : EvalConfigurationCore.Options) (limits :
         #[.Copy (⟨.immediate input,ActualReferenceMetadata.reference⟩),.Copy (second count)]
         false (.memory place) (.stop true) (⟨⟨frames⟩,initial⟩ : RootState)=
         .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-          {registeredFrame (atSpan args ⟨601⟩).frame sourceFrame physical.id output.tag with location:=.unwinding ⟨559⟩}) machine) ∧
+          {registeredFrame (atSpan args ⟨2⟩).frame sourceFrame physical.id output.tag with location:=.unwinding ⟨0⟩}) machine) ∧
       machine.borrowTracker=some ⟨output.global,tracker.retagMode⟩ ∧
       Q.pointer=CurrentCallResourceFnEntry.child_pointer B output.tag child ∧
       DuplicatePrefixBorrowContract.RuntimeFacts Q.allocation.extra output.global ∧
@@ -77,7 +77,7 @@ theorem init_current_of_copy (options : EvalConfigurationCore.Options) (limits :
       GeneralBorrowFreshActiveWithin.ActiveWithin Q.allocation.extra child .Write physical.offset (physical.offset+1) ∧
       SpatialDelegation machine ⟨output.global,tracker.retagMode⟩ physical.id Q.allocation Q.precise.completion B.pointer.grant ∧
       PointerBinds Q.allocation B.pointer ∧
-      (registeredFrame (atSpan args ⟨601⟩).frame sourceFrame physical.id output.tag).returnPlace=args.frame.returnPlace ∧
+      (registeredFrame (atSpan args ⟨2⟩).frame sourceFrame physical.id output.tag).returnPlace=args.frame.returnPlace ∧
       Q.precise.completion.parents[child.toNat]?=some (some B.pointer.grant) ∧
       CandidateCurrentFnEntryRaw.operation B.allocation.extra next.global sourceFrame physical.id B.pointer.value.provenance physical.offset 1=.ok output ∧
       Nonempty (CurrentCallResourceFnEntry.BorrowWitness B output child physical.offset 1) ∧
@@ -106,14 +106,14 @@ theorem init_current_of_copy (options : EvalConfigurationCore.Options) (limits :
   have sourceGhost' : source.user.payload.ghost=false := by simpa only [sourceEq] using sourceGhost
   obtain ⟨output,child,actual,tag,global,frameEq,⟨witness⟩,updated,protection,extra,bytes,length,mutable,mutation,snapshot,_,_,returnPlace⟩ :=
     CurrentCallSelectedBoolProtection.protect options limits (remaining+1) span ctx source current data owner frames
-      (atSpan args ⟨601⟩).frame sourceFrame tracked sourceBorrow place physical B pointer allocation runtime binding distinct fresh room
+      (atSpan args ⟨2⟩).frame sourceFrame tracked sourceBorrow place physical B pointer allocation runtime binding distinct fresh room
       sourceGhost' sourceRace backend ready
-  let constructor:=borrowedState frames (atSpan args ⟨601⟩).frame sourceFrame source current fresh physical.id physical.entry output.child.tree
+  let constructor:=borrowedState frames (atSpan args ⟨2⟩).frame sourceFrame source current fresh physical.id physical.entry output.child.tree
   let machine:Before:={constructor.machine with memory:={constructor.machine.memory with live:=
     ((constructor.machine.memory.live.filter (fun row=>row.1!=physical.id)).push (physical.id,{physical.entry with allocation:=updated}))}}
   have protectedStep : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan args ⟨601⟩).frame source)=
-      .ok () (Storage.withCurrent frames (registeredFrame (atSpan args ⟨601⟩).frame sourceFrame physical.id current.global.nextPointerTag) machine) := protection
+      (Storage.withCurrent frames (atSpan args ⟨2⟩).frame source)=
+      .ok () (Storage.withCurrent frames (registeredFrame (atSpan args ⟨2⟩).frame sourceFrame physical.id current.global.nextPointerTag) machine) := protection
   have arguments:=CurrentCallEmptyProtocolControl.arguments options limits remaining span debug fuel fuelEq frames root
     (RootEntryFrame.raw_locals _ _ _) (CurrentCallPush.preparedMachine initial frames) sourceFn tracker next enabled sourceTracked
     ghost shallow sourceGhost sourceShallow input updatedImmediate sourceFrame count copy

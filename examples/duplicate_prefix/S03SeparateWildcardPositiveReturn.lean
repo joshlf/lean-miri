@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03SeparateWildcardLivePacket
 import duplicate_prefix.S03SeparateEmptyBody
 import duplicate_prefix.S04FinalReturnWildcard
@@ -90,7 +91,7 @@ theorem complete
   have slot0 : result.locals[0] = ⟨.live (.immediate (.scalar (.fromBool false))),some RootCompilerFacts.boolLayout⟩ :=
     Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans result0)
   have currentExtras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == p.destination.id) =
-      some (p.destination.id,⟨none,#[]⟩) := by rw [extrasEq];exact p.extras
+      some (p.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (p.destination.id) }) := by rw [extrasEq];exact p.extras
   obtain ⟨updated,returned,_,_,_⟩ := S04FinalReturnWildcard.step options limits remaining span result current currentTracker p.borrowFrame
     currentTracked (by rw [fe];exact p.frameTracked) place destination p.returnTag p.child p.returnNode argument
     p.returnTagged p.returnPresent p.returnSame p.parentless p.leaf p.returnHidden p.hiddenFrame currentRuntime currentPositive

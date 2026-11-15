@@ -33,7 +33,7 @@ def frame (out : CurrentCallEmptyEntryRoot.Output input #[]) (count : UInt64) : 
   installed out.firstDone count (CurrentCallEmptyEntryRoot.sourceBorrow out.effect {}) out.physical.id (sourceTracker out).global.nextPointerTag
 
 def machine (out : CurrentCallEmptyEntryRoot.Output input #[]) (count : UInt64) : Before :=
-  let changed := atSpan (RootArgumentsTwo.result out.firstDone count) ⟨601⟩
+  let changed := atSpan (RootArgumentsTwo.result out.firstDone count) ⟨2⟩
   let retagged := ReturnProtection.borrowedState #[] changed.frame (CurrentCallEmptyEntryRoot.sourceBorrow out.effect {})
     (sourceMachine out) (sourceTracker out) out.room out.physical.id out.physical.entry out.certificate.output.child.tree
   {retagged.machine with memory := {retagged.machine.memory with live :=
@@ -74,7 +74,7 @@ theorem model (out : CurrentCallEmptyEntryRoot.Output input #[]) (count : UInt64
   let transported := CurrentCallPush.prepared_input input #[]
   have initial := model_after_arguments out.effect (fresh input) remaining span #[] (firstLive (root input)).frame {} 1
     ((firstLive (root input)).valid i1) transported.machine.settings transported.machine.state.enabled
-  exact model_after_protection options remaining span #[] (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨601⟩).frame
+  exact model_after_protection options remaining span #[] (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨2⟩).frame
     (CurrentCallEmptyEntryRoot.sourceBorrow out.effect {}) (sourceMachine out) (sourceTracker out) initial rfl
     out.room out.physical.id out.physical.entry out.certificate.output.child.tree out.updated
 

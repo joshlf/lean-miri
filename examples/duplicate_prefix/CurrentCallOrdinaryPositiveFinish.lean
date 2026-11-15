@@ -48,8 +48,8 @@ theorem invoke {options limits remaining span initial argument len place}
       let root := CurrentCallSpatialEntryControl.root initial #[] place input.model.noDataRace
       let args := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {} pointer len source.role.backing.id source.tag) count
       (ExecutionMachine.callHooks (config options (remaining + 1) span) limits).protectArgument () place
-        (Storage.withCurrent #[] (atSpan args ⟨601⟩).frame sourceMachine) =
-        .ok () (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨601⟩).frame
+        (Storage.withCurrent #[] (atSpan args ⟨2⟩).frame sourceMachine) =
+        .ok () (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨2⟩).frame
           (({} : FrameState).addProtector source.role.backing.id source.tag) output.id output.node.tag) finalMachine))
     (tracked : finalMachine.borrowTracker = some next) (mode : next.retagMode = .Default)
     (model : DuplicatePrefixCallModel.Model options remaining span finalMachine)
@@ -80,8 +80,8 @@ theorem invoke {options limits remaining span initial argument len place}
     initial input.model.noDataRace input.model.debugOff input.stackReady rfl rfl protection
   have frameEq : CallEntryFacts.doneRootFrame
       {registeredFrame (atSpan (RootArgumentsTwo.result
-        (CurrentCallSourceArguments.doneRoot options remaining span root {} pointer len source.role.backing.id source.tag) count) ⟨601⟩).frame
-        (({} : FrameState).addProtector source.role.backing.id source.tag) output.id output.node.tag with location := .unwinding ⟨559⟩} = checkpoint.frame := by
+        (CurrentCallSourceArguments.doneRoot options remaining span root {} pointer len source.role.backing.id source.tag) count) ⟨2⟩).frame
+        (({} : FrameState).addProtector source.role.backing.id source.tag) output.id output.node.tag with location := .unwinding ⟨0⟩} = checkpoint.frame := by
     change _ = PositiveRootInstalledFrame.installed root
       (CurrentCallTypedSourceCopy.value options remaining span source.role.family.value len).imm count {} source.role.backing.id source.tag output.id output.node.tag
     rw [entry_finish_rule ".CurrentCallSpatialEntryFacts.source_root", sourcePointer]

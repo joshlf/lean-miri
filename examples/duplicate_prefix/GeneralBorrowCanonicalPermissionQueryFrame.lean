@@ -19,6 +19,7 @@ private theorem permission_readonly {K U : Type} (hooks : TypedRetag.Hooks K U)
     (freeze : ∀ ty, ReadOnly (hooks.typeIsFreeze ty))
     (implicitWrites : ReadOnly hooks.implicitWrites)
     (noWritable : ∀ id, ReadOnly (hooks.rustcNoWritable id))
+    (definition : ∀ inst, ReadOnly (hooks.instanceDefinition inst))
     (pointee : TyId) (kind : RetagPolicy.ReferenceKind) (mode : RetagPolicy.RetagMode) :
     ReadOnly (TypedRetag.newPermission hooks pointee kind mode) := by
   unfold TypedRetag.newPermission
@@ -29,6 +30,7 @@ private theorem permission_readonly {K U : Type} (hooks : TypedRetag.Hooks K U)
     | exact freeze _
     | exact implicitWrites
     | exact noWritable _
+    | exact definition _
     | exact current_frame_readonly
     | apply ite_readonly
     | apply bind_readonly
@@ -42,7 +44,15 @@ theorem preserves (options : EvalConfigurationCore.Options) (remaining : Nat)
     (kind : RetagPolicy.ReferenceKind) (mode : RetagPolicy.RetagMode) :
     ReadOnly (TypedRetag.newPermission (PreparedContracts.actualConfig options () remaining span).retag pointee kind mode) := by
   obtain ⟨_,_,_,unpin,unsafeUnpin,freeze,_,implicitWrites,noWritable,_⟩ := canonical_queries options remaining span
-  exact permission_readonly _ unpin unsafeUnpin freeze implicitWrites noWritable pointee kind mode
+  have definition : ∀ inst, ReadOnly ((PreparedContracts.actualConfig options () remaining span).retag.instanceDefinition inst) := by
+    obtain ⟨pointers,table,globals,choice,construction,_⟩ :=
+      (CanonicalConfigFacts.actual_fields options () remaining span).retagConstruction
+    rw [construction]
+    intro inst state
+    cases result : CompilerInstance.definitionOf
+        PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.loweringContext.instances inst <;>
+      simp only [EvalRetagMachine.hooks, result] <;> rfl
+  exact permission_readonly _ unpin unsafeUnpin freeze implicitWrites noWritable definition pointee kind mode
 
 end
 end DuplicatePrefix.GeneralBorrowCanonicalPermissionQueryFrame

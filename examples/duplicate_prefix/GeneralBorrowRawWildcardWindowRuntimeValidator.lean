@@ -64,7 +64,9 @@ theorem positive
     (short : entry.allocation.extra.nodes.size < 65536)
     (nodeRoom : entry.allocation.extra.nodes.size+1 ≤ 4294967295)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ output : GeneralBorrowForestFnEntry.Output,
       GeneralBorrowRawWildcardFnEntryRuntime.operation entry.allocation.extra tracker.global borrowFrame id (address-base) len = .ok output ∧
     let cfg := config options remaining span
@@ -81,6 +83,7 @@ theorem positive
       ∃ child,output.child.tree.indexOfTag tracker.global.nextPointerTag = some child ∧
         Nonempty (DuplicatePrefixBorrowAuthorization.Positive output.child.tree output.global.protectedTags
           (some child) (some child) (some tracker.global.nextPointerTag) (address-base) len) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}

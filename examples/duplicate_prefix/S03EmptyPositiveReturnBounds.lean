@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03FinalReturnBounds
 import duplicate_prefix.S03EmptyPositiveBody
 import duplicate_prefix.S03EmptyPositiveTreeFacts
@@ -55,7 +56,7 @@ theorem complete
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩))
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (fuel dynamicFuel budget : Nat)
@@ -176,7 +177,7 @@ theorem complete
   have slot0 : result.locals[0] = ⟨.live (.immediate (.scalar (.fromBool false))),some RootCompilerFacts.boolLayout⟩ :=
     Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans result0)
   have currentExtras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩) := by rw [extrasEq];exact extras
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by rw [extrasEq];exact extras
   obtain ⟨updated,returned,_,_,_⟩ := S03FinalReturnBounds.step options limits remaining span result current currentTracker borrowFrame
     currentTracked (by rw [fe];exact frameTracked) place destinationCurrent returnTag child selected maximum returnFinal argumentCurrent
     (finalTagged returnTag child returnTagged) returnFinalPresent (returnFinalTag.trans returnSame)

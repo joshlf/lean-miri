@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestMixedLenCallReturnResources
 import duplicate_prefix.GeneralBorrowForestAcceptedAfterLen
 import duplicate_prefix.GeneralBorrowForestAcceptedAfterLenRuntime
@@ -152,7 +153,7 @@ structure Initial where
   aligned : place.mplace.misaligned = none
   slotFits : slotBase.toNat+1 < 2^64
   slotCached : beforeMachine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (beforeMachine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
   writeContext : PhysicalMachineWrite.Context
   validationContext : PhysicalMachineWrite.Context
@@ -191,7 +192,7 @@ structure Initial where
   provenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   storageFits : entry.allocation.len+64 < 18446744073709551616
   mutable : entry.allocation.mutability = .Mut
-  bufferExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (beforeMachine.user.payload.payload.user.runtime.extras.allocations) (id) })
   bounded : count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
   allocator : GeneralBorrowGcAllocator.Invariant entry.allocation.extra
   vacantClean : GeneralBorrowGcVacantClean.VacantClean entry.allocation.extra

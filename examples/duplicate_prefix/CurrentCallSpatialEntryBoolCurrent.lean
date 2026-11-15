@@ -176,7 +176,7 @@ private theorem write_geometry : out.updated.extra.nodes=out.boolOutput.child.tr
     out.updated.extra.locations.size=out.boolOutput.child.tree.locations.size := by
   obtain ⟨w⟩:=witness out
   have result:=(spatial_install_rule ".CurrentCallSpatialBoolActivation.write_runtime")
-    frames (RootFrameData.atSpan (argsRoot C count) ⟨601⟩).frame out.physical (parent out) (allocation_eq out)
+    frames (RootFrameData.atSpan (argsRoot C count) ⟨2⟩).frame out.physical (parent out) (allocation_eq out)
     (old_runtime out).1 out.sourceTracked (source_highwater out) out.fresh (old_runtime out).2.2
     out.boolOutput out.boolChild out.boolActual out.boolTag out.boolGlobal w
   rw [out.updatedExtra,←out.boolTag]

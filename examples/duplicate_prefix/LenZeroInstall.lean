@@ -38,7 +38,8 @@ theorem live_zero
     (cachedAddress : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+ :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.sliceValue cfg.access.runtime.base
       (Pointer.new (.concrete id (tags 2)) (Size.ofBytes (base+offset))) 0 SharedReferenceMetadata.sharedLayout).imm
@@ -52,6 +53,9 @@ theorem live_zero
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id (tags 2)) (Size.ofBytes (base+offset))) 0 SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid
@@ -115,6 +119,9 @@ theorem live_zero_scoped
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let activeTracker := {tracker with retagMode := .FnEntry}
   let activeMachine := {machine with borrowTracker := some activeTracker}
   have made := live_zero options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq
@@ -160,7 +167,8 @@ theorem nonlive_zero
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (cachedAddress : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+ :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.sliceValue cfg.access.runtime.base
       (Pointer.new (.concrete id (tags 2)) (Size.ofBytes (base+offset))) 0 SharedReferenceMetadata.sharedLayout).imm
@@ -172,6 +180,9 @@ theorem nonlive_zero
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id (tags 2)) (Size.ofBytes (base+offset))) 0 SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid
@@ -231,6 +242,9 @@ theorem nonlive_zero_scoped
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let activeTracker := {tracker with retagMode := .FnEntry}
   let activeMachine := {machine with borrowTracker := some activeTracker}
   have made := nonlive_zero options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq
@@ -268,7 +282,8 @@ theorem integer_zero
     (noClocks : frame.extra.dataRace = none)
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+ :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.integerSliceValue address 0 SharedReferenceMetadata.sharedLayout).imm
     let output := (RetagReferencePlace.integerSliceValue address 0 SharedReferenceMetadata.sharedLayout).imm
@@ -277,6 +292,9 @@ theorem integer_zero
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (LenInstall.resultFrame frame valid output) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.integerSliceValue address 0 SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid
   have cacheValid : 1 < cache.locals.size := by simpa [cache,LenInstall.cacheFrame,LenInstall.spanFrame,LocalOperands.cachedLayoutFrame] using valid
@@ -324,6 +342,9 @@ theorem integer_zero_scoped
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (LenInstall.resultFrame frame valid output) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let activeTracker := {tracker with retagMode := .FnEntry}
   let activeMachine := {machine with borrowTracker := some activeTracker}
   have made := integer_zero options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq

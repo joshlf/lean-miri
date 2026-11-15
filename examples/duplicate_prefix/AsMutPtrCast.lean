@@ -28,7 +28,7 @@ theorem fat_to_thin [PointerProvenance P]
 
 theorem compiler_raw_kind {K U C : Type} (choice : C) :
     (CompilerExecutionProviders.pointerCompiler (K := K) (U := U)
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts).kind choice 204 = pure .raw := by
+      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts).kind choice 99 = pure .raw := by
   simp only [CompilerExecutionProviders.pointerCompiler]
   rw [show PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context = RootMetadataQueries.context from rfl]
   simp_execution_query
@@ -88,7 +88,7 @@ theorem actual_source_kind
   change (PreparedContracts.actualConfig options () remaining span).casts.typeInfo () AsMutPtrFacts.rawLayout.ty = _
   rw [fields.castTypeInfo, AsMutPtrFacts.raw_type]
   funext state
-  change (match CompilerFactAdapters.castTypeInfo PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 204 with
+  change (match CompilerFactAdapters.castTypeInfo PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 99 with
     | .ok kind => EStateM.Result.ok kind state
     | .error reason => EStateM.Result.error (StepError.unsupported s!"cast compiler query: {reason}") state) =
     .ok (.rawPointer 4) state

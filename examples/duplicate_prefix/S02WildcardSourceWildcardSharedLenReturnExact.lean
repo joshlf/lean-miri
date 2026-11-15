@@ -72,7 +72,7 @@ theorem reaches_len
                   (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag)
                     (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
                 ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame
-            with location := .unwinding ⟨601⟩ }
+            with location := .unwinding ⟨2⟩ }
           (({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag)
           secondFresh tree updated).machine ∧
         entry.extra.borrowTracker = some borrowFrame ∧

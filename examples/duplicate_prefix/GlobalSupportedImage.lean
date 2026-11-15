@@ -93,7 +93,7 @@ theorem adjust_exists {Os R P H D O Aff B Host C : Type}
           (EvalPointerSource.address compiler image sourceLeaves choice)
           (EvalPointerSource.make compiler image extras sourceLeaves choice).rootPointer) id source before =
         .ok (.owned (converted.mapExtra (fun _ => BorrowTree.new root source.byteSize)))
-          (MemoryExtras.putAllocation extras before id ⟨none,#[]⟩) := by
+          (MemoryExtras.putAllocation extras before id { weakMemory := none }) := by
   let pointers := EvalPointerSource.make compiler image extras sourceLeaves choice
   let address := EvalPointerSource.address compiler image sourceLeaves choice
   have conversion : ∃ converted : Allocation Provenance Unit,

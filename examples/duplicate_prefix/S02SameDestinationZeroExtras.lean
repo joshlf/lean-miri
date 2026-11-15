@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationProtectedPacket
 import duplicate_prefix.S02SeparateDestinationEntryIdentity
 
@@ -32,7 +33,7 @@ theorem ready
         ⟨⟨#[]⟩,before⟩ = .ok () (Storage.withCurrent #[] frame machine) ∧
       machine.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == input.contract.destination.id) =
-          some (input.contract.destination.id,⟨none,#[]⟩) := by
+          some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) := by
   obtain ⟨reference,firstFresh,destination,secondFresh,updated,sourceChild,returnChild,sourceRaw,
       actual,_sameId,_offset,_extra,_bytes,_length,_mutable,_runtime,_order,_sourcePositive,
       _returnTagged,_returnPositive,_returnActivity⟩ :=
@@ -46,18 +47,18 @@ theorem ready
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra
     destination.tracker returnTag destination.offset 1
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   have preserved := (RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2
   have extras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) =
-        some (input.contract.destination.id,⟨none,#[]⟩) := by
+        some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) := by
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _
     rw [preserved]

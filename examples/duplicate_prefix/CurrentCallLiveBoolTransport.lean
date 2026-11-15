@@ -107,10 +107,15 @@ theorem transport {before oldTracker data owner id offset place}
     | concrete supplied tag=>simpa only [prov] using provenance
     | wildcard=>simpa only [prov] using wild prov
   obtain ⟨sync,selected,outside⟩:=ready
+  have nextSelected : after.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == physical.id) =
+      some (physical.id, { weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get after.user.payload.payload.user.runtime.extras.allocations physical.id }) := by
+    unfold AllocationBacktrace.get
+    rw [extras]
+    exact selected
   exact ⟨{
     window:=Q,loan:=rfl,pointer:=rfl,allocation:=rfl,precise:=rfl,runtime:=nextRuntime,
     physical:=nextPhysical,physicalPointer:=rfl,physicalId:=rfl,physicalOffset:=rfl,physicalEntry:=rfl,physicalCapacity:=rfl,
-    binding:=nextBinding,ready:=⟨sync,extras.trans selected,outside⟩}⟩
+    binding:=nextBinding,ready:=⟨sync,nextSelected,outside⟩}⟩
 end
 end DuplicatePrefix.CurrentCallLiveBoolTransport
 open Lean Elab Command in

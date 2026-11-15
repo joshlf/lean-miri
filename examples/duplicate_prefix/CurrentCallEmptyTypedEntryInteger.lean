@@ -38,7 +38,9 @@ theorem copy_argument
     (localId : MIR.LocalId) (valid : localId < frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value = .live (.immediate old))
     (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference)
-    (noClocks : frame.extra.dataRace = none) :
+    (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let entered := ScopedFrame.entered before tracker .FnEntry
     let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
     let value := (RetagReferencePlace.integerSliceValue address 0 ActualReferenceMetadata.reference).imm

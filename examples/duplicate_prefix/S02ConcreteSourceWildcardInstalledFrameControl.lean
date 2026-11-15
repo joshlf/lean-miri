@@ -41,12 +41,12 @@ theorem at_actual_call
   let sourceFrame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {sourceFrame with location := .unwinding ⟨601⟩}
+  let changed := {sourceFrame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let frame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let frame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   let other := after.machine
   have installedEq : frame = PositiveRootInstalledFrame.installed root adjusted count {}
       reference.id reference.tracker.global.nextPointerTag destination.id

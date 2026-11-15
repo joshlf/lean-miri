@@ -64,7 +64,7 @@ theorem uncached_of_copy
     simpa [cachedFrame,LocalPlaces.cachePlaceLayout,Array.getElem_set,different] using cached1
   have sourceClocks : cachedFrame.extra.dataRace = none := noClocks
   have operand := RootOperandCopy.copy_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    sourceId value layout (OperandPath.rvalue "operand") (some layout) sourceValid sourceLive sourceCached
+    sourceId value layout  (some layout) sourceValid sourceLive sourceCached
     (by simpa [LayoutData.isSized, BackendRepr.isSized] using sized) sourceClocks ghostFalse
   have destValid : destId < cachedFrame.locals.size := by
     simpa [cachedFrame,LocalPlaces.cachePlaceLayout] using valid2

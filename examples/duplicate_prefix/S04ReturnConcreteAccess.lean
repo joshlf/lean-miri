@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04ReturnSyncOutside
 import duplicate_prefix.S05ConcreteEntryBridge
 import duplicate_prefix.PhysicalMachineWrite
@@ -29,7 +30,7 @@ theorem from_input {options : EvalConfigurationCore.Options} {limits : Execution
     (tag : BorTag) (concrete : input.pointer.provenance = .concrete input.id tag)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat) :
     let result := input.entry.allocation.extra.performBorrowAccessRange (.concrete tag)
@@ -61,9 +62,9 @@ theorem from_input {options : EvalConfigurationCore.Options} {limits : Execution
     (runtime.roots (input.id,input.entry) member)
     (fun _ _ => runtime.parent_order input.id input.entry input.live) (by omega) (Nat.le_refl _) (Nat.le_refl _)
   have present : (context.extras.get before.user).allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩) := extras
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((context.extras.get before.user).allocations) (input.id) }) := extras
   have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras before input.id
-    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true ⟨none,sync⟩ present outside
+    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true _ present outside
   have actual := S04ReturnExtrasAccess.source_write_access_exact context.prepared context.image
     context.maximum context.fuel context.globalHooks context.pointers context.extras before input.tracker
     input.entry.allocation.extra input.id (.concrete tag)

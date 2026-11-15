@@ -24,7 +24,8 @@ theorem finishRoot_ok (before : MachineHooks.State K (PointerMachine.User U)) (p
 
 /-- Production allocateConfigured reaches its actual address callback after
 real backing creation, ID reservation, root-tag/tree/extras initialization and
-live insertion. Managed storage and disabled diagnostics are explicit policies;
+live insertion. Managed storage, disabled diagnostic/backtrace capture and inert
+allocation-span callbacks are explicit policies;
 the root callback's success or error is not a premise. -/
 theorem allocate {K U P : Type} [DecidableEq K]
     (config : PlaceMachine.AllocationConfig K (PointerMachine.User U))
@@ -39,7 +40,9 @@ theorem allocate {K U P : Type} [DecidableEq K]
     (emptyMemory : before.machine.memory={}) (enabled : before.machine.borrowTracker=some tracker)
     (initial : tracker.global=GlobalState.new) (race : before.machine.dataRace=none)
     (noExtras : ((extras.get before.machine.user).allocations.any (fun row=>row.1==AllocationLifecycleFormation.id))=false)
-    (bounded : size.bytes≤config.maximumObjectSize.bytes) :
+    (bounded : size.bytes≤config.maximumObjectSize.bytes)
+    (backtrace : config.allocationBacktrace = none := by rfl)
+    (spans : config.allocationSpan = fun _ _ _ => pure () := by rfl) :
     ∃ allocation : Allocation Provenance Unit,
       AllocationPointerFormation.Ready allocation size ∧
       ReallocationDriver.allocateConfigured config size Align.ONE kind .Zero before=
@@ -58,12 +61,13 @@ theorem allocate {K U P : Type} [DecidableEq K]
     simp [AllocationRootHookFormation.global,GlobalState.rootTag?]
   refine ⟨allocation,ready,?_⟩
   unfold ReallocationDriver.allocateConfigured
-  unfold_internal ".ReallocationDriver.machineAction"
-  simp only [managed,created,notLarge,↓reduceIte,diagnostic,tail,emptyMemory,reserve,
+  unfold PlaceMachine.initializeAllocation
+  unfold_internal ".PlaceMachine.allocationMachine"
+  simp only [backtrace,spans,managed,created,notLarge,↓reduceIte,diagnostic,tail,emptyMemory,reserve,
     get,getThe,MonadStateOf.get,EStateM.get,set,EStateM.set,
     modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet,
     bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
-    tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
+    EarlyReturnT.return,EarlyReturnT.return,ExceptT.mk,tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
   dsimp only [synchronize] at hook
   rw [hook]
   simp only [AllocationLifecycleFormation.initialized,AllocationRootHookFormation.rooted,MemoryExtras.putAllocation,
@@ -71,7 +75,7 @@ theorem allocate {K U P : Type} [DecidableEq K]
     get,getThe,MonadStateOf.get,EStateM.get,set,EStateM.set,
     modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet,
     bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
-    tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
+    EarlyReturnT.return,EarlyReturnT.return,ExceptT.mk,tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
   simp only [finishRoot,EStateM.tryCatch,EStateM.throw,insertedState,synchronize,AllocationLifecycleFormation.initialized,
     AllocationRootHookFormation.rooted,MemoryExtras.putAllocation,inserted,ready.1,reserved_live,Array.push_empty]
 end DuplicatePrefix.AllocationConfiguredFormation

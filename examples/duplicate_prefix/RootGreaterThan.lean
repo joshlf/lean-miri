@@ -68,10 +68,10 @@ theorem evaluate
   have rightCached' : cachedFrame.locals[10].layout = some RootCompilerFacts.usizeLayout := by
     simpa [cachedFrame,LocalPlaces.cachePlaceLayout,Array.getElem_set] using rightCached
   have leftOperand := RootOperandMove.move_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    9 left.imm RootCompilerFacts.usizeLayout (OperandPath.rvalue "left") none
+    9 left.imm RootCompilerFacts.usizeLayout  none
     leftValid leftLive' leftCached' (by decide +kernel) noClocks ghostFalse
   have rightOperand := RootOperandMove.move_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    10 right.imm RootCompilerFacts.usizeLayout (OperandPath.rvalue "right") (some RootCompilerFacts.usizeLayout)
+    10 right.imm RootCompilerFacts.usizeLayout  (some RootCompilerFacts.usizeLayout)
     rightValid rightLive' rightCached' (by decide +kernel) noClocks ghostFalse
   have retain := CanonicalConfigFacts.actual_retain_touched options () (remaining+1) span
   have leftRead := ImmediateReadProof.read_scalar_immediate config.access state1

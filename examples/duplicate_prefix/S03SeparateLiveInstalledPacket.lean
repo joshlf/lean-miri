@@ -87,7 +87,7 @@ theorem enters
     (Size.ofBytes original.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
   let frame := PositiveRootInstalledFrame.installed rawFrame adjusted count {} argumentId original.tracker.global.nextPointerTag
     original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag
-  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨601⟩}
+  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨2⟩}
     argumentFrame second protectedTree updated).machine
   let tracker : MachineHooks.BorrowState := ⟨global,original.tracker.retagMode⟩
   let borrowFrame := argumentFrame.addProtector original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag
@@ -118,7 +118,7 @@ theorem enters
   let argEntry : LocalAllocation Provenance BorrowTree MiriMemoryKind := {argumentEntry with allocation := argumentEntry.allocation.setExtra slot.after}
   have argumentCurrent : current.memory.live.find? (fun row => row.1 == argumentId) = some (argumentId,argEntry) :=
     MemoryCopyBridge.live_lookup_replaced _ _ _
-  have argumentAfter := other_live currentInput #[] {args.frame with location := .unwinding ⟨601⟩} argumentFrame second protectedTree updated
+  have argumentAfter := other_live currentInput #[] {args.frame with location := .unwinding ⟨2⟩} argumentFrame second protectedTree updated
     argumentId argEntry (Ne.symm separate) argumentCurrent
   obtain ⟨afterArgRuntime,⟨zero⟩,argGrowth⟩ := S03SeparateArgumentFacts.construct argumentEntry.allocation.extra original.tracker argRuntime argumentId original.id
     parentTag first second slot room

@@ -161,7 +161,7 @@ private theorem finish_result (initial : CurrentCallOrdinaryReturnLive.Packet in
   have args:=CurrentCallEmptyProtocolControl.arguments options limits remaining span input.model.debugOff (options.limits.validation-1) validationEq #[] rootFrame raw
     (CurrentCallPush.preparedMachine before #[]) sourceFn input.tracker ⟨result.global,.FnEntry⟩ input.runtime.enabled rfl input.model.ghostOff input.model.shallow
     (by exact sourceModel.ghostOff) (by exact sourceModel.shallow) inputValue updated sourceFrame count copy
-  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot rootFrame updated sourceFrame) count) ⟨601⟩).frame
+  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot rootFrame updated sourceFrame) count) ⟨2⟩).frame
   obtain ⟨D,allocation,idEq,offsetEq⟩:=live_data input id pointer root source externStatic tail finalAddresses finalTape result tree initial absent boolFrame rfl
   obtain ⟨ctx⟩:=ActualRetagContext.exists_context options (remaining+1) span input.model.preciseOff input.model.implicitOff
   obtain ⟨O⟩:=CurrentCallConversionBoolPhase.live ctx D #[]

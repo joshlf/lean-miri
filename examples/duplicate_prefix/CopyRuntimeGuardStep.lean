@@ -84,8 +84,8 @@ theorem runtime_local0_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = CopyPreconditions.Bodies.languageRuntime.loaded.body)
     (identity : frame.bodyIdentity = CopyPreconditions.Bodies.languageRuntime.loaded.identity)
     (callee : frame.functionInstance = CopyPreconditions.Bodies.languageRuntime.fnInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 

@@ -13,42 +13,26 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 
 noncomputable def functionLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 30).toOption.getD RootCompilerFacts.boolLayout
+  ((PreparedReflection.actual.layoutResults[30]'(by decide +kernel))).toOption.getD RootCompilerFacts.boolLayout
 
-theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 30 = .ok functionLayout := by
-  decide +kernel
+theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 30 = .ok functionLayout := by decide +kernel
 
 theorem functionLayout_shape : functionLayout.ty = 30 ∧ functionLayout.layout.isSized = true ∧
     functionLayout.layout.isZst = true := by
   decide +kernel
 
 theorem function_kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 30 =
-    .ok (.FnDef HelperCompilerFacts.addCall.callee.defId HelperCompilerFacts.addCall.callee.args) := by
+    .ok (.FnDef (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).instanceKind.defId (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs) := by
   with_unfolding_all rfl
 
-def rustExternAbiJson : Lean.Json := Lean.Json.mkObj
-  [("source_spelling", Lean.Json.str "Rust"), ("kind", Lean.Json.str "rust"),
-   ("status", Lean.Json.str "supported"), ("unwind", Lean.Json.null)]
+def rustExternAbi : ABI.ExternAbi := .Rust
 
 theorem function_signature_query : CompilerFunctionFacts.signature
-    PreparedReflection.actual.compiler.functions 30 = .ok (2, rustExternAbiJson) := by
+    PreparedReflection.actual.compiler.functions 30 = .ok (2, rustExternAbi) := by
   with_unfolding_all rfl
 
-theorem decode_rust_extern_abi (cmp : ProjectionMetadataFacts.NullComparator) :
-    CompilerExternAbi.decode rustExternAbiJson = .ok .Rust := by
-  have status : rustExternAbiJson.getObjVal? "status" = .ok (.str "supported") := by
-    with_unfolding_all rfl
-  have unwind : rustExternAbiJson.getObjVal? "unwind" = .ok .null := by
-    with_unfolding_all rfl
-  have kind : rustExternAbiJson.getObjVal? "kind" = .ok (.str "rust") := by
-    with_unfolding_all rfl
-  unfold CompilerExternAbi.decode
-  simp [status, unwind, kind, cmp,bind,Except.bind,pure,Except.pure,Lean.Json.getStr?]
-  exact cmp
-
 theorem runtime_function_type_id :
-    (HelperCompilerFacts.addCall.source.getObjVal? "function_type").bind
-      (fun fnType => (fnType.getObjVal? "type_id").bind Lean.Json.getNat?) = .ok 30 := by
+    HelperCompilerFacts.addCall.source.functionType = some 30 := by
   with_unfolding_all rfl
 
 theorem function_abi : CompilerInstanceAbi.abiOfInstance
@@ -61,7 +45,8 @@ theorem function_body : CallResolution.loadedBodyOfInstance
       .ok HelperCompilerFacts.addBody := by
   exact HelperCompilerFacts.add_body_eq
 
-theorem function_kind_matches_call : HelperCompilerFacts.addCall.callee = ⟨.Item HelperCompilerFacts.addCall.callee.defId, HelperCompilerFacts.addCall.callee.args⟩ := by
+theorem function_kind_matches_call : (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).instanceKind =
+    .Item (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).instanceKind.defId := by
   with_unfolding_all rfl
 
 theorem root_bundle_body :

@@ -61,12 +61,10 @@ theorem actual_entry_eq (options : EvalConfigurationCore.Options) (limits : Exec
     change (PreparedContracts.actualConfig options () remaining span).virtual.compiler.requiresCallerLocation
       GuardCompilerFacts.languageCall.callee state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).virtualCompiler]
-    with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime GuardCompilerFacts.languageCall.callee with
-      | .ok value => pure value
-      | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-        MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-    rw [GuardCompilerFacts.language_caller_location]
+    dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+    unfold CompilerVirtualFacts.inlineAttribute
+    erw [Reflection.natMap_getElem]
+    with_unfolding_all rfl
   have abi : h.fnAbiOfInstance () GuardCompilerFacts.languageCall.callee #[] = pure GuardCompilerFacts.languageAbi := by
     funext state
     exact GuardCompilerFacts.actual_language_abi options () remaining span state

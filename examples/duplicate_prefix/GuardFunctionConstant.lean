@@ -22,37 +22,12 @@ private theorem checkedOk_eq {Error Value : Type} (result : Except Error Value)
   | ok value => rfl
   | error reason => cases supported
 
-def constant : ConstOperand := ⟨⟨66⟩, none, .Val .ZeroSized 206⟩
-def site : CompilerConstantQueries.Site :=
-  ⟨CopyPreconditions.Bodies.copyWrapper.loaded.identity.index, ⟨0,2⟩,
-    #[.field "kind", .field "function", .field "constant"]⟩
-def evidence : Array CompilerConstantEvidence :=
-  (PreparedReflection.actual.compiler.constants.evidence.filter (·.site == site)).map (·.query)
-
-theorem literal : constant.value = .Val .ZeroSized 206 := by with_unfolding_all rfl
-theorem normalization : normalizationFromEvidence evidence CopyPreconditions.Bodies.copyWrapper.fnInstance
-    (.Val .ZeroSized 206) = .ok (.Val .ZeroSized 206) := by with_unfolding_all rfl
-theorem evaluation : evaluationFromEvidence evidence CopyPreconditions.Bodies.copyWrapper.fnInstance
-    (.Val .ZeroSized 206) constant.span = .ok .ZeroSized := by with_unfolding_all rfl
-
-def layoutQuery := PreparedReflection.actual.compiler.runtime.lookup 206
+def constant : ConstOperand := ⟨⟨119⟩, none, .Val .ZeroSized 101⟩
+theorem literal : constant.value = .Val .ZeroSized 101 := by with_unfolding_all rfl
+def layoutQuery := PreparedReflection.actual.compiler.runtime.lookup 101
 theorem layout_supported : layoutQuery.isOk = true := by decide +kernel
-def functionLayout := checkedOk layoutQuery layout_supported
-theorem layout_eq : layoutQuery = .ok functionLayout := checkedOk_eq _ _
-
-open Lean Elab Tactic in
-elab "simp_guard_function_constant" : tactic => do
-  let names := (← getEnv).constants.toList.filterMap fun (name, _) =>
-    if name.toString.endsWith "Miri.Interpreter.constantType" then some (mkIdent name) else none
-  let names := names.toArray
-  evalTactic (← `(tactic| simp_all (config := {maxSteps := 1000000}) [
-    CompilerConstantMachine.evalAtBound, ConstantMachine.fromCompiler,
-    ConstantMachine.evalOperandWithLayout, evalConstOperandWithLayout,
-    evalMirConstantWithLayout, constValueToOpWithLayout, valueToOpWithLayout,
-    ConstantQueries.valueQueries, MachineHooks.currentFrame,
-    Storage.withCurrent, Stack.currentFrame?, bind, EStateM.bind,
-    get, getThe, MonadStateOf.get, EStateM.get, pure, EStateM.pure,
-    Except.bind, Except.pure, site, evidence, constant, literal, $[$names:ident],*]))
+def functionLayout := checkedOk (PreparedReflection.actual.layoutResults[101]'(by decide +kernel)) (by decide +kernel)
+theorem layout_eq : layoutQuery = .ok functionLayout := by decide +kernel
 
 theorem function_eval_at_bound
     (source : PreparedContracts.SourceComparator)
@@ -65,18 +40,16 @@ theorem function_eval_at_bound
     (bodyIndex : frame.bodyIdentity.index = CopyPreconditions.Bodies.copyWrapper.loaded.identity.index)
     (location : frame.location = .mir ⟨0,2⟩)
     (fnInstance : frame.functionInstance = CopyPreconditions.Bodies.copyWrapper.fnInstance) :
-    CompilerConstantMachine.evalAtBound PreparedReflection.actual.compiler.constantBinding site functions
+    ConstantMachine.evalOperandWithLayout PreparedReflection.actual.compiler.runtime functions
       arithmetic externStatic MemoryErrors.constant constant none none
       (Storage.withCurrent frames frame machine) =
       .ok ⟨.immediate .uninit,functionLayout⟩ (Storage.withCurrent frames frame machine) := by
-  have compatible := RootCompilerFacts.constant_binding_compatible source
-  have norm := normalization
-  have eval := evaluation
-  unfold CompilerConstantMachine.evalAtBound
-  simp only [constant]
-  simp_guard_function_constant
-  have layoutQueryIs : PreparedReflection.actual.compiler.runtime.lookup 206 = .ok functionLayout := layout_eq
-  rw [layoutQueryIs]
+  unfold ConstantMachine.evalOperandWithLayout
+  rw [literal]
+  simp only [ConstantMachine.evalValueWithLayout, Option.map_none]
+  unfold valueToOpWithLayout
+  have layout : PreparedReflection.actual.compiler.runtime.lookup 101 = .ok functionLayout := layout_eq
+  rw [layout]
   unfold_internal ".Interpreter.metadata"
   rfl
 
@@ -91,31 +64,20 @@ theorem function_operand [DecidableEq MiriMemoryKind]
     (bodyIndex : frame.bodyIdentity.index = CopyPreconditions.Bodies.copyWrapper.loaded.identity.index)
     (location : frame.location = .mir ⟨0,2⟩)
     (fnInstance : frame.functionInstance = CopyPreconditions.Bodies.copyWrapper.fnInstance) :
-    OperandMachine.evalOperandAt (ExecutionMachine.operandHooks
+    OperandMachine.evalOperand (ExecutionMachine.operandHooks
       (ExecutionMachine.withValidation (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.instruction "function") (.Constant constant) none
+      ()  (.Constant constant) none
       (Storage.withCurrent frames frame machine) =
       .ok ⟨.immediate .uninit,functionLayout⟩ (Storage.withCurrent frames frame machine) := by
   let config := PreparedContracts.actualConfig options () remaining span
   let state := Storage.withCurrent frames frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have currentSite : CompilerOperandSites.current
-      ((OperandPath.instruction "function").push (.field "constant")) state = .ok site state := by
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame, state, Storage.withCurrent,
-      Stack.currentFrame?, site, bodyIndex, location, Bind.bind, EStateM.bind,
-      get, getThe, MonadStateOf.get, EStateM.get, Pure.pure, EStateM.pure,
-      OperandPath.instruction]
-  have result := function_eval_at_bound source config.functions config.arithmetic externStatic
-    frames frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-    ((OperandPath.instruction "function").push (.field "constant")) constant none state = _
+  change config.operands.constant () constant none state = _
   rw [constantAt]
-  simpa [currentSite, state, config, OperandPath.rvalue, Bind.bind, EStateM.bind,
-    Pure.pure, EStateM.pure] using result
+  exact function_eval_at_bound source config.functions config.arithmetic externStatic
+    frames frame machine bodyIndex location fnInstance
 
-#print axioms function_eval_at_bound
-#print axioms function_operand
 end
 end DuplicatePrefix.GuardFunctionConstant
 

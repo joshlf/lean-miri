@@ -11,7 +11,7 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
 def spanFrame (frame : Frame Provenance LocalLayout MachineHooks.FrameExtra) :=
-  {frame with location := .unwinding ⟨635⟩}
+  {frame with location := .unwinding ⟨126⟩}
 def cacheFrame (frame : Frame Provenance LocalLayout MachineHooks.FrameExtra) (valid : 1 < frame.locals.size) :=
   LocalOperands.cachedLayoutFrame (spanFrame frame) 1 PtrMetadataHelper.rawLayout valid
 
@@ -50,8 +50,8 @@ theorem install (options : EvalConfigurationCore.Options) (limits : ExecutionMac
         (resultFrame frame valid (PtrMetadataComplete.rawImmediate carrier (PreparedContracts.actualConfig options () remaining span).access.runtime.base len)) machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
   have query := MetadataLocalStages.span1 options limits (remaining+1) span frames frame machine body identity callee
-  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨635⟩
-  change MetadataCallCore.spanAt h ⟨635⟩ (Storage.withCurrent frames frame machine) = _ at setspan
+  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨126⟩
+  change MetadataCallCore.spanAt h ⟨126⟩ (Storage.withCurrent frames frame machine) = _ at setspan
   have layout := MetadataLocalStages.layout1 options limits (remaining+1) span frames (spanFrame frame) machine
     body identity callee valid uncached
   have cachedValid : 1 < (cacheFrame frame valid).locals.size := by simpa [cacheFrame,spanFrame,LocalOperands.cachedLayoutFrame] using valid

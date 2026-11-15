@@ -13,10 +13,10 @@ private theorem supported_slice_ref : (actual.runtime.lookup 7).isOk = true := b
 private theorem supported_slice : (actual.runtime.lookup 8).isOk = true := by decide +kernel
 private theorem supported_byte : (actual.runtime.lookup 4).isOk = true := by decide +kernel
 
-noncomputable def sharedLayout : LocalLayout := checkedLayout (actual.runtime.lookup 6) supported_shared
-noncomputable def sliceReferenceLayout : LocalLayout := checkedLayout (actual.runtime.lookup 7) supported_slice_ref
-noncomputable def sliceLayout : LocalLayout := checkedLayout (actual.runtime.lookup 8) supported_slice
-noncomputable def byteLayout : LocalLayout := checkedLayout (actual.runtime.lookup 4) supported_byte
+noncomputable def sharedLayout : LocalLayout := checkedLayout (actual.layoutResults[6]'(by decide +kernel)) (by decide +kernel)
+noncomputable def sliceReferenceLayout : LocalLayout := checkedLayout (actual.layoutResults[7]'(by decide +kernel)) (by decide +kernel)
+noncomputable def sliceLayout : LocalLayout := checkedLayout (actual.layoutResults[8]'(by decide +kernel)) (by decide +kernel)
+noncomputable def byteLayout : LocalLayout := checkedLayout (actual.layoutResults[4]'(by decide +kernel)) (by decide +kernel)
 
 theorem shared_layout_query : CompilerFacts.layoutOf facts.context 6 = .ok sharedLayout := by
   rw [compiler_layout_lookup]
@@ -70,7 +70,7 @@ theorem slice_reference_deref : CompilerFacts.builtinDeref facts.context 7 true 
   simp only [context_node]
   with_unfolding_all rfl
 private theorem supported_bool : (actual.runtime.lookup 27).isOk = true := by decide +kernel
-noncomputable def boolLayout : LocalLayout := checkedLayout (actual.runtime.lookup 27) supported_bool
+noncomputable def boolLayout : LocalLayout := checkedLayout (actual.layoutResults[27]'(by decide +kernel)) (by decide +kernel)
 
 theorem bool_layout_query : CompilerFacts.layoutOf facts.context 27 = .ok boolLayout := by
   rw [compiler_layout_lookup]
@@ -80,7 +80,7 @@ theorem bool_geometry : boolLayout.ty = 27 ∧ boolLayout.layout.size = Size.ofB
     boolLayout.layout.align.abi = Align.ONE := by decide +kernel
 
 private theorem supported_u16 : (actual.runtime.lookup 18).isOk = true := by decide +kernel
-noncomputable def u16Layout : LocalLayout := checkedLayout (actual.runtime.lookup 18) supported_u16
+noncomputable def u16Layout : LocalLayout := checkedLayout (actual.layoutResults[18]'(by decide +kernel)) (by decide +kernel)
 
 theorem u16_layout_query : CompilerFacts.layoutOf facts.context 18 = .ok u16Layout := by
   rw [compiler_layout_lookup]
@@ -104,9 +104,7 @@ run_cmd do
   let declaration := mkIdent `slice_projection_parents
   elabCommand (← `(theorem $declaration (cmp : NullComparator) :
       $helper actual.runtime 8 = .ok #[] := by
-    change (if (Lean.Json.null == Lean.Json.null) = true then _ else _) = _
-    rw [cmp]
-    rfl))
+    with_unfolding_all rfl))
 
 theorem slice_field (cmp : NullComparator) :
     actual.runtime.field sliceLayout 0 = .ok byteLayout := by

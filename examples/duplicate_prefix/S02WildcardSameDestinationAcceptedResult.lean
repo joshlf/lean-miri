@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationRejectedInitial
 import duplicate_prefix.S02WildcardRejectedSiteFrame
 import duplicate_prefix.S02WildcardRejectedSiteSlots
@@ -253,7 +254,7 @@ theorem result
   have guardNotConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent #[] guard post)).entries.any (·.value.ty == 4) = false := by
     change post.user.payload.payload.user.types.entries.any (·.value.ty == 4) = _
     rw [typesAfter];exact notConstructed
-  have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+  have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [extrasAfter,tickExtras,rawUser,rawExtras,←sourceId,sourceId,sameId]
     exact input.return_extras
   obtain ⟨sizeEq,lenEq,storage,mutable,storageFits,maskValid,maskLength,initialized,cleared⟩ :=
@@ -381,8 +382,8 @@ theorem result
   have doneClocks : done.extra.dataRace = none := by rw [ready.extra];exact guardClocks
   have valid0 : (0 : MIR.LocalId) < done.locals.size := by rw [ready.size];decide
   have cell0 := Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans ready.output)
-  have finalExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
-    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩)
+  have finalExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
+    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) })
     rw [copyExtras,sourceId];exact sourceExtras
   let copyActiveThread := Classical.choose copyThread
   have copyActive : finalMachine.threads.activeThread? = some copyActiveThread := Classical.choose_spec copyThread

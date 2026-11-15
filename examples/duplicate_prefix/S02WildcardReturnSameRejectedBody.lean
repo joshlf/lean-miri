@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationRejectedResult
 import duplicate_prefix.S02WildcardReturnSameCountEntry
 import duplicate_prefix.S02WildcardReturnSameStep
@@ -430,7 +431,7 @@ theorem result
     intro valid
     have oldValid : 0<sourceEntry.allocation.extra.roots.size := by simpa only [graph.roots] using valid
     simpa only [graph.roots] using packet.notPrimary oldValid
-  have finalExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+  have finalExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.physical.id) = _
     rw [packet.physicalId,extrasAfter,tickExtras,rawUser,rawExtras,physicalId];exact input.return_extras
   have valid0 : 0<done.locals.size := by rw [sizeDone];decide

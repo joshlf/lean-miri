@@ -13,17 +13,17 @@ theorem copy_cached_local
     (frame : Frame Provenance LocalLayout MachineHooks.FrameExtra)
     (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
     (localId : Miri.MIR.LocalId) (immediate : Immediate Provenance) (layout : LocalLayout)
-    (path : OperandPath) (known : Option LocalLayout)
+    (known : Option LocalLayout)
     (valid : localId < frame.locals.size)
     (live : frame.locals[localId].value = .live (.immediate immediate))
     (cached : frame.locals[localId].layout = some layout)
     (sized : layout.layout.backendRepr.isUnsized = false)
     (noClocks : frame.extra.dataRace = none)
     (ghostFalse : machine.user.payload.ghost = false) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () path (.Copy ⟨localId, #[]⟩) known (Storage.withCurrent framesBefore frame machine) =
+      ()  (.Copy ⟨localId, #[]⟩) known (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨.immediate immediate, layout⟩ (Storage.withCurrent framesBefore frame machine) := by
   let config := PreparedContracts.actualConfig options () remaining span
   let hooks := ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits)
@@ -38,7 +38,7 @@ theorem copy_cached_local
     immediate layout known valid live cached sized noClocks false validationGetter
   have check := RootLocalStages.operand_check_skipped options limits () remaining span debugOff
     (OperandDispatch.wholeLocal localId) ⟨.immediate immediate, layout⟩ state
-  exact OperandDispatch.evalOperandAt_copy_wholeLocal hooks () path localId known state state _ read check
+  exact OperandDispatch.evalOperandAt_copy_wholeLocal hooks ()  localId known state state _ read check
 
 theorem destination_cached_local
     [DecidableEq MiriMemoryKind] [PointerProvenance Provenance]
@@ -109,12 +109,12 @@ theorem use_copy_cached_reduction
   have destination := destination_cached_local options limits remaining span debugOff framesBefore frame machine
     destId layout destValid destCached sized
   have operand := copy_cached_local options limits remaining span debugOff framesBefore frame machine
-    sourceId immediate layout (OperandPath.rvalue "operand") (some layout)
+    sourceId immediate layout (some layout)
     sourceValid live sourceCached sizedBackend noClocks ghostFalse
   change evalRvalueIntoPlace hooks () (.Use (.Copy ⟨sourceId, #[]⟩) .Yes) ⟨destId, #[]⟩ state = _
   have destination' : hooks.evalPlace () ⟨destId, #[]⟩ true state =
       .ok (LocalPlaces.localRuntimePlace framesBefore.size frame destId layout) state := destination
-  have operand' : hooks.evalOperandAt () (OperandPath.rvalue "operand") (.Copy ⟨sourceId, #[]⟩)
+  have operand' : hooks.evalOperand ()  (.Copy ⟨sourceId, #[]⟩)
       (some layout) state = .ok ⟨.immediate immediate, layout⟩ state := operand
   unfold evalRvalueIntoPlace
   simp only [bind, EStateM.bind]

@@ -9,7 +9,7 @@ set_option maxHeartbeats 8000000
 
 open Lean Elab Tactic in
 elab "unfold_validity_query_helpers" : tactic => do
-  let names ← ([".CompilerFactAdapters.shape", ".CompilerFactAdapters.source"] : List String).mapM fun (suffix : String) => do
+  let names ← ([".CompilerFactAdapters.source"] : List String).mapM fun (suffix : String) => do
     let found := (← getEnv).constants.toList.filterMap fun (name, _) =>
       if name.toString.endsWith suffix then some (mkIdent name) else none
     match found with
@@ -24,7 +24,7 @@ theorem usize_kind : CompilerFactAdapters.validityKind
   unfold_validity_query_helpers
   dsimp only
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 5 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 5 :=
+      PreparedReflection.actual.runtime.node 5 :=
     RootMetadataQueries.context_node 5
   simp only [node]
   with_unfolding_all rfl
@@ -35,7 +35,7 @@ theorem bool_kind : CompilerFactAdapters.validityKind
   unfold_validity_query_helpers
   dsimp only
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 0 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 0 :=
+      PreparedReflection.actual.runtime.node 0 :=
     RootMetadataQueries.context_node 0
   simp only [node]
   with_unfolding_all rfl
@@ -71,7 +71,7 @@ theorem hooks_usize_name (base : ValidityVisitor.Hooks P S C E F A Pad) (choice 
   dsimp only
   unfold_validity_source
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 5 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 5 :=
+      PreparedReflection.actual.runtime.node 5 :=
     RootMetadataQueries.context_node 5
   rw [node]
   with_unfolding_all rfl
@@ -83,7 +83,7 @@ theorem hooks_bool_name (base : ValidityVisitor.Hooks P S C E F A Pad) (choice :
   dsimp only
   unfold_validity_source
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 0 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 0 :=
+      PreparedReflection.actual.runtime.node 0 :=
     RootMetadataQueries.context_node 0
   rw [node]
   with_unfolding_all rfl
@@ -93,14 +93,14 @@ theorem byte_sized : CompilerFacts.boolean
   unfold CompilerFacts.boolean
   unfold_fact_helpers
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 1 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 1 :=
+      PreparedReflection.actual.runtime.node 1 :=
     RootMetadataQueries.context_node 1
   simp only [node]
   with_unfolding_all rfl
 
 open Lean Elab Tactic in
 elab "unfold_raw_validity_helpers" : tactic => do
-  let names ← ([".CompilerFactAdapters.shape", ".CompilerFactAdapters.typeRef", ".CompilerFactAdapters.source"] : List String).mapM fun (suffix : String) => do
+  let names ← ([".CompilerFactAdapters.source"] : List String).mapM fun (suffix : String) => do
     let found := (← getEnv).constants.toList.filterMap fun (name, _) =>
       if name.toString.endsWith suffix then some (mkIdent name) else none
     match found with
@@ -115,7 +115,7 @@ theorem mut_pointer_kind : CompilerFactAdapters.validityKind
   unfold_raw_validity_helpers
   dsimp only
   have nodes (id : TypeId) : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node id =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node id :=
+      PreparedReflection.actual.runtime.node id :=
     RootMetadataQueries.context_node id
   simp only [nodes]
   change (do
@@ -130,7 +130,7 @@ theorem const_pointer_kind : CompilerFactAdapters.validityKind
   unfold_raw_validity_helpers
   dsimp only
   have nodes (id : TypeId) : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node id =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node id :=
+      PreparedReflection.actual.runtime.node id :=
     RootMetadataQueries.context_node id
   simp only [nodes]
   change (do
@@ -154,7 +154,7 @@ theorem hooks_mut_pointer_name (base : ValidityVisitor.Hooks P S C E F A Pad) (c
   dsimp only
   unfold_validity_source
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 8 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 8 :=
+      PreparedReflection.actual.runtime.node 8 :=
     RootMetadataQueries.context_node 8
   rw [node]
   with_unfolding_all rfl
@@ -174,7 +174,7 @@ theorem hooks_const_pointer_name (base : ValidityVisitor.Hooks P S C E F A Pad) 
   dsimp only
   unfold_validity_source
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 9 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 9 :=
+      PreparedReflection.actual.runtime.node 9 :=
     RootMetadataQueries.context_node 9
   rw [node]
   with_unfolding_all rfl

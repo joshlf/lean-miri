@@ -22,13 +22,10 @@ theorem actual_add_caller_location (options : EvalConfigurationCore.Options)
   change (PreparedContracts.actualConfig options choice remaining span).virtual.compiler.requiresCallerLocation
     HelperCompilerFacts.addCall.callee state = _
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).virtualCompiler]
-  with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime HelperCompilerFacts.addCall.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-      MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-  rw [add_caller_location]
-  rfl
+  dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  with_unfolding_all rfl
 
 
 theorem actual_add_target_features (options : EvalConfigurationCore.Options)
@@ -79,10 +76,11 @@ theorem actual_add_abi (options : EvalConfigurationCore.Options)
     (PreparedContracts.actualConfig options choice remaining span).calls.compiler.fnAbiOfInstance
       choice HelperCompilerFacts.addCall.callee #[] state = .ok HelperCompilerFacts.addAbi state := by
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).callCompiler]
-  with_unfolding_all change (match (HelperCompilerFacts.abiQuery HelperCompilerFacts.addCall.callee) with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported reason) : MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi MIR.TyId)) state = _
-  rw [HelperCompilerFacts.add_abi_eq]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  have query := HelperCompilerFacts.add_abi_eq
+  unfold HelperCompilerFacts.abiQuery at query
+  rw [query]
   rfl
 
 theorem actual_add_load (options : EvalConfigurationCore.Options)

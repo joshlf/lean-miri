@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootZeroInvocationState
 import duplicate_prefix.PositiveRootInstalledFrame
 import duplicate_prefix.ConcreteEmptyRootInvocationState
@@ -54,7 +55,7 @@ theorem invoke
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -225,7 +226,7 @@ theorem invoke
     (congrArg (fun row=>row.value) slot0) (congrArg (fun row=>row.layout) slot0) rfl layout outerWidth (by decide) (by decide)
     (by rw [addrState];exact slotCached) initialPresent protectedSize protectedMutable maskValid (by rw [outerRuntime];rfl)
     (by rw [protectedLen,protectedSize];rfl) (by rw [protectedMask,protectedSize];rfl) protectedProv race backendState rfl
-    (by change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
     rootFree childFree protectedTree slotPointer aligned (by rw [outerRuntime];rfl) outerAccess ghostState shallowState
     (by rw [frameReturn];rfl) (Size.ofBytes (slotBase+1)) endpoint
   exact ⟨Storage.withCurrent #[] frame initialMachine,CanonicalCopy.replaceAllocation state slotId slotEntry.kind result,call',trace,terminal,safe⟩

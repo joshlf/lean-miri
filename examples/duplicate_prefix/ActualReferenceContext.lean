@@ -19,6 +19,29 @@ abbrev adapted (options : EvalConfigurationCore.Options) (remaining : Nat)
     (config options remaining span).access (config options remaining span).validity.projection
     (config options remaining span).validity.vtable pointers () (config options remaining span).retag
 
+theorem instance_definition_ready (options : EvalConfigurationCore.Options) (remaining : Nat)
+    (span : PreparedContracts.FixedSpanQuery) (pointers : RootPointers)
+    (frame : CompilerFrameContext.ActualFrame)
+    (valid : frame.functionInstance < PreparedReflection.actual.program.input.instances.size) :
+    ∃ definition, (adapted options remaining span pointers).instanceDefinition frame.functionInstance = pure definition := by
+  obtain ⟨actualPointers, table, globals, choice, construction, rest⟩ :=
+    (actual_fields options () remaining span).retagConstruction
+  change ∃ definition, (config options remaining span).retag.instanceDefinition frame.functionInstance = pure definition
+  rw [construction]
+  dsimp only [EvalRetagMachine.hooks]
+  unfold_internal ".EvalRetagMachine.lift"
+  have query : CompilerInstance.definitionOf
+      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.loweringContext.instances
+      frame.functionInstance = .ok
+      (PreparedReflection.fixedInstance frame.functionInstance valid).instanceKind.defId := by
+    unfold CompilerInstance.definitionOf CompilerInstance.kindOf CompilerInstance.source
+    rw [show PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.loweringContext.instances =
+      PreparedReflection.actual.program.input.instances from rfl]
+    rw [Array.getElem?_eq_getElem valid]
+    rfl
+  rw [query]
+  exact ⟨_, rfl⟩
+
 structure Context (options : EvalConfigurationCore.Options) (remaining : Nat)
     (span : PreparedContracts.FixedSpanQuery) where
   pointers : RootPointers

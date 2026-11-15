@@ -7,7 +7,7 @@ set_option maxHeartbeats 8000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
-noncomputable def layout : LocalLayout := (PreparedReflection.actual.runtime.lookup 2).toOption.getD CopyCompilerFacts.byteLayout
+noncomputable def layout : LocalLayout := ((PreparedReflection.actual.layoutResults[2]'(by decide +kernel))).toOption.getD CopyCompilerFacts.byteLayout
 
 theorem layout_query : PreparedReflection.actual.runtime.lookup 2 = .ok layout := by decide +kernel
 
@@ -38,7 +38,7 @@ theorem unit_kind : CompilerFactAdapters.validityKind
   unfold_validity_query_helpers
   dsimp only
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 2 :=
+      PreparedReflection.actual.runtime.node 2 :=
     RootMetadataQueries.context_node 2
   simp only [node]
   with_unfolding_all rfl
@@ -48,7 +48,7 @@ theorem unit_inhabited : CompilerFacts.boolean
   unfold CompilerFacts.boolean
   unfold_fact_helpers
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 2 :=
+      PreparedReflection.actual.runtime.node 2 :=
     RootMetadataQueries.context_node 2
   simp only [node]
   with_unfolding_all rfl
@@ -134,7 +134,7 @@ theorem hooks_unit_name (base : ValidityVisitor.Hooks P S C E F A Pad) (choice :
   dsimp only
   unfold_validity_source
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 2 :=
+      PreparedReflection.actual.runtime.node 2 :=
     RootMetadataQueries.context_node 2
   simp only [node]
   with_unfolding_all rfl

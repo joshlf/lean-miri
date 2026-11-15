@@ -151,7 +151,7 @@ theorem configured (options : EvalConfigurationCore.Options) (remaining : Nat)
   obtain ⟨updated,write,extra,bytes,length,mutable,mutation⟩ :=
     on_context_of_access context state place input tree width runtimeSize access resolved (fun _ => false)
   refine ⟨updated,?_,extra,bytes,length,mutable,mutation⟩
-  rw [ReturnMemoryWrite.actual_uninit_eq options remaining span ctx context accessEq place state ghost]
+  rw [ReturnMemoryWrite.actual_uninit_eq options remaining span ctx context accessEq place state ghost (by rw [input.layout]; decide +kernel)]
   exact write
 
 end DuplicatePrefix.CandidateCurrentBoolUninitWrite

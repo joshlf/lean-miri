@@ -54,7 +54,10 @@ theorem argument_compat {State : Type} (queries : LayoutCompat.Queries MIR.TyId 
       (HelperCompilerFacts.addAbi.args.getD 0 HelperCompilerFacts.addAbi.ret) state = .ok true state := by
   with_unfolding_all rfl
 theorem inline_attr : CompilerVirtualFacts.inlineAttribute
-    PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes HelperCompilerFacts.addCall.callee = .ok none := by decide +kernel
+    PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes HelperCompilerFacts.addCall.callee = none := by
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  decide +kernel
 
 theorem argument1_compat {State : Type} (queries : LayoutCompat.Queries MIR.TyId State)
     (budget : Nat) (state : State) :

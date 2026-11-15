@@ -11,7 +11,7 @@ set_option autoImplicit false
 
 theorem positive_result (span : PreparedContracts.FixedSpanQuery)
     (cmp : ProjectionMetadataFacts.NullComparator)
-    (sourceMatches : (PreparedReflection.actual.runtime.source.raw == PreparedReflection.actual.runtime.source.raw)=true) :
+    (sourceMatches : PreparedReflection.actual.compiler.program.input = PreparedReflection.actual.runtime.source) :
     DuplicatePrefixArgumentCallResult.Result options limits budget span before
       (.pointer source.value) 2 1 place :=
   CurrentCallOrdinarySafety.invoke (input span cmp sourceMatches) 1

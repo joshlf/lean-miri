@@ -31,17 +31,17 @@ theorem binaryOp
     (leftImm rightImm result : RvalueImmTy Provenance)
     (s0 s1 s2 s3 s4 s5 s6 s7 : MachineHooks.State K User)
     (evalDest : hooks.evalPlace choice dest true s0 = .ok destValue s1)
-    (evalLeft : hooks.evalOperandAt choice (OperandPath.rvalue "left") left
+    (evalLeft : hooks.evalOperand choice  left
       (if operator.leftHomogeneous then some (hooks.placeLayout destValue) else none) s1 = .ok leftOp s2)
     (readLeft : hooks.readImmediate choice leftOp s2 = .ok leftImm s3)
-    (evalRight : hooks.evalOperandAt choice (OperandPath.rvalue "right") right
+    (evalRight : hooks.evalOperand choice  right
       (if operator.rightHomogeneous then some leftImm.layout else none) s3 = .ok rightOp s4)
     (readRight : hooks.readImmediate choice rightOp s4 = .ok rightImm s5)
     (binary : hooks.binaryOp choice operator leftImm rightImm s5 = .ok result s6)
     (resultLayout : result.layout = hooks.placeLayout destValue)
     (write : hooks.writeImmediate choice result.imm destValue s6 = .ok () s7) :
     evalRvalueIntoPlace hooks choice (.BinaryOp operator left right) dest s0 = .ok () s7 := by
-  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind, OperandPath.rvalue]
+  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind]
   simp_rvalue_assert
   change EStateM.bind (EStateM.pure ())
     (fun _ => hooks.writeImmediate choice result.imm destValue) s6 = .ok () s7
@@ -58,17 +58,17 @@ theorem binaryOp_to_write
     (leftImm rightImm result : RvalueImmTy Provenance)
     (s0 s1 s2 s3 s4 s5 s6 : MachineHooks.State K User)
     (evalDest : hooks.evalPlace choice dest true s0 = .ok destValue s1)
-    (evalLeft : hooks.evalOperandAt choice (OperandPath.rvalue "left") left
+    (evalLeft : hooks.evalOperand choice  left
       (if operator.leftHomogeneous then some (hooks.placeLayout destValue) else none) s1 = .ok leftOp s2)
     (readLeft : hooks.readImmediate choice leftOp s2 = .ok leftImm s3)
-    (evalRight : hooks.evalOperandAt choice (OperandPath.rvalue "right") right
+    (evalRight : hooks.evalOperand choice  right
       (if operator.rightHomogeneous then some leftImm.layout else none) s3 = .ok rightOp s4)
     (readRight : hooks.readImmediate choice rightOp s4 = .ok rightImm s5)
     (binary : hooks.binaryOp choice operator leftImm rightImm s5 = .ok result s6)
     (resultLayout : result.layout = hooks.placeLayout destValue) :
     evalRvalueIntoPlace hooks choice (.BinaryOp operator left right) dest s0 =
       hooks.writeImmediate choice result.imm destValue s6 := by
-  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind, OperandPath.rvalue]
+  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind]
   simp_rvalue_assert
   change EStateM.bind (EStateM.pure ())
     (fun _ => hooks.writeImmediate choice result.imm destValue) s6 =
@@ -83,13 +83,13 @@ theorem use_operand
     (destValue : RuntimePlace Provenance) (op : OpTy Provenance)
     (s0 s1 s2 s3 : MachineHooks.State K User)
     (evalDest : hooks.evalPlace choice dest true s0 = .ok destValue s1)
-    (evalSource : hooks.evalOperandAt choice (OperandPath.rvalue "operand") operand
+    (evalSource : hooks.evalOperand choice  operand
       (some (hooks.placeLayout destValue)) s1 = .ok op s2)
     (copy : hooks.withRetagMode choice
       (if retag == .Yes then RetagMode.Default else RetagMode.None)
       (hooks.copyOp choice op destValue) s2 = .ok () s3) :
     evalRvalueIntoPlace hooks choice (.Use operand retag) dest s0 = .ok () s3 := by
-  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind, OperandPath.rvalue]
+  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind]
 
 /-- The canonical assembled machine's Eq stage delegates to the real scalar
 operation provider. Only immutable type/layout query outcomes are premises;

@@ -36,7 +36,9 @@ theorem rvalue
     (addressMode : machine.user.addresses.provenanceMode ≠ .strict)
     (miss : machine.user.addresses.allocIdFromAddr address 0 (GlobalAddressLiveErrorExclusion.lookup machine.memory) = .ok none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let inner := config options remaining span
     let value := RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 (layout true)
     let resultMachine := ReferenceBorrowDriver.allocatedMachine machine tracker fresh

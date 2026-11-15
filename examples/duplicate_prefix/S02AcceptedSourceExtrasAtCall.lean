@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SeparateDestinationBothPhysicalReadyInstalled
 import duplicate_prefix.S02SeparateDestinationSharedExact
 
@@ -32,7 +33,7 @@ theorem at_actual_call
           .Copy (EmptyRootArguments.second count)] false (.memory place) (.stop true)
         ⟨⟨#[]⟩,before⟩ = .ok () (Storage.withCurrent #[] installed machine)) :
     machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
   obtain ⟨other,firstFresh,destination,secondFresh,updated,child,actual2,_extra,_tagged,
       _runtime,_positive,_activity,_parent,_node,_parentTagged,_present,_same,_edge,_leaf,
       _hidden,_hiddenFrame,_sourceChild,_sourceNode,_sourceRaw,_sourceTracker,_sourceEnabled,
@@ -50,14 +51,14 @@ theorem at_actual_call
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       other.id other.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector other.id other.tracker.global.nextPointerTag
   let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra
     destination.tracker returnTag destination.offset 1
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed2 := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed2 := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   have same : Storage.withCurrent #[] installed2 after.machine = Storage.withCurrent #[] installed machine :=
     (EStateM.Result.ok.inj (actual2.symm.trans actual)).2
   have machineEq : after.machine = machine := congrArg (fun s : RootState => s.machine) same

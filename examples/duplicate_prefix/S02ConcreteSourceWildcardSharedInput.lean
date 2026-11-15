@@ -38,7 +38,7 @@ theorem at_installed
             (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag)
               (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
           ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame with
-          location := .unwinding ⟨601⟩}
+          location := .unwinding ⟨2⟩}
         (({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag)
         secondFresh tree updated).machine) :
     let sourceTree := GeneralBorrowRawFnEntryArgument.finalTree reference.entry.allocation.extra

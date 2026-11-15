@@ -103,7 +103,9 @@ theorem with_context (options : EvalConfigurationCore.Options) (limits : Executi
     (input : CurrentCallAdmission.Proposed options limits remaining span before tracker argument len place call data)
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
-    (positive : 0 < len.toNat) :
+    (positive : 0 < len.toNat)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     Nonempty (Outcome options remaining span ctx before tracker frames frame borrowFrame argument len place call data) := by
   obtain ⟨raw⟩ := input.positive_fnentry borrowFrame positive
   let cfg := config options remaining span
@@ -190,6 +192,7 @@ theorem with_context (options : EvalConfigurationCore.Options) (limits : Executi
   let changed := changedPointer raw.sourcePointer.value call.sourceId tracker.global.nextPointerTag
   let value := RetagReferencePlace.sliceValue cfg.access.runtime.base raw.sourcePointer.value len ActualReferenceMetadata.reference
   let output := RetagReferencePlace.sliceValue cfg.access.runtime.base changed len ActualReferenceMetadata.reference
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h sourcePlace.layout.ty .Mutable .FnEntry start frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ = some ChildBorrow.fnEntryPolicy := rfl
@@ -284,7 +287,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     (input : CurrentCallAdmission.Proposed options limits remaining span before tracker argument len place call data)
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
-    (positive : 0 < len.toNat) :
+    (positive : 0 < len.toNat)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ ctx : Context options remaining span,
       Nonempty (Outcome options remaining span ctx before tracker frames frame borrowFrame argument len place call data) := by
   obtain ⟨ctx⟩ := ActualReferenceContext.exists_context options remaining span

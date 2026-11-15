@@ -13,9 +13,9 @@ theorem normalized (frame : CompilerFrameContext.ActualFrame)
     (identity : frame.bodyIdentity = HelperCompilerFacts.asMutPtrBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee)
     (id : Miri.MIR.LocalId) (which : id = 0 ∨ id = 2 ∨ id = 3 ∨ id = 4) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame id =
-      .ok (if id = 0 ∨ id = 2 then 8 else 204) := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame id =
+      .ok (if id = 0 ∨ id = 2 then 8 else 99) := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   rcases which with rfl | rfl | rfl | rfl <;> with_unfolding_all rfl
 
@@ -43,26 +43,6 @@ theorem compute
   all_goals simp only [Except.mapError, Except.bind,pure,Pure.pure,EStateM.pure]
   all_goals first
     | (rw [show PreparedReflection.actual.compiler.runtime.lookup 8 = .ok CopyCompilerFacts.destPointerLayout from CopyCompilerFacts.dest_pointer_layout_eq]; rfl)
-    | (rw [show PreparedReflection.actual.compiler.runtime.lookup 204 = .ok AsMutPtrFacts.rawLayout from AsMutPtrFacts.raw_layout_eq]; rfl)
+    | (rw [show PreparedReflection.actual.compiler.runtime.lookup 99 = .ok AsMutPtrFacts.rawLayout from AsMutPtrFacts.raw_layout_eq]; rfl)
 
-theorem normalize_cast
-    (options : EvalConfigurationCore.Options) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
-    (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
-    (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
-    (body : frame.body = HelperCompilerFacts.asMutPtrBody.body)
-    (identity : frame.bodyIdentity = HelperCompilerFacts.asMutPtrBody.identity)
-    (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee)
-    (location : frame.location = .mir ⟨0,5⟩) :
-    (PreparedContracts.actualConfig options () remaining span).rvalues.normalize () 8
-      (Storage.withCurrent frames frame machine) = .ok 8 (Storage.withCurrent frames frame machine) := by
-  rw [(CanonicalConfigFacts.actual_fields options () remaining span).rvalueNormalize]
-  unfold CompilerFrameContext.normalizeCastTarget
-  simp only [MachineHooks.currentFrame,Storage.withCurrent,Stack.currentFrame?,Array.back?_push,
-    bind,EStateM.bind,get,getThe,MonadStateOf.get,EStateM.get,pure,EStateM.pure]
-  rw [location]
-  unfold CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
-  rw [body,identity,callee]
-  with_unfolding_all rfl
-
-#print axioms normalize_cast
 end DuplicatePrefix.AsMutPtrLayouts

@@ -13,8 +13,8 @@ theorem normalized_local0 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.addBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.addBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 8 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 8 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -22,8 +22,8 @@ theorem normalized_local3 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.addBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.addBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 3 = .ok 8 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 3 = .ok 8 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -31,8 +31,8 @@ theorem normalized_local4 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.addBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.addBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 4 = .ok 5 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 4 = .ok 5 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -40,7 +40,7 @@ theorem compute_local (framesBefore : Array CompilerFrameContext.ActualFrame)
     (frame : CompilerFrameContext.ActualFrame)
     (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
     (localId : Miri.MIR.LocalId) (ty : TyId) (layout : LocalLayout)
-    (normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame localId = .ok ty)
+    (normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler frame localId = .ok ty)
     (lookup : PreparedReflection.actual.compiler.runtime.lookup ty = .ok layout) :
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler localId
       (Storage.withCurrent framesBefore frame machine) =

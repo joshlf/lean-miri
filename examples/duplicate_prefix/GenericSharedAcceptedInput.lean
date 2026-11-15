@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowFreshSharedNext
 import duplicate_prefix.GeneralBorrowFreshStagePool
 import duplicate_prefix.GenericAsMutDefaultReturn
@@ -130,7 +131,7 @@ structure Base where
   provenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   storageFits : entry.allocation.len+64 < 18446744073709551616
   mutable : entry.allocation.mutability = .Mut
-  bufferExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) })
   bounded : count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
   continuation : frame.returnContinuation = .stop true
   varargs : frame.vaList = #[]
@@ -168,7 +169,7 @@ structure Base where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   slotCached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : frame.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
   different23 : (ReferenceBorrowDriver.allocatedTracker tracker fresh).global.nextPointerTag ≠
     (ReferenceBorrowDriver.allocatedTracker (ReferenceBorrowDriver.allocatedTracker tracker fresh) fresh2).global.nextPointerTag

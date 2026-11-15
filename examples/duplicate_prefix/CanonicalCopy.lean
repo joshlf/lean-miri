@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.MemoryCopyBridge
 import duplicate_prefix.CopyComposition
 import duplicate_prefix.BorrowCopyRanges
@@ -75,7 +76,7 @@ private theorem canonical_prefix_success {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -235,7 +236,7 @@ private theorem canonical_interval_success {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -400,7 +401,7 @@ private theorem canonical_interval_provenance_success {Os R P H D O Aff B Host :
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -573,7 +574,7 @@ private theorem canonical_interval_initialized_success {Os R P H D O Aff B Host 
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -752,7 +753,7 @@ theorem canonical_prefix_copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -809,7 +810,7 @@ theorem canonical_prefix_provenance_copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -869,7 +870,7 @@ theorem canonical_slice_provenance_copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -931,7 +932,7 @@ theorem canonical_slice_initialized_copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -993,7 +994,7 @@ theorem canonical_slice_initialized_copy_protected {Os R P H D O Aff B Host : Ty
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -1056,7 +1057,7 @@ theorem canonical_nested_initialized_copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)

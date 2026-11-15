@@ -18,9 +18,9 @@ theorem normalized_destination (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) (shared : Bool) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame (destination shared) =
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame (destination shared) =
       .ok (layout shared).ty := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   cases shared <;> with_unfolding_all rfl
 

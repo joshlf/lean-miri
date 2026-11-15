@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroInitTail
 import duplicate_prefix.S03NonliveEmptyEntry
 import duplicate_prefix.S03NonliveZeroState
@@ -44,9 +45,9 @@ def frame {before : Before} {place : MPlaceTy Provenance}
   let args := RootArgumentsTwo.result (ConcreteEmptyRootArguments.firstDone
     (RawRootInvocation.root before place race) adjusted {} argumentId input.tracker.global.nextPointerTag) count
   CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-    {args.frame with location := .unwinding ⟨601⟩} (({} : FrameState).addProtector argumentId input.tracker.global.nextPointerTag) input.id
+    {args.frame with location := .unwinding ⟨2⟩} (({} : FrameState).addProtector argumentId input.tracker.global.nextPointerTag) input.id
     (⟨TypedRetagGeneric.protectedGlobal input.tracker.global first,input.tracker.retagMode⟩ : MachineHooks.BorrowState).global.nextPointerTag
-      with location := .unwinding ⟨559⟩}
+      with location := .unwinding ⟨0⟩}
 
 def installed {before : Before} {place : MPlaceTy Provenance}
     (input : DuplicatePrefixReturnPlaceInput.Input before place)
@@ -60,7 +61,7 @@ def installed {before : Before} {place : MPlaceTy Provenance}
     (RawRootInvocation.root before place race) adjusted {} argumentId input.tracker.global.nextPointerTag) count
   Storage.withCurrent #[] (frame input race argumentId base offset count first)
     (S04ProtectUninit.finished (S03NonliveZeroState.argumentsMachine before input.tracker first) place
-      (S03NonliveZeroState.input input first argumentId runtime) #[] {args.frame with location := .unwinding ⟨601⟩} (({} : FrameState).addProtector argumentId input.tracker.global.nextPointerTag)
+      (S03NonliveZeroState.input input first argumentId runtime) #[] {args.frame with location := .unwinding ⟨2⟩} (({} : FrameState).addProtector argumentId input.tracker.global.nextPointerTag)
       second (tree input first tag) updated).machine
 
 /-- Exact supported nonlive concrete empty initStackFrame for arbitrary count
@@ -87,7 +88,7 @@ theorem enters
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     ∃ updated,

@@ -20,8 +20,8 @@ theorem normalized_local4 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.asMutPtrBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.asMutPtrBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 4 = .ok 204 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 4 = .ok 99 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -67,7 +67,7 @@ theorem compute_local4
   simp only [MachineHooks.currentFrame,Storage.withCurrent,Stack.currentFrame?,Array.back?_push,
     bind,EStateM.bind,get,getThe,MonadStateOf.get,EStateM.get,pure,EStateM.pure]
   rw [normalized]
-  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 204 with
+  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 99 with
     | .ok value => EStateM.Result.ok value (Storage.withCurrent framesBefore frame machine)
     | .error error => EStateM.Result.error (StepError.unsupported s!"compiler frame query: {toString error}")
         (Storage.withCurrent framesBefore frame machine)) = _

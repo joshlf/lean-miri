@@ -64,7 +64,9 @@ theorem pointer {K U C F A : Type} [DecidableEq K]
     (dereference : CompilerFacts.builtinDeref prepared.context reference.ty true = .ok (some place.layout.ty))
     (pointeeLayout : CompilerFacts.layoutOf prepared.context place.layout.ty = .ok place.layout)
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
-    (placeShape : place = RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes (base+offset))) len place.layout) :
+    (placeShape : place = RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes (base+offset))) len place.layout)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     let tag := tracker.global.nextPointerTag
     let tree := (entry.allocation.extra.performBorrowAccessRange .wildcard (Size.ofBytes offset) (Size.ofBytes len) .Read (TypedBorrowSteps.registeredGlobal tracker tracker.global.nextPointerTag).protectedTags .VisitChildrenOfAccessed).tree
     let index : UniIndex := ⟨UInt32.ofNat entry.allocation.extra.tagMapping.mapping.size⟩

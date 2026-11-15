@@ -64,11 +64,11 @@ theorem validate_on_context (context : Context)
     rw [classified]; rfl
   have actualSize : hooks.sizeAndAlign choice ⟨mplace,RootCompilerFacts.boolLayout⟩ active =
       .ok (some (RootCompilerFacts.boolLayout.layout.size,RootCompilerFacts.boolLayout.layout.align.abi)) active := by
-    rw [sizing]
+    rw [sizing, RootCompilerFacts.bool_layout_geometry.1, RootCompilerFacts.bool_layout_geometry.2]
     rfl
   exact PhysicalPrimitiveValidity.validate_boolean_memory hooks choice fuel state mplace RootCompilerFacts.boolLayout value name
     ghost named ghostField active rfl classification read clear operand actualSize (by decide +kernel) (by decide +kernel)
-    finish endpoint
+    finish (by simpa only [RootCompilerFacts.bool_layout_geometry.1] using endpoint)
 
 #print axioms validate_on_context
 end DuplicatePrefix.PhysicalBoolValidation

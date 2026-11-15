@@ -5,8 +5,8 @@ namespace DuplicatePrefix.PositiveRootInstalledFrame
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.TreeBorrows Miri.Interpreter
 open RootFrameData EmptyRootArguments TypedBorrowSteps PositiveRootArguments
 noncomputable def installed (root : RootFrame) (adjusted : Immediate Provenance) (n : UInt64) (borrowFrame : FrameState) (buffer : AllocId) (bufferChild : BorTag) (id : AllocId) (child : BorTag) :=
-  CallEntryFacts.doneRootFrame {registeredFrame {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted borrowFrame buffer bufferChild) n).frame with location := .unwinding ⟨601⟩}
-    (borrowFrame.addProtector buffer bufferChild) id child with location := .unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {registeredFrame {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted borrowFrame buffer bufferChild) n).frame with location := .unwinding ⟨2⟩}
+    (borrowFrame.addProtector buffer bufferChild) id child with location := .unwinding ⟨0⟩}
  theorem metadata (root : RootFrame) (adjusted : Immediate Provenance) (n : UInt64) (borrowFrame : FrameState) (buffer : AllocId) (bufferChild : BorTag) (id : AllocId) (child : BorTag) :
     (installed root adjusted n borrowFrame buffer bufferChild id child).body = root.frame.body ∧
     (installed root adjusted n borrowFrame buffer bufferChild id child).bodyIdentity = root.frame.bodyIdentity ∧

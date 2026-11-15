@@ -1,3 +1,4 @@
+import duplicate_prefix.AddCalleeLeaves
 import duplicate_prefix.AddEntry
 import duplicate_prefix.AddDispatch
 import duplicate_prefix.AddFunctionFacts
@@ -55,9 +56,9 @@ set_option backward.dsimp.instances true
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).callCompiler]
     rfl
   apply CallItemDispatch.dispatch_one h _ state _ dispatchBudget
-  rw [CallItemDispatch.item_step h HelperCompilerFacts.addCall.callee HelperCompilerFacts.addCall.callee.defId
+  rw [CallItemDispatch.item_step h HelperCompilerFacts.addCall.callee 8
     HelperCompilerFacts.addAbi args true dest target unwind .Rust
-    (congrArg (·.kind) AddFunctionFacts.function_kind_matches_call) AddCallFacts.abi_flags.2.1 rust]
+    (AddCalleeLeaves.instance_kind options limits (remaining+1) span) AddCallFacts.abi_flags.2.1 rust]
   unfold CallItemDispatch.itemStage
   simp only [bind,EStateM.bind]
   rw [found]

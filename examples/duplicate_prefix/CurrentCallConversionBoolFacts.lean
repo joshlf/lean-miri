@@ -88,7 +88,7 @@ theorem live : outcome.post.machine.memory.live =
 include result outcome in
 theorem extras : outcome.post.machine.user.payload.payload.user.runtime.extras.allocations =
     (machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != D.family.allocation)).push
-      (D.family.allocation, ⟨none, #[]⟩) := by
+      (D.family.allocation, { weakMemory := none }) := by
   rw [outcome.machineEq, result.frame, CurrentCallConversionFiniteFold.state_eq]
   rfl
 

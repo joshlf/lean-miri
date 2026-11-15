@@ -5,8 +5,8 @@ import Lean
 
 /-! Explicit, effect-free compiler-query contracts. These are metadata
 coherence/support obligations, never assumptions that a memory access, call
-step, or Rust execution is safe. The opaque source Json comparator is not
-replaced or assigned an unchecked axiom. -/
+step, or Rust execution is safe. Source coherence compares the complete typed
+imported documents used by the compiler products. -/
 
 set_option maxRecDepth 16384
 set_option maxHeartbeats 8000000
@@ -30,19 +30,14 @@ structure CompilerConstruction (compiler : CompilerProviders.Prepared) where
   rootSpan : MIR.SpanRef
   rootSpan_eq : CompilerContextSpan.rootSpan compiler.program = .ok rootSpan
 
-/-- The only unknown in this contract is the existing opaque Json BEq's
-self-comparison on this exact fixed source. It is an external metadata
-comparator contract, not an assertion about the interpreter's safety. -/
+/-- The typed compiler products share the exact imported document. -/
 structure SourceComparator where
-  reflexive : (PreparedReflection.actual.runtime.source.raw ==
-    PreparedReflection.actual.runtime.source.raw) = true
+  reflexive : PreparedReflection.actual.compiler.program.input =
+    PreparedReflection.actual.runtime.source
 
-theorem fixed_source_matches (contract : SourceComparator)
-    (certificate : Option (RuntimeMetadata.JsonReflexivity PreparedReflection.actual.runtime.source.raw)) :
-    RuntimeMetadata.JsonReflexivity.matchesRightOr certificate
-      PreparedReflection.actual.compiler.program.input.raw = true := by
-  rw [RuntimeMetadata.JsonReflexivity.matchesRightOr_eq]
-  exact contract.reflexive
+theorem fixed_source_matches (contract : SourceComparator) :
+    PreparedReflection.actual.compiler.program.input =
+      PreparedReflection.actual.runtime.source := contract.reflexive
 
 open Lean Elab Tactic in
 elab "unfold_factory_helpers" : tactic => do
@@ -111,19 +106,19 @@ private theorem checkedOk_eq {Error Value : Type}
   | error _ => cases success
 
 theorem maximum_supported :
-    (CompilerExecutionBounds.maximum PreparedReflection.actual.runtime.target).isOk = true := by rfl
+    (CompilerExecutionBounds.maximum PreparedReflection.actual.runtime.target).isOk = true := by decide +kernel
 
 theorem i32_supported :
-    (PreparedReflection.actual.compiler.primitiveLayout "i32").isOk = true := by rfl
+    (PreparedReflection.actual.compiler.primitiveLayout "i32").isOk = true := by decide +kernel
 
 theorem bool_supported :
-    (PreparedReflection.actual.compiler.primitiveLayout "bool").isOk = true := by rfl
+    (PreparedReflection.actual.compiler.primitiveLayout "bool").isOk = true := by decide +kernel
 
 theorem u8_supported :
-    (PreparedReflection.actual.compiler.primitiveLayout "u8").isOk = true := by rfl
+    (PreparedReflection.actual.compiler.primitiveLayout "u8").isOk = true := by decide +kernel
 
 theorem unit_supported :
-    (PreparedReflection.actual.compiler.primitiveLayout "unit").isOk = true := by rfl
+    (PreparedReflection.actual.compiler.primitiveLayout "unit").isOk = true := by decide +kernel
 
 /-- Five construction queries are kernel-computed on the fixed metadata;
 only the existing opaque dummy-span decode needs an explicit contract. -/

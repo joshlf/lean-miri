@@ -75,7 +75,7 @@ noncomputable def accountedMachine := PtrMetadataReturn.accountedMachine
   have located : caller.location = .mir ⟨7,13⟩ := by simpa only [count] using location
   apply GenericCallStages.source_step cfg limits () before nextState _ caller ⟨7,13⟩ block
     HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1] ⟨21,#[]⟩
-    (some 8) .Continue .Normal ⟨34⟩
+    (some 8) .Continue .Normal ⟨49⟩
     (by simp [before,Storage.withCurrent,Stack.currentFrame?]) located blockAt noStatement source_call accounting' effect
   simp [Storage.withCurrent,nextState]
 end DuplicatePrefix.AddCallStep

@@ -68,7 +68,9 @@ theorem live_zero_reference_pointer {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 place.layout)
-    (slice : TypedRetagEntry.SliceFacts projection choice place 0) :
+    (slice : TypedRetagEntry.SliceFacts projection choice place 0)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let input := ConcreteEmptyRuntimeEntry.form entry.allocation.extra tracker.global.protectedTags parentTag tag
       formed parent parentNode parentTagged parentPresent
       (by rw [tagEq]; exact ConcreteEmptyRuntimeEntry.counter_fresh entry.allocation.extra tracker.global below) room

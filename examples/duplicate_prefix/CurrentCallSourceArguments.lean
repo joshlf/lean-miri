@@ -125,15 +125,15 @@ theorem tail_of_steps (options : EvalConfigurationCore.Options) (limits : Execut
     (frames : Array CompilerFrameContext.ActualFrame) (root : RootFrame) (machine : Before)
     (place : MPlaceTy Provenance) (after protectedState : RootState)
     (protect : (ExecutionMachine.callHooks (config options remaining span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine) = .ok () protectedState)
+      (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine) = .ok () protectedState)
     (finish : RootEntryFinish.finish (ExecutionMachine.callHooks (config options remaining span) limits)
       protectedState = .ok () after) :
     RootEntryTail.tail (ExecutionMachine.callHooks (config options remaining span) limits) place
       (Storage.withCurrent frames root.frame machine) = .ok () after := by
   have localSpan := CallEntryLocals.root_span0 options limits remaining span frames root.frame machine root.body root.identity root.callee
   have getFrame := CallEntryLocals.get_frame options limits remaining span frames root.frame machine
-  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨601⟩).frame machine
-  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine)
+  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨2⟩).frame machine
+  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine)
   unfold RootEntryTail.tail RootCallCore.spanAt
   simp only [bind,EStateM.bind]
   rw [localSpan]

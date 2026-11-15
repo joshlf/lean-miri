@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawWildcardFunctionCall
 import duplicate_prefix.RawRootInvocation
 namespace DuplicatePrefix.GeneralBorrowRawWildcardFunctionInvocation
@@ -59,7 +60,7 @@ theorem enters
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
@@ -73,7 +74,7 @@ theorem enters
     let argsMachine := resultMachine (RawRootInvocation.machine #[] before) tracker fresh id entry output.child.tree
     let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal tracker.global fresh,tracker.retagMode⟩
     let owned := ({} : FrameState).addProtector id tracker.global.nextPointerTag
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState #[] changed owned argsMachine next slotFresh slotId slotEntry
       (PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 false)
     ∃ updated,
@@ -81,7 +82,7 @@ theorem enters
         RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
         #[.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩,.Copy (second n)] false (.memory place) (.stop true) ⟨⟨#[]⟩,before⟩ =
       .ok () (Storage.withCurrent #[]
-        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed slotId slotEntry.kind updated).machine) ∧
       (updated.extra = PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧
@@ -110,7 +111,7 @@ theorem enters
   have slotPresentRaw : machine.memory.live.find? (fun row => row.1 == slotId) = some (slotId,slotEntry) := by rw [memory];exact slotPresent
   have raceRaw : machine.dataRace = none := dataRace.trans race
   have backendRaw : machine.user.payload.payload.user.backend = .none := backend.trans noBackend
-  have extrasRaw : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩) := by rw [extraEq];exact extras
+  have extrasRaw : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) }) := by rw [extraEq];exact extras
   have ghostRaw : machine.user.payload.ghost = false := ghostEq.trans ghost
   have shallowRaw : machine.user.payload.validation = .Shallow := validation.trans shallow
   have metadataRaw : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime := by rw [types];exact metadata

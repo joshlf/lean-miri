@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawRootAcceptedObserved
 import duplicate_prefix.GeneralBorrowRawRootRejectedObserved
 import duplicate_prefix.GeneralBorrowRawRootZeroDescribed
@@ -48,7 +49,7 @@ theorem invoke (s : Initial)
     (nodeMargin : s.entry.allocation.extra.nodes.size+5 < 65536)
     (tagMargin : s.tracker.global.nextPointerTag.value.toNat+5 < 18446744073709551615)
     (bytes : GeneralBorrowRawSliceBytes.Data s.entry.allocation s.offset s.len)
-    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,⟨none,#[]⟩))
+    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (s.before.user.payload.payload.user.runtime.extras.allocations) (s.id) }))
     (statementFuel : s.limits.validation = s.validityFuel+1) (n : UInt64) : Nonempty (Outcome s n) := by
   let safety : CallSafety.Context MiriMemoryKind Machine.RootUser Unit Unit Miri.ABI.ExternAbi Unit := ⟨config s.options (s.remaining+1) s.span,s.limits,fun _ _ => True⟩
   by_cases zero : n = 0

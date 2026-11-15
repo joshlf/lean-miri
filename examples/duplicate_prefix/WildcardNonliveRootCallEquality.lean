@@ -87,7 +87,7 @@ theorem call_equal
     (⟨⟨#[]⟩,before⟩ : RootState) (.memory place) thread active noCache
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] raw.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame machine
-  have unchanged : {raw.frame with trackCallerArg := none, location := .unwinding ⟨559⟩} = raw.frame := by rw [←control.1,←control.2.1]
+  have unchanged : {raw.frame with trackCallerArg := none, location := .unwinding ⟨0⟩} = raw.frame := by rw [←control.1,←control.2.1]
   rw [RootCallCore.actual_entry_eq,RootCallCore.actual_entry_eq]
   unfold RootCallCore.core
   unfold CallEntryFacts.config at push
@@ -96,7 +96,7 @@ theorem call_equal
   simp only [EStateM.bind]
   rw [getFrame]
   simp only [EStateM.bind]
-  rw [show raw.frame.location = .unwinding ⟨559⟩ from control.1]
+  rw [show raw.frame.location = .unwinding ⟨0⟩ from control.1]
   simp only [pure,EStateM.pure,EStateM.bind]
   rw [unchanged,setFrame]
   simp only [EStateM.bind]

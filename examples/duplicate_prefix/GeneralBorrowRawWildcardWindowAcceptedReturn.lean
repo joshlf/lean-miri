@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawWildcardWindowAccepted
 import duplicate_prefix.GeneralBorrowFreshRootScopedDefaultFullTrueExit
 import duplicate_prefix.DuplicatePrefixArgumentCallResult
@@ -20,7 +21,7 @@ theorem invoke (s : Initial) (n : UInt64) (positiveCount : n ≠ 0) (within : n 
     (nodeMargin : s.entry.allocation.extra.nodes.size+5 < 65536)
     (tagMargin : s.tracker.global.nextPointerTag.value.toNat+5 < 18446744073709551615)
     (bytes : GeneralBorrowRawSliceBytes.Data s.entry.allocation (offset s) s.len)
-    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,⟨none,#[]⟩))
+    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (s.before.user.payload.payload.user.runtime.extras.allocations) (s.id) }))
     (statementFuel : s.limits.validation = s.validityFuel+1) :
     DuplicatePrefixArgumentCallResult.Result s.options s.limits s.remaining s.span s.before
       (.pointer (Pointer.new .wildcard (Size.ofBytes s.address))) s.len n s.place := by
@@ -117,7 +118,7 @@ theorem invoke (s : Initial) (n : UInt64) (positiveCount : n ≠ 0) (within : n 
     aligned:=s.aligned,
     fits:=s.slotFits,
     cached:=by rw [outcome.flags.addresses];exact s.slotCached,
-    extras:=by change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [outcome.flags.extras];exact s.extras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [outcome.flags.extras];exact s.extras,
     destination:=by rw [outcome.metadata.returnPlace.trans frp];rfl }
   have byteFacts := (bytes.set_extra outcome.tree).for_count n (UInt64.pos_iff_ne_zero.mpr positiveCount) within
   obtain ⟨physical,value,slotId,result,updated,suffixTrace,terminal,safe⟩ :=

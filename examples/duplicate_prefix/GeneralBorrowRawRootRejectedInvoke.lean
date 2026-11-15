@@ -92,7 +92,7 @@ theorem prepare (s : Initial) (n : UInt64) (positiveCount : n ≠ 0) (rejected :
     slotSize:=slot.size,slotStorage:=slot.storage,slotMask:=slot.mask,slotProvenance:=slot.provenance,slotMutable:=slot.mutable,
     place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,aligned:=s.aligned,fits:=s.slotFits,
     cached:=by rw [heap.runtime.addresses];exact s.slotCached,
-    extras:=by change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [heap.runtime.extras];exact s.extras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [heap.runtime.extras];exact s.extras,
     destination:=by rw [frameFacts.returnPlace,entryEq];exact rootDestination }
   exact ⟨⟨entryFrame, initial, call, input, rfl, rfl, rfl, rfl, rfl, rfl, trace⟩⟩
 end

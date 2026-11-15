@@ -50,6 +50,9 @@ theorem live_zero
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id parentTag) (Size.ofBytes (base+offset))) 0 SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid
@@ -111,6 +114,9 @@ theorem live_zero_scoped
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let activeTracker := {tracker with retagMode := .FnEntry}
   let activeMachine := {machine with borrowTracker := some activeTracker}
   have made := live_zero options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq

@@ -68,7 +68,7 @@ theorem complete {options : EvalConfigurationCore.Options} {limits : ExecutionMa
   let currentInput := S03NonliveZeroState.input input first argumentId runtime
   let args := RootArgumentsTwo.result (ConcreteEmptyRootArguments.firstDone rawFrame adjusted {} argumentId input.tracker.global.nextPointerTag) count
   let destination := S03ReturnWildcardMetadata.of_protection currentInput wildcard #[]
-    {args.frame with location := .unwinding ⟨601⟩} argumentFrame second tree updated
+    {args.frame with location := .unwinding ⟨2⟩} argumentFrame second tree updated
     (S03NonliveWildcardInit.written input first second tree) treeEq byteSize bytes mutable maskValid maskLength pointerBounds capacity
   have initialPositive := input.borrow
   have binding := input.binding

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.MemoryCopyBridge
 
 namespace DuplicatePrefix.S04ReturnExtrasAccess
@@ -13,7 +14,7 @@ theorem weak_write_without_buffer {K U Payload : Type}
     (extras : MemoryExtras.Hooks K U Payload) (machine : MachineHooks.MachineState K U)
     (id : AllocId) (range : AllocRange) (sync : Array (Size × MemoryExtras.Entry Payload))
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none,sync⟩)) :
+      some (id, { weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     MemoryExtras.nonAtomicWrite extras id range machine = .ok () machine := by
   unfold MemoryExtras.nonAtomicWrite MemoryExtras.lookup
   unfold_internal ".MemoryExtras.liftResult"
@@ -42,7 +43,7 @@ theorem source_write_access_exact {Os R P H D O Aff B Host : Type}
     (noBackend : machine.user.payload.payload.user.backend = .none)
     (tracked : machine.borrowTracker = some tracker)
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id,⟨none,sync⟩)) :
+      some (id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     let config := Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras
     let access := tree.performBorrowAccessRange provenance range.start range.size
       .Write tracker.global.protectedTags .VisitChildrenOfAccessed
@@ -51,8 +52,8 @@ theorem source_write_access_exact {Os R P H D O Aff B Host : Type}
         match MemoryExtras.syncAccess extras true id range machine with
         | .ok _ after => ⟨⟨after,none⟩,access.tree,.ok ()⟩
         | .error error after => ⟨⟨after,some error⟩,access.tree,.error (reprStr error)⟩
-      else ⟨⟨machine,some (source_tree_error access.status)⟩,access.tree,
-        .error (reprStr (source_tree_error access.status))⟩ := by
+      else ⟨⟨machine,some (source_tree_error true access.status)⟩,access.tree,
+        .error (reprStr (source_tree_error true access.status))⟩ := by
   dsimp only
   have diagnostic :
       (Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras).diagnostic

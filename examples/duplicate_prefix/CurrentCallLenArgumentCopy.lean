@@ -60,7 +60,9 @@ theorem validate
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (race : machine.dataRace = none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (cacheOrigins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine))) :
+    (cacheOrigins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)))
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let registered := TypedBorrowSteps.registeredGlobal tracker tracker.global.nextPointerTag
     let read := entry.allocation.extra.performBorrowAccessRange (.concrete parentTag) (Size.ofBytes offset) (Size.ofBytes len)
@@ -145,7 +147,9 @@ theorem copy_argument
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (cacheOrigins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)))
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId SharedReferenceMetadata.sharedLayout) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId SharedReferenceMetadata.sharedLayout)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.sliceValue cfg.access.runtime.base
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) len SharedReferenceMetadata.sharedLayout).imm
@@ -210,7 +214,8 @@ theorem install_data
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (race : machine.dataRace = none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (cacheOrigins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine))) :
+    (cacheOrigins : DuplicatePrefixTypeCacheOrigins.Origins (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)))
+ :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.sliceValue cfg.access.runtime.base
       (Pointer.new (.concrete id exprTag) (Size.ofBytes (base+offset))) len SharedReferenceMetadata.sharedLayout).imm
@@ -224,6 +229,9 @@ theorem install_data
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (TypedBorrowSteps.registeredFrame (LenInstall.resultFrame frame valid output) borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id exprTag) (Size.ofBytes (base+offset))) len SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid

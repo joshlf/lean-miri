@@ -129,7 +129,7 @@ theorem call_eq
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame machine
   have setPrepared := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame prepared
   have control := RawRootInvocation.control before place race
-  have preamble : raw.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : raw.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {raw.frame with trackCallerArg := none} = raw.frame := by rw [←control.2.1]
   dsimp only
   rw [RootCallCore.actual_entry_eq]

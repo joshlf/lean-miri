@@ -9,7 +9,9 @@ set_option maxHeartbeats 2000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
-/-- Actual initialized managed stack allocation, including canonical root tag,
+/-- Allocation-time backtrace capture is disabled and allocation spans are inert
+in this construction profile.
+ Actual initialized managed stack allocation, including canonical root tag,
 borrow tree, extras, legal tape consumption and source address/cache placement.
 All semantic outcomes and inserted resources are derived from initial raw
 storage/configuration/address resources and numeric room. -/
@@ -37,7 +39,9 @@ theorem allocate
     (slack : Fin 16)
     (supplied : (EvalAllocationMachine.tape.get before).inputs[(EvalAllocationMachine.tape.get before).cursor]?=
       some (.index .addressSlack slack.val))
-    (room : Room generation.generator size Align.ONE slack) :
+    (room : Room generation.generator size Align.ONE slack)
+    (backtrace : config.allocationBacktrace = none := by rfl)
+    (spans : config.allocationSpan = fun _ _ _ => pure () := by rfl) :
     ∃ allocation : Allocation Provenance Unit,
       AllocationPointerFormation.Ready allocation size ∧ allocation.align=Align.ONE ∧
       let extras:=EvalCoreMachine.extras onAccess weakError
@@ -54,7 +58,7 @@ theorem allocate
       GlobalAddressReuseManagedResources.Post final.machine.memory final.machine.user.addresses sizes := by
   let extras:=EvalCoreMachine.extras onAccess weakError
   obtain ⟨allocation,ready,aligned,created,allocated⟩ := AllocationEvalConfiguredFormation.allocate pointers extras config before tracker size .stack bytes
-    managed diagnostic provided length zero emptyMemory enabled initialGlobal race noBackend noExtras bounded
+    managed diagnostic provided length zero emptyMemory enabled initialGlobal race noBackend noExtras bounded backtrace spans
   have sameSize : sizes AllocationLifecycleFormation.id=allocation.byteSize := sizeEq.trans ready.1.symm
   have actual := AllocationEvalStackRootReady.root pointers onAccess weakError config before tracker allocation aligned generation sizes
     emptyMemory initialAddress sameSize uncached slack supplied (by rw [ready.1];exact room)

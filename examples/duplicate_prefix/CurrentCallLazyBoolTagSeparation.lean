@@ -86,7 +86,7 @@ theorem protect_for_entry (options : EvalConfigurationCore.Options) (remaining :
       output.id=family.allocation ∧output.offset=offset.toNat ∧output.original=family.at allocationRoot ∧
       post.machine.borrowTracker=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag) ∧
       post.stack=(Storage.withCurrent frames (registeredFrame frame borrowFrame family.allocation tracker.global.nextPointerTag) machine).stack ∧
-      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation ⟨none,#[]⟩ with
+      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation { weakMemory := none } with
         memory:={machine.memory with live:=((machine.memory.live.filter (fun row=>row.1!=family.allocation)).push (family.allocation,⟨.machine .global,output.window.allocation⟩))},
         borrowTracker:=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag)} := by
   obtain ⟨post,output,current,copy,different,small,actual,familyEq,allocationEq,cellsEq,idEq,offsetEq,originalEq,tracked,stack,machineEq⟩:=

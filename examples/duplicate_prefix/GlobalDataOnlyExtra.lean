@@ -18,7 +18,7 @@ theorem init_extra {K U P : Type} [DecidableEq K]
     (race : before.dataRace = none)
     (noExtras : ((extras.get before.user).allocations.any (fun row => row.1 == id)) = false) :
     GlobalAllocationMachine.initExtra extras (fun _ _ _ => pure ()) id size align before =
-      .ok (BorrowTree.new root size) (MemoryExtras.putAllocation extras before id ⟨none,#[]⟩) := by
+      .ok (BorrowTree.new root size) (MemoryExtras.putAllocation extras before id { weakMemory := none }) := by
   have rootEq := GlobalState.rootPointerTag_existing tracker.global id root rootCached
   have unchanged : {before with borrowTracker := some tracker} = before := by rw [←enabled]
   simp only [GlobalAllocationMachine.initExtra, enabled, rootEq, race, unchanged,

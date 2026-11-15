@@ -40,18 +40,18 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
         .Rust,some LenHelper.abi,false⟩ (Storage.withCurrent frames frame machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
   let state := Storage.withCurrent frames frame machine
-  have fnOp : h.evalOperandAt () (OperandPath.instruction "function") LenHelper.resolved.function state =
+  have fnOp : h.evalOperand ()  LenHelper.resolved.function state =
       .ok ⟨.immediate .uninit,LenCallQueries.functionLayout⟩ state := by
     rw [function_constant]
     exact LenFunctionConstant.function_operand options limits remaining span source debug frames frame machine
       (congrArg (·.index) identity) located callee
-  have argOp : Call.evalFnCallArgumentAt h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨11,#[]⟩)
-      (OperandPath.argument 0) state = .ok (.Copy ⟨.immediate value,LenHelper.rawLayout⟩) state := by
+  have argOp : Call.evalFnCallArgument h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨11,#[]⟩)
+       state = .ok (.Copy ⟨.immediate value,LenHelper.rawLayout⟩) state := by
     rw [argument_operand,disjoint]
     exact CallMoveLocal.move_cached options limits remaining span debug frames frame machine 12 LenHelper.rawLayout value
-      valid live cached LenArgumentCopy.shared_sized noClocks ghost _
-  have resolve : h.resolve () 1 LenHelper.resolved.callee.args state = .ok LenHelper.resolved.callee state := by
-    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 1 LenHelper.resolved.callee.args state = _
+      valid live cached LenArgumentCopy.shared_sized noClocks ghost
+  have resolve : h.resolve () 1 (PreparedReflection.fixedInstance LenHelper.resolved.callee).genericArgs state = .ok LenHelper.resolved.callee state := by
+    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 1 (PreparedReflection.fixedInstance LenHelper.resolved.callee).genericArgs state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
     exact LenCallQueries.resolve_current frames frame machine body identity callee located
   have fnAbi : h.fnAbiOfInstance () LenHelper.resolved.callee #[] = pure LenHelper.abi := by
@@ -61,10 +61,10 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
     funext state
     exact LenCallFacts.actual_len_caller_location options () remaining span limits state
   exact CallOneArgumentAt.eval_callee_one_at h () LenHelper.resolved.function argument ⟨11,#[]⟩
-    ⟨.immediate .uninit,LenCallQueries.functionLayout⟩ state state state .Rust 1 LenHelper.resolved.callee.args
+    ⟨.immediate .uninit,LenCallQueries.functionLayout⟩ state state state .Rust 1 (PreparedReflection.fixedInstance LenHelper.resolved.callee).genericArgs
     LenHelper.resolved.callee 1 LenHelper.abi false (.Copy ⟨.immediate value,LenHelper.rawLayout⟩)
     fnOp argOp (LenCalleeLeaves.signature options limits remaining span cmp)
-    (LenCalleeLeaves.kind options limits remaining span) resolve LenHelper.callee_kind fnAbi callerLocation
+    (LenCalleeLeaves.kind options limits remaining span) resolve (LenCalleeLeaves.instance_kind options limits remaining span) fnAbi callerLocation
 end
 end DuplicatePrefix.LenEvaluateCall
 open Lean Elab Command in

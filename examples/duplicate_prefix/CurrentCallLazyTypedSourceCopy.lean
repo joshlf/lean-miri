@@ -120,7 +120,9 @@ private theorem validate (options : EvalConfigurationCore.Options) (remaining : 
     {data sourceOwner boolOwner boolId boolOffset}
     (license : CurrentCallLazyCurrentDescriptor.License data id offset len sourceOwner boolOwner boolId boolOffset)
     (B : UniformWindow before tracker data boolOwner boolId boolOffset 1 .ret)
-    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global) :
+    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ converted : Allocation Provenance Unit,GlobalAllocationAttributes.Attributes source converted ∧
     let afterFrame:=writtenFrame options remaining span frame borrowFrame localId valid pointer len id tracker.global.nextPointerTag
     let afterMachine:=validated options frames frame borrowFrame before tracker room id root source converted offset len
@@ -276,7 +278,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     {data sourceOwner boolOwner boolId boolOffset}
     (license : CurrentCallLazyCurrentDescriptor.License data id offset len sourceOwner boolOwner boolId boolOffset)
     (B : UniformWindow before tracker data boolOwner boolId boolOffset 1 .ret)
-    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global) :
+    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ converted : Allocation Provenance Unit,GlobalAllocationAttributes.Attributes source converted ∧
     let copied:=copiedFrame options remaining span frame localId valid pointer len
     let validCopied : localId<copied.locals.size:=by simpa only [copied,copiedFrame,Array.size_set] using valid

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04FinalReturnWildcardInput
 import duplicate_prefix.S03EmptyTagState
 
@@ -60,7 +61,7 @@ structure Packet (options : EvalConfigurationCore.Options) (remaining : Nat)
   ghost : machine.user.payload.ghost = false
   shallow : machine.user.payload.validation = .Shallow
   extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-    some (destination.id,⟨none,#[]⟩)
+    some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) })
   metadata : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime
   notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false
   sourceBody : frame.body = RootBody.reflected.body.body

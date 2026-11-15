@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroFrame
 import duplicate_prefix.S03ReturnWrittenGeometry
 import duplicate_prefix.S03ZeroCountBodyBounds
@@ -33,7 +34,7 @@ theorem complete
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     DuplicatePrefixArgumentCallResult.Result options limits remaining span before (.integer address) 0 0 place := by

@@ -82,7 +82,9 @@ theorem protected_reference_pointer {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) len place.layout)
-    (sliceFacts : TypedRetagEntry.SliceFacts projection choice place len) :
+    (sliceFacts : TypedRetagEntry.SliceFacts projection choice place len)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     ∃ (finalTree : BorrowTree) (index : UniIndex),
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base

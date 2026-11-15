@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestAcceptedFunctionSafety
 import duplicate_prefix.GeneralBorrowForestRejectedFunctionSafety
 import duplicate_prefix.GeneralBorrowForestZeroSafety
@@ -52,7 +53,7 @@ structure Initial extends toOriginal : GeneralBorrowForestFunctionEntryZero.Init
   provenanceBuffer : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   storageFitsBuffer : entry.allocation.len+64 < 18446744073709551616
   mutableBuffer : entry.allocation.mutability = .Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
   bounded : count ≤ len/2 → count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
   fresh5 : (ReferenceBorrowDriver.allocatedTracker (ReferenceBorrowDriver.allocatedTracker (held tracker fresh slotFresh) fresh3) fresh4).global.nextPointerTag.value < 18446744073709551615
   fresh6 : (ReferenceBorrowDriver.allocatedTracker (ReferenceBorrowDriver.allocatedTracker (ReferenceBorrowDriver.allocatedTracker (held tracker fresh slotFresh) fresh3) fresh4) fresh5).global.nextPointerTag.value < 18446744073709551615

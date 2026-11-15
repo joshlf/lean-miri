@@ -85,7 +85,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     change (TypedRetagEmpty.successorTag tracker.global.nextPointerTag fresh).value.toNat<18446744073709551615
     rw [GenericFunctionEntryNumerics.successor_value]
     exact tagRoom
-  let constructor:=borrowedState frames (atSpan args ⟨601⟩).frame {} source next freshAfter physical.id physical.entry output.child.tree
+  let constructor:=borrowedState frames (atSpan args ⟨2⟩).frame {} source next freshAfter physical.id physical.entry output.child.tree
   have constructorPresent : Present (ActualWorld constructor.machine) physical.id (P.allocation.setExtra output.child.tree) := by
     simp only [Present,ActualWorld,Array.toList_map]
     apply List.mem_map.mpr

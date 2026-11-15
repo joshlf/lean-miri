@@ -29,7 +29,7 @@ theorem adjust {K U P : Type} [DecidableEq K]
     (noExtras : ((extras.get after.user).allocations.any (fun row=>row.1==id))=false) :
     GlobalAllocationMachine.adjust target extras (GlobalDataOnlyAdjust.leaves pointer) id source before=
       .ok (.owned (converted.mapExtra (fun _=>BorrowTree.new root converted.byteSize)))
-        (MemoryExtras.putAllocation extras after id ⟨none,#[]⟩) := by
+        (MemoryExtras.putAllocation extras after id { weakMemory := none }) := by
   have inspect : source.inspectWithUninitAndPtrOutsideInterpreter 0 source.len=.ok (AllocationCopy.snapshot source) := by
     cases source
     simp [AllocationCopy.snapshot,Allocation.inspectWithUninitAndPtrOutsideInterpreter,
@@ -62,7 +62,7 @@ theorem adjust_actual {Os R P H D O Aff B Host C : Type}
     GlobalAllocationMachine.adjust compiler.runtime.target.base extras
       (GlobalDataOnlyActualBytes.leaves compiler image sourceLeaves address pointer) id source before=
       .ok (.owned (converted.mapExtra (fun _=>BorrowTree.new root converted.byteSize)))
-        (MemoryExtras.putAllocation extras after id ⟨none,#[]⟩) := by
+        (MemoryExtras.putAllocation extras after id { weakMemory := none }) := by
   have inspect : source.inspectWithUninitAndPtrOutsideInterpreter 0 source.len=.ok (AllocationCopy.snapshot source) := by
     cases source
     simp [AllocationCopy.snapshot,Allocation.inspectWithUninitAndPtrOutsideInterpreter,

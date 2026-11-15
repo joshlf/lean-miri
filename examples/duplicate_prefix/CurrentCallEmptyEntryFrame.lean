@@ -37,8 +37,8 @@ theorem installed_locals {options before tracker argument} (effect : Effect opti
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (root firstDone : RootFrame)
     (copied : firstDone.frame = resultFrame effect remaining span (firstLive root).frame {} 1 ((firstLive root).valid i1))
     (count : UInt64) (borrow : FrameState) (id : AllocId) (tag : BorTag) :
-    (CallEntryFacts.doneRootFrame {registeredFrame (atSpan (RootArgumentsTwo.result firstDone count) ⟨601⟩).frame
-      borrow id tag with location := .unwinding ⟨559⟩}).locals =
+    (CallEntryFacts.doneRootFrame {registeredFrame (atSpan (RootArgumentsTwo.result firstDone count) ⟨2⟩).frame
+      borrow id tag with location := .unwinding ⟨0⟩}).locals =
     (PositiveRootInstalledFrame.installed root (adjusted effect remaining span) count {} id tag id tag).locals := by
   have locals := copied_locals effect remaining span root
   rw [←copied] at locals
@@ -52,8 +52,8 @@ theorem installed_locals {options before tracker argument} (effect : Effect opti
 
 /-- The exact installed empty-entry frame; its borrow extras remain explicit. -/
 def installed (firstDone : RootFrame) (count : UInt64) (borrow : FrameState) (id : AllocId) (tag : BorTag) :=
-  CallEntryFacts.doneRootFrame {registeredFrame (atSpan (RootArgumentsTwo.result firstDone count) ⟨601⟩).frame
-    borrow id tag with location := .unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {registeredFrame (atSpan (RootArgumentsTwo.result firstDone count) ⟨2⟩).frame
+    borrow id tag with location := .unwinding ⟨0⟩}
 
 theorem installed_slot {options before tracker argument} (effect : Effect options before tracker argument)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (root firstDone : RootFrame)

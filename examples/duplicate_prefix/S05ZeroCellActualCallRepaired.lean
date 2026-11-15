@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallAsMutReturn
 import duplicate_prefix.GenericCopyMemoryCore
 import Init.Internal.Order.While
@@ -53,7 +54,7 @@ theorem actual_state_copy_completed {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some copyTracker)
     (extras : (ctx.extras.get state.machine.user).allocations.find? (fun row => row.1 == S05ZeroCellJointPacket.sourceId) =
-      some (S05ZeroCellJointPacket.sourceId, ⟨none,#[]⟩))
+      some (S05ZeroCellJointPacket.sourceId, { weakMemory := none, backtrace := AllocationBacktrace.get ((ctx.extras.get state.machine.user).allocations) (S05ZeroCellJointPacket.sourceId) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == S05ZeroCellJointPacket.sourceId) = some (S05ZeroCellJointPacket.sourceId,copyEntry))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == S05ZeroCellJointPacket.sourceId) =
       some ⟨S05ZeroCellJointPacket.sourceId,4096⟩) :

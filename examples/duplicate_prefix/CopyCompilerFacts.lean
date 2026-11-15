@@ -21,13 +21,15 @@ theorem byte_layout_supported : (PreparedReflection.actual.runtime.lookup 1).isO
 theorem source_pointer_layout_supported : (PreparedReflection.actual.runtime.lookup 9).isOk = true := by decide +kernel
 theorem dest_pointer_layout_supported : (PreparedReflection.actual.runtime.lookup 8).isOk = true := by decide +kernel
 
-def byteLayout : LocalLayout := checkedOk (PreparedReflection.actual.runtime.lookup 1) byte_layout_supported
-def sourcePointerLayout : LocalLayout := checkedOk (PreparedReflection.actual.runtime.lookup 9) source_pointer_layout_supported
-def destPointerLayout : LocalLayout := checkedOk (PreparedReflection.actual.runtime.lookup 8) dest_pointer_layout_supported
+def byteLayout : LocalLayout := checkedOk (PreparedReflection.actual.layoutResults[1]'(by decide +kernel)) (by decide +kernel)
+def sourcePointerLayout : LocalLayout := checkedOk (PreparedReflection.actual.layoutResults[9]'(by decide +kernel)) (by decide +kernel)
+def destPointerLayout : LocalLayout := checkedOk (PreparedReflection.actual.layoutResults[8]'(by decide +kernel)) (by decide +kernel)
 
-theorem byte_layout_eq : PreparedReflection.actual.runtime.lookup 1 = .ok byteLayout := checkedOk_eq _ _
-theorem source_pointer_layout_eq : PreparedReflection.actual.runtime.lookup 9 = .ok sourcePointerLayout := checkedOk_eq _ _
-theorem dest_pointer_layout_eq : PreparedReflection.actual.runtime.lookup 8 = .ok destPointerLayout := checkedOk_eq _ _
+theorem byte_layout_eq : PreparedReflection.actual.runtime.lookup 1 = .ok byteLayout := by decide +kernel
+
+theorem source_pointer_layout_eq : PreparedReflection.actual.runtime.lookup 9 = .ok sourcePointerLayout := by decide +kernel
+
+theorem dest_pointer_layout_eq : PreparedReflection.actual.runtime.lookup 8 = .ok destPointerLayout := by decide +kernel
 
 theorem byte_layout_shape : byteLayout.ty = 1 ∧ byteLayout.layout.size = Size.ofBytes 1 ∧
     byteLayout.layout.align.abi = Align.ONE := by decide +kernel
@@ -54,25 +56,21 @@ theorem copy_helper_locals : RootBody.reflected.copyHelper.body.locals =
 theorem compiler_byte_layout : CompilerFacts.layoutOf
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context 1 = .ok byteLayout := by
   unfold CompilerFacts.layoutOf
-  erw [LayoutLookupProof.indexed_lookup_eq]
   decide +kernel
 
 theorem compiler_source_pointer_layout : CompilerFacts.layoutOf
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context 9 = .ok sourcePointerLayout := by
   unfold CompilerFacts.layoutOf
-  erw [LayoutLookupProof.indexed_lookup_eq]
   decide +kernel
 
 theorem compiler_dest_pointer_layout : CompilerFacts.layoutOf
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context 8 = .ok destPointerLayout := by
   unfold CompilerFacts.layoutOf
-  erw [LayoutLookupProof.indexed_lookup_eq]
   decide +kernel
 
 theorem compiler_usize_layout : CompilerFacts.layoutOf
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context 5 = .ok RootCompilerFacts.usizeLayout := by
   unfold CompilerFacts.layoutOf
-  erw [LayoutLookupProof.indexed_lookup_eq]
   decide +kernel
 
 #print axioms compiler_byte_layout

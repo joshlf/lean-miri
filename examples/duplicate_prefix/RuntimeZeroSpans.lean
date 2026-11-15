@@ -14,7 +14,7 @@ def inputBody : LoweredBody := PreparedReflection.actual.program.bundle.bodies[
   CopyPreconditions.Bodies.languageRuntime.loaded.identity.index]'(by decide +kernel)
 
 def localSpan : SourceSpanData :=
-  (inputBody.input.locals[0]'(by decide +kernel)).sourceInfo.span
+  PreparedReflection.actual.program.bundle.spans[(inputBody.input.localSources[0]'(by decide +kernel)).spanId]'(by decide +kernel)
 
 def spans := PreparedReflection.actual.program.bundle.spans
 def spanKeyQuery := (spans.toList.map SpanFacts.spanKey).idxOf? (SpanFacts.spanKey localSpan)
@@ -48,12 +48,12 @@ theorem runtime_local_span_from_metadata
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler
       CopyPreconditions.Bodies.languageRuntime.loaded.body 0 (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨spanIndex⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 0 < inputBody.input.locals.size := by decide +kernel
-  let decl := inputBody.input.locals[0]'valid
-  have present : inputBody.input.locals[0]? = some decl := by simp [decl, valid]
+  have valid : 0 < inputBody.input.localSources.size := by decide +kernel
+  let decl := inputBody.input.localSources[0]'valid
+  have present : inputBody.input.localSources[0]? = some decl := by simp [decl, valid]
   have sourceBody := body_of_frame frame body identity callee
-  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ 0 inputBody decl localSpan spanIndex
-    body.symm sourceBody present rfl span_query_eq
+  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ 0 inputBody decl spanIndex
+    body.symm sourceBody present (by with_unfolding_all rfl) (by decide +kernel)
 
 theorem actual_local_span (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)

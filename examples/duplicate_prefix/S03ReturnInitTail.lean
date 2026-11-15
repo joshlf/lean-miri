@@ -22,8 +22,8 @@ theorem after_protection
     (fresh : input.tracker.global.nextPointerTag.value < 18446744073709551615)
     (tree : BorrowTree) (updated : Allocation Provenance BorrowTree)
     (protect : TypedRetag.protectInPlaceFunctionArgument (config options remaining span).retag limits.retag place
-      (Storage.withCurrent frames {frame with location := .unwinding ⟨601⟩} before) =
-      .ok () (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨601⟩}
+      (Storage.withCurrent frames {frame with location := .unwinding ⟨2⟩} before) =
+      .ok () (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨2⟩}
         borrowFrame fresh tree updated))
     (body : frame.body = RootBody.reflected.body.body) (localSize : frame.locals.size = 25)
     (dead0 : (frame.locals[0]'(by omega)).value = .dead)
@@ -37,11 +37,11 @@ theorem after_protection
       (Storage.withCurrent frames frame before) =
       .ok () (Storage.withCurrent frames
         (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-          {frame with location := .unwinding ⟨601⟩} borrowFrame input.id input.tracker.global.nextPointerTag
-            with location := .unwinding ⟨559⟩})
-        (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨601⟩}
+          {frame with location := .unwinding ⟨2⟩} borrowFrame input.id input.tracker.global.nextPointerTag
+            with location := .unwinding ⟨0⟩})
+        (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨2⟩}
           borrowFrame fresh tree updated).machine) := by
-  let changed := {frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {frame with location := FrameLocation.unwinding ⟨2⟩}
   let protectedState := S04ProtectUninit.finished before place input frames changed borrowFrame fresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed borrowFrame input.id input.tracker.global.nextPointerTag
   have finish := RootEntryFinish.actual_finish options limits remaining span frames protectedFrame protectedState.machine

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02AcceptedActualReturnReady
 import duplicate_prefix.S02AcceptedDestinationCapabilityAfterCopy
 import duplicate_prefix.S02DestinationPhysicalCopyTransport
@@ -66,7 +67,7 @@ theorem preserved
         (GeneralBorrowRawAsMutToCopy.held copyPacket).global.protectedTags
         (some originalPacket.child) (some originalPacket.selected) originalPacket.maximum destination.offset 1 ∧
       finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-        (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+        (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
   obtain ⟨_,_,_,_,tickAddresses,_,_,_⟩ :=
     S02SeparateDestinationTickLedger.preserved options remaining span initial
   let postDest := S02SeparateDestinationRejectedPhysicalTransport.after_body (post := post)
@@ -105,7 +106,7 @@ theorem preserved
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination originalPacket.destination
       returnTag returnConcrete).1
   have extras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destId,copyExtras,postExtras,physicalId,←machineExtra]
     exact initialExtras
   refine ⟨destination,destId,destEntry,destOffset,destParent,?_,?_,extras⟩

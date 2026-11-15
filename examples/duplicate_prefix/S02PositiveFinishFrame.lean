@@ -35,7 +35,7 @@ theorem after_destination_registration (root : RootFrame)
       (PositiveRootArguments.firstDone root adjusted ({} : FrameState) argumentId argumentTag) count
     let owned := ({} : FrameState).addProtector argumentId argumentTag
     let protectedFrame := TypedBorrowSteps.registeredFrame
-      {args.frame with location := .unwinding ⟨601⟩} owned destinationId destinationTag
+      {args.frame with location := .unwinding ⟨2⟩} owned destinationId destinationTag
     protectedFrame.body = RootBody.reflected.body.body ∧
     protectedFrame.locals.size = 25 ∧
     (∀ (i : Fin 25) (valid : i.val < protectedFrame.locals.size),
@@ -46,7 +46,7 @@ theorem after_destination_registration (root : RootFrame)
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState) argumentId argumentTag) count
   let owned := ({} : FrameState).addProtector argumentId argumentTag
   let protectedFrame := TypedBorrowSteps.registeredFrame
-    {args.frame with location := .unwinding ⟨601⟩} owned destinationId destinationTag
+    {args.frame with location := .unwinding ⟨2⟩} owned destinationId destinationTag
   have read (i : Fin 25) (ne1 : i.val ≠ 1) (ne2 : i.val ≠ 2) :
       (args.frame.locals[i.val]'(args.valid i)).value = .dead := by
     rw [untouched root adjusted {} argumentId argumentTag count i ne1 ne2]

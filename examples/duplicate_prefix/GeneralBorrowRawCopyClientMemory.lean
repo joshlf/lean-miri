@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawCopyInput
 import duplicate_prefix.GenericCopyMemoryCore
 
@@ -28,7 +29,7 @@ theorem copy {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)

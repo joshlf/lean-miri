@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.PositiveRootSuccessProfile
 import duplicate_prefix.PositiveRootCopyBounds
 import duplicate_prefix.CopyRootGuardBody
@@ -49,7 +50,7 @@ noncomputable def data
     (provenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len)
     (storageFits : entry.allocation.len+64 < 18446744073709551616)
     (mutable : entry.allocation.mutability = .Mut)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (cached : before.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (distinct : Function.Injective tags)
     (bounded : count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes) :

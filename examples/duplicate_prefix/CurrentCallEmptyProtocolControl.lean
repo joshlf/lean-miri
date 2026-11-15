@@ -75,18 +75,18 @@ theorem init_of_arguments (options : EvalConfigurationCore.Options) (limits : Ex
       (Storage.withCurrent frames (CurrentCallSpatialEntryControl.root initial frames place race).frame (CurrentCallPush.preparedMachine initial frames))=
       .ok (2,2) (Storage.withCurrent frames (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count).frame sourceMachine))
     (protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨601⟩).frame sourceMachine)=
+      (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨2⟩).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (TypedBorrowSteps.registeredFrame
-        (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨601⟩).frame sourceFrame boolId boolTag) finalMachine)) :
+        (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨2⟩).frame sourceFrame boolId boolTag) finalMachine)) :
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
       #[.Copy ⟨.immediate input,ActualReferenceMetadata.reference⟩,.Copy (second count)] false (.memory place) (.stop true)
       (⟨⟨frames⟩,initial⟩ : RootState)=.ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-        {TypedBorrowSteps.registeredFrame (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨601⟩).frame sourceFrame boolId boolTag
-          with location:=.unwinding ⟨559⟩}) finalMachine) := by
+        {TypedBorrowSteps.registeredFrame (atSpan (RootArgumentsTwo.result (sourceRoot (CurrentCallSpatialEntryControl.root initial frames place race) updated sourceFrame) count) ⟨2⟩).frame sourceFrame boolId boolTag
+          with location:=.unwinding ⟨0⟩}) finalMachine) := by
   let root:=CurrentCallSpatialEntryControl.root initial frames place race
   let args:=RootArgumentsTwo.result (sourceRoot root updated sourceFrame) count
-  let protectedFrame:=TypedBorrowSteps.registeredFrame (atSpan args ⟨601⟩).frame sourceFrame boolId boolTag
+  let protectedFrame:=TypedBorrowSteps.registeredFrame (atSpan args ⟨2⟩).frame sourceFrame boolId boolTag
   have raw : root.frame.locals=Array.replicate 25 (⟨.dead,none⟩ : LocalState Provenance LocalLayout):=RootEntryFrame.raw_locals _ _ _
   have dead (slot : Fin 25) (ne1 : slot.val≠1) (ne2 : slot.val≠2) :
       (protectedFrame.locals[slot.val]'(by simpa only [protectedFrame,TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,atSpan] using args.valid slot)).value=.dead := by
@@ -107,8 +107,8 @@ theorem init_of_arguments (options : EvalConfigurationCore.Options) (limits : Ex
 def frame (root : RootFrame) (updated : Immediate Provenance) (sourceFrame : FrameState)
     (count : UInt64) (id : AllocId) (tag : BorTag) :=
   CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-    (atSpan (RootArgumentsTwo.result (sourceRoot root updated sourceFrame) count) ⟨601⟩).frame sourceFrame id tag
-    with location:=.unwinding ⟨559⟩}
+    (atSpan (RootArgumentsTwo.result (sourceRoot root updated sourceFrame) count) ⟨2⟩).frame sourceFrame id tag
+    with location:=.unwinding ⟨0⟩}
 
 theorem source_some (root : RootFrame) (updated : Immediate Provenance) (borrow : FrameState) (id : AllocId) (tag : BorTag) :
     sourceRoot root updated (borrow.addProtector id tag)=PositiveRootArguments.firstDone root updated borrow id tag := rfl
@@ -204,7 +204,7 @@ theorem init_eq_of_arguments (options : EvalConfigurationCore.Options) (limits :
   have rawEq : CallEntryFacts.rawPushedState #[] before (.memory place)=Storage.withCurrent #[] root.frame machine:=rfl
   have getFrame:=CallEntryLocals.get_frame options limits (remaining+1) span #[] root.frame machine
   have setFrame:=CallEntryLocals.set_frame options limits (remaining+1) span #[] root.frame root.frame machine
-  have location : root.frame.location=.unwinding ⟨559⟩:=rfl
+  have location : root.frame.location=.unwinding ⟨0⟩:=rfl
   have noCaller : root.frame.trackCallerArg=none:=rfl
   have unchanged : {root.frame with trackCallerArg:=none}=root.frame:=by rw [←noCaller]
   rw [RootCallCore.actual_entry_eq,RootCallCore.actual_entry_eq]

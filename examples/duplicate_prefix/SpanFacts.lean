@@ -26,24 +26,30 @@ noncomputable def rootInputBody : LoweredBody :=
   PreparedReflection.actual.program.bundle.bodies[RootBody.reflected.body.identity.index]'(by decide +kernel)
 
 noncomputable def rootLocalSpan (localId : Fin 25) : SourceSpanData :=
-  (rootInputBody.input.locals[localId.val]'(by
-    have size : rootInputBody.input.locals.size = 25 := by rfl
-    omega)).sourceInfo.span
+  let spanId := (rootInputBody.input.localSources[localId.val]'(by
+    have size : rootInputBody.input.localSources.size = 25 := by rfl
+    omega)).spanId
+  PreparedReflection.actual.program.bundle.spans[spanId]'(by
+    have valid : ∀ i : Fin 25,
+        (rootInputBody.input.localSources[i.val]'(by
+          have size : rootInputBody.input.localSources.size = 25 := by rfl
+          omega)).spanId < PreparedReflection.actual.program.bundle.spans.size := by decide +kernel
+    exact valid localId)
 
 theorem root_local0_span_index :
-    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨0, by decide⟩) = some 601 := by
+    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨0, by decide⟩) = some 2 := by
   refine index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
   · decide +kernel
 
 theorem root_local1_span_index :
-    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨1, by decide⟩) = some 602 := by
+    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨1, by decide⟩) = some 3 := by
   refine index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
   · decide +kernel
 
 theorem root_local2_span_index :
-    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨2, by decide⟩) = some 603 := by
+    PreparedReflection.actual.program.bundle.spans.toList.idxOf? (rootLocalSpan ⟨2, by decide⟩) = some 4 := by
   refine index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
   · decide +kernel

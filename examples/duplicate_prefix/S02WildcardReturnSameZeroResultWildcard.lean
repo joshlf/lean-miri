@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardPositiveIdUnique
 import duplicate_prefix.S02WildcardSameDestinationInitAfterArgument
 import duplicate_prefix.S02WildcardSourceWildcardZeroControl
@@ -52,7 +53,7 @@ theorem result
   let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
   let args := RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) 0
-  let changed := {args.frame with location := .unwinding ⟨601⟩}
+  let changed := {args.frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let original := input.contract.destination
   have entryEq : reference.entry = original.entry := by
@@ -110,7 +111,7 @@ theorem result
     simp only [changed,args,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,RootFrameData.cache,
       RootFrameData.atSpan,LocalOperands.cachedLayoutFrame,PositiveRootArguments.firstDone,PositiveRootArguments.protectedRoot,
       TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,owned]
-  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,destId];exact input.return_extras
   have runtime : DuplicatePrefixBorrowContract.RuntimeFacts destination.entry.allocation.extra destination.tracker.global := sourceRuntime
@@ -125,7 +126,7 @@ theorem result
       limits.retag current model place destination runtime roots initialOrder headroom secondFresh wildcard #[] changed owned frameBorrow #[] extras (by simp)
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let installed := CallEntryFacts.doneRootFrame
-    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩}
+    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩}
   let global := TypedBorrowSteps.registeredGlobal (ReferenceBorrowDriver.allocatedTracker destination.tracker secondFresh) destination.tracker.global.nextPointerTag
   let written := (tree.performBorrowAccessRange (.concrete destination.tracker.global.nextPointerTag)
     (Size.ofBytes destination.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
@@ -280,7 +281,7 @@ theorem result
   have flags2 := RootZeroCompleteState.tick_flags options remaining span first
   have currentGhost : current2.user.payload.ghost = false := by rw [RootZeroCompleteState.tick_ghost,RootZeroCompleteState.tick_ghost];exact settings.ghost
   have currentShallow : current2.user.payload.validation = .Shallow := by rw [RootZeroCompleteState.tick_shallow,RootZeroCompleteState.tick_shallow];exact settings.shallow
-  have currentExtras : current2.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == d2.id) = some (d2.id,⟨none,#[]⟩) := by
+  have currentExtras : current2.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == d2.id) = some (d2.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current2.user.payload.payload.user.runtime.extras.allocations) (d2.id) }) := by
     change current2.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = _
     rw [fields2.2.2.2.2.2.2,fields1.2.2.2.2.2.2];exact settings.extras
   have valid0 : 0 < done.locals.size := by rw [fsz];decide

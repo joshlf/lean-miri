@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnSameCountEntry
 import duplicate_prefix.S02WildcardFinishFromProtect
 import duplicate_prefix.S02WildcardSameDestinationInitReady
@@ -176,7 +177,7 @@ theorem enters
       let root := RawRootInvocation.root before place input.contract.model.noDataRace
       let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
-      let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨601⟩}
+      let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       ∃ post : S02WildcardReturnSameCountEntry.Packet options (remaining+1) span limits.retag current place data.destination
         #[] changed owned data.nextFresh reference.tracker.global.nextPointerTag data.child data.child (some reference.tracker.global.nextPointerTag) reference.offset len data.node,
@@ -185,7 +186,7 @@ theorem enters
         #[.Copy (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base
           (.pointer (Pointer.new .wildcard (Size.ofBytes address))) len),.Copy (EmptyRootArguments.second count)]
         false (.memory place) (.stop true) ⟨⟨#[]⟩,before⟩ = .ok () (Storage.withCurrent #[]
-          (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame changed owned data.destination.id data.destination.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩})
+          (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame changed owned data.destination.id data.destination.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩})
           (S04ProtectUninit.finished current place data.destination #[] changed owned data.nextFresh post.tree post.updated).machine) ∧
       post.updated.extra.nodes.size+8 < 65536 ∧
       (TypedBorrowSteps.registeredGlobal (ReferenceBorrowDriver.allocatedTracker data.destination.tracker data.nextFresh)
@@ -199,12 +200,12 @@ theorem enters
   let root := RawRootInvocation.root before place input.contract.model.noDataRace
   let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
-  let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨601⟩}
+  let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have frameBorrow : changed.extra.borrowTracker = some owned := by
     simp only [changed,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,RootFrameData.cache,RootFrameData.atSpan,
       LocalOperands.cachedLayoutFrame,PositiveRootArguments.firstDone,PositiveRootArguments.protectedRoot,TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,owned]
-  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == data.destination.id) = some (data.destination.id,⟨none,#[]⟩) := by
+  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == data.destination.id) = some (data.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (data.destination.id) }) := by
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find? _ = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,data.sameId,same];exact input.return_extras
   obtain ⟨post⟩ := S02WildcardReturnSameCountEntry.after_current (options := options) (remaining := remaining+1) (span := span)

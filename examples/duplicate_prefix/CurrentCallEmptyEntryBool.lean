@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallEmptyEntryArguments
 import duplicate_prefix.CurrentCallBoolProtection
 import duplicate_prefix.CurrentCallEmptyEntryRootLoop
@@ -308,7 +309,9 @@ private theorem window_ready_after_effect {options before tracker argument} (eff
     (ready : CurrentCallBoolProtection.WindowReady before id offset length) :
     CurrentCallBoolProtection.WindowReady (CurrentCallEmptyTypedEntry.resultMachine effect fresh remaining span frames frame borrowFrame localId valid) id offset length := by
   obtain ⟨sync,present,outside⟩ := ready
-  exact ⟨sync,extras_after_effect effect fresh remaining span frames frame borrowFrame localId valid id entry live ⟨none,sync⟩ present,outside⟩
+  have selected := extras_after_effect effect fresh remaining span frames frame borrowFrame localId valid id entry live _ present
+  refine ⟨sync, ?_, outside⟩
+  simpa only [AllocationBacktrace.of_lookup selected] using selected
 
 
 private theorem zero_root_owned (tree : BorrowTree) (slot : WildcardHitPoolRoot.Slot tree) (tag : BorTag)
@@ -3816,7 +3819,7 @@ private theorem protect_from_operation (options : EvalConfigurationCore.Options)
   have tracked : retagged.machine.borrowTracker = some ⟨output.global,tracker.retagMode⟩ := by rw [outputEq];rfl
   obtain ⟨sync,extraAt,outside⟩ := ready
   have childExtra : retagged.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == childWindow.id) =
-      some (childWindow.id,⟨none,sync⟩) := extraAt
+      some (childWindow.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (retagged.machine.user.payload.payload.user.runtime.extras.allocations) (childWindow.id) }) := extraAt
   have concrete : childWindow.pointer.provenance = .concrete childWindow.id tracker.global.nextPointerTag := rfl
   have completed : (childWindow.entry.allocation.extra.performBorrowAccessRange (.concrete tracker.global.nextPointerTag)
       (Size.ofBytes childWindow.offset) (Size.ofBytes 1) .Write output.global.protectedTags .VisitChildrenOfAccessed).status = .Completed := by

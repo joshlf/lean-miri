@@ -10,8 +10,8 @@ theorem normalized_local0 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 2 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 2 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -19,8 +19,8 @@ theorem normalized_local4 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 4 = .ok 2 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 4 = .ok 2 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -28,8 +28,8 @@ theorem normalized_local5 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 5 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 5 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -37,8 +37,8 @@ theorem normalized_local14 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 14 = .ok 9 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 14 = .ok 9 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -46,8 +46,8 @@ theorem normalized_local15 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 15 = .ok 8 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 15 = .ok 8 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -55,8 +55,8 @@ theorem normalized_local16 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 16 = .ok 5 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 16 = .ok 5 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 

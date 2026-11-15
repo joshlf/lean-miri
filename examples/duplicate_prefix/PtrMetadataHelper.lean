@@ -33,7 +33,7 @@ def callQuery := CallResolution.atSite PreparedReflection.actual.compiler.lifecy
 theorem site_supported : callQuery.isOk = true := by decide +kernel
 def resolved := checkedOk callQuery site_supported
 theorem call_eq : callQuery = .ok resolved := checkedOk_eq _ _
-theorem callee_kind : resolved.callee.kind = .Item 10 := by with_unfolding_all rfl
+theorem callee_kind : (PreparedReflection.fixedInstance resolved.callee).instanceKind = .Item 13 := by with_unfolding_all rfl
 theorem callee_name : CompilerIntrinsicFacts.itemName PreparedReflection.actual.compiler.intrinsics
     resolved.callee = .ok "metadata" := by with_unfolding_all rfl
 
@@ -43,7 +43,7 @@ theorem body_supported : bodyQuery.isOk = true := by decide +kernel
 def body := checkedOk bodyQuery body_supported
 theorem body_eq : bodyQuery = .ok body := checkedOk_eq _ _
 theorem body_shape : (body.identity.index,body.body.argumentCount,body.body.locals,
-    body.body.basicBlocks.size) = (11,1,#[5,154,154],1) := by decide +kernel
+    body.body.basicBlocks.size) = (6,1,#[5,49,49],1) := by decide +kernel
 
 theorem source_statements :
     CopyPreconditions.Bodies.statementKindAt body.body 0 0 = some (.StorageLive 2) ∧
@@ -57,12 +57,12 @@ theorem source_statements :
 
 open RootMetadataQueries
 
-theorem raw_pointer_class : CompilerExecutionProviders.scalarClass context 154 = .ok .pointer := by
+theorem raw_pointer_class : CompilerExecutionProviders.scalarClass context 49 = .ok .pointer := by
   simp_execution_query
   simp only [context_node]
   with_unfolding_all rfl
 
-theorem raw_pointer_pointee : CompilerFacts.requiredType context 154 "builtin_deref_explicit" = .ok 4 := by
+theorem raw_pointer_pointee : CompilerFacts.requiredType context 49 "builtin_deref_explicit" = .ok 4 := by
   unfold CompilerFacts.requiredType CompilerFacts.optionalType
   unfold_fact_helpers
   simp only [context_node]
@@ -89,19 +89,21 @@ elab "unfold_metadata_query" : tactic => do
 theorem context_usize_layout : CompilerFacts.layoutOf context 5 = .ok RootCompilerFacts.usizeLayout := by
   unfold CompilerFacts.layoutOf
   rw [show context.runtime.lookup 5 = PreparedReflection.actual.runtime.lookup 5 from
-    LayoutLookupProof.indexed_lookup_eq PreparedReflection.actual.runtime none 5]
+    by rfl]
   rw [RootCompilerFacts.usize_layout_eq]
   rfl
 
-def rawLayoutQuery := PreparedReflection.actual.runtime.lookup 154
-def sliceLayoutQuery := PreparedReflection.actual.runtime.lookup 4
+def rawLayoutQuery := (PreparedReflection.actual.layoutResults[49]'(by decide +kernel))
+def sliceLayoutQuery := (PreparedReflection.actual.layoutResults[4]'(by decide +kernel))
 theorem raw_layout_supported : rawLayoutQuery.isOk = true := by decide +kernel
 theorem slice_layout_supported : sliceLayoutQuery.isOk = true := by decide +kernel
 def rawLayout := checkedOk rawLayoutQuery raw_layout_supported
 def sliceLayout := checkedOk sliceLayoutQuery slice_layout_supported
-theorem raw_layout_eq : PreparedReflection.actual.runtime.lookup 154 = .ok rawLayout := checkedOk_eq _ _
-theorem slice_layout_eq : PreparedReflection.actual.runtime.lookup 4 = .ok sliceLayout := checkedOk_eq _ _
-theorem raw_layout_type : rawLayout.ty = 154 := by with_unfolding_all rfl
+theorem raw_layout_eq : PreparedReflection.actual.runtime.lookup 49 = .ok rawLayout := by decide +kernel
+
+theorem slice_layout_eq : PreparedReflection.actual.runtime.lookup 4 = .ok sliceLayout := by decide +kernel
+
+theorem raw_layout_type : rawLayout.ty = 49 := by with_unfolding_all rfl
 theorem slice_layout_type : sliceLayout.ty = 4 := by with_unfolding_all rfl
 theorem slice_align : sliceLayout.layout.align.abi = Align.ONE := by with_unfolding_all rfl
 theorem slice_unsized : sliceLayout.layout.isSized = false := by with_unfolding_all rfl
@@ -109,28 +111,28 @@ theorem slice_unsized : sliceLayout.layout.isSized = false := by with_unfolding_
 theorem context_slice_layout : CompilerFacts.layoutOf context 4 = .ok sliceLayout := by
   unfold CompilerFacts.layoutOf
   rw [show context.runtime.lookup 4 = PreparedReflection.actual.runtime.lookup 4 from
-    LayoutLookupProof.indexed_lookup_eq PreparedReflection.actual.runtime none 4]
+    by rfl]
   rw [slice_layout_eq]
   rfl
 
 def prepared := PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts
 
 theorem compiler_raw_kind {K U C : Type} (choice : C) :
-    (CompilerExecutionProviders.pointerCompiler (K := K) (U := U) prepared).kind choice 154 = pure .raw := by
+    (CompilerExecutionProviders.pointerCompiler (K := K) (U := U) prepared).kind choice 49 = pure .raw := by
   simp only [CompilerExecutionProviders.pointerCompiler]
   rw [show prepared.context = context from rfl]
   simp_execution_query
   simp only [context_node]
   with_unfolding_all rfl
 
-theorem raw_builtin_deref : CompilerFacts.builtinDeref context 154 true = .ok (some 4) := by
+theorem raw_builtin_deref : CompilerFacts.builtinDeref context 49 true = .ok (some 4) := by
   unfold CompilerFacts.builtinDeref CompilerFacts.optionalType
   unfold_fact_helpers
   simp only [context_node]
   with_unfolding_all rfl
 
 theorem compiler_raw_deref {K U C : Type} (choice : C) :
-    (CompilerExecutionProviders.pointerCompiler (K := K) (U := U) prepared).builtinDeref choice 154 = pure (some 4) := by
+    (CompilerExecutionProviders.pointerCompiler (K := K) (U := U) prepared).builtinDeref choice 49 = pure (some 4) := by
   simp only [CompilerExecutionProviders.pointerCompiler]
   rw [show prepared.context = context from rfl,raw_builtin_deref]
   unfold_metadata_query
@@ -155,7 +157,7 @@ theorem raw_readable : ∃ pa pb ra rb offset, rawLayout.layout.backendRepr =
         (b := .Initialized (value := pb) (validRange := rb)) (bOffset := offset) := by
   with_unfolding_all exact ⟨_,_,_,_,_,rfl⟩
 
-theorem metadata_layout : CompilerExecutionProviders.metadataLayout context 154 = .ok RootCompilerFacts.usizeLayout := by
+theorem metadata_layout : CompilerExecutionProviders.metadataLayout context 49 = .ok RootCompilerFacts.usizeLayout := by
   unfold CompilerExecutionProviders.metadataLayout
   rw [raw_pointer_pointee]
   unfold_metadata_query
@@ -182,7 +184,7 @@ theorem scalar_pair_metadata {Prov S C : Type} [PointerProvenance Prov]
 theorem compiler_scalar_pair_metadata {Prov S C : Type} [PointerProvenance Prov]
     (base : ScalarOpsHooks Prov S C) (floats : FloatOpsHooks Prov S C) (choice : C)
     (pointer metadata : Scalar Prov) (pointerLayout : LocalLayout)
-    (pointerType : pointerLayout.ty = 154) :
+    (pointerType : pointerLayout.ty = 49) :
     ScalarOps.unary (CompilerExecutionProviders.scalarHooks context floats base) choice .PtrMetadata
       ⟨.scalarPair pointer metadata,pointerLayout⟩ =
       (do base.derefValidity choice ⟨.scalarPair pointer metadata,pointerLayout⟩
@@ -255,7 +257,7 @@ theorem bound_scalar_pair_metadata [DecidableEq K]
     (base : ScalarOpsHooks Provenance (ValidityMachine.State K U) C)
     (floats : FloatOpsHooks Provenance (ValidityMachine.State K U) C)
     (pointer : Pointer Provenance) (len : UInt64) (raw pointee : LocalLayout)
-    (rawType : raw.ty = 154)
+    (rawType : raw.ty = 49)
     (rawKind : compiler.kind choice raw.ty = pure .raw)
     (dereference : compiler.builtinDeref choice raw.ty = pure (some pointee.ty))
     (layout : compiler.layoutOf choice pointee.ty = pure pointee)
@@ -471,12 +473,18 @@ theorem actual_integer_metadata
 
 
 def abiQuery := HelperCompilerFacts.abiQuery resolved.callee
-theorem abi_supported : abiQuery.isOk = true := by decide +kernel
-def abi := checkedOk abiQuery abi_supported
-theorem abi_eq : abiQuery = .ok abi := checkedOk_eq _ _
-theorem site_abi : resolved.abi = .ok abi := by with_unfolding_all rfl
+theorem abi_supported : abiQuery.isOk = true := by
+  unfold abiQuery HelperCompilerFacts.abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+def abi := checkedOk (PreparedReflection.actual.abiResults[4]'(by decide +kernel)) (by decide +kernel)
+theorem abi_eq : abiQuery = .ok abi := by
+  unfold abiQuery HelperCompilerFacts.abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem site_abi : resolved.abi = .normal 4 := by with_unfolding_all rfl
 theorem abi_shape : (abi.args.map (·.layout.ty),abi.ret.layout.ty,abi.fixedCount.toNat,
-    abi.cVariadic,abi.conv,abi.canUnwind) = (#[154],5,1,false,.Rust,true) := by decide +kernel
+    abi.cVariadic,abi.conv,abi.canUnwind) = (#[49],5,1,false,.Rust,true) := by decide +kernel
 
 #print axioms callee_kind
 #print axioms source_statements

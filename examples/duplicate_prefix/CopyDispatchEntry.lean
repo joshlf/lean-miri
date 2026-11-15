@@ -1,3 +1,4 @@
+import duplicate_prefix.CopyCalleeLeaves
 import duplicate_prefix.CopyEntry
 import duplicate_prefix.CopyDispatch
 import duplicate_prefix.CopyFunctionFacts
@@ -55,9 +56,9 @@ set_option backward.dsimp.instances true
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).callCompiler]
     rfl
   apply CallItemDispatch.dispatch_one h _ state _ dispatchBudget
-  rw [CallItemDispatch.item_step h HelperCompilerFacts.copyCall.callee HelperCompilerFacts.copyCall.callee.defId
+  rw [CallItemDispatch.item_step h HelperCompilerFacts.copyCall.callee 9
     HelperCompilerFacts.copyAbi args true dest target unwind .Rust
-    (congrArg (·.kind) CopyFunctionFacts.function_kind_matches_call) CopyCallFacts.abi_flags.2.1 rust]
+    (CopyCalleeLeaves.instance_kind options limits (remaining+1) span) CopyCallFacts.abi_flags.2.1 rust]
   unfold CallItemDispatch.itemStage
   simp only [bind,EStateM.bind]
   rw [found]

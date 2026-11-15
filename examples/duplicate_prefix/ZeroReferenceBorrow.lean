@@ -63,6 +63,9 @@ theorem unprotected_live_zero_pointer {K U C F A : Type} [DecidableEq K]
       (Storage.withCurrent frames frame
         {allocatedMachine machine tracker fresh
           with memory := RetagEntry.updatedMemory machine.memory id entry finalTree}) := by
+  have definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+    intro same
+    exact False.elim (TypedRetagPolicyFields.unprotected_not_fn_entry mutability mode policy created protection same)
   subst tag
   let before := Storage.withCurrent frames frame machine
   let after := Storage.withCurrent frames frame
@@ -151,7 +154,9 @@ theorem protected_live_zero_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base
         (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 reference)
@@ -230,7 +235,9 @@ theorem no_provenance_zero_pointer {K U C F A : Type} [DecidableEq K]
     (modeEq : tracker.retagMode = retagMode)
     (fresh : tracker.global.nextPointerTag.value < 18446744073709551615)
     (sizingAt : h.sizeAndAlign (RetagReferencePlace.integerSlicePlace address 0 pointee) state =
-      .ok (some (Size.ZERO, Align.ONE)) state) :
+      .ok (some (Size.ZERO, Align.ONE)) state)
+    (definitionReady : retagMode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.machineRetagPtrValue h budget (RetagReferencePlace.integerSliceValue address 0 reference)
       reference.ty state = .ok (some (RetagReferencePlace.integerSliceValue address 0 reference))
         (TypedRetagEmpty.afterTag state tracker fresh) := by
@@ -308,6 +315,9 @@ theorem unprotected_nonlive_zero_pointer {K U C F A : Type} [DecidableEq K]
       .ok (some (RetagReferencePlace.sliceValue access.runtime.base
         (Pointer.new (.concrete id tag) (Size.ofBytes (base+offset))) 0 reference))
       (Storage.withCurrent frames frame (allocatedMachine machine tracker fresh)) := by
+  have definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+    intro same
+    exact False.elim (TypedRetagPolicyFields.unprotected_not_fn_entry mutability mode policy created protection same)
   subst tag
   let before := Storage.withCurrent frames frame machine
   let after := Storage.withCurrent frames frame (allocatedMachine machine tracker fresh)
@@ -390,7 +400,9 @@ theorem protected_nonlive_zero_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base
         (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 reference)

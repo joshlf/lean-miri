@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroState
 import duplicate_prefix.S03ReturnProtectionMetadata
 
@@ -27,7 +28,7 @@ theorem run
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat)
     (body : frame.body = RootBody.reflected.body.body) (localSize : frame.locals.size = 25)
@@ -48,9 +49,9 @@ theorem run
         (Storage.withCurrent frames frame before) =
         .ok () (Storage.withCurrent frames
           (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-            {frame with location := .unwinding ⟨601⟩} borrowFrame input.id input.tracker.global.nextPointerTag
-              with location := .unwinding ⟨559⟩})
-          (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨601⟩}
+            {frame with location := .unwinding ⟨2⟩} borrowFrame input.id input.tracker.global.nextPointerTag
+              with location := .unwinding ⟨0⟩})
+          (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨2⟩}
             borrowFrame fresh tree updated).machine) ∧
       updated.extra = written ∧ updated.byteSize = input.entry.allocation.byteSize ∧
       updated.len = input.entry.allocation.len ∧ updated.mutability = .Mut ∧
@@ -63,7 +64,7 @@ theorem run
         Nonempty (DuplicatePrefixBorrowAuthorization.Positive written global.protectedTags
           (some child) input.selectedRoot input.maximum input.offset 1) ∧
         GeneralBorrowFreshActiveWithin.ActiveWithin written child .Write input.offset (input.offset+1) := by
-  let changed := {frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {frame with location := FrameLocation.unwinding ⟨2⟩}
   obtain ⟨updated,protect,properties⟩ := S03ReturnProtectionMetadata.invoke_concrete limits.retag before model place input
     runtime distinct order headroom fresh tag concrete frames changed borrowFrame frameBorrow sync extras outside
   let tree := GeneralBorrowRawFnEntryArgument.finalTree input.entry.allocation.extra input.tracker tag input.offset 1

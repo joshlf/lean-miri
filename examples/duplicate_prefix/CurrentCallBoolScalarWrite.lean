@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03ReturnValidWriteBounds
 import duplicate_prefix.CurrentCallBoolProtection
 
@@ -179,9 +180,9 @@ theorem configured (options : EvalConfigurationCore.Options) (remaining : Nat)
     .Write tracker.global.protectedTags .VisitChildrenOfAccessed
   obtain ⟨sync,present,outside⟩ := ready
   have present' : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩) := present
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (input.id) }) := present
   have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras state.machine input.id
-    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true ⟨none,sync⟩ present' outside
+    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true _ present' outside
   have actual := S04ReturnExtrasAccess.source_write_access_exact context.prepared context.image
     context.maximum context.fuel context.globalHooks context.pointers context.extras state.machine tracker
     input.entry.allocation.extra input.id (S04ReturnBorrowBridge.extra input.pointer.provenance)

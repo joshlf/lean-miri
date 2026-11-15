@@ -28,7 +28,7 @@ theorem result
   let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
   let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have binding := reference.binding
   simp only [DuplicatePrefixReferenceInput.Binding,Pointer.new] at binding

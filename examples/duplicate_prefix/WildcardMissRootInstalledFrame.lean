@@ -5,8 +5,8 @@ namespace DuplicatePrefix.WildcardMissRootInstalledFrame
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.TreeBorrows Miri.Interpreter
 open RootFrameData WildcardMissRootArguments TypedBorrowSteps
 noncomputable def installed (root : RootFrame) (target : TargetDataLayout) (address n : UInt64) (borrowFrame : FrameState) (id : AllocId) (child : BorTag) :=
-  CallEntryFacts.doneRootFrame {registeredFrame {(result root target address n).frame with location := .unwinding ⟨601⟩}
-    borrowFrame id child with location := .unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {registeredFrame {(result root target address n).frame with location := .unwinding ⟨2⟩}
+    borrowFrame id child with location := .unwinding ⟨0⟩}
  theorem metadata (root : RootFrame) (target : TargetDataLayout) (address n : UInt64) (borrowFrame : FrameState) (id : AllocId) (child : BorTag) :
     (installed root target address n borrowFrame id child).body = root.frame.body ∧
     (installed root target address n borrowFrame id child).bodyIdentity = root.frame.bodyIdentity ∧

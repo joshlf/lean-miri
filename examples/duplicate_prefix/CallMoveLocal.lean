@@ -49,11 +49,11 @@ theorem move_cached (options : EvalConfigurationCore.Options) (limits : Executio
     (valid : id < frame.locals.size) (live : frame.locals[id].value = .live (.immediate value))
     (cached : frame.locals[id].layout = some layout) (sized : layout.layout.isSized = true)
     (noClocks : frame.extra.dataRace = none) (ghost : machine.user.payload.ghost = false)
-    (path : OperandPath) :
-    Call.evalFnCallArgumentAt (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits)
-      () (.Move ⟨id,#[]⟩) true path (Storage.withCurrent frames frame machine) =
+    :
+    Call.evalFnCallArgument (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits)
+      () (.Move ⟨id,#[]⟩) true  (Storage.withCurrent frames frame machine) =
       .ok (.Copy ⟨.immediate value,layout⟩) (Storage.withCurrent frames frame machine) := by
-  exact CallOneArgument.move_immediate _ () ⟨id,#[]⟩ path _ _ _ _ value layout
+  exact CallOneArgument.move_immediate _ () ⟨id,#[]⟩ _ _ _ _ value layout
     (eval_cached options limits remaining span debug frames frame machine id layout valid cached sized)
     (CallLocalRead.place_to_op_cached options limits remaining span debug frames frame machine id layout value valid live cached sized noClocks ghost)
 end DuplicatePrefix.CallMoveLocal

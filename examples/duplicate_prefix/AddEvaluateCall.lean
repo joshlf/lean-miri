@@ -14,7 +14,7 @@ set_option backward.dsimp.instances true
 
 noncomputable def terminator := (RootBody.reflected.body.body.basicBlocks[7]'(by with_unfolding_all decide +kernel)).terminator
 
-theorem callee_kind : HelperCompilerFacts.addCall.callee.kind = .Item 4 := by with_unfolding_all rfl
+theorem callee_kind : (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).instanceKind = .Item 8 := by with_unfolding_all rfl
 
 noncomputable def argument0 : MIR.SpannedOperand := match terminator.kind with
   | .Call _ args _ _ _ _ _ => args.getD 0 ⟨⟨0⟩,.Move ⟨22,#[]⟩⟩
@@ -50,23 +50,23 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
         .Rust,some HelperCompilerFacts.addAbi,true⟩ (Storage.withCurrent frames frame machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
   let state := Storage.withCurrent frames frame machine
-  have fnOp : h.evalOperandAt () (OperandPath.instruction "function") HelperCompilerFacts.addCall.function state =
+  have fnOp : h.evalOperand ()  HelperCompilerFacts.addCall.function state =
       .ok ⟨.immediate .uninit,AddFunctionFacts.functionLayout⟩ state := by
     rw [function_constant]
     exact AddFunctionConstant.function_operand options limits remaining span source debug frames frame machine
       (congrArg (·.index) identity) located callee
-  have arg0 : Call.evalFnCallArgumentAt h () argument0.operand (Call.moveDefinitelyDisjoint #[argument0,argument1] ⟨21,#[]⟩)
-      (OperandPath.argument 0) state = .ok (.Copy ⟨.immediate (.scalar pointer),CopyCompilerFacts.destPointerLayout⟩) state := by
+  have arg0 : Call.evalFnCallArgument h () argument0.operand (Call.moveDefinitelyDisjoint #[argument0,argument1] ⟨21,#[]⟩)
+       state = .ok (.Copy ⟨.immediate (.scalar pointer),CopyCompilerFacts.destPointerLayout⟩) state := by
     rw [argument0_operand,disjoint]
     exact CallMoveLocal.move_cached options limits remaining span debug frames frame machine 22 CopyCompilerFacts.destPointerLayout (.scalar pointer)
-      valid22 live22 cached22 RootRawPointerValidity.mut_pointer_sized noClocks ghost _
-  have arg1 : Call.evalFnCallArgumentAt h () argument1.operand (Call.moveDefinitelyDisjoint #[argument0,argument1] ⟨21,#[]⟩)
-      (OperandPath.argument 1) state = .ok (.Copy ⟨.immediate (.scalar (.fromScalarInt (.ofUInt64 n))),RootCompilerFacts.usizeLayout⟩) state := by
+      valid22 live22 cached22 RootRawPointerValidity.mut_pointer_sized noClocks ghost
+  have arg1 : Call.evalFnCallArgument h () argument1.operand (Call.moveDefinitelyDisjoint #[argument0,argument1] ⟨21,#[]⟩)
+       state = .ok (.Copy ⟨.immediate (.scalar (.fromScalarInt (.ofUInt64 n))),RootCompilerFacts.usizeLayout⟩) state := by
     rw [argument1_operand,disjoint]
     exact CallMoveLocal.move_cached options limits remaining span debug frames frame machine 23 RootCompilerFacts.usizeLayout (.scalar (.fromScalarInt (.ofUInt64 n)))
-      valid23 live23 cached23 (by decide +kernel) noClocks ghost _
-  have resolve : h.resolve () 4 HelperCompilerFacts.addCall.callee.args state = .ok HelperCompilerFacts.addCall.callee state := by
-    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 4 HelperCompilerFacts.addCall.callee.args state = _
+      valid23 live23 cached23 (by decide +kernel) noClocks ghost
+  have resolve : h.resolve () 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs state = .ok HelperCompilerFacts.addCall.callee state := by
+    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
     exact AddCallQueries.resolve_current frames frame machine body identity callee located
   have fnAbi : h.fnAbiOfInstance () HelperCompilerFacts.addCall.callee #[] = pure HelperCompilerFacts.addAbi := by
@@ -76,11 +76,11 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
     funext state
     exact AddCallFacts.actual_add_caller_location options () remaining span limits state
   exact CallTwoArgumentsAt.eval_callee_two_at h () HelperCompilerFacts.addCall.function argument0 argument1 ⟨21,#[]⟩
-    ⟨.immediate .uninit,AddFunctionFacts.functionLayout⟩ state state state state .Rust 4 HelperCompilerFacts.addCall.callee.args
-    HelperCompilerFacts.addCall.callee 4 HelperCompilerFacts.addAbi true (.Copy ⟨.immediate (.scalar pointer),CopyCompilerFacts.destPointerLayout⟩)
+    ⟨.immediate .uninit,AddFunctionFacts.functionLayout⟩ state state state state .Rust 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs
+    HelperCompilerFacts.addCall.callee 8 HelperCompilerFacts.addAbi true (.Copy ⟨.immediate (.scalar pointer),CopyCompilerFacts.destPointerLayout⟩)
     (.Copy ⟨.immediate (.scalar (.fromScalarInt (.ofUInt64 n))),RootCompilerFacts.usizeLayout⟩)
     fnOp arg0 arg1 (AddCalleeLeaves.signature options limits remaining span cmp)
-    (AddCalleeLeaves.kind options limits remaining span) resolve callee_kind fnAbi callerLocation
+    (AddCalleeLeaves.kind options limits remaining span) resolve (AddCalleeLeaves.instance_kind options limits remaining span) fnAbi callerLocation
 
 end
 end DuplicatePrefix.AddEvaluateCall

@@ -61,24 +61,14 @@ theorem actual_entry_eq (options : EvalConfigurationCore.Options) (limits : Exec
     change (PreparedContracts.actualConfig options () remaining span).virtual.compiler.requiresCallerLocation
       GuardCompilerFacts.runtimeCall.callee state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).virtualCompiler]
-    with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime GuardCompilerFacts.runtimeCall.callee with
-      | .ok value => pure value
-      | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-        MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-    rw [GuardCompilerFacts.runtime_caller_location]
+    dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+    unfold CompilerVirtualFacts.inlineAttribute
+    erw [Reflection.natMap_getElem]
+    with_unfolding_all rfl
   have abi : h.fnAbiOfInstance () GuardCompilerFacts.runtimeCall.callee #[] =
       pure GuardCompilerFacts.runtimeAbi := by
     funext state
-    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.fnAbiOfInstance
-      () GuardCompilerFacts.runtimeCall.callee #[] state = _
-    rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
-    with_unfolding_all change (match CompilerInstanceAbi.abiOfInstance
-      PreparedReflection.actual.compiler.lifecycle.instances GuardCompilerFacts.runtimeCall.callee #[] with
-      | .ok value => pure value
-      | .error reason => throw (StepError.unsupported reason) :
-        MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi TyId)) state = _
-    rw [RuntimeCallQueries.function_abi]
+    exact GuardCompilerFacts.actual_runtime_abi options () remaining span state
   have features : h.checkTargetFeatures () GuardCompilerFacts.runtimeCall.callee = pure () := by
     funext state
     change ExecutionCallLeaves.checkTargetFeatures

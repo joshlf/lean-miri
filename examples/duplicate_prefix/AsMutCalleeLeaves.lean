@@ -7,6 +7,16 @@ set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
+theorem instance_kind (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
+    (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) :
+    (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).instanceKind
+      HelperCompilerFacts.asMutPtrCall.callee = (pure (.Item 6) : MachineHooks.M MiriMemoryKind Machine.RootUser CallInstanceKind) := by
+  change (PreparedContracts.actualConfig options () remaining span).calls.compiler.instanceKind _ = _
+  rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  with_unfolding_all rfl
+
 theorem signature (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (cmp : ProjectionMetadataFacts.NullComparator) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).functionSignature ()
@@ -14,16 +24,14 @@ theorem signature (options : EvalConfigurationCore.Options) (limits : ExecutionM
       (pure (1,.Rust) : MachineHooks.M MiriMemoryKind Machine.RootUser (Nat × ABI.ExternAbi)) := by
   change (PreparedContracts.actualConfig options () remaining span).calls.compiler.functionSignature () _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
-  simp only [CompilerCallConstruction.compiler,CompilerExecutionCallLeaves.make]
-  rw [AsMutFunctionFacts.functionLayout_shape.1,AsMutFunctionFacts.function_signature_query]
-  simp only [bind,Except.bind,pure,Except.pure]
-  rw [AsMutFunctionFacts.decode_rust_extern_abi cmp]
-  with_unfolding_all rfl
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  rw [AsMutFunctionFacts.functionLayout_shape.1, AsMutFunctionFacts.function_signature_query]
+  rfl
 
 theorem kind (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).functionKind AsMutFunctionFacts.functionLayout.ty =
-      (pure (.FnDef HelperCompilerFacts.asMutPtrCall.callee.defId HelperCompilerFacts.asMutPtrCall.callee.args) : MachineHooks.M MiriMemoryKind Machine.RootUser CallFunctionKind) := by
+      (pure (.FnDef (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind.defId (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs) : MachineHooks.M MiriMemoryKind Machine.RootUser CallFunctionKind) := by
   change (PreparedContracts.actualConfig options () remaining span).calls.compiler.functionKind _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
   with_unfolding_all change (match CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions AsMutFunctionFacts.functionLayout.ty with

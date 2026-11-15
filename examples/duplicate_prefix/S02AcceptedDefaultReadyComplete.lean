@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02AcceptedSharedFullSiteShapeBothNode
 import duplicate_prefix.S02SeparateDestinationSharedSiteMargin
 import duplicate_prefix.S02SeparateDestinationGenericAcceptedLedgerRuntimeSlot0
@@ -79,7 +80,7 @@ theorem after_guard_complete
       sourceEntry.allocation.len+64 < 18446744073709551616 ∧
       sourceEntry.allocation.mutability = .Mut ∧
       post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) =
-        some (reference.id,⟨none,#[]⟩) ∧
+        some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) ∧
       initial.borrowTracker = some tracker ∧
       post.borrowTracker = some held ∧ held.retagMode = tracker.retagMode ∧
       post.user.payload.ghost = false ∧ post.user.payload.validation = .Shallow ∧
@@ -158,7 +159,7 @@ theorem after_guard_complete
   have extrasSource := S02AcceptedSourceExtrasAtCall.at_actual_call id tag address len count input
     nonempty different returnTag returnConcrete reference entry machine actual
   have postSourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [extrasAfter]
     have tickExtras := (S02SeparateDestinationTickLedger.preserved options remaining span machine).2.2.2.2.2.2.2
     rw [tickExtras]

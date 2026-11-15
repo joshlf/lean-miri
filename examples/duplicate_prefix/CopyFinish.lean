@@ -34,11 +34,11 @@ theorem finish (options : EvalConfigurationCore.Options) (limits : ExecutionMach
       (Storage.withCurrent frames frame machine) =
       .ok () (Storage.withCurrent frames (CopyDone.doneFrame {frame with location := .unwinding preamble}) machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
-  let f0 := {frame with location := .unwinding ⟨619⟩}
+  let f0 := {frame with location := .unwinding ⟨90⟩}
   let fp := {frame with location := .unwinding preamble}
   have query := CopyEntryLocalStages.local_span options limits remaining span frames frame machine body identity callee 0
-  have set0 := CallEntryLocals.set_span options limits remaining span frames frame machine ⟨619⟩
-  change CopyCallCore.spanAt h ⟨619⟩ (Storage.withCurrent frames frame machine) = _ at set0
+  have set0 := CallEntryLocals.set_span options limits remaining span frames frame machine ⟨90⟩
+  change CopyCallCore.spanAt h ⟨90⟩ (Storage.withCurrent frames frame machine) = _ at set0
   have compat : h.checkArgumentCompat () HelperCompilerFacts.copyAbi.ret HelperCompilerFacts.copyAbi.ret
       (Storage.withCurrent frames f0 machine) = .ok true (Storage.withCurrent frames f0 machine) := by
     change (PreparedContracts.actualConfig options () remaining span).calls.compiler.checkArgumentCompat () _ _ _ = _
@@ -54,7 +54,7 @@ theorem finish (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     have valid : 3 < HelperCompilerFacts.copyAbi.args.size := by rw [CopyCallFacts.abi_flags.2.2]; decide
     simp only [Array.getElem?_eq_getElem valid, Array.getD, valid, ↓reduceDIte]
     with_unfolding_all rfl
-  change h.localSpan HelperCompilerFacts.copyBody.body 0 (Storage.withCurrent frames frame machine) = EStateM.Result.ok ⟨619⟩ (Storage.withCurrent frames frame machine) at query
+  change h.localSpan HelperCompilerFacts.copyBody.body 0 (Storage.withCurrent frames frame machine) = EStateM.Result.ok ⟨90⟩ (Storage.withCurrent frames frame machine) at query
   unfold action
   simp only [bind,EStateM.bind]
   rw [query]

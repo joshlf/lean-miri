@@ -41,14 +41,14 @@ private theorem tail_of_steps (options : EvalConfigurationCore.Options) (limits 
     (frames : Array CompilerFrameContext.ActualFrame) (root : RootFrame) (machine : Before)
     (place : MPlaceTy Provenance) (after protectedState : RootState)
     (protect : (ExecutionMachine.callHooks (config options remaining span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine) = .ok () protectedState)
+      (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine) = .ok () protectedState)
     (finish : RootEntryFinish.finish (ExecutionMachine.callHooks (config options remaining span) limits) protectedState = .ok () after) :
     RootEntryTail.tail (ExecutionMachine.callHooks (config options remaining span) limits) place
       (Storage.withCurrent frames root.frame machine) = .ok () after := by
   have localSpan := CallEntryLocals.root_span0 options limits remaining span frames root.frame machine root.body root.identity root.callee
   have getFrame := CallEntryLocals.get_frame options limits remaining span frames root.frame machine
-  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨601⟩).frame machine
-  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine)
+  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨2⟩).frame machine
+  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine)
   unfold RootEntryTail.tail RootCallCore.spanAt
   simp only [bind,EStateM.bind]
   rw [localSpan]
@@ -88,14 +88,14 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
       physical.id physical.pointer.provenance (UInt64.ofNat call.returnOffset) effect.allocation tracker.global.nextPointerTag room,
     certificate.output=output ∧ ∃ updated : Allocation Provenance BorrowTree,
     let argsRoot := RootArgumentsTwo.result firstDone count
-    let changed := atSpan argsRoot ⟨601⟩
+    let changed := atSpan argsRoot ⟨2⟩
     let currentMachine := afterArgumentsMachine effect fresh remaining span frames prepared.frame {} 1 (prepared.valid i1)
     let currentTracker := afterArgumentsTracker effect fresh
     let protectedFrame := registeredFrame changed.frame (sourceBorrow effect {}) physical.id currentTracker.global.nextPointerTag
     let retagged := ReturnProtection.borrowedState frames changed.frame (sourceBorrow effect {}) currentMachine currentTracker room physical.id physical.entry output.child.tree
     let finalMachine : Before := {retagged.machine with memory := {retagged.machine.memory with live :=
       ((retagged.machine.memory.live.filter fun row => row.1 != physical.id).push (physical.id,{physical.entry with allocation := updated}))}}
-    let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+    let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
     firstDone.frame = resultFrame effect remaining span prepared.frame {} 1 (prepared.valid i1) ∧
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
@@ -121,7 +121,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
   obtain ⟨effect,firstDone,frameEq,returnEq,arguments⟩ := CurrentCallEmptyEntryArguments.arguments options limits remaining span machine tracker argument place call data
     transported frames (CallEntryFacts.freshRoot before).2 count
   let argsRoot := RootArgumentsTwo.result firstDone count
-  let changed := atSpan argsRoot ⟨601⟩
+  let changed := atSpan argsRoot ⟨2⟩
   have initialBorrow : prepared.frame.extra.borrowTracker = some ({} : FrameState) :=
     RootEntryFrame.raw_borrow machine (CurrentCallArguments.destination place) (CallEntryFacts.freshRoot before).2 tracker transported.machine.state.enabled
   have frameBorrow : changed.frame.extra.borrowTracker = some (sourceBorrow effect {}) := by
@@ -175,7 +175,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
   change CallEntryFacts.rawPushedState frames before (.memory place) = Storage.withCurrent frames initialRoot.frame machine at rawEq
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span frames initialRoot.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span frames initialRoot.frame initialRoot.frame machine
-  have preamble : initialRoot.frame.location = .unwinding ⟨559⟩ := rfl
+  have preamble : initialRoot.frame.location = .unwinding ⟨0⟩ := rfl
   have trackNone : initialRoot.frame.trackCallerArg = none := rfl
   have unchanged : {initialRoot.frame with trackCallerArg := none} = initialRoot.frame := by rw [←trackNone]
   refine ⟨effect,firstDone,physical,room,output,certificate,outputEq,updated,frameEq,?_,returnEq,idEq,offsetEq,offsetNat,extra,runtime,ready,binding,origins,bytes,length,snapshot,mutation⟩
@@ -224,14 +224,14 @@ def Facts {options limits remaining span before tracker argument place call data
     let output := out.certificate.output
     let updated := out.updated
     let argsRoot := RootArgumentsTwo.result firstDone count
-    let changed := atSpan argsRoot ⟨601⟩
+    let changed := atSpan argsRoot ⟨2⟩
     let currentMachine := afterArgumentsMachine effect fresh remaining span frames prepared.frame {} 1 (prepared.valid i1)
     let currentTracker := afterArgumentsTracker effect fresh
     let protectedFrame := registeredFrame changed.frame (sourceBorrow effect {}) physical.id currentTracker.global.nextPointerTag
     let retagged := ReturnProtection.borrowedState frames changed.frame (sourceBorrow effect {}) currentMachine currentTracker room physical.id physical.entry output.child.tree
     let finalMachine : Before := {retagged.machine with memory := {retagged.machine.memory with live :=
       ((retagged.machine.memory.live.filter fun row => row.1 != physical.id).push (physical.id,{physical.entry with allocation := updated}))}}
-    let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+    let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
     firstDone.frame = resultFrame effect remaining span prepared.frame {} 1 (prepared.valid i1) ∧
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi

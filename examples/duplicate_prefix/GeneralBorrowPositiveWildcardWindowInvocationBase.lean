@@ -21,7 +21,7 @@ theorem enters (s : GeneralBorrowPositiveWildcardWindowOriginalInput.Base)
     let argsMachine := resultMachine (RawRootInvocation.machine #[] s.before) s.tracker s.fresh s.id s.entry s.offset s.len
     let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal s.tracker.global s.fresh,s.tracker.retagMode⟩
     let owned := ({} : FrameState).addProtector s.id s.tracker.global.nextPointerTag
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState #[] changed owned argsMachine next s.slotFresh s.slotId s.slotEntry
       (PhysicalMachineWrite.slotTree s.slotRoot next.global.nextPointerTag 1 false)
     ∃ updated,
@@ -29,7 +29,7 @@ theorem enters (s : GeneralBorrowPositiveWildcardWindowOriginalInput.Base)
         RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
         #[.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩,.Copy (second count)] false (.memory s.place) (.stop true) ⟨⟨#[]⟩,s.before⟩ =
       .ok () (Storage.withCurrent #[]
-        (CallEntryFacts.doneRootFrame {registeredFrame changed owned s.slotId next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed owned s.slotId next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed s.slotId s.slotEntry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree s.slotRoot next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧

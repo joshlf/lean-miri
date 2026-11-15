@@ -42,29 +42,53 @@ noncomputable def abiQuery (callee : CallInstance) :=
 noncomputable def bodyQuery (callee : CallInstance) :=
   CallResolution.loadedBodyOfInstance PreparedReflection.actual.compiler.lifecycle.calls.calls callee
 
-theorem len_abi_supported : (abiQuery lenCall.callee).isOk = true := by decide +kernel
-theorem as_mut_ptr_abi_supported : (abiQuery asMutPtrCall.callee).isOk = true := by decide +kernel
-theorem add_abi_supported : (abiQuery addCall.callee).isOk = true := by decide +kernel
-theorem copy_abi_supported : (abiQuery copyCall.callee).isOk = true := by decide +kernel
+theorem len_abi_supported : (abiQuery lenCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem as_mut_ptr_abi_supported : (abiQuery asMutPtrCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem add_abi_supported : (abiQuery addCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem copy_abi_supported : (abiQuery copyCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
 
 theorem len_body_supported : (bodyQuery lenCall.callee).isOk = true := by decide +kernel
 theorem as_mut_ptr_body_supported : (bodyQuery asMutPtrCall.callee).isOk = true := by decide +kernel
 theorem add_body_supported : (bodyQuery addCall.callee).isOk = true := by decide +kernel
 theorem copy_body_supported : (bodyQuery copyCall.callee).isOk = true := by decide +kernel
 
-noncomputable def lenAbi := checkedOk (abiQuery lenCall.callee) len_abi_supported
-noncomputable def asMutPtrAbi := checkedOk (abiQuery asMutPtrCall.callee) as_mut_ptr_abi_supported
-noncomputable def addAbi := checkedOk (abiQuery addCall.callee) add_abi_supported
-noncomputable def copyAbi := checkedOk (abiQuery copyCall.callee) copy_abi_supported
+noncomputable def lenAbi := checkedOk (PreparedReflection.actual.abiResults[0]'(by decide +kernel)) (by decide +kernel)
+noncomputable def asMutPtrAbi := checkedOk (PreparedReflection.actual.abiResults[1]'(by decide +kernel)) (by decide +kernel)
+noncomputable def addAbi := checkedOk (PreparedReflection.actual.abiResults[2]'(by decide +kernel)) (by decide +kernel)
+noncomputable def copyAbi := checkedOk (PreparedReflection.actual.abiResults[3]'(by decide +kernel)) (by decide +kernel)
 noncomputable def lenBody := checkedOk (bodyQuery lenCall.callee) len_body_supported
 noncomputable def asMutPtrBody := checkedOk (bodyQuery asMutPtrCall.callee) as_mut_ptr_body_supported
 noncomputable def addBody := checkedOk (bodyQuery addCall.callee) add_body_supported
 noncomputable def copyBody := checkedOk (bodyQuery copyCall.callee) copy_body_supported
 
-theorem len_abi_eq : abiQuery lenCall.callee = .ok lenAbi := checkedOk_eq _ _
-theorem as_mut_ptr_abi_eq : abiQuery asMutPtrCall.callee = .ok asMutPtrAbi := checkedOk_eq _ _
-theorem add_abi_eq : abiQuery addCall.callee = .ok addAbi := checkedOk_eq _ _
-theorem copy_abi_eq : abiQuery copyCall.callee = .ok copyAbi := checkedOk_eq _ _
+theorem len_abi_eq : abiQuery lenCall.callee = .ok lenAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem as_mut_ptr_abi_eq : abiQuery asMutPtrCall.callee = .ok asMutPtrAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem add_abi_eq : abiQuery addCall.callee = .ok addAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem copy_abi_eq : abiQuery copyCall.callee = .ok copyAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
 theorem len_body_eq : bodyQuery lenCall.callee = .ok lenBody := checkedOk_eq _ _
 theorem as_mut_ptr_body_eq : bodyQuery asMutPtrCall.callee = .ok asMutPtrBody := checkedOk_eq _ _
 theorem add_body_eq : bodyQuery addCall.callee = .ok addBody := checkedOk_eq _ _

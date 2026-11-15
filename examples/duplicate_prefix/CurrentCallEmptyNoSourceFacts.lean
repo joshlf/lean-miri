@@ -34,8 +34,8 @@ def args : RootFrame := RootArgumentsTwo.result
     remaining span root {}) count
 
 def frame := CallEntryFacts.doneRootFrame
-  {registeredFrame (atSpan (args options remaining span before tracker argument effect root count) ⟨601⟩).frame {} id tag
-    with location:=.unwinding ⟨559⟩}
+  {registeredFrame (atSpan (args options remaining span before tracker argument effect root count) ⟨2⟩).frame {} id tag
+    with location:=.unwinding ⟨0⟩}
 
 def value : Immediate Provenance := (DuplicatePrefixSliceArgument.rawValue (config options remaining span).access.runtime.base argument 0 ActualReferenceMetadata.reference).imm
 

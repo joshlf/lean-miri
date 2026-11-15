@@ -12,9 +12,9 @@ namespace DuplicatePrefix.PriorCellProgram
 
 import_mir "examples/duplicate_prefix/prior_cell_context/input.json" as imported
 
-theorem rootedBodyCount : imported.document.bodies.size = 1 := by rfl
+theorem rootedBodyCount : imported.document.bodyRoots.size = 1 := by rfl
 
-theorem typeCount : imported.document.types.size = 490 := by rfl
+theorem typeCount : imported.document.types.size = 135 := by rfl
 
 theorem pinnedRustc : imported.document.producer.rustcCommit =
     "8144389c895da997dbdecaa635e41d6a50be6ffd" := by rfl

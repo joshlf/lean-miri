@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawAsMutCopyLedger
 import duplicate_prefix.GeneralBorrowRawAsMutCopyResources
 import duplicate_prefix.GeneralBorrowRawCopyRootGuardBodyIndependentFuel
@@ -26,7 +27,7 @@ theorem from_suffix (packet : GeneralBorrowRawAsMutToCopy.Input)
     (valid : ProvenanceCopy.WellFormed packet.entry.allocation.provenanceMap packet.entry.allocation.len)
     (storageFits : packet.entry.allocation.len+64 < 18446744073709551616)
     (mutable : packet.entry.allocation.mutability = .Mut)
-    (extras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,⟨none,#[]⟩))
+    (extras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (packet.machine.user.payload.payload.user.runtime.extras.allocations) (packet.id) }))
     (bounded : packet.count ≤ (PreparedContracts.actualConfig packet.options () (packet.remaining+1) packet.span).projection.maxSizeOfVal.bytes) :
     let cfg := PreparedContracts.actualConfig packet.options () (packet.remaining+1) packet.span
     let released := (packet.entry.allocation.extra.releaseProtector packet.tag packet.tracker.global.protectedTags).tree

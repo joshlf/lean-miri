@@ -59,7 +59,9 @@ theorem copy_same_bool (options : EvalConfigurationCore.Options) (limits : Execu
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any
       (·.value.ty == 4) = false)
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let entryInput := ConcreteEmptyRuntimeEntry.form entry.allocation.extra global.protectedTags parentTag global.nextPointerTag
       runtime.formed parent parentNode tagged parentAt (ConcreteEmptyRuntimeEntry.counter_fresh _ _ runtime.below) nodeRoom
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base

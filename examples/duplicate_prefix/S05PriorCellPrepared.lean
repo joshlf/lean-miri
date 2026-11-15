@@ -1,14 +1,8 @@
 import duplicate_prefix.S05PriorCellProgram
-import Miri.Input.EvalPreparation
-import Miri.Input.CompilerGlobalBytes
-import Lean.Elab.Deriving.ToExpr
-import Init.Internal.Order.While
-attribute [local cbv_eval] Lean.Loop.forIn_eq_of_monadTail
+import duplicate_prefix.Reflection
 
-/-! Reflection of the actual compiler preparation products. This is a data
-preparation trust boundary like import_mir, never a safety theorem. Dependent
-cache certificates are rebuilt by their public constructors. Optional caches
-use their documented uncached representations. -/
+/-! Kernel-checked reflection of typed compiler preparation products. The
+preparation input is checked against the imported fixed document before quoting. -/
 
 set_option maxRecDepth 16384
 set_option maxHeartbeats 8000000
@@ -17,182 +11,6 @@ set_option synthInstance.maxSize 4096
 open Lean Miri Miri.ABI Miri.Input Miri.Interpreter Miri.Memory
 
 namespace DuplicatePrefix.PriorCellMetadata
-
-open Lean Elab Command in
-private partial def deriveDataQuote (name : Name) : StateT NameSet CommandElabM Unit := do
-  if (← get).contains name then return
-  modify (·.insert name)
-  let env ← getEnv
-  let some info := env.find? name | return
-  if !name.toString.startsWith "Miri." then return
-  let custom := #[``LowerContext, ``RuntimeMetadata, ``RuntimeMetadata.Indexed,
-    ``CompilerFacts.Context, ``CompilerInstanceAbi.Prepared, ``CompilerProviders.Prepared,
-    ``EvalPreparation.Prepared, ``AllocationImage.Imported]
-  if custom.contains name then return
-  match info with
-  | .inductInfo indInfo =>
-    let found ← liftM <| liftTermElabM <| Meta.forallTelescopeReducing indInfo.type fun xs _ => do
-      let type := mkAppN (mkConst name (indInfo.levelParams.map Level.param)) xs
-      let classType ← Meta.mkAppM ``ToExpr #[type]
-      Meta.synthInstance? classType
-    if found.isSome then return
-    for ctor in indInfo.ctors do
-      let ctorInfo ← getConstInfo ctor
-      for dependency in ctorInfo.type.getUsedConstants do
-        if dependency != name then deriveDataQuote dependency
-    liftM <| elabCommand (← `(deriving instance ToExpr for $(mkIdent name)))
-  | .defnInfo definition =>
-    let isTypeFormer ← liftM <| liftTermElabM <| Meta.forallTelescopeReducing definition.type fun _ body => do
-      pure body.isSort
-    if isTypeFormer then
-      for dependency in definition.value.getUsedConstants do
-        if dependency != name then deriveDataQuote dependency
-  | _ => pure ()
-
-open Lean Elab Command in
-elab "derive_prior_cell_data_quote " names:ident,* : command => do
-  let resolvedNames ← names.getElems.mapM fun name => resolveGlobalConstNoOverload name.raw
-  let action : StateT NameSet CommandElabM Unit := do
-    resolvedNames.forM deriveDataQuote
-  discard <| action.run {}
-
-deriving instance ToExpr for Except
-
-section
-variable [ToExpr Json]
-
-derive_prior_cell_data_quote ImportDocument
-
-/-- Diagnostic imports use the public uncached core projection. Reject a native
-cached core rather than discarding its certificates during reflection. -/
-instance : ToExpr ImportDocumentCore where
-  toTypeExpr := mkConst ``ImportDocumentCore
-  toExpr value :=
-    if value.compilerFunctionAbiTable.isSome || value.compilerValueMemo.isSome then
-      panic! "reflection requires a diagnostic uncached import core"
-    else
-      mkApp (mkConst ``ImportDocument.toCore)
-        (toExpr (value.withTypedTree (.scalar .null)))
-
-derive_prior_cell_data_quote LoweredProgram, RuntimeTargetDataLayout, RuntimeMetadataError, TyAndLayout
-
-private def uncachedLowerContext (typeIds : Array TypeId)
-    (scalarSizes : Array (TypeId × Nat)) (allocationIds : Array AllocationId)
-    (obligations : Array Obligation) (sourceDocument : Option Json) : LowerContext :=
-  {typeIds, scalarSizes, allocationIds, obligations, sourceDocument}
-
-private def uncachedRuntime (source : ImportDocumentCore) (target : RuntimeTargetDataLayout)
-    (layouts : Array (TypeId × Except RuntimeMetadataError (TyAndLayout TypeId))) : RuntimeMetadata :=
-  {source, target, layouts}
-
-private def uncachedFacts (runtime : RuntimeMetadata.Indexed) (program : LoweredProgram) : CompilerFacts.Context :=
-  {runtime, program}
-
-private def uncachedInstanceAbi (program : LoweredProgram)
-    (entries : Array CompilerInstanceAbi.Entry) : CompilerInstanceAbi.Prepared :=
-  {program, entries}
-
-
-instance [ToExpr ImportDocumentCore] : ToExpr RuntimeMetadata where
-  toTypeExpr := mkConst ``RuntimeMetadata
-  toExpr value := mkApp3 (mkConst ``uncachedRuntime) (toExpr value.source)
-    (toExpr value.target) (toExpr value.layouts)
-
-instance [ToExpr RuntimeMetadata] : ToExpr RuntimeMetadata.Indexed where
-  toTypeExpr := mkConst ``RuntimeMetadata.Indexed
-  toExpr value :=
-    let runtime := toExpr value.toRuntimeMetadata
-    let raw := mkApp (mkConst ``ImportDocumentCore.raw) (mkApp (mkConst ``RuntimeMetadata.source) runtime)
-    mkApp2 (mkConst ``RuntimeMetadata.Indexed.ofMetadata) runtime
-      (mkApp (mkConst ``Option.none [0]) (mkApp (mkConst ``RuntimeMetadata.JsonReflexivity) raw))
-
-instance [ToExpr RuntimeMetadata.Indexed] [ToExpr LoweredProgram] : ToExpr CompilerFacts.Context where
-  toTypeExpr := mkConst ``CompilerFacts.Context
-  toExpr value := mkApp2 (mkConst ``uncachedFacts) (toExpr value.runtime) (toExpr value.program)
-
-instance {left : Json} : ToExpr (RuntimeMetadata.JsonReflexivity left) where
-  toTypeExpr := mkApp (mkConst ``RuntimeMetadata.JsonReflexivity) (toExpr left)
-  toExpr _ := mkApp (mkConst ``RuntimeMetadata.JsonReflexivity.prepare) (toExpr left)
-
-instance [ToExpr RuntimeMetadata] {runtime : RuntimeMetadata} : ToExpr (CallResolution.FunctionAbiCache runtime) where
-  toTypeExpr := mkApp (mkConst ``CallResolution.FunctionAbiCache) (toExpr runtime)
-  toExpr _ := mkApp (mkConst ``CallResolution.prepareFunctionAbiCache) (toExpr runtime)
-
-instance [ToExpr RuntimeMetadata] {runtime : RuntimeMetadata} : ToExpr (CallCompatibility.UnitLayoutCache runtime) where
-  toTypeExpr := mkApp (mkConst ``CallCompatibility.UnitLayoutCache) (toExpr runtime)
-  toExpr _ := mkApp (mkConst ``CallCompatibility.bindUnitLayout) (toExpr runtime)
-
-section
-variable [ToExpr LoweredProgram] [ToExpr RuntimeMetadata]
-
-derive_prior_cell_data_quote CompilerInstanceAbi.Entry
-
-instance : ToExpr CompilerInstanceAbi.Prepared where
-  toTypeExpr := mkConst ``CompilerInstanceAbi.Prepared
-  toExpr value := mkApp2 (mkConst ``uncachedInstanceAbi) (toExpr value.program) (toExpr value.entries)
-
-derive_prior_cell_data_quote CompilerLifecyclePipeline.Prepared, CompilerFunctionFacts.Prepared,
-  CompilerMain.Prepared, CompilerIntrinsicFacts.Prepared, CompilerConstantQueries.Prepared,
-  CompilerNamedConstants.Prepared, CompilerNamedGlobals.Prepared, CompilerExternStatic.Prepared,
-  CompilerFunctionPointers.Prepared, CompilerVTableMachine.Prepared, CompilerNamedShimAbi.Prepared,
-  CompilerForeignSymbolTables.Prepared, RuntimeArrayTypes.World, CompilerThreadLocal.Entry,
-  EvalEntryMachine.Layouts, CompilerGlobalBytes.Prepared
-
-
-@[noinline] private def checkedVector {α : Type u} (length : Nat) (items : Array α)
-    (size : items.size = length) : Vector α length := ⟨items, size⟩
-
-instance {α : Type u} [ToLevel.{u}] [ToExpr α] {length : Nat} : ToExpr (Vector α length) where
-  toTypeExpr := mkApp2 (mkConst ``Vector [toLevel.{u}]) (toTypeExpr α) (toExpr length)
-  toExpr value := mkApp4 (mkConst ``checkedVector [toLevel.{u}]) (toTypeExpr α)
-    (toExpr length) (toExpr value.toArray)
-    (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Nat) (toExpr length))
-
-derive_prior_cell_data_quote Allocation
-
-instance : ToExpr AllocationImage.Imported where
-  toTypeExpr := mkConst ``AllocationImage.Imported
-  toExpr value := mkApp2 (mkConst ``AllocationImage.Imported.ofSource)
-    (toExpr value.source) (toExpr value.initializers)
-
-private def rebuildProviders (program : LoweredProgram) (runtime : RuntimeMetadata)
-    (lifecycle : CompilerLifecyclePipeline.Prepared) (functions : CompilerFunctionFacts.Prepared)
-    (main : CompilerMain.Prepared) (intrinsics : CompilerIntrinsicFacts.Prepared)
-    (constants : CompilerConstantQueries.Prepared) (namedConstants : CompilerNamedConstants.Prepared)
-    (namedGlobals : CompilerNamedGlobals.Prepared) (externStatics : CompilerExternStatic.Prepared)
-    (pointers : CompilerFunctionPointers.Prepared) (vtables : CompilerVTableMachine.Prepared)
-    (namedAbi : CompilerNamedShimAbi.Prepared)
-    (foreignSymbols : Except String CompilerForeignSymbolTables.Prepared)
-    (initialArrays : Except String RuntimeArrayTypes.World)
-    (tls : Except String (Array CompilerThreadLocal.Entry)) : CompilerProviders.Prepared :=
-  let sourceEquality := RuntimeMetadata.JsonReflexivity.prepare (left := runtime.source.raw)
-  { program, runtime, lifecycle, functions, main, intrinsics, constants,
-    sourceEquality, constantBinding := CompilerConstantQueries.bind constants runtime (some sourceEquality),
-    namedConstants, namedGlobals, externStatics, pointers, vtables, namedAbi, foreignSymbols,
-    covarianceIndex := CompilerQueryIndices.covariance program.input.raw,
-    signatureAbiIndex := CompilerQueryIndices.signatureAbi runtime program.input.raw,
-    initialArrays, tls }
-
-instance : ToExpr CompilerProviders.Prepared where
-  toTypeExpr := mkConst ``CompilerProviders.Prepared
-  toExpr value := mkAppN (mkConst ``rebuildProviders) #[
-    toExpr value.program, toExpr value.runtime, toExpr value.lifecycle,
-    toExpr value.functions, toExpr value.main, toExpr value.intrinsics,
-    toExpr value.constants, toExpr value.namedConstants, toExpr value.namedGlobals,
-    toExpr value.externStatics, toExpr value.pointers, toExpr value.vtables,
-    toExpr value.namedAbi, toExpr value.foreignSymbols, toExpr value.initialArrays,
-    toExpr value.tls]
-
-instance : ToExpr EvalPreparation.Prepared where
-  toTypeExpr := mkConst ``EvalPreparation.Prepared
-  toExpr value := mkAppN (mkConst ``EvalPreparation.Prepared.mk) #[
-    toExpr value.compiler, toExpr value.image, toExpr value.types,
-    toExpr value.layouts, toExpr value.dummySpan]
-
-end
-end
-
-
 
 /-- The actual preparation profile has no materialized local allocation. All
 compiler registration tables and identity-supply fields are retained as data;
@@ -216,12 +34,9 @@ structure InitialMemoryData where
   opaqueSourceGlobalIds : Array UInt64
   sourceByteImageFamilyComplete : Bool
 
-section
-variable [ToExpr Json]
-derive_prior_cell_data_quote DeadAllocation, GlobalAllocation
+derive_duplicate_prefix_quote DeadAllocation, GlobalAllocation
 
 deriving instance ToExpr for InitialMemoryData
-end
 
 def InitialMemoryData.restore (data : InitialMemoryData) :
     MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind :=
@@ -262,6 +77,8 @@ private structure ReflectionSource where
   prepared : EvalPreparation.Prepared
   bytes : CompilerGlobalBytes.Prepared
   memory : InitialMemoryData
+  layoutResults : Array (Except RuntimeMetadataError (TyAndLayout TypeId))
+  abiResults : Array (Except String (FnAbi TypeId))
 
 private def readPreparation (path : String) : IO (Except String ReflectionSource) := do
   let decoded ← Input.decodeFile path
@@ -271,11 +88,15 @@ private def readPreparation (path : String) : IO (Except String ReflectionSource
     let attempted := EvalPreparation.prepare lowered
     let prepared ← attempted.outcome
     let bytes ← CompilerGlobalBytes.prepare prepared.compiler.program prepared.compiler.runtime
-      attempted.memory (some prepared.compiler.sourceEquality)
+      attempted.memory
     let memory ← captureInitialMemory attempted.memory
-    pure ⟨decoded.document, prepared, bytes, memory⟩
+    let layoutResults := prepared.compiler.runtime.source.types.map fun node =>
+      prepared.compiler.runtime.lookup node.id
+    let abiResults := prepared.compiler.program.input.functionAbis.map fun row =>
+      CallResolution.functionAbi prepared.compiler.runtime row
+    pure ⟨decoded.document, prepared, bytes, memory, layoutResults, abiResults⟩
 
-private def quoteProgram [ToExpr Json] [ToExpr ImportDocumentCore] (program : LoweredProgram) : Expr :=
+private def quoteProgram [ToExpr ImportDocument] (program : LoweredProgram) : Expr :=
   mkAppN (mkConst ``LoweredProgram.mk) #[toExpr program.bundle, toExpr program.roots,
     toExpr program.instances, toExpr program.promoted, toExpr program.input]
 
@@ -327,33 +148,20 @@ elab_rules : command
     let source ← match source with
       | .ok source => pure source
       | .error reason => throwErrorAt path "compiler preparation failed: {reason}"
-    unless source.document.raw == DuplicatePrefix.PriorCellProgram.imported.document.raw do
+    let sourceMatches ← liftTermElabM <| Meta.isDefEq (toExpr source.document)
+      (mkApp (mkConst ``ExecutionInput.document) (mkConst ``DuplicatePrefix.PriorCellProgram.imported))
+    unless sourceMatches do
       throwErrorAt path "preparation source differs from the imported fixed document"
     let base := (← getCurrNamespace) ++ base.getId
     liftTermElabM <| withOptions (Elab.async.set · false) do
-      let env ← getEnv
-      let mut shared : Std.HashMap Json Expr := {}
-      for h : index in [:source.document.sharedNodes.size] do
-        let name := ``DuplicatePrefix.PriorCellProgram.imported ++ Name.mkSimple s!"_mir_json_{index}"
-        unless env.contains name do
-          throwError "fixed document is missing shared JSON declaration {name}"
-        shared := shared.insert source.document.sharedNodes[index] (mkConst name)
-      let documentExpr := mkApp (mkConst ``DecodeResult.document) (mkConst ``DuplicatePrefix.PriorCellProgram.imported)
-      shared := shared.insert source.document.raw (mkApp (mkConst ``ImportDocument.raw) documentExpr)
-      let originalJson : ToExpr Json := inferInstance
-      letI : ToExpr Json := {
-        toTypeExpr := mkConst ``Json
-        toExpr := fun value => match shared[value]? with
-          | some expr => expr
-          | none => originalJson.toExpr value }
-      let originalCore : ToExpr ImportDocumentCore := inferInstance
-      let sourceCore := originalCore.toExpr source.document.toCore
-      let sourceExpr := mkApp (mkConst ``ImportDocument.toCore) documentExpr
-      letI : ToExpr ImportDocumentCore := {
-        toTypeExpr := mkConst ``ImportDocumentCore
+      let documentExpr := mkApp (mkConst ``ExecutionInput.document) (mkConst ``DuplicatePrefix.PriorCellProgram.imported)
+      let originalDocument : ToExpr ImportDocument := inferInstance
+      let sourceValue := originalDocument.toExpr source.document
+      letI : ToExpr ImportDocument := {
+        toTypeExpr := mkConst ``ImportDocument
         toExpr := fun value =>
-          let quoted := originalCore.toExpr value
-          if quoted == sourceCore then sourceExpr else quoted }
+          let quoted := originalDocument.toExpr value
+          if quoted == sourceValue then documentExpr else quoted }
       let programName := base ++ `program
       let programValue := quoteProgram source.prepared.compiler.program
       letI : ToExpr LoweredProgram := {
@@ -378,7 +186,9 @@ elab_rules : command
         (base ++ `layouts, mkConst ``EvalEntryMachine.Layouts, toExpr source.prepared.layouts),
         (base ++ `dummySpan, mkConst ``MIR.SpanRef, toExpr source.prepared.dummySpan),
         (base ++ `bytes, mkConst ``CompilerGlobalBytes.Prepared, toExpr source.bytes),
-        (base ++ `memoryData, mkConst ``InitialMemoryData, toExpr source.memory)]
+        (base ++ `memoryData, mkConst ``InitialMemoryData, toExpr source.memory),
+        (base ++ `layoutResults, toTypeExpr (Array (Except RuntimeMetadataError (TyAndLayout TypeId))), toExpr source.layoutResults),
+        (base ++ `abiResults, toTypeExpr (Array (Except String (FnAbi TypeId))), toExpr source.abiResults)]
       for (name, type, value) in products do
         emitData name type value
       addData (base ++ `initialMemory)

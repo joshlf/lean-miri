@@ -22,42 +22,26 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 
 noncomputable def functionLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 206).toOption.getD RootCompilerFacts.boolLayout
+  ((PreparedReflection.actual.layoutResults[101]'(by decide +kernel))).toOption.getD RootCompilerFacts.boolLayout
 
-theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 206 = .ok functionLayout := by
-  decide +kernel
+theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 101 = .ok functionLayout := by decide +kernel
 
-theorem functionLayout_shape : functionLayout.ty = 206 ∧ functionLayout.layout.isSized = true ∧
+theorem functionLayout_shape : functionLayout.ty = 101 ∧ functionLayout.layout.isSized = true ∧
     functionLayout.layout.isZst = true := by
   decide +kernel
 
-theorem function_kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 206 =
-    .ok (.FnDef 13 #[]) := by
+theorem function_kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 101 =
+    .ok (.FnDef (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId #[]) := by
   with_unfolding_all rfl
 
-noncomputable def rustExternAbiJson : Lean.Json := Lean.Json.mkObj
-  [("source_spelling", Lean.Json.str "Rust"), ("kind", Lean.Json.str "rust"),
-   ("status", Lean.Json.str "supported"), ("unwind", Lean.Json.null)]
+def rustExternAbi : ABI.ExternAbi := .Rust
 
 theorem function_signature_query : CompilerFunctionFacts.signature
-    PreparedReflection.actual.compiler.functions 206 = .ok (0, rustExternAbiJson) := by
+    PreparedReflection.actual.compiler.functions 101 = .ok (0, rustExternAbi) := by
   with_unfolding_all rfl
 
-theorem decode_rust_extern_abi (cmp : ProjectionMetadataFacts.NullComparator) :
-    CompilerExternAbi.decode rustExternAbiJson = .ok .Rust := by
-  have status : rustExternAbiJson.getObjVal? "status" = .ok (.str "supported") := by
-    with_unfolding_all rfl
-  have unwind : rustExternAbiJson.getObjVal? "unwind" = .ok .null := by
-    with_unfolding_all rfl
-  have kind : rustExternAbiJson.getObjVal? "kind" = .ok (.str "rust") := by
-    with_unfolding_all rfl
-  unfold CompilerExternAbi.decode
-  change (Lean.Json.null == Lean.Json.null) = true at cmp
-  simp [status, unwind, kind, cmp, bind, Except.bind, pure, Except.pure, Lean.Json.getStr?]
-
 theorem language_function_type_id :
-    (GuardCompilerFacts.languageCall.source.getObjVal? "function_type").bind
-      (fun fnType => (fnType.getObjVal? "type_id").bind Lean.Json.getNat?) = .ok 206 := by
+    GuardCompilerFacts.languageCall.source.functionType = some 101 := by
   with_unfolding_all rfl
 
 theorem function_abi : CompilerInstanceAbi.abiOfInstance
@@ -70,8 +54,9 @@ theorem function_body : CallResolution.loadedBodyOfInstance
       .ok CopyPreconditions.Bodies.checkLanguage.loaded := by
   exact GuardCompilerFacts.language_body_eq
 
-theorem function_kind_matches_call : GuardCompilerFacts.languageCall.callee = ⟨.Item 13, #[]⟩ := by
-  exact GuardCompilerFacts.language_callee
+theorem function_kind_matches_call : (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind =
+    .Item (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId := by
+  with_unfolding_all rfl
 
 theorem copy_wrapper_bundle_body :
     (PreparedReflection.actual.compiler.program.bundle.bodies[
@@ -87,7 +72,7 @@ theorem resolve_current
     (identity : frame.bodyIdentity = CopyPreconditions.Bodies.copyWrapper.loaded.identity)
     (function : frame.functionInstance = CopyPreconditions.Bodies.copyWrapper.fnInstance)
     (location : frame.location = .mir ⟨0,2⟩) :
-    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 13 #[]
+    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId #[]
       (Storage.withCurrent framesBefore frame machine) =
       .ok GuardCompilerFacts.languageCall.callee (Storage.withCurrent framesBefore frame machine) := by
   unfold CompilerProviders.resolveCurrent
@@ -113,4 +98,3 @@ run_cmd do
         throwError "unapproved dependency {dependency} in {declaration}"
 
 #print axioms DuplicatePrefix.LanguageZeroFunctionFacts.resolve_current
-#print axioms DuplicatePrefix.LanguageZeroFunctionFacts.decode_rust_extern_abi

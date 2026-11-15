@@ -118,6 +118,9 @@ theorem concrete (limits : ExecutionMachine.Limits)
     (tagged : entry.allocation.extra.indexOfTag parentTag=some parent)
     (present : entry.allocation.extra.nodeAt parent=some parentNode) :
     Nonempty (Packet limits R (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset)))) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let input:=ConcreteEmptyRuntimeEntry.form entry.allocation.extra tracker.global.protectedTags parentTag tracker.global.nextPointerTag
     R.runtime.formed parent parentNode tagged present (ConcreteEmptyRuntimeEntry.counter_fresh _ _ R.runtime.below) R.room
   let next:=(registered tracker.global {} id R.fresh).1
@@ -150,6 +153,9 @@ theorem wildcard (limits : ExecutionMachine.Limits)
     (geometry : WildcardGeneralHitReborrow.Geometry before.user.addresses.intToPtrMap (base+offset) base id entry.allocation.byteSize)
     (exposed : before.user.addresses.exposed.contains id=true) :
     Nonempty (Packet limits R (Pointer.new .wildcard (Size.ofBytes (base+offset)))) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let slot : WildcardHitPoolRoot.Slot entry.allocation.extra:=WildcardHitPoolRoot.factory entry.allocation.extra
     R.runtime.formed.allocator.pool R.runtime.formed.allocator.accounting (by
       have balance:=R.runtime.formed.allocator.accounting

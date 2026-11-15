@@ -12,7 +12,7 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
 def spanFrame (frame : CompilerFrameContext.ActualFrame) :=
-  {frame with location := .unwinding ⟨613⟩}
+  {frame with location := .unwinding ⟨72⟩}
 def cacheFrame (frame : CompilerFrameContext.ActualFrame) (valid : (1 : MIR.LocalId) < frame.locals.size) :=
   LocalOperands.cachedLayoutFrame (spanFrame frame) 1 ActualReferenceMetadata.reference valid
 
@@ -82,10 +82,13 @@ theorem install
           (RetagReferencePlace.sliceValue cfg.access.runtime.base
             (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes (base+offset))) len ActualReferenceMetadata.reference).imm
           borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
   have query := AsMutLocalStages.span1 options limits (remaining+1) span frames frame machine body identity callee
-  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨613⟩
-  change AsMutCallCore.spanAt h ⟨613⟩ (Storage.withCurrent frames frame machine) = _ at setspan
+  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨72⟩
+  change AsMutCallCore.spanAt h ⟨72⟩ (Storage.withCurrent frames frame machine) = _ at setspan
   have layout := AsMutLocalStages.layout1 options limits (remaining+1) span frames (spanFrame frame) machine
     body identity callee valid uncached
   have cachedValid : (1 : MIR.LocalId) < (cacheFrame frame valid).locals.size := by

@@ -37,7 +37,7 @@ theorem positive_source_after_real_protect
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       ∃ (destination : DuplicatePrefixReturnPlaceInput.Input current place)
         (secondFresh : destination.tracker.global.nextPointerTag.value < 18446744073709551615)
@@ -92,7 +92,7 @@ theorem positive_source_after_real_protect
             (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag)
               (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
           ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame) with
-          location := .unwinding ⟨601⟩}
+          location := .unwinding ⟨2⟩}
       (({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag)
       secondFresh tree updated reference.id sourceEntry separate sourceLive runtime
       (some child) (some raw.selected) raw.maximum reference.offset len positive

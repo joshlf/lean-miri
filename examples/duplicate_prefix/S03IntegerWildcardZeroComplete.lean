@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroFrame
 import duplicate_prefix.S03IntegerWildcardInit
 import duplicate_prefix.S03ReturnWildcardMetadata
@@ -34,7 +35,7 @@ theorem complete
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     DuplicatePrefixArgumentCallResult.Result options limits remaining span before (.integer address) 0 0 place := by
@@ -52,7 +53,7 @@ theorem complete
   let currentInput := S03IntegerZeroState.input input first
   let args := EmptyRootArguments.result (RawRootInvocation.root before place model.noDataRace) address 0
   let destination := S03ReturnWildcardMetadata.of_protection currentInput wildcard #[]
-    {args.frame with location := .unwinding ⟨601⟩} {} second tree updated
+    {args.frame with location := .unwinding ⟨2⟩} {} second tree updated
     (S03IntegerWildcardInit.written input first second tree) treeEq byteSize bytes mutable maskValid maskLength pointerBounds capacity
   have initialPositive := input.borrow
   have binding := input.binding

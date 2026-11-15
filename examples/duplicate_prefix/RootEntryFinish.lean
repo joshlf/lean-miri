@@ -5,7 +5,7 @@ namespace DuplicatePrefix.RootEntryFinish
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter
 open CanonicalConfigFacts
 noncomputable def finish (h : RootCallCore.RootHooks) : MachineHooks.M MiriMemoryKind Machine.RootUser Unit := do
-  RootCallCore.spanAt h ⟨559⟩
+  RootCallCore.spanAt h ⟨0⟩
   RootCallCore.require (2 == RootCompilerFacts.rootAbi.args.size) "mismatch between callee ABI and callee body arguments"
   if 2 < 2 then throw (.undefinedBehavior "calling a function with more arguments than it expected")
   h.afterFrameInit ()
@@ -23,8 +23,8 @@ theorem actual_finish (options : EvalConfigurationCore.Options) (limits : Execut
     (noClocks : frame.extra.dataRace = none) :
     finish (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits)
       (Storage.withCurrent frames frame machine) =
-      .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame {frame with location := .unwinding ⟨559⟩}) machine) := by
-  let next := {frame with location := FrameLocation.unwinding ⟨559⟩}
+      .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame {frame with location := .unwinding ⟨0⟩}) machine) := by
+  let next := {frame with location := FrameLocation.unwinding ⟨0⟩}
   have getFrame := CallEntryLocals.get_frame options limits remaining span frames frame machine
   have setFrame := CallEntryLocals.set_frame options limits remaining span frames frame next machine
   have push := CallEntryFacts.actual_call_hooks_push_done options () remaining span limits frames next machine body size dead0 dead6 dead13 dead14 noClocks

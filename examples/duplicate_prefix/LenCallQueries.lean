@@ -22,42 +22,26 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 
 noncomputable def functionLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 10).toOption.getD RootCompilerFacts.boolLayout
+  ((PreparedReflection.actual.layoutResults[10]'(by decide +kernel))).toOption.getD RootCompilerFacts.boolLayout
 
-theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 10 = .ok functionLayout := by
-  decide +kernel
+theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 10 = .ok functionLayout := by decide +kernel
 
 theorem functionLayout_shape : functionLayout.ty = 10 ∧ functionLayout.layout.isSized = true ∧
     functionLayout.layout.isZst = true := by
   decide +kernel
 
 theorem function_kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 10 =
-    .ok (.FnDef 1 LenHelper.resolved.callee.args) := by
+    .ok (.FnDef (PreparedReflection.fixedInstance LenHelper.resolved.callee).instanceKind.defId (PreparedReflection.fixedInstance LenHelper.resolved.callee).genericArgs) := by
   with_unfolding_all rfl
 
-def rustExternAbiJson : Lean.Json := Lean.Json.mkObj
-  [("source_spelling", Lean.Json.str "Rust"), ("kind", Lean.Json.str "rust"),
-   ("status", Lean.Json.str "supported"), ("unwind", Lean.Json.null)]
+def rustExternAbi : ABI.ExternAbi := .Rust
 
 theorem function_signature_query : CompilerFunctionFacts.signature
-    PreparedReflection.actual.compiler.functions 10 = .ok (1, rustExternAbiJson) := by
+    PreparedReflection.actual.compiler.functions 10 = .ok (1, rustExternAbi) := by
   with_unfolding_all rfl
 
-theorem decode_rust_extern_abi (cmp : ProjectionMetadataFacts.NullComparator) :
-    CompilerExternAbi.decode rustExternAbiJson = .ok .Rust := by
-  have status : rustExternAbiJson.getObjVal? "status" = .ok (.str "supported") := by
-    with_unfolding_all rfl
-  have unwind : rustExternAbiJson.getObjVal? "unwind" = .ok .null := by
-    with_unfolding_all rfl
-  have kind : rustExternAbiJson.getObjVal? "kind" = .ok (.str "rust") := by
-    with_unfolding_all rfl
-  unfold CompilerExternAbi.decode
-  simp [status, unwind, kind, cmp,bind,Except.bind,pure,Except.pure,Lean.Json.getStr?]
-  exact cmp
-
 theorem runtime_function_type_id :
-    (LenHelper.resolved.source.getObjVal? "function_type").bind
-      (fun fnType => (fnType.getObjVal? "type_id").bind Lean.Json.getNat?) = .ok 10 := by
+    LenHelper.resolved.source.functionType = some 10 := by
   with_unfolding_all rfl
 
 theorem function_abi : CompilerInstanceAbi.abiOfInstance
@@ -70,7 +54,8 @@ theorem function_body : CallResolution.loadedBodyOfInstance
       .ok LenHelper.body := by
   exact LenHelper.body_eq
 
-theorem function_kind_matches_call : LenHelper.resolved.callee = ⟨.Item 1, LenHelper.resolved.callee.args⟩ := by
+theorem function_kind_matches_call : (PreparedReflection.fixedInstance LenHelper.resolved.callee).instanceKind =
+    .Item (PreparedReflection.fixedInstance LenHelper.resolved.callee).instanceKind.defId := by
   with_unfolding_all rfl
 
 theorem len_bundle_body :
@@ -87,7 +72,7 @@ theorem resolve_current
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (function : frame.functionInstance = RootBody.reflected.functionInstance)
     (location : frame.location = .mir ⟨2,12⟩) :
-    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 1 LenHelper.resolved.callee.args
+    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler (PreparedReflection.fixedInstance LenHelper.resolved.callee).instanceKind.defId (PreparedReflection.fixedInstance LenHelper.resolved.callee).genericArgs
       (Storage.withCurrent framesBefore frame machine) =
       .ok LenHelper.resolved.callee (Storage.withCurrent framesBefore frame machine) := by
   unfold CompilerProviders.resolveCurrent
@@ -131,12 +116,11 @@ theorem resolve_current
         runtime_function_type_id, function_kind, EStateM.bind, EStateM.pure,
         bind,Except.bind,pure,Except.pure,ite_true,beq_self_eq_true]
       simp_all [Except.bind,Except.pure,bind,EStateM.bind,pure,EStateM.pure]
-      with_unfolding_all rfl
 
 end DuplicatePrefix.LenCallQueries
 open Lean Elab Command in
 run_cmd do
-  for name in #[``DuplicatePrefix.LenCallQueries.resolve_current, ``DuplicatePrefix.LenCallQueries.decode_rust_extern_abi, ``DuplicatePrefix.LenCallQueries.function_signature_query, ``DuplicatePrefix.LenCallQueries.function_kind] do
+  for name in #[``DuplicatePrefix.LenCallQueries.resolve_current, ``DuplicatePrefix.LenCallQueries.function_signature_query, ``DuplicatePrefix.LenCallQueries.function_kind] do
     for dependency in (← collectAxioms name) do
       unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
         throwError "unapproved metadata callee dependency {dependency}"

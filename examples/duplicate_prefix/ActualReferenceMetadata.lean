@@ -17,7 +17,7 @@ theorem pointee_ty : pointee.ty = 4 := ProjectionMetadataFacts.slice_layout_shap
 
 theorem pointee_layout : CompilerFacts.layoutOf RootMetadataQueries.context 4 = .ok pointee := by
   unfold CompilerFacts.layoutOf
-  erw [LayoutLookupProof.indexed_lookup_eq]
+  change (PreparedReflection.actual.runtime.lookup 4).mapError toString = _
   rw [ProjectionMetadataFacts.slice_layout_eq]
   rfl
 

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationRejectedResultOrder
 import duplicate_prefix.S02SameDestinationRejectedResultLookup
 import duplicate_prefix.S02SameDestinationRejectedResultActualLiteral
@@ -140,11 +141,11 @@ theorem result
   have physicalId : packet.destination.id = input.contract.destination.id :=
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination packet.destination returnTag returnConcrete).1
   have finalExtras : post.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [extras]
     have tick := S02SeparateDestinationTickLedger.preserved options remaining span machine
     change (RootZeroCompleteState.tick options remaining span machine).user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩)
+      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get ((RootZeroCompleteState.tick options remaining span machine).user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) })
     rw [tick.2.2.2.2.2.2.2,physicalId,←extraSame]
     exact initialExtras
   have frameTracked : done.extra.borrowTracker = some packet.borrowFrame := by rw [extraEntry];exact packet.frameTracked

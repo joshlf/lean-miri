@@ -9,7 +9,7 @@ set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 theorem raw_storage_trivial : CompilerStorage.veryTriviallySized
-    PreparedReflection.actual.compiler.runtime 154 = .ok true := by decide +kernel
+    PreparedReflection.actual.compiler.runtime 49 = .ok true := by decide +kernel
 theorem pass_argument
     (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
@@ -27,15 +27,15 @@ theorem pass_argument
     Call.passArgument (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining + 1) span) limits) ()
       (.Copy ⟨.immediate (PtrMetadataComplete.rawImmediate carrier (PreparedContracts.actualConfig options () remaining span).access.runtime.base len), PtrMetadataHelper.rawLayout⟩)
       (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret)
-      (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret) 0 ⟨1, #[]⟩ 154 false
+      (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret) 0 ⟨1, #[]⟩ 49 false
       (Storage.withCurrent frames frame machine) = .ok () (Storage.withCurrent frames { (liveFrame frame 1 valid) with locals := ((liveFrame frame 1 valid).locals.set 1
       {value := .live (.immediate (PtrMetadataComplete.rawImmediate carrier (PreparedContracts.actualConfig options () remaining span).access.runtime.base len)),
        layout := ((liveFrame frame 1 valid).locals[1]'(by simpa [liveFrame] using valid)).layout} (by simpa [liveFrame] using valid)) } machine) := by
   let cfg := PreparedContracts.actualConfig options () (remaining + 1) span
   let h := ExecutionMachine.callHooks cfg limits
   have fields := CanonicalConfigFacts.actual_fields options () (remaining + 1) span
-  have typed : frame.body.locals[1]? = some 154 := by rw [body]; rfl
-  have storage := CallEntryLocals.storage_live options limits (remaining + 1) span frames frame machine 1 154 valid
+  have typed : frame.body.locals[1]? = some 49 := by rw [body]; rfl
+  have storage := CallEntryLocals.storage_live options limits (remaining + 1) span frames frame machine 1 49 valid
     typed raw_storage_trivial dead noClocks
   have postValid : 1 < (liveFrame frame 1 valid).locals.size := by simp [liveFrame]; exact valid
   have postCached : ((liveFrame frame 1 valid).locals[1]'(by simpa [liveFrame] using valid)).layout = some PtrMetadataHelper.rawLayout := by
@@ -49,8 +49,8 @@ theorem pass_argument
     change cfg.calls.compiler.checkArgumentCompat () _ _ _ = _
     rw [fields.callCompiler]
     exact MetadataEntryFacts.argument_compat _ options.compatibilityBudget _
-  apply CallArgumentStages.copy_argument h () _ _ _ 0 ⟨1, #[]⟩ 154 _ _ _ _ _
-  · change (154 == (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret).layout.ty) = true
+  apply CallArgumentStages.copy_argument h () _ _ _ 0 ⟨1, #[]⟩ 49 _ _ _ _ _
+  · change (49 == (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret).layout.ty) = true
     with_unfolding_all rfl
   · change (PtrMetadataHelper.rawLayout.layout == (PtrMetadataHelper.abi.args.getD 0 PtrMetadataHelper.abi.ret).layout.layout) = true
     with_unfolding_all rfl

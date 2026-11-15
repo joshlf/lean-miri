@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteSourceWildcardInstalledBothIdentity
 import duplicate_prefix.S02ConcreteSourceWildcardZeroControl
 import duplicate_prefix.S04ZeroCountBodyActiveWildcardBounds
@@ -40,13 +41,13 @@ theorem result
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) 0).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   obtain ⟨settings⟩ := S02ConcreteSourceWildcardZeroControl.at_protection id tag address len
     input reference firstFresh destination destId secondFresh tree updated
   have trackerEq : sourcePacket.tracker = settings.tracker :=
@@ -62,7 +63,7 @@ theorem result
     exact Ne.symm different
   have extras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == returnPacket.destination.id) =
-        some (returnPacket.destination.id,⟨none,#[]⟩) := by
+        some (returnPacket.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (returnPacket.destination.id) }) := by
     rw [packetId]
     exact settings.extras
   have outside : ∀ row ∈ (#[] : Array (Size × MemoryExtras.Entry Unit)),

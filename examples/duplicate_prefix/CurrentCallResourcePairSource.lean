@@ -44,7 +44,9 @@ theorem invoke
     (returnRuntime : DuplicatePrefixBorrowContract.RuntimeFacts V.allocation.extra tracker.global)
     (sameAllocation : returnId=id → V.allocation=W.allocation)
     (sameCompletion : returnId=id → V.precise.completion=W.precise.completion)
-    (separate : returnId=id → ∀ byte,Window id offset len.toNat byte → Window returnId returnOffset 1 byte → False) :
+    (separate : returnId=id → ∀ byte,Window id offset len.toNat byte → Window returnId returnOffset 1 byte → False)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (entry : LocalAllocation Provenance BorrowTree MiriMemoryKind) (output : GeneralBorrowForestFnEntry.Output) (child : UniIndex),
     let copied := CurrentCallTypedSourceCopy.copiedFrame options remaining span frame localId valid W.pointer.value len
     let validCopied : localId<copied.locals.size := by simpa only [copied,CurrentCallTypedSourceCopy.copiedFrame,Array.size_set] using valid

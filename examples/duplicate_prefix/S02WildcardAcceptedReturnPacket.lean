@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardAcceptedSharedLedgerPhysical
 import duplicate_prefix.S02PostLenMutableInput
 import duplicate_prefix.S02WildcardRejectedSiteFrame
@@ -296,7 +297,7 @@ theorem executes
   have sourceMutable : buffer.allocation.mutability = .Mut := by
     rw [sameMutable]; exact mutable
   have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [extras]
     obtain ⟨_,_,_,_,_,_,_,tickExtras⟩ :=
       S02SeparateDestinationTickLedger.preserved options remaining span machine

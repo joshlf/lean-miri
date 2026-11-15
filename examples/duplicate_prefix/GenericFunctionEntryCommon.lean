@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GenericFunctionEntryZero
 import duplicate_prefix.GenericFunctionEntryAccepted
 import duplicate_prefix.PositiveRootCopyBounds
@@ -41,7 +42,7 @@ structure Base extends GenericFunctionEntryZero.Initial where
   bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : entry.allocation.len+64 < 18446744073709551616
   bufferMutable : entry.allocation.mutability = .Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
   lenBounded : len ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
 
 

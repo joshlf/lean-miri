@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationAcceptedGuardControl
 import duplicate_prefix.S02SameDestinationAcceptedEntryPhysical
 import duplicate_prefix.S02SameDestinationUninitInitializedActual
@@ -220,8 +221,8 @@ theorem result
   have valid0 : (0 : MIR.LocalId) < done.locals.size := by rw [ready.size];decide
   have local0 := Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans ready.output)
   have finalExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
-    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == original.destination.id) = some (original.destination.id,⟨none,#[]⟩)
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
+    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == original.destination.id) = some (original.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (original.destination.id) })
     rw [copyExtras,sourceId];exact sourceExtras
   let finalThread := Classical.choose copyThread
   have finalActive : finalMachine.threads.activeThread? = some finalThread := Classical.choose_spec copyThread

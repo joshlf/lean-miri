@@ -6,13 +6,7 @@ set_option maxHeartbeats 8000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
-noncomputable def site : CompilerConstantQueries.Site :=
-  ⟨RootBody.reflected.body.identity.index,⟨3,1⟩,#[.field "kind",.field "rvalue",.field "right",.field "constant"]⟩
-def constant : ConstOperand := ⟨⟨11⟩,none,.Val (.Scalar (.Int 0 8)) 5⟩
-
-theorem normalization : normalizationFromEvidence (LiteralConstant.evidence site)
-    RootBody.reflected.functionInstance (.Val (.Scalar (.Int 0 8)) 5) = .ok (.Val (.Scalar (.Int 0 8)) 5) := by
-  with_unfolding_all rfl
+def constant : ConstOperand := ⟨⟨12⟩,none,.Val (.Scalar (.Int 0 8)) 5⟩
 
 theorem conversion (queries : ConstantValueQueries Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind
       (ConstantMachine.Context MiriMemoryKind Machine.RootUser))
@@ -32,18 +26,17 @@ theorem operand
     (bodyIndex : frame.bodyIdentity.index = RootBody.reflected.body.identity.index)
     (location : frame.location = .mir ⟨3,1⟩)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "right") (.Constant constant) (some RootCompilerFacts.usizeLayout)
+      ()  (.Constant constant) (some RootCompilerFacts.usizeLayout)
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (.fromScalarInt (.ofUInt64 0))),RootCompilerFacts.usizeLayout⟩
       (Storage.withCurrent framesBefore frame machine) := by
-  exact LiteralConstant.operand_at options limits remaining span source debugOff site (OperandPath.rvalue "right") (by simp [site, OperandPath.rvalue])
-    (.Scalar (.Int 0 8)) 5 ⟨11⟩ (some RootCompilerFacts.usizeLayout) (.scalar (.fromScalarInt (.ofUInt64 0)))
-    RootCompilerFacts.usizeLayout normalization conversion framesBefore frame machine bodyIndex location callee
+  exact LiteralConstant.operand_at options limits remaining span debugOff
+    (.Scalar (.Int 0 8)) 5 ⟨12⟩ (some RootCompilerFacts.usizeLayout) (.scalar (.fromScalarInt (.ofUInt64 0)))
+    RootCompilerFacts.usizeLayout conversion (Storage.withCurrent framesBefore frame machine)
 
-#print axioms normalization
 #print axioms conversion
 #print axioms operand
 end DuplicatePrefix.RootDivisionCheckZero

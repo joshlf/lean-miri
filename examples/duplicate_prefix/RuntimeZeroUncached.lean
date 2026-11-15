@@ -15,8 +15,8 @@ theorem compute_local1 (frames : Array CompilerFrameContext.ActualFrame) (caller
     (callee : caller.functionInstance = CopyPreconditions.Bodies.checkLanguage.fnInstance) :
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler 1 (Storage.withCurrent frames caller machine) =
       .ok RootCompilerFacts.boolLayout (Storage.withCurrent frames caller machine) := by
-  have normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler caller 1 = .ok 0 := by
-    unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  have normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler caller 1 = .ok 0 := by
+    unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
     rw [body,identity,callee]
     with_unfolding_all rfl
   unfold CompilerFrameContext.computeLocalLayout
@@ -90,17 +90,17 @@ theorem call_uncached
   let terminator := block.terminator
   have fields := CanonicalConfigFacts.actual_fields options () (remaining + 1) span
   have termKind : terminator.kind =
-      .Call function #[] ⟨1,#[]⟩ (some 1) .Continue .Misc ⟨159⟩ := by
+      .Call function #[] ⟨1,#[]⟩ (some 1) .Continue .Misc ⟨185⟩ := by
     with_unfolding_all rfl
   have blockAt : caller.body.basicBlocks[0]? = some block := by
     rw [body]
     with_unfolding_all rfl
   have noStatement : block.statements[3]? = none := by
     with_unfolding_all rfl
-  have functionEval : h.evalOperandAt () (OperandPath.instruction "function") function state =
+  have functionEval : h.evalOperand ()  function state =
       .ok ⟨.immediate .uninit,RuntimeCallQueries.functionLayout⟩ state := by
-    change OperandMachine.evalOperandAt (ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits))
-      () (OperandPath.instruction "function") function none state = _
+    change OperandMachine.evalOperand (ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits))
+      ()  function none state = _
     rw [function]
     exact RuntimeFunctionConstant.function_operand options limits (remaining+1) span source debugOff
       frames caller machine (congrArg (·.index) identity) location callee
@@ -111,10 +111,9 @@ theorem call_uncached
     simp only [CompilerCallConstruction.compiler,CompilerExecutionCallLeaves.make]
     rw [RuntimeCallQueries.functionLayout_shape.1,RuntimeCallQueries.function_signature_query]
     simp only [bind,Except.bind,pure,Except.pure]
-    rw [RuntimeCallQueries.decode_rust_extern_abi cmp]
     with_unfolding_all rfl
   have kind : h.functionKind RuntimeCallQueries.functionLayout.ty =
-      pure (.FnDef 24 #[]) := by
+      pure (.FnDef 46 #[]) := by
     change config.calls.compiler.functionKind _ = _
     rw [fields.callCompiler]
     with_unfolding_all change (match CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions
@@ -123,12 +122,17 @@ theorem call_uncached
       | .error reason => throw (.unsupported reason) :
         MachineHooks.M MiriMemoryKind Machine.RootUser CallFunctionKind) = _
     rw [RuntimeCallQueries.functionLayout_shape.1,RuntimeCallQueries.function_kind]
-  have resolve : h.resolve () 24 #[] state = .ok GuardCompilerFacts.runtimeCall.callee state := by
-    change config.calls.compiler.resolve () 24 #[] state = _
+    with_unfolding_all rfl
+  have resolve : h.resolve () 46 #[] state = .ok GuardCompilerFacts.runtimeCall.callee state := by
+    change config.calls.compiler.resolve () 46 #[] state = _
     rw [fields.callCompiler]
     exact RuntimeCallQueries.resolve_current frames caller machine body identity callee location
-  have itemKind : GuardCompilerFacts.runtimeCall.callee.kind = .Item 24 := by
-    rw [RuntimeCallQueries.function_kind_matches_call]
+  have itemKind : h.instanceKind GuardCompilerFacts.runtimeCall.callee = pure (.Item 46) := by
+    change config.calls.compiler.instanceKind _ = _
+    rw [fields.callCompiler]
+    dsimp only [CompilerCallConstruction.compiler,CompilerExecutionCallLeaves.make]
+    unfold_internal ".CompilerExecutionCallLeaves.lift"
+    with_unfolding_all rfl
   have fnAbi : h.fnAbiOfInstance () GuardCompilerFacts.runtimeCall.callee #[] = pure GuardCompilerFacts.runtimeAbi := by
     funext st
     exact GuardCompilerFacts.actual_runtime_abi options () (remaining+1) span st
@@ -136,8 +140,8 @@ theorem call_uncached
     funext st
     exact GuardCompilerFacts.actual_runtime_caller_location options () (remaining+1) span limits st
   have calleeEval := GenericCallStages.eval_callee_zero h () function ⟨1,#[]⟩
-    ⟨.immediate .uninit,RuntimeCallQueries.functionLayout⟩ state state .Rust 24 #[]
-    GuardCompilerFacts.runtimeCall.callee 24 GuardCompilerFacts.runtimeAbi false
+    ⟨.immediate .uninit,RuntimeCallQueries.functionLayout⟩ state state .Rust 46 #[]
+    GuardCompilerFacts.runtimeCall.callee 46 GuardCompilerFacts.runtimeAbi false
     functionEval signature kind resolve itemKind fnAbi callerLocation
   have destinationEval := CallUncachedLocal.uncached options limits (remaining+1) span debugOff
     frames original machine 1 RootCompilerFacts.boolLayout originalSize originalUncached (by decide +kernel)
@@ -166,7 +170,7 @@ theorem call_uncached
     rw [fields.callCompiler]
     rfl
   have dispatchStep : Call.initFnCallStep h () request state = .ok none after := by
-    have item := CallItemDispatch.item_step h GuardCompilerFacts.runtimeCall.callee 24 GuardCompilerFacts.runtimeAbi
+    have item := CallItemDispatch.item_step h GuardCompilerFacts.runtimeCall.callee 46 GuardCompilerFacts.runtimeAbi
       #[] false (RuntimeZeroEntry.destination frames caller) (some 1) .Continue .Rust itemKind canUnwind rustCall
     rw [item]
     simp only [CallItemDispatch.itemStage, bind, EStateM.bind]
@@ -213,7 +217,7 @@ theorem call_uncached
       get,getThe,MonadStateOf.get,EStateM.get,pure,Pure.pure,EStateM.pure,Except.pure]
   have progress : frames.size + 1 ≠ frames.size := by omega
   exact GenericCallStages.call_terminator h () limits.callDispatch block.terminator function #[] ⟨1,#[]⟩
-    1 .Continue .Misc ⟨159⟩ originalState state state after original frames.size (frames.size+1)
+    1 .Continue .Misc ⟨185⟩ originalState state state after original frames.size (frames.size+1)
     (RuntimeZeroEntry.destination frames caller) call termKind getFrame oldIndex
     (by simpa [destEq] using destinationEval') calleeEval' init' newIndex progress
 

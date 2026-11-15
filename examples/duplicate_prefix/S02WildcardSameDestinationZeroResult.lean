@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationInit
 import duplicate_prefix.S02WildcardPositiveZeroFrameSettings
 import duplicate_prefix.S03ZeroCountBodyActiveSame
@@ -40,12 +41,12 @@ theorem result
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
   let args := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
     reference.id reference.tracker.global.nextPointerTag) 0).frame
-  let changed := {args with location := .unwinding ⟨601⟩}
+  let changed := {args with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra destination.tracker returnTag destination.offset 1
   let after := S04ProtectUninit.finished current place destination #[] changed owned data.nextFresh tree updated
   let installed := CallEntryFacts.doneRootFrame
-    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩}
+    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩}
   obtain ⟨frame,machine,tracker,borrowFrame,thread,fuel,actual2,body,identity,callee,location,frameSize,
     slot0,slot2,slot3,slot4,slot5,noLocalClocks,frameTracked,returnPlace,continuation,immediateLocals,varargs,
     enabled,defaultMode,active,race,backend,ghost,shallow,unchecked,noGc,fixed,extrasEq,returnExtras,debugOff,validationFuel⟩ :=
@@ -63,7 +64,7 @@ theorem result
   have physicalId : packet.destination.id = input.contract.destination.id :=
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination packet.destination returnTag returnConcrete).1
   have extras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) }) := by
     rw [physicalId];exact returnExtras
   have outside : ∀ row ∈ (#[] : Array (Size × MemoryExtras.Entry Unit)),
       row.1.bytes.toNat < packet.destination.offset.toNat ∨ packet.destination.offset.toNat+1 ≤ row.1.bytes.toNat := by simp

@@ -13,7 +13,7 @@ theorem resolve_current
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (function : frame.functionInstance = RootBody.reflected.functionInstance)
     (location : frame.location = .mir ⟨7,13⟩) :
-    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 4 HelperCompilerFacts.addCall.callee.args
+    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs
       (Storage.withCurrent framesBefore frame machine) =
       .ok HelperCompilerFacts.addCall.callee (Storage.withCurrent framesBefore frame machine) := by
   obtain ⟨input,sourceAt,sameInput⟩ := Option.map_eq_some_iff.mp PreparedContracts.fixed_root_body
@@ -28,12 +28,12 @@ theorem resolve_current
     rw [sameInput]
     exact Array.getElem?_eq_getElem blockBound
   have atEnd : (13 : Nat) = block.statements.size := by with_unfolding_all rfl
-  have id : HelperCompilerFacts.addCall.callee.defId = 4 := by with_unfolding_all rfl
+  have id : (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).instanceKind.defId = 8 := by with_unfolding_all rfl
   have kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 30 =
-      .ok (.FnDef 4 HelperCompilerFacts.addCall.callee.args) := by
+      .ok (.FnDef 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs) := by
     simpa only [id] using function_kind
   apply ResolveCurrentMetadata.resolve PreparedReflection.actual.compiler framesBefore frame machine ⟨7,13⟩
-    input RootBody.reflected.body block HelperCompilerFacts.addCall 4 HelperCompilerFacts.addCall.callee.args 30
+    input RootBody.reflected.body block HelperCompilerFacts.addCall 8 (PreparedReflection.fixedInstance HelperCompilerFacts.addCall.callee).genericArgs 30
     location sourceAtFrame
   · exact sameInput.trans body.symm
   · rw [function]

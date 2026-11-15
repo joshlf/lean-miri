@@ -43,22 +43,22 @@ theorem actual_raw_scope_identity
     (value : RvalueImmTy Provenance) (state : MachineHooks.State MiriMemoryKind Machine.RootUser) :
     (ExecutionMachine.rvalueHooks (PreparedContracts.actualConfig options () remaining span) limits).withRetagMode () .Raw
       (do
-        let changed ← (ExecutionMachine.rvalueHooks (PreparedContracts.actualConfig options () remaining span) limits).retagPtrValue () value 204
+        let changed ← (ExecutionMachine.rvalueHooks (PreparedContracts.actualConfig options () remaining span) limits).retagPtrValue () value 99
         pure (changed.getD value)) state = .ok value state := by
   let config := PreparedContracts.actualConfig options () remaining span
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
-  have shape : config.retag.typeShape 204 = pure ⟨false, false, true, false⟩ := by
+  have shape : config.retag.typeShape 99 = pure ⟨false, false, true, false⟩ := by
     rw [fields.retagTypeShape]
     funext observed
-    change (match CompilerFacts.retagTypeShape RootMetadataQueries.context 204 with
+    change (match CompilerFacts.retagTypeShape RootMetadataQueries.context 99 with
       | .ok kind => EStateM.Result.ok kind observed
       | .error reason => EStateM.Result.error (StepError.unsupported reason) observed) =
       .ok ⟨false, false, true, false⟩ observed
     rw [AsMutPtrFacts.raw_retag_shape]
   change MachineHooks.withRetagMode .Raw (do
-    let changed ← TypedRetag.machineRetagPtrValue config.retag limits.retag value 204
+    let changed ← TypedRetag.machineRetagPtrValue config.retag limits.retag value 99
     pure (changed.getD value)) state = _
-  exact raw_scope_identity config.retag limits.retag value 204 shape state
+  exact raw_scope_identity config.retag limits.retag value 99 shape state
 
 open Lean Elab Command in
 run_cmd do

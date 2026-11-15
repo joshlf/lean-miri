@@ -35,7 +35,9 @@ theorem typed_of_operation
     (output : GeneralBorrowForestFnEntry.Output)
     (actual : CandidateCurrentFnEntryRaw.operation entry.allocation.extra tracker.global borrowFrame id pointer.provenance
       (UInt64.ofNat offset) len=.ok output)
-    (readCompleted : output.access.status=.Completed) (childCompleted : output.child.outcome=.ok ()) :
+    (readCompleted : output.access.status=.Completed) (childCompleted : output.child.outcome=.ok ())
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     TypedRetag.retagPtrValue (adapted options remaining span ctx.pointers) options.limits.retag
       (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base pointer len ActualReferenceMetadata.reference)
       ActualReferenceMetadata.reference.ty .FnEntry (Storage.withCurrent frames frame before) =
@@ -111,6 +113,7 @@ theorem typed_of_operation
   let changed := changedPointer pointer id tracker.global.nextPointerTag
   let value := RetagReferencePlace.sliceValue cfg.access.runtime.base pointer len ActualReferenceMetadata.reference
   let typedOutput := RetagReferencePlace.sliceValue cfg.access.runtime.base changed len ActualReferenceMetadata.reference
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h sourcePlace.layout.ty .Mutable .FnEntry start frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ = some ChildBorrow.fnEntryPolicy := rfl

@@ -66,7 +66,7 @@ theorem installed
   let args := RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count
-  let changed := {args.frame with location := .unwinding ⟨601⟩}
+  let changed := {args.frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let sourceEntry := {reference.entry with allocation := reference.entry.allocation.setExtra output.child.tree}
   refine ⟨reference,?_⟩
@@ -77,7 +77,7 @@ theorem installed
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   let h := ExecutionMachine.callHooks (config options (remaining+1) span) limits
   have shape := S02PositiveFinishFrame.after_destination_registration root
     (RawRootInvocation.locals before place input.contract.model.noDataRace)

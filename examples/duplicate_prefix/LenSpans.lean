@@ -4,8 +4,8 @@ noncomputable section
 open Miri Miri.ABI Miri.Input Miri.Interpreter Miri.Memory
 set_option maxRecDepth 1000000
 set_option maxHeartbeats 16000000
-def span0 : Nat := 607
-def span1 : Nat := 608
+def span0 : Nat := 54
+def span1 : Nat := 55
 theorem local0_index : PreparedReflection.actual.program.bundle.spans.toList.idxOf? (LenLocals.localSpan 0) = some span0 := by
   refine SpanFacts.index_of_unique_key _ _ _ (by decide +kernel) ?_ ?_
   · with_unfolding_all rfl
@@ -18,13 +18,11 @@ theorem local1_index : PreparedReflection.actual.program.bundle.spans.toList.idx
 theorem local_span_from_metadata (compiler : CompilerProviders.Prepared)
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
     (frame : CompilerFrameContext.ActualFrame) (machine : MachineHooks.MachineState K User)
-    (supplied : MIR.Body) (localId : Nat) (source : LoweredBody) (decl : Input.LocalDecl)
-    (spanData : SourceSpanData) (index : Nat)
-    (sameBody : supplied = frame.body)
+    (supplied : MIR.Body) (localId : Nat) (source : LoweredBody) (decl : Input.SourceInfo)
+    (index : Nat) (sameBody : supplied = frame.body)
     (sourceBody : CompilerFrameContext.bodyOfFrame compiler frame = .ok source)
-    (sourceDecl : source.input.locals[localId]? = some decl)
-    (declSpan : decl.sourceInfo.span = spanData)
-    (lookupSpan : compiler.program.bundle.spans.toList.idxOf? spanData = some index) :
+    (sourceDecl : source.input.localSources[localId]? = some decl)
+    (declSpan : decl.spanId = index) (bound : index < compiler.program.bundle.spans.size) :
     CompilerFrameContext.localSpan compiler supplied localId (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨index⟩ (Storage.withCurrent framesBefore frame machine) := by
   unfold CompilerFrameContext.localSpan
@@ -36,9 +34,7 @@ theorem local_span_from_metadata (compiler : CompilerProviders.Prepared)
   unfold_frame_query_lift
   simp only [EStateM.bind, pure, EStateM.pure]
   rw [sourceDecl]
-  dsimp only
-  rw [declSpan, lookupSpan]
-  rfl
+  simp [declSpan, bound, pure, EStateM.pure]
 
 theorem local0_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -49,16 +45,16 @@ theorem local0_span
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler LenHelper.body.body 0
       (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨LenSpans.span0⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 0 < LenLocals.inputBody.input.locals.size := by decide +kernel
-  let decl := LenLocals.inputBody.input.locals[0]'valid
-  have present : LenLocals.inputBody.input.locals[0]? = some decl := by
+  have valid : 0 < LenLocals.inputBody.input.localSources.size := by decide +kernel
+  let decl := LenLocals.inputBody.input.localSources[0]'valid
+  have present : LenLocals.inputBody.input.localSources[0]? = some decl := by
     simp [decl, valid]
   have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
       (LenLocals.localSpan ⟨0, by decide⟩) = some span0 := by
     rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
     exact local0_index
-  exact local_span_from_metadata _ _ _ _ _ _ LenLocals.inputBody decl _ span0 body.symm
-    (LenLocals.body_of_frame frame body identity callee) present rfl spanQuery
+  exact local_span_from_metadata _ _ _ _ _ _ LenLocals.inputBody decl span0 body.symm
+    (LenLocals.body_of_frame frame body identity callee) present (by with_unfolding_all rfl) (by decide +kernel)
 
 theorem local1_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -69,16 +65,16 @@ theorem local1_span
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler LenHelper.body.body 1
       (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨LenSpans.span1⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 1 < LenLocals.inputBody.input.locals.size := by decide +kernel
-  let decl := LenLocals.inputBody.input.locals[1]'valid
-  have present : LenLocals.inputBody.input.locals[1]? = some decl := by
+  have valid : 1 < LenLocals.inputBody.input.localSources.size := by decide +kernel
+  let decl := LenLocals.inputBody.input.localSources[1]'valid
+  have present : LenLocals.inputBody.input.localSources[1]? = some decl := by
     simp [decl, valid]
   have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
       (LenLocals.localSpan ⟨1, by decide⟩) = some span1 := by
     rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
     exact local1_index
-  exact local_span_from_metadata _ _ _ _ _ _ LenLocals.inputBody decl _ span1 body.symm
-    (LenLocals.body_of_frame frame body identity callee) present rfl spanQuery
+  exact local_span_from_metadata _ _ _ _ _ _ LenLocals.inputBody decl span1 body.symm
+    (LenLocals.body_of_frame frame body identity callee) present (by with_unfolding_all rfl) (by decide +kernel)
 
 end
 end DuplicatePrefix.LenSpans

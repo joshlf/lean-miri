@@ -40,14 +40,26 @@ def abiQuery (callee : CallInstance) := CompilerInstanceAbi.abiOfInstance
 def bodyQuery (callee : CallInstance) := CallResolution.loadedBodyOfInstance
   PreparedReflection.actual.compiler.lifecycle.calls.calls callee
 
-theorem language_abi_supported : (abiQuery languageCall.callee).isOk = true := by decide +kernel
-theorem runtime_abi_supported : (abiQuery runtimeCall.callee).isOk = true := by decide +kernel
+theorem language_abi_supported : (abiQuery languageCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem runtime_abi_supported : (abiQuery runtimeCall.callee).isOk = true := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
 
-def languageAbi := checkedOk (abiQuery languageCall.callee) language_abi_supported
-def runtimeAbi := checkedOk (abiQuery runtimeCall.callee) runtime_abi_supported
+def languageAbi := checkedOk (PreparedReflection.actual.abiResults[7]'(by decide +kernel)) (by decide +kernel)
+def runtimeAbi := checkedOk (PreparedReflection.actual.abiResults[7]'(by decide +kernel)) (by decide +kernel)
 
-theorem language_abi_eq : abiQuery languageCall.callee = .ok languageAbi := checkedOk_eq _ _
-theorem runtime_abi_eq : abiQuery runtimeCall.callee = .ok runtimeAbi := checkedOk_eq _ _
+theorem language_abi_eq : abiQuery languageCall.callee = .ok languageAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
+theorem runtime_abi_eq : abiQuery runtimeCall.callee = .ok runtimeAbi := by
+  unfold abiQuery CompilerInstanceAbi.abiOfInstance
+  erw [Reflection.natMap_getD]
+  decide +kernel
 theorem language_body_eq : bodyQuery languageCall.callee = .ok Bodies.checkLanguage.loaded := by with_unfolding_all rfl
 theorem runtime_body_eq : bodyQuery runtimeCall.callee = .ok Bodies.languageRuntime.loaded := by with_unfolding_all rfl
 
@@ -63,7 +75,7 @@ theorem abi_return_layouts : languageAbi.ret.layout = RootCompilerFacts.boolLayo
     runtimeAbi.ret.layout = RootCompilerFacts.boolLayout := by
   constructor <;> with_unfolding_all rfl
 
-theorem call_site_abis : languageCall.abi = .ok languageAbi ∧ runtimeCall.abi = .ok runtimeAbi := by
+theorem call_site_abis : languageCall.abi = .normal 7 ∧ runtimeCall.abi = .normal 7 := by
   constructor <;> with_unfolding_all rfl
 
 theorem source_body_shapes :
@@ -96,10 +108,11 @@ theorem actual_language_abi (options : EvalConfigurationCore.Options)
     (PreparedContracts.actualConfig options choice remaining span).calls.compiler.fnAbiOfInstance
       choice languageCall.callee #[] state = .ok languageAbi state := by
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).callCompiler]
-  with_unfolding_all change (match abiQuery languageCall.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported reason) : MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi MIR.TyId)) state = _
-  rw [language_abi_eq]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  have query := language_abi_eq
+  unfold abiQuery at query
+  rw [query]
   rfl
 
 theorem actual_runtime_abi (options : EvalConfigurationCore.Options)
@@ -108,10 +121,11 @@ theorem actual_runtime_abi (options : EvalConfigurationCore.Options)
     (PreparedContracts.actualConfig options choice remaining span).calls.compiler.fnAbiOfInstance
       choice runtimeCall.callee #[] state = .ok runtimeAbi state := by
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).callCompiler]
-  with_unfolding_all change (match abiQuery runtimeCall.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported reason) : MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi MIR.TyId)) state = _
-  rw [runtime_abi_eq]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  have query := runtime_abi_eq
+  unfold abiQuery at query
+  rw [query]
   rfl
 
 theorem actual_language_load (options : EvalConfigurationCore.Options)
@@ -207,13 +221,10 @@ theorem actual_language_caller_location (options : EvalConfigurationCore.Options
   change (PreparedContracts.actualConfig options choice remaining span).virtual.compiler.requiresCallerLocation
     languageCall.callee state = _
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).virtualCompiler]
-  with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime languageCall.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-      MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-  rw [language_caller_location]
-  rfl
+  dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  with_unfolding_all rfl
 
 theorem actual_language_target_features (options : EvalConfigurationCore.Options)
     (choice : Unit) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
@@ -268,13 +279,10 @@ theorem actual_runtime_caller_location (options : EvalConfigurationCore.Options)
   change (PreparedContracts.actualConfig options choice remaining span).virtual.compiler.requiresCallerLocation
     runtimeCall.callee state = _
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).virtualCompiler]
-  with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime runtimeCall.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-      MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-  rw [runtime_caller_location]
-  rfl
+  dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  with_unfolding_all rfl
 
 theorem actual_runtime_target_features (options : EvalConfigurationCore.Options)
     (choice : Unit) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)

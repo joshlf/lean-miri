@@ -15,8 +15,8 @@ noncomputable def cachedCaller (caller : CompilerFrameContext.ActualFrame) (vali
     (callee : caller.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler 21 (Storage.withCurrent frames caller machine) =
       .ok CopyCompilerFacts.destPointerLayout (Storage.withCurrent frames caller machine) := by
-  have normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler caller 21 = .ok 8 := by
-    unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  have normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler caller 21 = .ok 8 := by
+    unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
     rw [body,identity,callee]
     with_unfolding_all rfl
   unfold CompilerFrameContext.computeLocalLayout
@@ -104,7 +104,7 @@ noncomputable def cachedCaller (caller : CompilerFrameContext.ActualFrame) (vali
     simp [after,Storage.withCurrent,Stack.frameIndex,Array.isEmpty_push,bind,EStateM.bind,
       get,getThe,MonadStateOf.get,EStateM.get,pure,Pure.pure,EStateM.pure,Except.pure]
   apply GenericCallStages.call_terminator h () limits.callDispatch AddEvaluateCall.terminator
-    HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1] ⟨21,#[]⟩ 8 .Continue .Normal ⟨34⟩
+    HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1] ⟨21,#[]⟩ 8 .Continue .Normal ⟨49⟩
     state cachedState cachedState after caller frames.size (frames.size+1) destination
     ⟨.Instance HelperCompilerFacts.addCall.callee,
       #[.Copy (AddInstall.first pointer),.Copy (AddInstall.second n)],.Rust,some HelperCompilerFacts.addAbi,true⟩

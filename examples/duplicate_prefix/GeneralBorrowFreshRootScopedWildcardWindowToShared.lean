@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawWildcardWindowReady
 import duplicate_prefix.GeneralBorrowRawWildcardWindowFunctionToShared
 import duplicate_prefix.GeneralBorrowRawWildcardFnEntryScoped
@@ -64,7 +65,7 @@ theorem enters_shared_boundary
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)

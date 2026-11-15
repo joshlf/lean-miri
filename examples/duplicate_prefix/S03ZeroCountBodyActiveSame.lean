@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03ZeroCountBodyActiveSameBounds
 import duplicate_prefix.S02HiddenLeafActiveRelease
 namespace DuplicatePrefix.S03ZeroCountBodyActiveSame
@@ -60,7 +61,7 @@ theorem complete
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩))
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (fuel : Nat) (debugOff : options.place.debugAssertions = false)

@@ -114,7 +114,7 @@ private theorem current_data {options limits remaining span before argument plac
     (count : UInt64) (value : Immediate Provenance) :
     ∃D : CurrentData (sourceMachine input) (sourceTracker input) #[]
       (atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot
-        (CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace) value {}) count) ⟨601⟩).frame {} place, D.family=input.returnFamily ∧D.offset=input.returnOffset := by
+        (CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace) value {}) count) ⟨2⟩).frame {} place, D.family=input.returnFamily ∧D.offset=input.returnOffset := by
   obtain ⟨absent,noFunction,noVaList,registry,⟨root,concrete,rootCached⟩,source,current,size,format,physical⟩:=latent
   obtain ⟨base,cached,baseRoom,address,nonnull,represented⟩:=input.returnRepresentation
   have offsetBound : input.returnOffset.toNat<input.returnCapacity.toNat := by
@@ -169,7 +169,7 @@ private theorem first_phase {options limits remaining span before argument place
     (count : UInt64) (value : Immediate Provenance)
     (D : CurrentData (sourceMachine input) (sourceTracker input) #[]
       (atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot
-        (CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace) value {}) count) ⟨601⟩).frame {} place)
+        (CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace) value {}) count) ⟨2⟩).frame {} place)
     (family : D.family=input.returnFamily) :
     ∃phase : FirstPhase input D,phase.rest=[] ∧phase.reserve=14 := by
   have current : CurrentPayload before D.family.allocation D.source := by
@@ -233,6 +233,9 @@ private theorem integer_arguments {options limits remaining span before place}
         (CurrentCallEmptyProtocolControl.sourceRoot root value {}) count).frame (sourceMachine input)) := by
   dsimp only
   let root:=CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let machine:=CurrentCallPush.preparedMachine before #[]
   let frame:=(firstLive root).frame
   let value:=(RetagReferencePlace.integerSliceValue address 0 ActualReferenceMetadata.reference).imm
@@ -289,6 +292,9 @@ private theorem miss_arguments {options limits remaining span before place}
         (CurrentCallEmptyProtocolControl.sourceRoot root value {}) count).frame (sourceMachine input)) := by
   dsimp only
   let root:=CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let machine:=CurrentCallPush.preparedMachine before #[]
   let frame:=(firstLive root).frame
   let value:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 ActualReferenceMetadata.reference).imm
@@ -398,11 +404,11 @@ private theorem integer_entry {options limits remaining span before place}
   let frame:FrameState:=({} : FrameState).addProtector R.id R.node.tag
   let core:=CurrentCallEmptyReturnCore.of_return R none .none frame rfl model O.tracked currentThread activeNow
   have finalState : O.post=Storage.withCurrent #[]
-      (registeredFrame (atSpan args ⟨601⟩).frame {} D.family.allocation (sourceTracker input).global.nextPointerTag) O.post.machine :=
+      (registeredFrame (atSpan args ⟨2⟩).frame {} D.family.allocation (sourceTracker input).global.nextPointerTag) O.post.machine :=
     state_of_stack O.post _ O.stack
   have protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-      (Storage.withCurrent #[] (atSpan args ⟨601⟩).frame (sourceMachine input))=.ok ()
-      (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨601⟩).frame {} R.id R.node.tag) O.post.machine) := by
+      (Storage.withCurrent #[] (atSpan args ⟨2⟩).frame (sourceMachine input))=.ok ()
+      (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨2⟩).frame {} R.id R.node.tag) O.post.machine) := by
     have actual:=O.actual
     rw [finalState] at actual
     rw [O.id,O.tag]
@@ -693,11 +699,11 @@ private theorem miss_entry {options limits remaining span before place}
   let frame:FrameState:=({} : FrameState).addProtector R.id R.node.tag
   let core:=CurrentCallEmptyReturnCore.of_return R none .none frame rfl model O.tracked currentThread activeNow
   have finalState : O.post=Storage.withCurrent #[]
-      (registeredFrame (atSpan args ⟨601⟩).frame {} D.family.allocation (sourceTracker input).global.nextPointerTag) O.post.machine :=
+      (registeredFrame (atSpan args ⟨2⟩).frame {} D.family.allocation (sourceTracker input).global.nextPointerTag) O.post.machine :=
     state_of_stack O.post _ O.stack
   have protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-      (Storage.withCurrent #[] (atSpan args ⟨601⟩).frame (sourceMachine input))=.ok ()
-      (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨601⟩).frame {} R.id R.node.tag) O.post.machine) := by
+      (Storage.withCurrent #[] (atSpan args ⟨2⟩).frame (sourceMachine input))=.ok ()
+      (Storage.withCurrent #[] (registeredFrame (atSpan args ⟨2⟩).frame {} R.id R.node.tag) O.post.machine) := by
     have actual:=O.actual
     rw [finalState] at actual
     rw [O.id,O.tag]

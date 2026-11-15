@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardAcceptedReturnPacketTagged
 import duplicate_prefix.S02AcceptedDestinationCapabilityAfterCopy
 import duplicate_prefix.S02SeparateDestinationRejectedPhysicalTransport
@@ -65,7 +66,7 @@ theorem result
     (S02SeparateDestinationPhysicalIdentity.original input.contract.destination packet.destination
       returnTag returnConcrete).1
   have returnExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destinationId,physicalId,copyExtras,postExtras]
     obtain ⟨_,_,_,_,_,_,_,tickExtras⟩ :=
       S02SeparateDestinationTickLedger.preserved options remaining span machine

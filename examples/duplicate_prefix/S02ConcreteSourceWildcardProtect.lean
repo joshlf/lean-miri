@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SeparateDestinationAuthorization
 import duplicate_prefix.S02SeparateDestinationReady
 import duplicate_prefix.S03ReturnWildcardProtectionRaw
@@ -35,7 +36,7 @@ theorem after_argument
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       (ExecutionMachine.callHooks (config options (remaining+1) span) limits).withRetagMode () .FnEntry
         (RootCallCore.argumentBody (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
           (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base
@@ -58,7 +59,7 @@ theorem after_argument
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have frameBorrow : changed.extra.borrowTracker = some owned := by
     simp only [changed,frame,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,
@@ -69,7 +70,7 @@ theorem after_argument
     S02SeparateDestinationReady.local_facts_after_argument input reference fresh destination destEntry
   have model := S02SeparateDestinationReady.model_after_argument input reference fresh
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destId]
     change machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _

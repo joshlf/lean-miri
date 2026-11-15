@@ -37,7 +37,7 @@ theorem adjust_exists {Os R P H D O Aff B Host C : Type}
       GlobalDataOnlyConversion.Facts source converted ∧
       GlobalAllocationMachine.adjust compiler.runtime.target.base extra (leaves compiler image sourceLeaves address pointer) id source before =
         .ok (.owned (converted.mapExtra (fun _ => BorrowTree.new root source.byteSize)))
-          (MemoryExtras.putAllocation extra before id ⟨none,#[]⟩) := by
+          (MemoryExtras.putAllocation extra before id { weakMemory := none }) := by
   obtain ⟨converted,conversion,facts⟩ := GlobalDataOnlyConversion.adjust_exists source compiler.runtime.target.base pointer before empty
   refine ⟨converted,facts,?_⟩
   have inspect : source.inspectWithUninitAndPtrOutsideInterpreter 0 source.len =

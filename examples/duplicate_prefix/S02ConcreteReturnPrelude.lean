@@ -42,7 +42,7 @@ theorem executes
         reference.id reference.entry tag reference.offset len
       before_protect (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
         (Storage.withCurrent #[] args.frame afterMachine) =
-        .ok () (Storage.withCurrent #[] {args.frame with location := .unwinding ⟨601⟩} afterMachine) := by
+        .ok () (Storage.withCurrent #[] {args.frame with location := .unwinding ⟨2⟩} afterMachine) := by
   obtain ⟨reference,fresh,_arguments⟩ := S02ConcreteArgumentScope.argument_body
     id tag address len count input nonempty
   let root := RawRootInvocation.root before place input.contract.model.noDataRace
@@ -55,7 +55,7 @@ theorem executes
       reference.id reference.tracker.global.nextPointerTag) count
   let afterMachine := GeneralBorrowRawFnEntryScope.resultMachine machine reference.tracker fresh
     reference.id reference.entry tag reference.offset len
-  let changed := {args.frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {args.frame with location := FrameLocation.unwinding ⟨2⟩}
   let h := ExecutionMachine.callHooks (config options (remaining+1) span) limits
   have localSpan := CallEntryLocals.root_span0 options limits (remaining+1) span #[] args.frame
     afterMachine args.body args.identity args.callee

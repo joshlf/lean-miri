@@ -1,3 +1,5 @@
+import duplicate_prefix.ReturnMemoryWrite
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnSameSourceActivity
 import duplicate_prefix.S03ReturnWildcardProtectionRawOtherTags
 namespace DuplicatePrefix.S02WildcardReturnSameSourceActivityPacket
@@ -24,7 +26,7 @@ theorem invoke
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (sync : Array (Size × MemoryExtras.Entry Unit))
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) = some (input.id,⟨none,sync⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) = some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outsideSync : ∀ row ∈ sync, row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat)
     (query selected : UniIndex) (maximum : Option BorTag) (lower width : UInt64)
     (outside : input.offset.toNat+1 ≤ lower.toNat ∨ (lower+width).toNat ≤ input.offset.toNat)
@@ -92,15 +94,14 @@ theorem invoke
   let after := S04ProtectUninit.finished before place input frames frame borrowFrame fresh tree updated
   have configuredWrite : (config options remaining span).retag.writeUninit
       (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag) current = .ok () after := by
-    rw [ctx.construction]
-    change (do
-      let access ← ValidityMachine.scopedAccess (config options remaining span).access
-      PlaceMachine.writeMemory access (fun _ => false) .uninit
-        (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag)) current = .ok () after
-    have notGhost : (config options remaining span).access.ghostMode = false := by
-      rw [(DuplicatePrefixPhysicalContexts.canonical options remaining span).accessEq];rfl
-    have scope := S04ProtectUninitWrite.scopedAccess_of_not_ghost (config options remaining span).access current notGhost model.ghostOff
-    simp only [bind,EStateM.bind,scope]
+    have fields := CanonicalConfigFacts.actual_fields options () remaining span
+    obtain ⟨context,accessEq,_,_⟩ := fields.canonicalCopy
+    have sized : (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag).layout.layout.backendRepr.isUnsized = false := by
+      change place.layout.layout.backendRepr.isUnsized = false
+      rw [input.layout]
+      decide +kernel
+    rw [ReturnMemoryWrite.actual_uninit_eq options remaining span ctx context accessEq _ current model.ghostOff sized]
+    rw [←accessEq]
     exact write
   have sourceFacts := S02WildcardReturnSameSource.positive input.entry.allocation.extra input.tracker.global borrowFrame input.id runtime
     input.offset destination distinct headroom fresh (some query) (some selected) maximum lower width outside old

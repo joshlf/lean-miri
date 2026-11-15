@@ -53,7 +53,9 @@ theorem retag (options : EvalConfigurationCore.Options) (remaining : Nat)
     (noFree : entry.allocation.extra.tagMapping.deassigned.back? = none)
     (fits : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     (config options remaining span).validity.retagPointer ()
       (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new .wildcard (Size.ofBytes base)) 0 reference) reference.ty
@@ -61,6 +63,7 @@ theorem retag (options : EvalConfigurationCore.Options) (remaining : Nat)
       .ok (some (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new (.concrete id global.nextPointerTag) (Size.ofBytes base)) 0 reference))
         (resultState frames frame machine borrowFrame global fresh id entry) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let adaptedRetag := adapted options remaining span ctx.pointers
   let place := RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes base)) 0 pointee
@@ -121,7 +124,9 @@ theorem validate (options : EvalConfigurationCore.Options) (remaining : Nat)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata =
       PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any
-      (·.value.ty == 4) = false) :
+      (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}
     let afterFrame := TypedBorrowSteps.registeredFrame frame borrowFrame id global.nextPointerTag
     let afterMachine := (resultState frames frame activeMachine borrowFrame global fresh id entry).machine
@@ -212,7 +217,9 @@ theorem validate_runtime (options : EvalConfigurationCore.Options) (remaining : 
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata =
       PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any
-      (·.value.ty == 4) = false) :
+      (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}
     let afterFrame := TypedBorrowSteps.registeredFrame frame borrowFrame id global.nextPointerTag
     let afterMachine := (resultState frames frame activeMachine borrowFrame global fresh id entry).machine

@@ -60,7 +60,9 @@ theorem in_view (options : EvalConfigurationCore.Options) (limits : ExecutionMac
     (input : CurrentCallAdmission.Proposed options limits remaining span before tracker argument len place call data)
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
-    (positive : 0 < len.toNat) (mode : RetagPolicy.RetagMode) (ghost : Bool) :
+    (positive : 0 < len.toNat) (mode : RetagPolicy.RetagMode) (ghost : Bool)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     Nonempty (ViewedOutcome options remaining span ctx before tracker frames frame borrowFrame argument len place call data mode ghost) := by
   obtain ⟨old⟩ := CurrentCallTypedFnEntry.with_context options limits remaining span ctx before tracker argument len place call data input
     frames frame borrowFrame frameBorrow positive
@@ -149,6 +151,7 @@ theorem in_view (options : EvalConfigurationCore.Options) (limits : ExecutionMac
   let changed := changedPointer raw.sourcePointer.value call.sourceId tracker.global.nextPointerTag
   let value := RetagReferencePlace.sliceValue cfg.access.runtime.base raw.sourcePointer.value len ActualReferenceMetadata.reference
   let output := RetagReferencePlace.sliceValue cfg.access.runtime.base changed len ActualReferenceMetadata.reference
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h sourcePlace.layout.ty .Mutable .FnEntry start frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ = some ChildBorrow.fnEntryPolicy := rfl
@@ -236,7 +239,9 @@ theorem validate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
     (positive : 0 < len.toNat) (localId : MIR.LocalId) (valid : localId < frame.locals.size)
     (live : frame.locals[localId].value = .live (.immediate
       (DuplicatePrefixSliceArgument.rawValue (config options remaining span).access.runtime.base argument len ActualReferenceMetadata.reference).imm))
-    (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference) :
+    (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ outcome : ViewedOutcome options remaining span ctx before tracker frames frame borrowFrame argument len place call data .FnEntry true,
       ValidityMachine.validateRuntime (config options remaining span).validity () options.limits.validation
         (LocalPlaces.localRuntimePlace frames.size frame localId ActualReferenceMetadata.reference) true
@@ -374,7 +379,9 @@ theorem copy_argument (options : EvalConfigurationCore.Options) (limits : Execut
     (positive : 0 < len.toNat) (localId : MIR.LocalId) (valid : localId < frame.locals.size)
     (old : Immediate Provenance) (live : frame.locals[localId].value = .live (.immediate old))
     (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference)
-    (noClocks : frame.extra.dataRace = none) :
+    (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ outcome : ViewedOutcome options remaining span ctx before tracker frames
         (copiedFrame options remaining span frame localId valid argument len) borrowFrame argument len place call data .FnEntry true,
       ∃ validCopied : localId < (copiedFrame options remaining span frame localId valid argument len).locals.size,
@@ -414,7 +421,9 @@ theorem scoped_copy_argument (options : EvalConfigurationCore.Options) (limits :
     (positive : 0 < len.toNat) (localId : MIR.LocalId) (valid : localId < frame.locals.size)
     (old : Immediate Provenance) (live : frame.locals[localId].value = .live (.immediate old))
     (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference)
-    (noClocks : frame.extra.dataRace = none) :
+    (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ outcome : ViewedOutcome options remaining span ctx before tracker frames
         (copiedFrame options remaining span frame localId valid argument len) borrowFrame argument len place call data .FnEntry true,
       ∃ validCopied : localId < (copiedFrame options remaining span frame localId valid argument len).locals.size,
@@ -444,7 +453,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     (positive : 0 < len.toNat) (localId : MIR.LocalId) (valid : localId < frame.locals.size)
     (old : Immediate Provenance) (live : frame.locals[localId].value = .live (.immediate old))
     (cached : frame.locals[localId].layout = some ActualReferenceMetadata.reference)
-    (noClocks : frame.extra.dataRace = none) :
+    (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ ctx : Context options remaining span,
     ∃ outcome : ViewedOutcome options remaining span ctx before tracker frames
         (copiedFrame options remaining span frame localId valid argument len) borrowFrame argument len place call data .FnEntry true,

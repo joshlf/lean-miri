@@ -34,7 +34,7 @@ theorem span0 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = PtrMetadataHelper.resolved.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       PtrMetadataHelper.body.body 0 (Storage.withCurrent frames frame machine) =
-      .ok ⟨634⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨125⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact MetadataSpans.local0_span frames frame machine body identity callee
@@ -50,7 +50,7 @@ theorem span1 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = PtrMetadataHelper.resolved.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       PtrMetadataHelper.body.body 1 (Storage.withCurrent frames frame machine) =
-      .ok ⟨635⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨126⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact MetadataSpans.local1_span frames frame machine body identity callee

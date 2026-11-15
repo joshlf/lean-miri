@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationRejectedProtect
 import duplicate_prefix.S02WildcardSameDestinationInit
 import duplicate_prefix.S02WildcardSharedTagMarginPlusOne
@@ -64,7 +65,7 @@ theorem enters
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
   let args := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
     reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {args with location := .unwinding ⟨601⟩}
+  let changed := {args with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have frameBorrow : changed.extra.borrowTracker = some owned := by
     simp only [changed,args,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,RootFrameData.cache,
@@ -72,7 +73,7 @@ theorem enters
       TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,owned]
   have model := S02WildcardSeparateDestinationReady.model_after_argument input reference output fresh
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,#[]⟩) := by
+      some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find? _ = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,data.sameId,same]
     exact input.return_extras
@@ -88,7 +89,7 @@ theorem enters
   let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra destination.tracker returnTag destination.offset 1
   let after := S04ProtectUninit.finished current place destination #[] changed owned data.nextFresh tree updated
   let installed := CallEntryFacts.doneRootFrame
-    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩}
+    {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩}
   have actual := S02WildcardFinishFromProtect.init address len count input nonempty reference output fresh argument
     destination data.nextFresh tree updated protect
   have destOriginal : destination.entry = {reference.entry with allocation := reference.entry.allocation.setExtra output.child.tree} := by

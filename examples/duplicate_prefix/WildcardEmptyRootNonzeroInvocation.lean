@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootZeroInvocationState
 import duplicate_prefix.WildcardEmptyRootInvocationEntry
 import duplicate_prefix.WildcardEmptyRootSafetyToLen
@@ -38,7 +39,7 @@ theorem invoke
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : before.user.payload.ghost = false)
     (target : TargetDataLayout)
     (targetEq : target = (ActualReferenceContext.config options remaining span).access.runtime.base)
@@ -325,7 +326,7 @@ theorem invoke
     (by rw [end0]) (by rw [end0]) rfl layout outerWidth (by decide) (by decide)
     (by rw [addrState];exact cached) initialPresent protectedSize protectedMutable maskValid (by rw [outerRuntime];rfl)
     (by rw [protectedLen,protectedSize];rfl) (by rw [protectedMask,protectedSize];rfl) protectedProv stateRace backendState stateBorrow
-    (by change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
     rootFree childFree protectedTree pointer aligned (by rw [outerRuntime];rfl) outerAccess ghostState shallowState
     (by change caller.returnPlace.toRuntimePlace=_;rw [crp,frameReturn];rfl) (Size.ofBytes (base+1)) endpoint
   have fullTrace := SuccessfulTrace.append prefixTrace (SuccessfulTrace.append lenTrace tailTrace)

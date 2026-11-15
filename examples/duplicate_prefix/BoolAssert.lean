@@ -26,9 +26,9 @@ theorem dispatch [DecidableEq K]
     (kind : terminator.kind = .Assert condition expected message target unwind)
     (read : (do
       PlaceMachine.readImmediate (ExecutionMachine.withValidation config limits).access
-        (← OperandMachine.evalOperandAt
+        (← OperandMachine.evalOperand
           (ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits)) choice
-          (OperandPath.instruction "condition") condition none)) before =
+           condition none)) before =
       .ok (ScalarOperations.boolImmediate expected layout) evaluated) :
     (ExecutionMachine.stepHooks config limits).terminator choice terminator before =
       ControlFlow.goToBlock target evaluated := by

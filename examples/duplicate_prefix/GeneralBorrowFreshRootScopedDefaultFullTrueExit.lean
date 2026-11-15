@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowFreshRootScopedMutableParentRestore
 import duplicate_prefix.GeneralBorrowFreshRootScopedDefaultExitLedger
 import duplicate_prefix.GeneralBorrowFreshRootScopedMutableRootMetadata
@@ -99,7 +100,7 @@ theorem invoke
     (provenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len)
     (storageFits : entry.allocation.len+64 < 18446744073709551616)
     (mutable : entry.allocation.mutability = .Mut)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (bounded : count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes)
     (ret : GeneralBorrowFreshRootScopedTrueReturnData.Data options remaining span caller machine tracker id entry parentTag raw.parent) :
     let cfg := PreparedContracts.actualConfig options () (remaining+1) span
@@ -141,7 +142,7 @@ theorem invoke
   have packetProvenance : ProvenanceCopy.WellFormed packet.entry.allocation.provenanceMap packet.entry.allocation.len := by rw [metadataLedger.entry];exact provenance
   have packetFits : packet.entry.allocation.len+64 < 18446744073709551616 := by rw [metadataLedger.entry];exact storageFits
   have packetMutable : packet.entry.allocation.mutability = .Mut := by rw [metadataLedger.entry];exact mutable
-  have packetExtras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,⟨none,#[]⟩) := by
+  have packetExtras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (packet.machine.user.payload.payload.user.runtime.extras.allocations) (packet.id) }) := by
     rw [metadataLedger.extras,metadataLedger.idEq];exact extras
   have packetBounded : packet.count ≤ (PreparedContracts.actualConfig packet.options () (packet.remaining+1) packet.span).projection.maxSizeOfVal.bytes := by
     rw [metadataLedger.countEq,configuration.optionsEq,configuration.remainingEq,configuration.spanEq];exact bounded
@@ -294,7 +295,7 @@ theorem invoke
     slotSize := ret.slotSize,slotStorage := ret.slotStorage,slotMask := ret.slotMask,slotProvenance := ret.slotProvenance,slotMutable := ret.slotMutable,
     place := ret.place,layout := ret.layout,slotBase := ret.slotBase,slotPointer := ret.slotPointer,aligned := ret.aligned,fits := ret.fits,
     cached := by rw [readyFields.2.2.1,addresses,outcome.addresses,packetAddresses];exact ret.cached,
-    extras := by change readyMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [readyFields.2.2.2.1,extrasAfter,outcome.extras,metadataLedger.extras];exact ret.extras,
+    extras := by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change readyMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [readyFields.2.2.2.1,extrasAfter,outcome.extras,metadataLedger.extras];exact ret.extras,
     destination := by rw [frameReady.destination];exact ret.destination }
   obtain ⟨returned⟩ := GeneralBorrowFreshRootScopedRootCurrentBoolReturn.complete current
   have physicalResult := returned.returned

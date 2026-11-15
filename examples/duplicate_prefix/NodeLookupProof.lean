@@ -30,42 +30,13 @@ theorem list_lookup {Value : Type} (key : Value → TypeId)
       have different : (key node == id) = false := by simpa using same
       rw [different]
 
-open Lean Elab Tactic in
-elab "unfold_node_table" : tactic => do
-  let env ← getEnv
-  let found := env.constants.toList.filterMap fun (name, _) =>
-    if name.toString.endsWith (".canonicalNodeLookup" : String) then some (mkIdent name) else none
-  match found with
-  | [name] => evalTactic (← `(tactic| unfold $name:ident))
-  | _ => throwError "expected exact canonicalNodeLookup source"
-
-theorem node_table_lookup (nodes : Array TypeNode) (id : TypeId) :
-    (RuntimeNodeLookupCache.build nodes).entries[id]? = nodes.find? (·.id == id) := by
-  unfold RuntimeNodeLookupCache.build
-  unfold_node_table
-  simp only [← Array.forIn_toList]
-  have callback :
-      (fun (node : TypeNode) (entries : Std.HashMap TypeId TypeNode) =>
-        if !(entries.contains node.id) then
-          (pure (ForInStep.yield (entries.insert node.id node)) : Id _)
-        else pure (ForInStep.yield entries)) =
-      (fun node entries => pure (ForInStep.yield (firstInsert (·.id) entries node))) := by
-    funext node entries
-    cases flag : entries.contains node.id <;> simp [flag, firstInsert]
-  rw [callback]
-  simpa [Id.run, bind, pure] using (list_lookup (·.id) nodes.toList {} id)
-
-
-
-theorem indexed_node (metadata : RuntimeMetadata) (id : TypeId)
-    (certificate : Option (RuntimeMetadata.JsonReflexivity metadata.source.raw)) :
-    (RuntimeMetadata.Indexed.ofMetadata metadata certificate).node id = metadata.node id := by
-  cases cached : metadata.nodeCache <;>
-    simp [RuntimeMetadata.Indexed.ofMetadata, RuntimeMetadata.Indexed.node,
-      RuntimeMetadata.node, cached, node_table_lookup]
+/-- The current reader checks both the canonical table index and row identity. -/
+theorem indexed_node (metadata : RuntimeMetadata) (id : TypeId) (node : TypeNode)
+    (found : metadata.source.types[id]? = some node) (identity : node.id = id) :
+    metadata.node id = .ok node := by
+  simp [RuntimeMetadata.node, RuntimeMetadata.require, found, identity]
+  rfl
 
 #print axioms list_lookup
-#print axioms node_table_lookup
 #print axioms indexed_node
-
 end DuplicatePrefix.NodeLookupProof

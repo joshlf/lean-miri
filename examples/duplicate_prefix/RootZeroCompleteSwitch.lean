@@ -108,19 +108,19 @@ theorem switch_exact
   have typeCheck := RootLocalStages.operand_check_skipped options limits () (remaining+1) span
     debugOff (OperandDispatch.wholeLocal 4) op accounted
   have operand := OperandDispatch.evalOperandAt_move_wholeLocal hooks ()
-    (OperandPath.instruction "discriminant") 4 none accounted accounted op localRead typeCheck
-  have operand' : OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant")
+     4 none accounted accounted op localRead typeCheck
+  have operand' : OperandMachine.evalOperand hooks ()
       (.Move ⟨4,#[]⟩) none accounted = .ok op accounted := by
     simpa only [OperandDispatch.wholeLocal] using operand
   have scalarRead := RootLocalStages.canonical_read_scalar options limits (remaining+1) span
     accounted scalar RootCompilerFacts.boolLayout ⟨primitive, range, readable⟩
   have read : MachineHooks.run (do
       PlaceMachine.readImmediate (ExecutionMachine.withValidation config limits).access
-        (← OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant")
+        (← OperandMachine.evalOperand hooks ()
           (.Move ⟨4,#[]⟩) none)) accounted =
       (accounted,.ok (ScalarOperations.boolImmediate (n == 0) RootCompilerFacts.boolLayout)) := by
     change MachineHooks.run (do
-      let value ← OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant")
+      let value ← OperandMachine.evalOperand hooks ()
         (.Move ⟨4,#[]⟩) none
       (ExecutionMachine.rvalueHooks config limits).readImmediate () value) accounted = _
     simp only [MachineHooks.run, Call.run, Bind.bind, EStateM.bind]

@@ -307,7 +307,9 @@ theorem invoke_with_binding (options : EvalConfigurationCore.Options) (limits : 
     {data sourceOwner boolOwner boolId boolOffset}
     (license : CurrentCallLazyCurrentDescriptor.License data id offset len sourceOwner boolOwner boolId boolOffset)
     (B : UniformWindow before tracker data boolOwner boolId boolOffset 1 .ret)
-    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global) :
+    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (converted : Allocation Provenance Unit) (stage : Stage tracker.global borrowFrame id root source.byteSize.bytes offset len room),
       GlobalAllocationAttributes.Attributes source converted ∧
     let copied:=CurrentCallTypedSourceCopy.copiedFrame options remaining span frame localId valid pointer len
@@ -378,7 +380,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     {data sourceOwner boolOwner boolId boolOffset}
     (license : CurrentCallLazyCurrentDescriptor.License data id offset len sourceOwner boolOwner boolId boolOffset)
     (B : UniformWindow before tracker data boolOwner boolId boolOffset 1 .ret)
-    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global) :
+    (boolRuntime : DuplicatePrefixBorrowContract.RuntimeFacts B.allocation.extra tracker.global)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (converted : Allocation Provenance Unit) (stage : Stage tracker.global borrowFrame id root source.byteSize.bytes offset len room),
       GlobalAllocationAttributes.Attributes source converted ∧
     let copied:=CurrentCallTypedSourceCopy.copiedFrame options remaining span frame localId valid pointer len

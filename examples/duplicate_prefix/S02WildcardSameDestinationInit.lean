@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationInitAfterArgument
 import duplicate_prefix.S02WildcardSameDestinationCoreProtect
 import duplicate_prefix.S02WildcardFinishFromProtect
@@ -30,7 +31,7 @@ theorem enters
         (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
       let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits).withRetagMode () .FnEntry
         (RootCallCore.argumentBody (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits)
@@ -44,7 +45,7 @@ theorem enters
           let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra destination.tracker returnTag destination.offset 1
           let after := S04ProtectUninit.finished current place destination #[] changed owned data.nextFresh tree updated
           let installed := CallEntryFacts.doneRootFrame
-            {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩}
+            {TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩}
           TypedRetag.protectInPlaceFunctionArgument (config options (remaining+1) span).retag limits.retag place
             (Storage.withCurrent #[] changed current) = .ok () after ∧
           Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
@@ -65,7 +66,7 @@ theorem enters
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
   let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
     reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let destination := data.destination
   have frameBorrow : changed.extra.borrowTracker = some owned := by
@@ -75,7 +76,7 @@ theorem enters
   have model := S02WildcardSeparateDestinationReady.model_after_argument input reference output fresh
   have destId : destination.id = input.contract.destination.id := data.sameId.trans same
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,#[]⟩) := by
+      some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,destId]
     exact input.return_extras

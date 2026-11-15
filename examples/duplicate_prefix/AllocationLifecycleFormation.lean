@@ -38,7 +38,7 @@ def initExtra [DecidableEq K] (extras : MemoryExtras.Hooks K U P)
 
 def initialized (extras : MemoryExtras.Hooks K U P) (before : MachineHooks.MachineState K U)
     (tracker : MachineHooks.BorrowState) : MachineHooks.MachineState K U :=
-  MemoryExtras.putAllocation extras (AllocationRootHookFormation.rooted (synchronize reservedMemory before) tracker id) id ⟨none,#[]⟩
+  MemoryExtras.putAllocation extras (AllocationRootHookFormation.rooted (synchronize reservedMemory before) tracker id) id { weakMemory := none }
 
 def inserted (kind : MemoryKind K) (allocation : Allocation Provenance Unit) : MemoryState Provenance BorrowTree K :=
   {(reservedMemory (K:=K)) with live:=#[(id,⟨kind,allocation.withExtra (BorrowTree.new BorTag.one allocation.byteSize)⟩)]}

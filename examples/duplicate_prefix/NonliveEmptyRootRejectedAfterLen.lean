@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.PositiveLenPost
 import duplicate_prefix.RootRejectedExit
 import duplicate_prefix.RootZeroInvocationState
@@ -86,7 +87,7 @@ theorem complete
     (slotMask : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (slotWellFormed : InitMaskCopy.WellFormed slotEntry.allocation.initializationMask)
     (slotProvenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
-    (slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (beforeMachine.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (slotFree : tracker.global.protectedTags.contains slotRoot = false)
     (slotHeld : tracker.global.protectedTags.contains slotChild = true)
     (slotDistinct : slotRoot ≠ slotChild)
@@ -253,7 +254,7 @@ theorem complete
     ((congrArg (fun row => row.value) (kept ⟨0,by decide⟩ (by decide))).trans live0) ((congrArg (fun row => row.layout) (kept ⟨0,by decide⟩ (by decide))).trans cache0)
     rfl slotLayout outerWidth (by decide) (by decide) (by rw [addrState];exact slotCached) slotPresentAfter slotSize slotMutable slotWellFormed
     (by rw [outerRuntime];rfl) slotStorage slotMask slotProvenance stateRace backendState stateBorrow
-    (by change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact slotExtras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact slotExtras)
     rootFree childFree slotTree slotPointer slotAligned (by rw [outerRuntime];rfl) outerAccess ghostState shallowState destination
     (Size.ofBytes (slotBase+1)) endpoint
   let done := CanonicalCopy.replaceAllocation state slotId slotEntry.kind updated

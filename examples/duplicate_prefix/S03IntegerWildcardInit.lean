@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerEmptyEntry
 import duplicate_prefix.S03ReturnInitTail
 import duplicate_prefix.S03ReturnWildcardProtectionRaw
@@ -43,7 +44,7 @@ def installed {before : Before} {place : MPlaceTy Provenance}
   let args := EmptyRootArguments.result (RawRootInvocation.root before place race) address count
   Storage.withCurrent #[] (frame input race address count first)
     (S04ProtectUninit.finished (S03IntegerZeroState.argumentsMachine before input.tracker first) place
-      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨601⟩} {}
+      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨2⟩} {}
       second tree updated).machine
 
 /-- Original integer/NoProv argument plus actual wildcard destination
@@ -66,7 +67,7 @@ theorem enters
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     ∃ tree updated,
@@ -111,7 +112,7 @@ theorem enters
   let currentModel := S03IntegerZeroState.model input model first
   obtain ⟨tree,updated,protect,properties⟩ := S03ReturnWildcardProtectionRaw.invoke limits.retag current currentModel place currentInput
     (S03IntegerZeroState.runtime input first runtime) distinct order headroom second wildcard #[]
-    {args.frame with location := .unwinding ⟨601⟩} {} frameBorrow #[] extras (by simp)
+    {args.frame with location := .unwinding ⟨2⟩} {} frameBorrow #[] extras (by simp)
   have tail := S03ReturnInitTail.after_protection limits current currentModel place currentInput #[] args.frame {}
     frameBorrow second tree updated protect args.body args.size
     (dead ⟨0,by decide⟩ (by decide) (by decide)) (dead ⟨6,by decide⟩ (by decide) (by decide))

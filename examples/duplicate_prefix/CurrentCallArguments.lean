@@ -28,7 +28,7 @@ theorem creation (crates : Array Nat) (before : Before) (frames : Array Compiler
     MachineHooks.initFrame (FrameMetadata.userRelevance
       (CompilerFrameMetadata.hooks PreparedReflection.actual.compiler.lifecycle.frames crates))
       (Frame.create RootBody.reflected.body RootBody.reflected.functionInstance () (.stop true)
-        (destination place) ⟨559⟩ identity) (⟨⟨frames⟩,before⟩ : RootState) =
+        (destination place) ⟨0⟩ identity) (⟨⟨frames⟩,before⟩ : RootState) =
       .ok (RootFrameData.raw before (destination place) identity race).frame (⟨⟨frames⟩,before⟩ : RootState) :=
   CallEntryFacts.init_root_frame crates (⟨⟨frames⟩,before⟩ : RootState) (destination place) identity
 
@@ -56,6 +56,9 @@ theorem arguments (options : EvalConfigurationCore.Options) (limits : ExecutionM
           .ok (2,2) (Storage.withCurrent frames (RootArgumentsTwo.result firstDone count).frame
             {validatedMachine source with borrowTracker := some ⟨source.base.raw.output.global,tracker.retagMode⟩}) := by
   let root := RootFrameData.raw before (destination place) identity input.machine.settings.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let prepared := firstLive root
   have rawLocals : root.frame.locals = Array.replicate 25 (⟨.dead,none⟩ : LocalState Provenance LocalLayout) :=
     RootEntryFrame.raw_locals before (destination place) identity

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteSourceWildcardInstalledBoth
 import duplicate_prefix.AsMutPushPreserves
 import duplicate_prefix.RootZeroInvocationState
@@ -27,7 +28,7 @@ structure Settings (options : EvalConfigurationCore.Options) (remaining : Nat)
   noGc : ((PreparedContracts.actualConfig options () (remaining+1) span).terminators.getControl machine.user).gcInterval = 0
   fixed : machine.threads.fixedScheduling = true
   extras : machine.user.payload.payload.user.runtime.extras.allocations.find?
-    (fun row => row.1 == destinationId) = some (destinationId,⟨none,#[]⟩)
+    (fun row => row.1 == destinationId) = some (destinationId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destinationId) })
   fuel : Nat
   validationFuel : options.limits.validation = fuel+1
   debugOff : options.place.debugAssertions = false
@@ -59,7 +60,7 @@ theorem at_protection
     let frame := (RootArgumentsTwo.result
       (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) 0).frame
-    let changed := {frame with location := .unwinding ⟨601⟩}
+    let changed := {frame with location := .unwinding ⟨2⟩}
     let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
     let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
     Nonempty (Settings options remaining span destination.id after.machine) := by
@@ -73,7 +74,7 @@ theorem at_protection
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) 0).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let tracker := TypedBorrowSteps.registeredTracker
@@ -117,7 +118,7 @@ theorem at_protection
     dsimp only [fuel]
     omega
   have extras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [user,(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,destinationId]
     exact input.return_extras
   exact ⟨{

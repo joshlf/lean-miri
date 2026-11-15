@@ -22,7 +22,7 @@ theorem compute_local2
   simp only [MachineHooks.currentFrame,Storage.withCurrent,Stack.currentFrame?,Array.back?_push,
     bind,EStateM.bind,get,getThe,MonadStateOf.get,EStateM.get,pure,EStateM.pure]
   rw [normalized]
-  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 154 with
+  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 49 with
     | .ok value => EStateM.Result.ok value (Storage.withCurrent framesBefore frame machine)
     | .error error => EStateM.Result.error (StepError.unsupported s!"compiler frame query: {toString error}")
         (Storage.withCurrent framesBefore frame machine)) = _

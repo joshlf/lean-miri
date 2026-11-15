@@ -78,7 +78,7 @@ theorem installed
             let argumentFrame := (RootArgumentsTwo.result
               (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
                 reference.id reference.tracker.global.nextPointerTag) count).frame
-            let changed := {argumentFrame with location := .unwinding ⟨601⟩}
+            let changed := {argumentFrame with location := .unwinding ⟨2⟩}
             let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
             let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra
               destination.tracker returnTag destination.offset 1
@@ -86,7 +86,7 @@ theorem installed
             let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
               destination.tracker.global.nextPointerTag
             let expectedFrame := CallEntryFacts.doneRootFrame
-              {protectedFrame with location := .unwinding ⟨559⟩}
+              {protectedFrame with location := .unwinding ⟨0⟩}
             let global := TypedBorrowSteps.registeredGlobal
               (ReferenceBorrowDriver.allocatedTracker destination.tracker secondFresh)
               destination.tracker.global.nextPointerTag
@@ -117,7 +117,7 @@ theorem installed
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let sourceEntry := {reference.entry with allocation := reference.entry.allocation.setExtra output.child.tree}
   refine ⟨reference,output,firstFresh,?_⟩
@@ -128,7 +128,7 @@ theorem installed
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   have destId : destination.id = input.contract.destination.id := by
     have pointer := destination.physicalPointer.symm.trans input.contract.destination.physicalPointer
     have provenance := congrArg (fun ptr : Pointer (Option Provenance) => ptr.provenance) pointer

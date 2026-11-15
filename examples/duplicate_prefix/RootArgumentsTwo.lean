@@ -7,7 +7,7 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false
 noncomputable def result (firstDone : RootFrame) (n : UInt64) :=
-  write (live (cache (atSpan firstDone ⟨603⟩) i2 RootCompilerFacts.usizeLayout) i2) i2
+  write (live (cache (atSpan firstDone ⟨4⟩) i2 RootCompilerFacts.usizeLayout) i2) i2
     (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n)))
 
 theorem body (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
@@ -32,10 +32,10 @@ theorem body (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
       ⟨.immediate value,ActualReferenceMetadata.reference⟩ (second n) (Storage.withCurrent frames root.frame machine) =
       .ok (2,2) (Storage.withCurrent frames (result d1 n).frame m1) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
-  let f1 := atSpan root ⟨602⟩
+  let f1 := atSpan root ⟨3⟩
   let c1 := firstCache root
   let l1 := firstLive root
-  let f2 := atSpan d1 ⟨603⟩
+  let f2 := atSpan d1 ⟨4⟩
   let c2 := cache f2 i2 RootCompilerFacts.usizeLayout
   let l2 := live c2 i2
   let d2 := result d1 n

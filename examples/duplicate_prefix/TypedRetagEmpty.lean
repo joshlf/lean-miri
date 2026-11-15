@@ -147,7 +147,10 @@ theorem canonical_zero_retag_pointer {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : pointee.layout.align.abi = Align.ONE)
     (unpin : CompilerFacts.boolean prepared.context pointee.ty "is_unpin" = .ok true)
     (unsafeUnpin : CompilerFacts.boolean prepared.context pointee.ty "is_unsafe_unpin" = .ok true)
-    (frozen : CompilerFacts.boolean prepared.context pointee.ty "is_freeze" = .ok true) :
+    (frozen : CompilerFacts.boolean prepared.context pointee.ty "is_freeze" = .ok true)
+    {definition : DefId}
+    (definitionQuery : CompilerInstance.definitionOf prepared.context.loweringContext.instances
+      frame.functionInstance = .ok definition) :
     let h := EvalRetagMachine.hooks prepared runtime
       (CompilerRetagOptions.make compiler ⟨false, false⟩) access projection vtable pointers choice
     TypedRetag.retagPtrValue h budget (RetagReferencePlace.integerSliceValue address 0 reference)
@@ -166,7 +169,7 @@ theorem canonical_zero_retag_pointer {K U C F A : Type} [DecidableEq K]
     unfold_typed ".EvalRetagMachine.lift"
     rw [referencePointee]
   have policy := TypedRetagEntry.canonical_new_permission prepared runtime compiler access projection vtable
-    pointers choice pointee.ty state frames frame frameShape unpin unsafeUnpin frozen
+    pointers choice pointee.ty state frames frame frameShape unpin unsafeUnpin frozen definitionQuery
   have construct : h.immPtrToMPlace value = pure place := by
     exact RetagReferencePlace.canonical_from_integer access prepared choice address 0 reference pointee
       dereference pointeeLayout pointeeAlign width

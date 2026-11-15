@@ -25,8 +25,7 @@ theorem slice_inhabited : CompilerFacts.boolean context 4 "opsem_inhabited" = .o
 open Lean Elab Tactic in
 elab "simp_adapter_source" : tactic => do
   let env ← getEnv
-  let names ← ([".CompilerFactAdapters.source", ".CompilerFactAdapters.shape",
-    ".CompilerFactAdapters.field"] : List String).mapM fun (suffix : String) => do
+  let names ← ([".CompilerFactAdapters.source"] : List String).mapM fun (suffix : String) => do
       let found := env.constants.toList.filterMap fun (name, _) =>
         if name.toString.endsWith suffix then some (mkIdent name) else none
       match found with
@@ -74,19 +73,16 @@ theorem hooks_reference_name (base : ValidityVisitor.Hooks P S C E F A Pad) (cho
   with_unfolding_all rfl
 
 theorem runtime_slice_inhabited (world : RuntimeArrayTypes.World) (fuel : Nat)
-    (sameSource : context.runtime.matchesSourceLeft world.metadata.source.raw = true)
     (noConstructedSlice : world.entries.find? (·.value.ty == 4) = none) :
     RuntimeArrayFacts.opsemInhabited context world 4 (fuel+1) = .ok true := by
   unfold RuntimeArrayFacts.opsemInhabited
-  rw [sameSource, noConstructedSlice]
+  rw [noConstructedSlice]
   simp [slice_inhabited]
 
 theorem prepared_slice_inhabited (source : PreparedContracts.SourceComparator) (fuel : Nat) :
     RuntimeArrayFacts.opsemInhabited context PreparedReflection.actual.prepared.types 4 (fuel+1) = .ok true := by
   apply runtime_slice_inhabited
-  · rw [RuntimeMetadata.Indexed.matchesSourceLeft_eq]
-    exact source.reflexive
-  · rfl
+  rfl
 
 #print axioms prepared_slice_inhabited
 

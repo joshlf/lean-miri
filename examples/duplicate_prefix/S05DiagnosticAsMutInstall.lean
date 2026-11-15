@@ -69,6 +69,9 @@ theorem install_data
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (AsMutInstall.resultFrame frame valid value output borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id exprTag) (Size.ofBytes (base+offset))) len ActualReferenceMetadata.reference).imm
   let cache := AsMutInstall.cacheFrame frame valid
@@ -125,8 +128,8 @@ theorem install_data
     (Storage.withCurrent frames cache machine) _ _ _ _
     (by with_unfolding_all rfl) (by with_unfolding_all rfl) compat rfl rfl storage evaluate checked
   have query := AsMutLocalStages.span1 options limits (remaining+1) span frames frame machine body identity callee
-  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨613⟩
-  change AsMutCallCore.spanAt h ⟨613⟩ (Storage.withCurrent frames frame machine) = _ at setspan
+  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨72⟩
+  change AsMutCallCore.spanAt h ⟨72⟩ (Storage.withCurrent frames frame machine) = _ at setspan
   have layout := AsMutLocalStages.layout1 options limits (remaining+1) span frames (AsMutInstall.spanFrame frame) machine
     body identity callee valid uncached
   dsimp only [AsMutInstall.spanFrame] at layout

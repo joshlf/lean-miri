@@ -9,17 +9,17 @@ theorem slice_unsized : CompilerFacts.boolean
   unfold CompilerFacts.boolean
   unfold_fact_helpers
   have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 4 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 4 :=
+      PreparedReflection.actual.runtime.node 4 :=
     RootMetadataQueries.context_node 4
   simp only [node]
   with_unfolding_all rfl
 theorem raw_slice_kind : CompilerFactAdapters.validityKind
-    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 154 = .ok (.rawPointer 4 false) := by
+    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 49 = .ok (.rawPointer 4 false) := by
   unfold CompilerFactAdapters.validityKind
   unfold_raw_validity_helpers
   dsimp only
   have nodes (id : TypeId) : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node id =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node id :=
+      PreparedReflection.actual.runtime.node id :=
     RootMetadataQueries.context_node id
   simp only [nodes]
   change (do
@@ -29,7 +29,7 @@ theorem raw_slice_kind : CompilerFactAdapters.validityKind
   rfl
 theorem hooks_raw_slice_kind (base : ValidityVisitor.Hooks P S C E F A Pad) (choice : C) :
     (CompilerFactAdapters.validityHooks PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts base).classify
-      choice 154 = pure (.rawPointer 4 false) := by
+      choice 49 = pure (.rawPointer 4 false) := by
   unfold CompilerFactAdapters.validityHooks
   dsimp only
   rw [raw_slice_kind]
@@ -37,13 +37,13 @@ theorem hooks_raw_slice_kind (base : ValidityVisitor.Hooks P S C E F A Pad) (cho
 
 theorem hooks_raw_slice_name (base : ValidityVisitor.Hooks P S C E F A Pad) (choice : C) :
     (CompilerFactAdapters.validityHooks PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts base).typeName
-      choice 154 = pure "*const [u8]" := by
+      choice 49 = pure "*const [u8]" := by
   unfold CompilerFactAdapters.validityHooks
   dsimp only
   unfold_validity_source
-  have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 154 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 154 :=
-    RootMetadataQueries.context_node 154
+  have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 49 =
+      PreparedReflection.actual.runtime.node 49 :=
+    RootMetadataQueries.context_node 49
   rw [node]
   with_unfolding_all rfl
 
@@ -53,7 +53,7 @@ theorem slice_metadata_tail : CompilerFactAdapters.metadataTail
   unfold_fact_helpers
   unfold_validity_source
   have nodes (id : TypeId) : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node id =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node id :=
+      PreparedReflection.actual.runtime.node id :=
     RootMetadataQueries.context_node id
   simp only [nodes]
   with_unfolding_all rfl

@@ -112,7 +112,7 @@ def pointer : PointerInstance := ⟨out.physical.id,{C.V.pointer.value with prov
 theorem live : out.finalMachine.memory.live.find? (fun row=>row.1==out.physical.id)=some (out.physical.id,{out.physical.entry with allocation:=out.updated}) := by
   rw [out.finalMachineEq]
   exact MemoryCopyBridge.live_lookup_replaced
-    (ReturnProtection.borrowedState frames (RootFrameData.atSpan out.argsRoot ⟨601⟩).frame out.sourceOutput.frame out.sourceMachine
+    (ReturnProtection.borrowedState frames (RootFrameData.atSpan out.argsRoot ⟨2⟩).frame out.sourceOutput.frame out.sourceMachine
       ⟨out.sourceOutput.global,tracker.retagMode⟩ out.returnRoom out.physical.id out.physical.entry out.boolOutput.child.tree).machine.memory
     out.physical.id {out.physical.entry with allocation:=out.updated}
 

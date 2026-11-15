@@ -53,7 +53,8 @@ theorem copy_argument (options : EvalConfigurationCore.Options) (remaining : Nat
       (·.value.ty == 4) = false)
     (view : RuntimeStackPlace Provenance)
     (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
-    : ∃ converted : Allocation Provenance Unit,
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) : ∃ converted : Allocation Provenance Unit,
       GlobalAllocationAttributes.Attributes source converted ∧
       let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 reference).imm

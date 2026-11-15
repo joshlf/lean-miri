@@ -11,36 +11,9 @@ set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
-def constant : ConstOperand := ⟨⟨158⟩, none, .Val .ZeroSized 243⟩
+def constant : ConstOperand := ⟨⟨191⟩, none, .Val .ZeroSized 127⟩
 
-def site : CompilerConstantQueries.Site :=
-  ⟨CopyPreconditions.Bodies.checkLanguage.loaded.identity.index, ⟨0,3⟩,
-    #[.field "kind", .field "function", .field "constant"]⟩
-def evidence : Array CompilerConstantEvidence :=
-  (PreparedReflection.actual.compiler.constants.evidence.filter (·.site == site)).map (·.query)
-
-theorem literal : constant.value = .Val .ZeroSized 243 := by with_unfolding_all rfl
-theorem normalization : normalizationFromEvidence evidence
-    CopyPreconditions.Bodies.checkLanguage.fnInstance (.Val .ZeroSized 243) =
-      .ok (.Val .ZeroSized 243) := by with_unfolding_all rfl
-theorem evaluation : evaluationFromEvidence evidence
-    CopyPreconditions.Bodies.checkLanguage.fnInstance (.Val .ZeroSized 243) constant.span =
-      .ok .ZeroSized := by with_unfolding_all rfl
-
-open Lean Elab Tactic in
-elab "simp_runtime_function_constant" : tactic => do
-  let names := (← getEnv).constants.toList.filterMap fun (name, _) =>
-    if name.toString.endsWith "Miri.Interpreter.constantType" then some (mkIdent name) else none
-  let names := names.toArray
-  evalTactic (← `(tactic| simp_all (config := {maxSteps := 1000000}) [
-    CompilerConstantMachine.evalAtBound, ConstantMachine.fromCompiler,
-    ConstantMachine.evalOperandWithLayout, evalConstOperandWithLayout,
-    evalMirConstantWithLayout, constValueToOpWithLayout, valueToOpWithLayout,
-    ConstantQueries.valueQueries, MachineHooks.currentFrame,
-    Storage.withCurrent, Stack.currentFrame?, bind, EStateM.bind,
-    get, getThe, MonadStateOf.get, EStateM.get, pure, EStateM.pure,
-    Except.bind, Except.pure, site, evidence, constant, literal, $[$names:ident],*]))
-
+theorem literal : constant.value = .Val .ZeroSized 127 := by with_unfolding_all rfl
 theorem function_eval_at_bound
     (source : PreparedContracts.SourceComparator)
     (functions : FunctionPointers.Hooks MiriMemoryKind Machine.RootUser Unit)
@@ -52,24 +25,16 @@ theorem function_eval_at_bound
     (bodyIndex : frame.bodyIdentity.index = CopyPreconditions.Bodies.checkLanguage.loaded.identity.index)
     (location : frame.location = .mir ⟨0,3⟩)
     (fnInstance : frame.functionInstance = CopyPreconditions.Bodies.checkLanguage.fnInstance) :
-    CompilerConstantMachine.evalAtBound PreparedReflection.actual.compiler.constantBinding
-      site functions arithmetic externStatic MemoryErrors.constant constant none none
+    ConstantMachine.evalOperandWithLayout PreparedReflection.actual.compiler.runtime functions arithmetic externStatic MemoryErrors.constant constant none none
       (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨.immediate .uninit, RuntimeCallQueries.functionLayout⟩
         (Storage.withCurrent framesBefore frame machine) := by
-  have compatible := RootCompilerFacts.constant_binding_compatible source
-  have norm : normalizationFromEvidence evidence CopyPreconditions.Bodies.checkLanguage.fnInstance
-      (.Val .ZeroSized 243) = .ok (.Val .ZeroSized 243) := normalization
-  have eval : evaluationFromEvidence evidence CopyPreconditions.Bodies.checkLanguage.fnInstance
-      (.Val .ZeroSized 243) constant.span = .ok .ZeroSized := evaluation
-  unfold CompilerConstantMachine.evalAtBound
-  simp only [constant]
-  simp_runtime_function_constant
-  have compilerLayout : PreparedReflection.actual.compiler.runtime.lookup 243 =
-      .ok RuntimeCallQueries.functionLayout := by
-    change PreparedReflection.actual.runtime.lookup 243 = _
-    exact RuntimeCallQueries.functionLayout_query
-  rw [compilerLayout]
+  unfold ConstantMachine.evalOperandWithLayout
+  rw [literal]
+  simp only [ConstantMachine.evalValueWithLayout, Option.map_none]
+  unfold valueToOpWithLayout
+  have layout : PreparedReflection.actual.compiler.runtime.lookup 127 = .ok RuntimeCallQueries.functionLayout := RuntimeCallQueries.functionLayout_query
+  rw [layout]
   unfold_internal ".Interpreter.metadata"
   rfl
 
@@ -85,10 +50,10 @@ theorem function_operand
     (bodyIndex : frame.bodyIdentity.index = CopyPreconditions.Bodies.checkLanguage.loaded.identity.index)
     (location : frame.location = .mir ⟨0,3⟩)
     (fnInstance : frame.functionInstance = CopyPreconditions.Bodies.checkLanguage.fnInstance) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.instruction "function") (.Constant constant) none
+      ()  (.Constant constant) none
       (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨.immediate .uninit, RuntimeCallQueries.functionLayout⟩
         (Storage.withCurrent framesBefore frame machine) := by
@@ -96,24 +61,10 @@ theorem function_operand
   let state := Storage.withCurrent framesBefore frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have currentSite : CompilerOperandSites.current
-      ((OperandPath.instruction "function").push (.field "constant")) state = .ok site state := by
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame,
-      state, Storage.withCurrent, Stack.currentFrame?, site, bodyIndex, location,
-      Bind.bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get,
-      Pure.pure, EStateM.pure, OperandPath.instruction]
-  have siteLit : CompilerOperandSites.current
-      ((OperandPath.instruction "function").push (.field "constant"))
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok site (Storage.withCurrent framesBefore frame machine) := by
-    simpa [OperandPath.rvalue, state] using currentSite
-  have result := function_eval_at_bound source config.functions config.arithmetic externStatic
-    framesBefore frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-    ((OperandPath.instruction "function").push (.field "constant")) constant none state = _
+  change config.operands.constant () constant none state = _
   rw [constantAt]
-  simpa [siteLit, state, config, OperandPath.rvalue, Bind.bind,
-    EStateM.bind, Pure.pure, EStateM.pure] using result
+  exact function_eval_at_bound source config.functions config.arithmetic externStatic
+    framesBefore frame machine bodyIndex location fnInstance
 
 end
 end DuplicatePrefix.RuntimeFunctionConstant

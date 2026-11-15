@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroInitTail
 import duplicate_prefix.S03WildcardArgumentSeparateState
 import duplicate_prefix.ConcreteEmptyRootArgumentProperties
@@ -43,7 +44,7 @@ theorem enters
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == original.id) =
-      some (original.id,⟨none,#[]⟩))
+      some (original.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (original.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     ∃ (slot : WildcardHitPoolRoot.Slot argumentEntry.allocation.extra) (updated : Allocation Provenance BorrowTree),
@@ -61,9 +62,9 @@ theorem enters
       (Size.ofBytes original.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
     let after := Storage.withCurrent #[]
       (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-        {args.frame with location := .unwinding ⟨601⟩} owned original.id
-          (S03LiveEmptyState.next original.tracker first).global.nextPointerTag with location := .unwinding ⟨559⟩})
-      (S04ProtectUninit.finished current place input #[] {args.frame with location := .unwinding ⟨601⟩}
+        {args.frame with location := .unwinding ⟨2⟩} owned original.id
+          (S03LiveEmptyState.next original.tracker first).global.nextPointerTag with location := .unwinding ⟨0⟩})
+      (S04ProtectUninit.finished current place input #[] {args.frame with location := .unwinding ⟨2⟩}
         owned second tree updated).machine
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
@@ -128,7 +129,7 @@ theorem enters
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] raw.frame rawMachine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame rawMachine
   have control := RawRootInvocation.control before place model.noDataRace
-  have preamble : raw.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : raw.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {raw.frame with trackCallerArg := none} = raw.frame := by rw [←control.2.1]
   simp only [preamble] at unchanged
   refine ⟨slot,updated,?_,properties⟩

@@ -57,7 +57,9 @@ theorem reference_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     let finalTree := WildcardPoolHitReborrow.after entry.allocation.extra rootSlot tracker.global.nextPointerTag policy.outsidePermission sifa
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base
@@ -146,7 +148,9 @@ theorem fnentry_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let finalTree := WildcardPoolHitReborrow.after entry.allocation.extra rootSlot tracker.global.nextPointerTag ChildBorrow.fnEntryPolicy.outsidePermission .None
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base

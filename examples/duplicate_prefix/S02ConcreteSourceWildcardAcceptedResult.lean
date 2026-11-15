@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteSourceWildcardAcceptedFullCopyPacket
 import duplicate_prefix.S02ConcreteSourceWildcardAcceptedDestinationCopy
 import duplicate_prefix.S02ConcreteSourceWildcardRejectedSourceNode
@@ -52,13 +53,13 @@ theorem result
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let entry := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   let sourceTree := GeneralBorrowRawFnEntryArgument.finalTree reference.entry.allocation.extra
     reference.tracker tag reference.offset len
   let sourceEntry := {reference.entry with allocation := reference.entry.allocation.setExtra sourceTree}
@@ -171,12 +172,12 @@ theorem result
       row.1.bytes.toNat < destCopy.offset.toNat ∨
         destCopy.offset.toNat + 1 ≤ row.1.bytes.toNat := by simp
   have copyExtrasFound : finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destCopy.id) = some (destCopy.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destCopy.id) = some (destCopy.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destCopy.id) }) := by
     obtain ⟨settings⟩ := S02ConcreteSourceWildcardControl.at_protection_any_count
       id tag address len count input reference firstFresh destination destId secondFresh tree updated
     have entryExtras : entry.machine.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == returnPacket.destination.id) =
-          some (returnPacket.destination.id,⟨none,#[]⟩) := by
+          some (returnPacket.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (entry.machine.user.payload.payload.user.runtime.extras.allocations) (returnPacket.destination.id) }) := by
       rw [packetId]
       exact settings.extras
     change finalMachine.user.payload.payload.user.runtime.extras.allocations.find?

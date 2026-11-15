@@ -12,23 +12,22 @@ private def checkedOk {Error Value : Type} : (result : Except Error Value) → r
   | .ok value, _ => value
   | .error _, impossible => False.elim (by cases impossible)
 
-theorem context_runtime : facts.context.runtime.toRuntimeMetadata = actual.runtime := by rfl
+theorem context_runtime : actual.runtime = actual.runtime := by rfl
 
 theorem compiler_layout_lookup (id : TypeId) :
     CompilerFacts.layoutOf facts.context id = (actual.runtime.lookup id).mapError toString := by
   unfold CompilerFacts.layoutOf
-  have query : facts.context.runtime.lookup id = facts.context.runtime.toRuntimeMetadata.lookup id :=
-    LayoutLookupProof.indexed_lookup_eq _ none id
+  have query : facts.context.runtime.lookup id = actual.runtime.lookup id :=
+    by rfl
   rw [query, context_runtime]
 
 theorem context_node (id : TypeId) :
-    facts.context.runtime.node id = facts.context.runtime.toRuntimeMetadata.node id := by
-  exact NodeLookupProof.indexed_node _ id none
+    facts.context.runtime.node id = actual.runtime.node id := by
+  rfl
 
 open Lean Elab Tactic in
 elab "unfold_prior_fact_helpers" : tactic => do
-  let names ← ([".CompilerFacts.facts", ".CompilerFacts.node", ".CompilerFacts.shape",
-    ".CompilerFacts.typeRef", ".CompilerFacts.string", ".CompilerFacts.field"] : List String).mapM fun (suffix : String) => do
+  let names ← ([".CompilerFacts.facts", ".CompilerFacts.node"] : List String).mapM fun (suffix : String) => do
     let found := (← getEnv).constants.toList.filterMap fun (name, _) =>
       if name.toString.endsWith suffix then some (mkIdent name) else none
     match found with
@@ -39,12 +38,12 @@ elab "unfold_prior_fact_helpers" : tactic => do
 
 theorem cell_layout_supported : (actual.runtime.lookup 2).isOk = true := by decide +kernel
 noncomputable def cellLayout : LocalLayout :=
-  checkedOk (actual.runtime.lookup 2) cell_layout_supported
+  checkedOk (actual.layoutResults[2]'(by decide +kernel)) (by decide +kernel)
 
 theorem cell_layout_query : CompilerFacts.layoutOf facts.context 2 = .ok cellLayout := by
   unfold CompilerFacts.layoutOf
-  have query : facts.context.runtime.lookup 2 = facts.context.runtime.toRuntimeMetadata.lookup 2 :=
-    LayoutLookupProof.indexed_lookup_eq _ none 2
+  have query : facts.context.runtime.lookup 2 = actual.runtime.lookup 2 :=
+    by rfl
   rw [query]
   decide +kernel
 

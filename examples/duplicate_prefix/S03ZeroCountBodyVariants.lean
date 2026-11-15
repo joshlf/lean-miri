@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04FinalReturnVariants
 import duplicate_prefix.RootZeroCompletePrefix
 import duplicate_prefix.RootZeroInvocationState
@@ -49,7 +50,7 @@ theorem complete
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩))
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (fuel : Nat) (debugOff : options.place.debugAssertions = false)
@@ -110,7 +111,7 @@ theorem complete
   have fields1 := RootZeroInvocationState.tick_fields options remaining span machine
   have fields2 := RootZeroInvocationState.tick_fields options remaining span first
   have currentExtras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩) := by
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [fields2.2.2.2.2.2.2,fields1.2.2.2.2.2.2]
     exact extras
   obtain ⟨updated,returned,_,_,_⟩ := S04FinalReturnVariants.step options limits remaining span result current tracker borrowFrame

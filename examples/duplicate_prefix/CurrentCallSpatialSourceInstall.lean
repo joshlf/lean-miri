@@ -316,7 +316,9 @@ theorem typed (options : EvalConfigurationCore.Options) (limits : ExecutionMachi
     (shallowMode : before.user.payload.validation=.Shallow)
     (localId : MIR.LocalId) (valid : localId<frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value=.live (.immediate old))
-    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none) :
+    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let output := CurrentCallSpatialEntryRead.output role borrowFrame room (UInt64.ofNat offset) len
     ∃entry : LocalAllocation Provenance BorrowTree MiriMemoryKind,entry.allocation=role.backing.allocation ∧
       ∃doneFrame : CompilerFrameContext.ActualFrame,
@@ -373,7 +375,9 @@ theorem typed_cover (options : EvalConfigurationCore.Options) (limits : Executio
     (shallowMode : before.user.payload.validation=.Shallow)
     (localId : MIR.LocalId) (valid : localId<frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value=.live (.immediate old))
-    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none) :
+    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let output := CurrentCallSpatialEntryRead.output role borrowFrame room (UInt64.ofNat offset) len
     ∃(entry : LocalAllocation Provenance BorrowTree MiriMemoryKind) (doneFrame : CompilerFrameContext.ActualFrame) (child : UniIndex)
       (installed : CellResources role (copiedMachine role borrowFrame room (UInt64.ofNat offset) len entry)

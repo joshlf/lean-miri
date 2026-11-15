@@ -22,13 +22,10 @@ theorem actual_metadata_caller_location (options : EvalConfigurationCore.Options
   change (PreparedContracts.actualConfig options choice remaining span).virtual.compiler.requiresCallerLocation
     PtrMetadataHelper.resolved.callee state = _
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).virtualCompiler]
-  with_unfolding_all change (match CompilerRuntimeQueries.requiresCallerLocation
-      PreparedReflection.actual.compiler.lifecycle.calls.runtime PtrMetadataHelper.resolved.callee with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported s!"compiler virtual query: {reason}") :
-      MachineHooks.M MiriMemoryKind Machine.RootUser Bool) state = _
-  rw [metadata_caller_location]
-  rfl
+  dsimp only [CompilerVirtualLeaves.make, CompilerVirtualFacts.scopeHooks]
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  with_unfolding_all rfl
 
 
 theorem actual_metadata_target_features (options : EvalConfigurationCore.Options)
@@ -79,10 +76,11 @@ theorem actual_metadata_abi (options : EvalConfigurationCore.Options)
     (PreparedContracts.actualConfig options choice remaining span).calls.compiler.fnAbiOfInstance
       choice PtrMetadataHelper.resolved.callee #[] state = .ok PtrMetadataHelper.abi state := by
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).callCompiler]
-  with_unfolding_all change (match PtrMetadataHelper.abiQuery with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported reason) : MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi MIR.TyId)) state = _
-  rw [PtrMetadataHelper.abi_eq]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  have query := PtrMetadataHelper.abi_eq
+  unfold PtrMetadataHelper.abiQuery HelperCompilerFacts.abiQuery at query
+  rw [query]
   rfl
 
 theorem actual_metadata_load (options : EvalConfigurationCore.Options)

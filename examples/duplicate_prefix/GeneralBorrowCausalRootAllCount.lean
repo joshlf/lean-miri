@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawRootAllCount
 import duplicate_prefix.GeneralBorrowCausalGraphFormation
 namespace DuplicatePrefix.GeneralBorrowCausalRootAllCount
@@ -91,7 +92,7 @@ structure Initial where
   maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize
   provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new
   noBackend : before.user.payload.payload.user.backend = .none
-  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   thread : Miri.Concurrency.ThreadRecord
   active : before.threads.activeThread? = some thread
   noCache : thread.topUserRelevantFrame = none
@@ -224,7 +225,7 @@ theorem invoke (s : Initial)
     (nodeMargin : s.entry.allocation.extra.nodes.size+5 < 65536)
     (tagMargin : s.tracker.global.nextPointerTag.value.toNat+5 < 18446744073709551615)
     (bytes : GeneralBorrowRawSliceBytes.Data s.entry.allocation s.offset s.len)
-    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,⟨none,#[]⟩))
+    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (s.before.user.payload.payload.user.runtime.extras.allocations) (s.id) }))
     (statementFuel : s.limits.validation = s.validityFuel+1) (n : UInt64) :
     DuplicatePrefixArgumentCallResult.Result s.options s.limits s.remaining s.span s.before
       (.pointer (Pointer.new (.concrete s.id s.parentTag) (Size.ofBytes (s.base+s.offset)))) s.len n s.place := by

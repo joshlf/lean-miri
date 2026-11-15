@@ -81,7 +81,9 @@ private theorem retag_pointer_at {K U C F A : Type} [DecidableEq K]
     (addressMode : state.machine.user.addresses.provenanceMode ≠ .strict)
     (below : ∀ entry ∈ state.machine.user.addresses.intToPtrMap, address < entry.address)
     (sizingAt : h.sizeAndAlign (RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes address)) 0 pointee) state =
-      .ok (some (Size.ZERO, Align.ONE)) state) :
+      .ok (some (Size.ZERO, Align.ONE)) state)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.machineRetagPtrValue h budget (RetagReferencePlace.sliceValue access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 reference)
       reference.ty state = .ok (some (RetagReferencePlace.sliceValue access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 reference))
         (TypedRetagEmpty.afterTag state tracker fresh) := by
@@ -157,7 +159,9 @@ private theorem check_at {K U C F A : Type} [DecidableEq K]
     (below : ∀ entry ∈ machine.user.addresses.intToPtrMap, address < entry.address)
     (sizingAt : retag.sizeAndAlign (RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes address)) 0 pointee)
       (Storage.withCurrent frames frame machine) = .ok (some (Size.ZERO, Align.ONE))
-      (Storage.withCurrent frames frame machine)) :
+      (Storage.withCurrent frames frame machine))
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let state := Storage.withCurrent frames frame machine
     source_check_safe hooks choice (ReferenceValidity.referenceSession name)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) reference.ty (.reference true) state =
@@ -260,7 +264,9 @@ private theorem validate_at {K U C F A : Type} [DecidableEq K]
     (sizingAt : retag.sizeAndAlign (RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes address)) 0 pointee)
       (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}) =
       .ok (some (Size.ZERO, Align.ONE))
-      (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}})) :
+      (Storage.withCurrent frames frame {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}))
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let state := Storage.withCurrent frames frame machine
     ValidityMachine.validateRuntime hooks choice (fuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) true state =
@@ -317,12 +323,15 @@ theorem validate (options : EvalConfigurationCore.Options) (remaining : Nat)
     (addressMode : machine.user.addresses.provenanceMode ≠ .strict)
     (below : ∀ entry ∈ machine.user.addresses.intToPtrMap, address < entry.address)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ValidityMachine.validateRuntime (config options remaining span).validity () (validationFuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) true
       (Storage.withCurrent frames frame machine) =
       .ok () (TypedRetagEmpty.afterTag (Storage.withCurrent frames frame machine) tracker fresh) := by
   obtain ⟨ctx⟩ := exists_context options remaining span precise implicitWrites
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have fields := actual_fields options () remaining span
   obtain ⟨target, tail, inhabit, name, kind⟩ := visitor_metadata options remaining span
   obtain ⟨width, pointerSize⟩ := visitor_target options remaining span

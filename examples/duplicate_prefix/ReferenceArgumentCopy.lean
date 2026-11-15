@@ -103,7 +103,9 @@ theorem copy_empty_argument
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining + 1) span) limits).copyAllowTransmute ()
       ⟨.immediate (RetagReferencePlace.integerSliceValue address 0 reference).imm, reference⟩ view
       (Storage.withCurrent frames frame machine) = .ok ()

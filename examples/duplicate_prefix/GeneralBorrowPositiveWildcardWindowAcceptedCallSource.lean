@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveWildcardWindowAcceptedToCopy
 namespace DuplicatePrefix.GeneralBorrowPositiveWildcardWindowAcceptedCallSource
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows Miri.Concurrency
@@ -35,8 +36,8 @@ structure Facts (s : GeneralBorrowPositiveWildcardWindowAcceptedInput.Initial) (
   storageFits : call.entry.allocation.len+64<18446744073709551616
   mutable : call.entry.allocation.mutability=.Mut
   runtime : GenericSharedLenAccepted.RuntimeFacts s.options s.remaining s.span s.before call.machine
-  bufferExtras : call.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==call.id)=some (call.id,⟨none,#[]⟩)
-  slotExtras : call.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==s.slotId)=some (s.slotId,⟨none,#[]⟩)
+  bufferExtras : call.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==call.id)=some (call.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (call.machine.user.payload.payload.user.runtime.extras.allocations) (call.id) })
+  slotExtras : call.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==s.slotId)=some (s.slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (call.machine.user.payload.payload.user.runtime.extras.allocations) (s.slotId) })
   slotCached : call.machine.user.addresses.baseAddr.find? (fun row=>row.allocId==s.slotId)=some ⟨s.slotId,s.slotBase⟩
   slotPresent : call.machine.memory.live.find? (fun row=>row.1==s.slotId)=some (s.slotId,{s.slotEntry with allocation:=updated})
   slotTree : updated.extra=PhysicalMachineWrite.slotTree s.slotRoot (GeneralBorrowPositiveWildcardWindowFunctionState.next s.tracker s.fresh).global.nextPointerTag 1 true

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveWildcardAcceptedInput
 import duplicate_prefix.GeneralBorrowPositiveWildcardZeroSafety
 import duplicate_prefix.GeneralBorrowPositiveWildcardRejectedSafety
@@ -51,7 +52,7 @@ structure Initial extends GeneralBorrowPositiveWildcardOriginalInput.Base where
   bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : (0 : UInt64)<count→count≤len/2→entry.allocation.len+64<18446744073709551616
   bufferMutable : entry.allocation.mutability=.Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
 
 def zero (s : Initial) (zero : s.count=0) : GeneralBorrowPositiveWildcardZero.Initial :=
   {toBase:=s.toBase,zero:=zero}

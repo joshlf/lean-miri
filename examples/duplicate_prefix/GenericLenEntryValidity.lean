@@ -46,7 +46,9 @@ theorem positive_data
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (race : machine.dataRace = none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let finalTree := (GeneralBorrowFreshSharedSequence.child
       second tracker.global.protectedTags true).tree
@@ -142,7 +144,9 @@ theorem positive
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (race : machine.dataRace = none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let finalTree := (GeneralBorrowFreshSharedSequence.child
       (GeneralBorrowFreshSharedNext.next initialTree tracker.global.protectedTags target exprTag tracker.global.nextPointerTag

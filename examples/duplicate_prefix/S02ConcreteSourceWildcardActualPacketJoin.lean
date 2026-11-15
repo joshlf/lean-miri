@@ -60,13 +60,13 @@ theorem at_same_call
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       other.id other.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector other.id other.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   have same : Storage.withCurrent #[] installed after.machine = Storage.withCurrent #[] entry machine :=
     (EStateM.Result.ok.inj (otherActual.symm.trans actual)).2
   have machineEq : after.machine = machine :=

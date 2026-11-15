@@ -97,7 +97,12 @@ theorem at_post {before tracker offset len}
     binding := binding, positive := source.positive, signedFits := source.signedFits, nodes := source.nodes }
   refine ⟨current, ⟨ready.storage, ?_⟩, rfl, rfl, rfl, HEq.rfl, rfl, rfl, rfl, ?_⟩
   · obtain ⟨sync, selected, outside⟩ := ready.profile
-    exact ⟨sync, extras.trans selected, outside⟩
+    refine ⟨sync, ?_, outside⟩
+    change post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == source.role.backing.id) =
+      some (source.role.backing.id, { weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get post.user.payload.payload.user.runtime.extras.allocations source.role.backing.id })
+    unfold AllocationBacktrace.get
+    rw [extras]
+    exact selected
   · intro i overlap
     exact ⟨i, rfl, overlap, rfl⟩
 

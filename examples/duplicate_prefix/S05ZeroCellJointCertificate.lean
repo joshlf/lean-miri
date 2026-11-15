@@ -172,7 +172,7 @@ noncomputable def castSite : MachineHooks.State MiriMemoryKind Machine.RootUser 
         payload := {S05ZeroCellJointPacket.before.user.payload.payload with
           user := {S05ZeroCellJointPacket.before.user.payload.payload.user with
             runtime := {S05ZeroCellJointPacket.before.user.payload.payload.user.runtime with
-              extras := {allocations := #[(S05ZeroCellJointPacket.sourceId,⟨none,#[]⟩)]}}}}}}}⟩
+              extras := {allocations := #[(S05ZeroCellJointPacket.sourceId,{ weakMemory := none })]}}}}}}}⟩
 
 noncomputable def wildcardFamily : Pointer Provenance := Pointer.new .wildcard (Size.ofBytes 4096)
 noncomputable def origin : Pointer Provenance := Pointer.new (.concrete S05ZeroCellJointPacket.sourceId (tag 1)) (Size.ofBytes 4096)

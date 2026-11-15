@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawRootAcceptedCompleteLedger
 import duplicate_prefix.GeneralBorrowRawRootInitialSlot
 import duplicate_prefix.GeneralBorrowRawRootInitialNode
@@ -22,7 +23,7 @@ theorem invoke (s : Initial) (n : UInt64) (positiveCount : n ≠ 0) (within : n 
     (nodeMargin : s.entry.allocation.extra.nodes.size+5 < 65536)
     (tagMargin : s.tracker.global.nextPointerTag.value.toNat+5 < 18446744073709551615)
     (bytes : GeneralBorrowRawSliceBytes.Data s.entry.allocation s.offset s.len)
-    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,⟨none,#[]⟩))
+    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (s.before.user.payload.payload.user.runtime.extras.allocations) (s.id) }))
     (statementFuel : s.limits.validation = s.validityFuel+1) :
     ∃ (entryFrame : CompilerFrameContext.ActualFrame)
       (initial : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
@@ -89,7 +90,7 @@ theorem invoke (s : Initial) (n : UInt64) (positiveCount : n ≠ 0) (within : n 
     slotDistinct:=slot.distinct,frameTracked:=physicalFrame.tracked,slotSize:=slot.size,slotStorage:=slot.storage,slotMask:=slot.mask,
     slotProvenance:=slot.provenance,slotMutable:=slot.mutable,place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,
     aligned:=s.aligned,fits:=s.slotFits,cached:=by rw [heap.runtime.addresses];exact s.slotCached,
-    extras:=by change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [heap.runtime.extras];exact s.extras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [heap.runtime.extras];exact s.extras,
     destination:=by rw [physicalFrame.destination];rfl }
   have byteFacts := (bytes.set_extra heap.tree).for_count n (UInt64.pos_iff_ne_zero.mpr positiveCount) within
   obtain ⟨physical,value,slotId,result,updated,suffixTrace,terminal,safe⟩ :=

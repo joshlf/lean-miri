@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestMixedLenCallReturnResources
 import duplicate_prefix.GeneralBorrowForestRootRejectedPhysical
 namespace DuplicatePrefix.GeneralBorrowForestRejectedAfterLen
@@ -144,7 +145,7 @@ structure Initial where
   aligned : place.mplace.misaligned = none
   slotFits : slotBase.toNat+1 < 2^64
   slotCached : beforeMachine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (beforeMachine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
   writeContext : PhysicalMachineWrite.Context
   validationContext : PhysicalMachineWrite.Context
@@ -223,7 +224,7 @@ theorem prepare (s : Initial) :
     slotSize:=s.slotSize,slotStorage:=s.slotStorage,slotMask:=s.slotMask,slotProvenance:=s.slotProvenance,slotMutable:=s.slotMutable,
     place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,aligned:=s.aligned,fits:=s.slotFits,
     cached:=by rw [runtime.addresses];exact s.slotCached,
-    extras:=by change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [runtime.extras];exact s.slotExtras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [runtime.extras];exact s.slotExtras,
     destination:=by rw [rootEq];exact s.destination }
   exact ⟨input,rfl,rfl,rfl,rfl,trace⟩
 

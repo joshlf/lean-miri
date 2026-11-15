@@ -69,7 +69,9 @@ theorem positive
     (noFree : entry.allocation.extra.tagMapping.deassigned.back? = none)
     (fits : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let tree := (entry.allocation.extra.performBorrowAccessRange .wildcard (Size.ofBytes offset) (Size.ofBytes len) .Read (TypedBorrowSteps.registeredGlobal tracker tracker.global.nextPointerTag).protectedTags .VisitChildrenOfAccessed).tree
     let tag := tracker.global.nextPointerTag
     let index : UniIndex := ⟨UInt32.ofNat entry.allocation.extra.tagMapping.mapping.size⟩
@@ -86,6 +88,7 @@ theorem positive
         {value := .live (.immediate (RetagReferencePlace.sliceValue cfg.access.runtime.base
           (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes (base+offset))) len reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let tree := (entry.allocation.extra.performBorrowAccessRange .wildcard (Size.ofBytes offset) (Size.ofBytes len) .Read (TypedBorrowSteps.registeredGlobal tracker tracker.global.nextPointerTag).protectedTags .VisitChildrenOfAccessed).tree
   let tag := tracker.global.nextPointerTag
   let index : UniIndex := ⟨UInt32.ofNat entry.allocation.extra.tagMapping.mapping.size⟩

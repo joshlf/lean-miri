@@ -19,10 +19,11 @@ theorem actual_root_abi (options : EvalConfigurationCore.Options)
       RootBody.reflected.functionInstance #[] state = .ok RootCompilerFacts.rootAbi state := by
   unfold config
   rw [(CanonicalConfigFacts.actual_fields options choice remaining span).callCompiler]
-  with_unfolding_all change (match RootCompilerFacts.rootAbiQuery with
-    | .ok value => pure value
-    | .error reason => throw (StepError.unsupported reason) : MachineHooks.M MiriMemoryKind Machine.RootUser (FnAbi MIR.TyId)) state = _
-  rw [RootCompilerFacts.root_abi_eq]
+  dsimp only [CompilerCallConstruction.compiler, CompilerExecutionCallLeaves.make]
+  unfold_internal ".CompilerExecutionCallLeaves.lift"
+  have query := RootCompilerFacts.root_abi_eq
+  unfold RootCompilerFacts.rootAbiQuery at query
+  rw [query]
   rfl
 
 theorem actual_root_load_mir (options : EvalConfigurationCore.Options)
@@ -154,7 +155,7 @@ theorem root_usize_argument_compat {S : Type} (queries : LayoutCompat.Queries MI
 
 theorem root_preamble_span {K User : Type} (state : MachineHooks.State K User) :
     CompilerLifecycle.preambleSpan PreparedReflection.actual.compiler.lifecycle.lifecycle
-      RootBody.reflected.body state = .ok ⟨559⟩ state := by with_unfolding_all rfl
+      RootBody.reflected.body state = .ok ⟨0⟩ state := by with_unfolding_all rfl
 
 theorem root_required_constants (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
     (frame : Frame Provenance LocalLayout MachineHooks.FrameExtra)
@@ -190,7 +191,7 @@ noncomputable def rawRootFrame (machine : MachineHooks.MachineState MiriMemoryKi
     (destination : RuntimeStackPlace Provenance) (identity : LocalsIdentity) :
     Frame Provenance LocalLayout MachineHooks.FrameExtra :=
   let frame : Frame Provenance LocalLayout Unit := Frame.create RootBody.reflected.body
-    RootBody.reflected.functionInstance () (.stop true) destination ⟨559⟩ identity
+    RootBody.reflected.functionInstance () (.stop true) destination ⟨0⟩ identity
   { body := frame.body, bodyIdentity := frame.bodyIdentity, functionInstance := frame.functionInstance
     extra := {borrowTracker := machine.borrowTracker.map (fun _ => {}), catchUnwind := none, userRelevance := 255, dataRace := machine.dataRace.map (fun _ => {})}
     returnContinuation := frame.returnContinuation, returnPlace := frame.returnPlace
@@ -203,12 +204,12 @@ theorem init_root_frame (crates : Array Nat)
     MachineHooks.initFrame (FrameMetadata.userRelevance
       (CompilerFrameMetadata.hooks PreparedReflection.actual.compiler.lifecycle.frames crates))
       (Frame.create RootBody.reflected.body RootBody.reflected.functionInstance ()
-        (.stop true) destination ⟨559⟩ identity) state =
+        (.stop true) destination ⟨0⟩ identity) state =
       .ok (rawRootFrame state.machine destination identity) state := by
   unfold MachineHooks.initFrame
   have relevance := root_user_relevance crates
     (Frame.create RootBody.reflected.body RootBody.reflected.functionInstance ()
-      (.stop true) destination ⟨559⟩ identity : Frame Provenance LocalLayout Unit) state rfl
+      (.stop true) destination ⟨0⟩ identity : Frame Provenance LocalLayout Unit) state rfl
   simp only [bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get,
     pure, EStateM.pure] at relevance ⊢
   rw [relevance]
@@ -294,8 +295,8 @@ theorem root_local4_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 4 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 4 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -343,8 +344,8 @@ theorem root_local0_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -352,8 +353,8 @@ theorem root_local1_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 1 = .ok 3 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 1 = .ok 3 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -361,8 +362,8 @@ theorem root_local2_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 2 = .ok 5 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 2 = .ok 5 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -378,7 +379,7 @@ private theorem compute_local_from_metadata (compiler : CompilerProviders.Prepar
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
     (frame : CompilerFrameContext.ActualFrame) (machine : MachineHooks.MachineState K User)
     (localId ty : Nat) (layout : LocalLayout)
-    (normalized : CompilerFrameContext.normalizedLocalType compiler frame localId = .ok ty)
+    (normalized : CompilerFrameContext.localType compiler frame localId = .ok ty)
     (queried : compiler.runtime.lookup ty = .ok layout) :
     CompilerFrameContext.computeLocalLayout compiler localId (Storage.withCurrent framesBefore frame machine) =
       .ok layout (Storage.withCurrent framesBefore frame machine) := by
@@ -568,13 +569,11 @@ private theorem root_body_of_frame (frame : CompilerFrameContext.ActualFrame)
 private theorem local_span_from_metadata (compiler : CompilerProviders.Prepared)
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
     (frame : CompilerFrameContext.ActualFrame) (machine : MachineHooks.MachineState K User)
-    (supplied : MIR.Body) (localId : Nat) (source : LoweredBody) (decl : Input.LocalDecl)
-    (spanData : SourceSpanData) (index : Nat)
-    (sameBody : supplied = frame.body)
+    (supplied : MIR.Body) (localId : Nat) (source : LoweredBody) (decl : Input.SourceInfo)
+    (index : Nat) (sameBody : supplied = frame.body)
     (sourceBody : CompilerFrameContext.bodyOfFrame compiler frame = .ok source)
-    (sourceDecl : source.input.locals[localId]? = some decl)
-    (declSpan : decl.sourceInfo.span = spanData)
-    (lookupSpan : compiler.program.bundle.spans.toList.idxOf? spanData = some index) :
+    (sourceDecl : source.input.localSources[localId]? = some decl)
+    (declSpan : decl.spanId = index) (bound : index < compiler.program.bundle.spans.size) :
     CompilerFrameContext.localSpan compiler supplied localId (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨index⟩ (Storage.withCurrent framesBefore frame machine) := by
   unfold CompilerFrameContext.localSpan
@@ -586,9 +585,7 @@ private theorem local_span_from_metadata (compiler : CompilerProviders.Prepared)
   unfold_frame_query_lift
   simp only [EStateM.bind, pure, EStateM.pure]
   rw [sourceDecl]
-  dsimp only
-  rw [declSpan, lookupSpan]
-  rfl
+  simp [declSpan, bound, pure, EStateM.pure]
 
 theorem root_local0_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -598,17 +595,14 @@ theorem root_local0_span
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler RootBody.reflected.body.body 0
       (Storage.withCurrent framesBefore frame machine) =
-      .ok ⟨601⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 0 < SpanFacts.rootInputBody.input.locals.size := by decide +kernel
-  let decl := SpanFacts.rootInputBody.input.locals[0]'valid
-  have present : SpanFacts.rootInputBody.input.locals[0]? = some decl := by
+      .ok ⟨2⟩ (Storage.withCurrent framesBefore frame machine) := by
+  have valid : 0 < SpanFacts.rootInputBody.input.localSources.size := by decide +kernel
+  let decl := SpanFacts.rootInputBody.input.localSources[0]'valid
+  have present : SpanFacts.rootInputBody.input.localSources[0]? = some decl := by
     simp [decl, valid]
-  have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
-      (SpanFacts.rootLocalSpan ⟨0, by decide⟩) = some 601 := by
-    rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
-    exact SpanFacts.root_local0_span_index
-  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl _ 601 body.symm
-    (root_body_of_frame frame body identity callee) present rfl spanQuery
+  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl 2 body.symm
+    (root_body_of_frame frame body identity callee) present rfl (by decide +kernel)
+
 
 theorem root_local1_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -618,17 +612,14 @@ theorem root_local1_span
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler RootBody.reflected.body.body 1
       (Storage.withCurrent framesBefore frame machine) =
-      .ok ⟨602⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 1 < SpanFacts.rootInputBody.input.locals.size := by decide +kernel
-  let decl := SpanFacts.rootInputBody.input.locals[1]'valid
-  have present : SpanFacts.rootInputBody.input.locals[1]? = some decl := by
+      .ok ⟨3⟩ (Storage.withCurrent framesBefore frame machine) := by
+  have valid : 1 < SpanFacts.rootInputBody.input.localSources.size := by decide +kernel
+  let decl := SpanFacts.rootInputBody.input.localSources[1]'valid
+  have present : SpanFacts.rootInputBody.input.localSources[1]? = some decl := by
     simp [decl, valid]
-  have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
-      (SpanFacts.rootLocalSpan ⟨1, by decide⟩) = some 602 := by
-    rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
-    exact SpanFacts.root_local1_span_index
-  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl _ 602 body.symm
-    (root_body_of_frame frame body identity callee) present rfl spanQuery
+  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl 3 body.symm
+    (root_body_of_frame frame body identity callee) present rfl (by decide +kernel)
+
 
 theorem root_local2_span
     (framesBefore : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -638,17 +629,13 @@ theorem root_local2_span
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler RootBody.reflected.body.body 2
       (Storage.withCurrent framesBefore frame machine) =
-      .ok ⟨603⟩ (Storage.withCurrent framesBefore frame machine) := by
-  have valid : 2 < SpanFacts.rootInputBody.input.locals.size := by decide +kernel
-  let decl := SpanFacts.rootInputBody.input.locals[2]'valid
-  have present : SpanFacts.rootInputBody.input.locals[2]? = some decl := by
+      .ok ⟨4⟩ (Storage.withCurrent framesBefore frame machine) := by
+  have valid : 2 < SpanFacts.rootInputBody.input.localSources.size := by decide +kernel
+  let decl := SpanFacts.rootInputBody.input.localSources[2]'valid
+  have present : SpanFacts.rootInputBody.input.localSources[2]? = some decl := by
     simp [decl, valid]
-  have spanQuery : PreparedReflection.actual.compiler.program.bundle.spans.toList.idxOf?
-      (SpanFacts.rootLocalSpan ⟨2, by decide⟩) = some 603 := by
-    rw [show PreparedReflection.actual.compiler.program = PreparedReflection.actual.program by rfl]
-    exact SpanFacts.root_local2_span_index
-  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl _ 603 body.symm
-    (root_body_of_frame frame body identity callee) present rfl spanQuery
+  exact local_span_from_metadata _ _ _ _ _ _ SpanFacts.rootInputBody decl 4 body.symm
+    (root_body_of_frame frame body identity callee) present rfl (by decide +kernel)
 
 open Lean Elab Command in
 run_cmd do

@@ -42,6 +42,9 @@ theorem integer_zero
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (LenInstall.resultFrame frame valid output) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 SharedReferenceMetadata.sharedLayout).imm
   let cache := LenInstall.cacheFrame frame valid
   have cacheValid : 1 < cache.locals.size := by simpa [cache,LenInstall.cacheFrame,LenInstall.spanFrame,LocalOperands.cachedLayoutFrame] using valid
@@ -91,6 +94,9 @@ theorem integer_zero_scoped
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (LenInstall.resultFrame frame valid output) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let activeTracker := {tracker with retagMode := .FnEntry}
   let activeMachine := {machine with borrowTracker := some activeTracker}
   have made := integer_zero options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq

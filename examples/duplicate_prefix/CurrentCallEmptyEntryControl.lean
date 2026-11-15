@@ -46,25 +46,25 @@ theorem finish_of_arguments (options : EvalConfigurationCore.Options) (limits : 
         (RootArgumentsTwo.result (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count).frame sourceMachine))
     (protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
       (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceMachine)=
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (registeredFrame (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceFrame boolId boolTag) finalMachine)) :
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceFrame boolId boolTag) finalMachine)) :
     action (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
       (value options remaining span argument).imm count place
       (Storage.withCurrent frames root.frame before)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) ∧
+          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) ∧
     RootEntryTail.tail (ExecutionMachine.callHooks (config options (remaining+1) span) limits) place
       (Storage.withCurrent frames (RootArgumentsTwo.result
         (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) := by
+          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) := by
   let argsRoot := RootArgumentsTwo.result (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count
-  let protectedFrame := registeredFrame (atSpan argsRoot ⟨601⟩).frame sourceFrame boolId boolTag
+  let protectedFrame := registeredFrame (atSpan argsRoot ⟨2⟩).frame sourceFrame boolId boolTag
   have dead : ∀ slot : Fin 25,slot.val≠1 → slot.val≠2 →
       (protectedFrame.locals[slot.val]'(by simpa only [protectedFrame,registeredFrame,TypedRetagEntry.frameWithBorrow,atSpan] using argsRoot.valid slot)).value=.dead := by
     intro slot ne1 ne2
@@ -105,17 +105,17 @@ theorem init_of_arguments (options : EvalConfigurationCore.Options) (limits : Ex
     (preparedEq : before=CurrentCallPush.preparedMachine initial frames)
     (protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
       (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceMachine)=
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (registeredFrame (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceFrame boolId boolTag) finalMachine)) :
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceFrame boolId boolTag) finalMachine)) :
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
       #[.Copy ⟨.immediate (value options remaining span argument).imm,ActualReferenceMetadata.reference⟩,
         .Copy (second count)] false (.memory place) (.stop true) (⟨⟨frames⟩,initial⟩ : RootState)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) := by
+          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) := by
   obtain ⟨_,tail⟩ := finish_of_arguments options limits remaining span frames root rawLocals
     before tracker argument effect borrowFrame count sourceMachine finalMachine sourceFrame boolId boolTag
     place arguments protection
@@ -155,17 +155,17 @@ theorem init_of_copy_protect (options : EvalConfigurationCore.Options) (limits :
     (preparedEq : before=CurrentCallPush.preparedMachine initial frames)
     (protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
       (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceMachine)=
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (registeredFrame (atSpan (RootArgumentsTwo.result
-        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame sourceFrame boolId boolTag) finalMachine)) :
+        (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame sourceFrame boolId boolTag) finalMachine)) :
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
       #[.Copy ⟨.immediate (value options remaining span argument).imm,ActualReferenceMetadata.reference⟩,
         .Copy (second count)] false (.memory place) (.stop true) (⟨⟨frames⟩,initial⟩ : RootState)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) := by
+          (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) := by
   have arguments := (CurrentCallEmptySourceArguments.arguments options limits remaining span debug fuel fuelEq
     frames root rawLocals before sourceFnMachine tracker nextTracker tracked afterTracked ghost shallow
     afterGhost afterShallow argument effect borrowFrame count copy).2

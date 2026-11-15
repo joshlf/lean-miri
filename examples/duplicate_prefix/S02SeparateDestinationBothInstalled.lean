@@ -48,7 +48,7 @@ theorem enters_both
         let frame := (RootArgumentsTwo.result
           (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
             reference.id reference.tracker.global.nextPointerTag) count).frame
-        let changed := {frame with location := .unwinding ⟨601⟩}
+        let changed := {frame with location := .unwinding ⟨2⟩}
         let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
         let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra
           destination.tracker returnTag destination.offset 1
@@ -59,7 +59,7 @@ theorem enters_both
         let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
         let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
           destination.tracker.global.nextPointerTag
-        let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+        let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
         let sourceTree := GeneralBorrowRawFnEntryArgument.finalTree reference.entry.allocation.extra
           reference.tracker tag reference.offset len
         let sourceEntry := {reference.entry with allocation := reference.entry.allocation.setExtra sourceTree}
@@ -117,7 +117,7 @@ theorem enters_both
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let tree := GeneralBorrowRawFnEntryArgument.finalTree destination.entry.allocation.extra
     destination.tracker returnTag destination.offset 1

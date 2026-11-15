@@ -40,8 +40,8 @@ theorem root_local5_layout
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler 5
       (Storage.withCurrent framesBefore frame machine) =
       .ok RootCompilerFacts.usizeLayout (Storage.withCurrent framesBefore frame machine) := by
-  have normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 5 = .ok 5 := by
-    unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  have normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler frame 5 = .ok 5 := by
+    unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
     rw [body, identity, callee]
     with_unfolding_all rfl
   unfold CompilerFrameContext.computeLocalLayout
@@ -153,7 +153,7 @@ theorem actual_copy_count_step
   have typeCheck := RootLocalStages.operand_check_skipped options limits () (remaining + 1) span debugOff
     (OperandDispatch.wholeLocal 2) sourceValue state1
   have evalSource := OperandDispatch.evalOperandAt_copy_wholeLocal operandHooks ()
-    (OperandPath.rvalue "operand") 2 (some RootCompilerFacts.usizeLayout) state1 state1 sourceValue
+     2 (some RootCompilerFacts.usizeLayout) state1 state1 sourceValue
     localRead typeCheck
   have getFrame : placeHooks.getFrame state0 = .ok frame state0 := by
     change config.projection.place.getFrame state0 = .ok frame state0

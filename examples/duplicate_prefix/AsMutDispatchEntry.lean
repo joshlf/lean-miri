@@ -1,3 +1,4 @@
+import duplicate_prefix.AsMutCalleeLeaves
 import duplicate_prefix.AsMutEntry
 import duplicate_prefix.AsMutDispatch
 import duplicate_prefix.CallItemDispatch
@@ -79,11 +80,11 @@ theorem actual_dispatch
     change (PreparedContracts.actualConfig options () (remaining+1) span).calls.compiler.isRustCall .Rust = false
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).callCompiler]
     rfl
-  have kind : HelperCompilerFacts.asMutPtrCall.callee.kind = .Item HelperCompilerFacts.asMutPtrCall.callee.defId := by
-    with_unfolding_all rfl
+  have kind : h.instanceKind HelperCompilerFacts.asMutPtrCall.callee = pure (.Item 6) :=
+    AsMutCalleeLeaves.instance_kind options limits (remaining+1) span
   dsimp only
   apply CallItemDispatch.dispatch_one h _ state _ budget
-  rw [CallItemDispatch.item_step h HelperCompilerFacts.asMutPtrCall.callee HelperCompilerFacts.asMutPtrCall.callee.defId
+  rw [CallItemDispatch.item_step h HelperCompilerFacts.asMutPtrCall.callee 6
     HelperCompilerFacts.asMutPtrAbi args false destination (some 7) .Continue .Rust kind AsMutCallFacts.abi_flags.2.1 rust]
   unfold CallItemDispatch.itemStage
   simp only [bind,EStateM.bind]

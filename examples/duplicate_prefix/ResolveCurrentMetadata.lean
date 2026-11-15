@@ -20,8 +20,7 @@ theorem resolve
     (blockAt : source.body.basicBlocks[location.block]? = some block)
     (atEnd : location.statementIndex = block.statements.size)
     (resolveAt : CallResolution.atSite compiler.lifecycle.calls.calls ⟨frame.bodyIdentity.index,location.block⟩ = .ok resolution)
-    (functionType : (resolution.source.getObjVal? "function_type").bind
-      (fun object => (object.getObjVal? "type_id").bind Lean.Json.getNat?) = .ok ty)
+    (functionType : resolution.source.functionType = some ty)
     (kind : CompilerFunctionFacts.kind compiler.functions ty = .ok (.FnDef definition args))
     (argsSelf : (args == args) = true) :
     CompilerProviders.resolveCurrent compiler definition args (Storage.withCurrent frames frame machine) =
@@ -37,18 +36,8 @@ theorem resolve
     Except.bind,Except.pure,bind,EStateM.bind,pure,EStateM.pure]
   simp only [frameBlock,atEnd,beq_self_eq_true,ite_true]
   simp only [resolveAt,Except.bind,Except.pure,bind,EStateM.bind,pure,EStateM.pure]
-  cases first : resolution.source.getObjVal? "function_type" with
-  | error reason => simp [first,Except.bind] at functionType
-  | ok object =>
-    cases second : object.getObjVal? "type_id" with
-    | error reason => simp [first,second,Except.bind] at functionType
-    | ok number =>
-      cases third : number.getNat? with
-      | error reason => simp [first,second,third,Except.bind] at functionType
-      | ok typeId =>
-        have same : typeId = ty := by simpa [first,second,third,Except.bind] using functionType
-        subst typeId
-        simp [first,second,third,kind,argsSelf,pure,Pure.pure,EStateM.pure]
+  simp only [functionType,kind,argsSelf,beq_self_eq_true,ite_true,Except.bind,Except.pure]
+  rfl
 
 #print axioms resolve
 end DuplicatePrefix.ResolveCurrentMetadata

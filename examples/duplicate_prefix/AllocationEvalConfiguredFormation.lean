@@ -9,7 +9,8 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
 /-- Canonical Eval backend selection and actual production allocation prefix.
-Only initial backend/registry/storage/numeric facts are required; the address
+Initial backend/registry/storage/numeric facts and the disabled allocation
+diagnostic profile are explicit; the address
 callback executes after the derived root/tree/global/live installation. -/
 theorem allocate
     (pointers : PointerMachine.Hooks MiriMemoryKind
@@ -25,7 +26,9 @@ theorem allocate
     (initial : tracker.global=GlobalState.new) (race : before.machine.dataRace=none)
     (noBackend : before.machine.user.payload.payload.user.backend=.none)
     (noExtras : ((extras.get before.machine.user).allocations.any (fun row=>row.1==AllocationLifecycleFormation.id))=false)
-    (bounded : size.bytes≤base.maximumObjectSize.bytes) :
+    (bounded : size.bytes≤base.maximumObjectSize.bytes)
+    (backtrace : base.allocationBacktrace = none := by rfl)
+    (spans : base.allocationSpan = fun _ _ _ => pure () := by rfl) :
     let config:=EvalAllocationMachine.allocation pointers extras base
     ∃ allocation : Allocation Provenance Unit,
       AllocationPointerFormation.Ready allocation size ∧ allocation.align=Align.ONE ∧
@@ -34,6 +37,8 @@ theorem allocate
         finishRoot before (config.adjustRootAddress AllocationLifecycleFormation.id BorTag.one
           (insertedState extras before tracker kind allocation)) := by
   let config:=EvalAllocationMachine.allocation pointers extras base
+  have backtraceConfig : (EvalAllocationMachine.allocation pointers extras base).allocationBacktrace = none := backtrace
+  have spansConfig : (EvalAllocationMachine.allocation pointers extras base).allocationSpan = fun _ _ _ => pure () := spans
   have managedConfig : (EvalAllocationMachine.allocation pointers extras base).nativeStorage=none := managed
   have diagnosticConfig : (EvalAllocationMachine.allocation pointers extras base).diagnostic=fun _ _ _=>pure () := diagnostic
   obtain ⟨allocation,created,ready⟩ := AllocationPointerFormation.backing size bytes config.zeroedStorage provided length zero
@@ -55,12 +60,13 @@ theorem allocate
   subst other
   refine ⟨allocation,ready,aligned,created,?_⟩
   unfold ReallocationDriver.allocateConfigured
-  unfold_internal ".ReallocationDriver.machineAction"
-  simp only [managedConfig,createdConfig,notLarge,↓reduceIte,diagnosticConfig,emptyMemory,reserve,
+  unfold PlaceMachine.initializeAllocation
+  unfold_internal ".PlaceMachine.allocationMachine"
+  simp only [backtraceConfig,spansConfig,managedConfig,createdConfig,notLarge,↓reduceIte,diagnosticConfig,emptyMemory,reserve,
     get,getThe,MonadStateOf.get,EStateM.get,set,EStateM.set,
     modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet,
     bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
-    tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
+    EarlyReturnT.return,ExceptT.mk,tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
   dsimp only [synchronize] at hook
   rw [hook]
   simp only [AllocationLifecycleFormation.initialized,AllocationRootHookFormation.rooted,MemoryExtras.putAllocation,
@@ -68,7 +74,7 @@ theorem allocate
     get,getThe,MonadStateOf.get,EStateM.get,set,EStateM.set,
     modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet,
     bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
-    tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
+    EarlyReturnT.return,ExceptT.mk,tryCatch,tryCatchThe,MonadExceptOf.tryCatch,EStateM.tryCatch,throw,throwThe,MonadExceptOf.throw,EStateM.throw]
   simp only [finishRoot,EStateM.tryCatch,EStateM.throw,insertedState,synchronize,AllocationLifecycleFormation.initialized,
     AllocationRootHookFormation.rooted,MemoryExtras.putAllocation,inserted,ready.1,reserved_live,Array.push_empty]
 end DuplicatePrefix.AllocationEvalConfiguredFormation

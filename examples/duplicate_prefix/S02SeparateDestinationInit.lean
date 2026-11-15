@@ -50,7 +50,7 @@ theorem concrete_positive_call
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] raw.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame machine
   have control := RawRootInvocation.control before place input.contract.model.noDataRace
-  have preamble : raw.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : raw.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {raw.frame with trackCallerArg := none} = raw.frame := by rw [←control.2.1]
   simp only [preamble] at unchanged
   refine ⟨done,?_⟩

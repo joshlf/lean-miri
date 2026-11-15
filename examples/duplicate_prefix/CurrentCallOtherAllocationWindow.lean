@@ -64,6 +64,7 @@ theorem ready {before after : Before} {other offset length}
     CurrentCallBoolProtection.WindowReady after other offset length := by
   obtain ⟨sync,present,outside⟩:=old
   refine ⟨sync,?_,outside⟩
+  unfold AllocationBacktrace.get
   rw [extras,lookup _ id other extra different]
   exact present
 

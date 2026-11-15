@@ -98,7 +98,7 @@ def input (s : GeneralBorrowPositiveWildcardSparseAcceptedInput.Initial) (p : Po
     slotSize:=p.source.slotSize,slotStorage:=p.source.slotLen,slotMask:=p.source.slotMask,slotProvenance:=p.source.slotProvenance,slotMutable:=p.source.slotMutable,
     place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,aligned:=s.aligned,fits:=s.slotFits,
     cached:=by rw [p.output.addresses,p.runtime.addresses];exact p.source.slotCached,
-    extras:=by change p.output.finalMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change p.output.finalMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
                rw [p.output.extras,p.runtime.extras];exact p.source.slotExtras,
     destination:=p.source.returnPlace }
 

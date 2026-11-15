@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.AllocationCopy
 import duplicate_prefix.PointerArithmetic
 import duplicate_prefix.PointerAccess
@@ -369,7 +370,7 @@ theorem weak_write_without_buffer {K U Payload : Type}
     (extras : MemoryExtras.Hooks K U Payload) (machine : MachineHooks.MachineState K U)
     (id : AllocId) (range : AllocRange)
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩)) :
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     MemoryExtras.nonAtomicWrite extras id range machine = .ok () machine := by
   unfold MemoryExtras.nonAtomicWrite MemoryExtras.lookup
   unfold_internal ".MemoryExtras.liftResult"
@@ -380,7 +381,7 @@ theorem sync_access_without_entries {K U Payload : Type}
     (extras : MemoryExtras.Hooks K U Payload) (machine : MachineHooks.MachineState K U)
     (id : AllocId) (range : AllocRange) (write : Bool)
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩)) :
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     MemoryExtras.syncAccess extras write id range machine = .ok () machine := by
   unfold MemoryExtras.syncAccess Miri.Concurrency.SyncObject.onMemoryAccess
     MemoryExtras.accessHooks MemoryExtras.lookup
@@ -548,7 +549,7 @@ theorem source_memory_access_reduces_to_tree {Os R P H D O Aff B Host : Type}
     (noBackend : machine.user.payload.payload.user.backend = .none)
     (tracked : machine.borrowTracker = some tracker)
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩)) :
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     let config := Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras
     let result := PlaceMachine.memoryAccess config write ⟨machine, none⟩ tree id provenance range
     let access := tree.performBorrowAccessRange provenance range.start range.size
@@ -605,7 +606,7 @@ theorem source_memory_access_exact {Os R P H D O Aff B Host : Type}
     (noBackend : machine.user.payload.payload.user.backend = .none)
     (tracked : machine.borrowTracker = some tracker)
     (present : (extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩)) :
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((extras.get machine.user).allocations) (id) })) :
     let config := Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras
     let result := PlaceMachine.memoryAccess config write ⟨machine, none⟩ tree id provenance range
     let access := tree.performBorrowAccessRange provenance range.start range.size
@@ -613,8 +614,8 @@ theorem source_memory_access_exact {Os R P H D O Aff B Host : Type}
     result = if access.status = .Completed then
       ⟨⟨machine, none⟩, access.tree, .ok ()⟩
     else
-      ⟨⟨machine, some (source_tree_error access.status)⟩, access.tree,
-        .error (reprStr (source_tree_error access.status))⟩ := by
+      ⟨⟨machine, some (source_tree_error write access.status)⟩, access.tree,
+        .error (reprStr (source_tree_error write access.status))⟩ := by
   dsimp only
   have diagnostic :
       (Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras).diagnostic
@@ -671,7 +672,7 @@ theorem source_global_access_exact {Os R P H D O Aff B Host : Type}
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (tracked : state.machine.borrowTracker = some tracker)
     (present : (extras.get state.machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get ((extras.get state.machine.user).allocations) (id) }))
     (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩)) :
     let config := Miri.Input.EvalAccessMachine.make prepared image maximum fuel globals pointers extras
     let access := allocation.extra.performBorrowAccessRange provenance range.start range.size
@@ -682,7 +683,7 @@ theorem source_global_access_exact {Os R P H D O Aff B Host : Type}
     let after := {state with machine := {state.machine with memory}}
     source_global_access config write allocation id provenance range state =
       if access.status = .Completed then .ok updated after
-      else .error (source_tree_error access.status) after := by
+      else .error (source_tree_error write access.status) after := by
   have accessed := source_memory_access_exact prepared image maximum fuel globals pointers extras
     state.machine tracker allocation.extra id provenance range write noClocks noBackend tracked present
   dsimp only at accessed ⊢

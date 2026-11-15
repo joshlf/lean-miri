@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.EmptyRootSafety
 import duplicate_prefix.DuplicatePrefixCompletedCallResult
 
@@ -44,7 +45,7 @@ theorem invoke
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : before.user.payload.ghost = false)
     (address count : UInt64) (nonzero : address ≠ 0)
     (cmp : ProjectionMetadataFacts.NullComparator)

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellTypedGeneratedPrefix
 import duplicate_prefix.PhysicalMemoryWrite
 import duplicate_prefix.CanonicalConfigFacts
@@ -71,7 +72,7 @@ theorem write_from_fields (context : Context)
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (enabled : state.machine.borrowTracker = some tracker)
     (protections : tracker.global.protectedTags = {})
-    (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (layout : place.layout = PriorCellMetadata.u16Layout)
     (pointer : place.mplace.ptr = Pointer.new (some (.concrete id (tag 1))) (Size.ofBytes base))
     (aligned : place.mplace.misaligned = none)

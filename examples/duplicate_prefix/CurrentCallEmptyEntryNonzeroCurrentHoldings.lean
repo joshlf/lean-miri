@@ -34,7 +34,7 @@ private theorem runtime_advance (tree : BorrowTree) (before after : GlobalState)
 
 private theorem initial_live (out : CurrentCallEmptyEntryRoot.Output input #[]) (count : UInt64) : (machine out count).memory.live.find? (fun row=>row.1==out.physical.id)=
       some (out.physical.id,{out.physical.entry with allocation:=out.updated}) := by
-    change (((ReturnProtection.borrowedState #[] (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨601⟩).frame
+    change (((ReturnProtection.borrowedState #[] (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨2⟩).frame
       (CurrentCallEmptyEntryRoot.sourceBorrow out.effect {}) (sourceMachine out) (sourceTracker out) out.room
       out.physical.id out.physical.entry out.certificate.output.child.tree).machine.memory.live.filter
       fun row=>row.1!=out.physical.id).push (out.physical.id,{out.physical.entry with allocation:=out.updated})).find?

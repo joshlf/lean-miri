@@ -13,7 +13,7 @@ set_option maxHeartbeats 8000000
 open Lean Elab Command in
 run_cmd do
   let hash ← IO.Process.output {cmd:="sha256sum",args:=#["examples/duplicate_prefix/input.json"]}
-  unless hash.exitCode == 0 && hash.stdout.startsWith "444638d5f40f4e59df584939ed6479272ecea1ca9244de2f9e5152ab7f459f06 " do
+  unless hash.exitCode == 0 && hash.stdout.startsWith "15a9992e38706a4481d598d86fcfdc89ef48115d97b1a0b8b1cc1d8a7a973143 " do
     throwError "fixed allocation catalog input hash mismatch"
 
 def memoryReadonly (descriptor : GlobalAllocation) : Bool :=
@@ -26,7 +26,7 @@ def memoryReadonly (descriptor : GlobalAllocation) : Bool :=
 not a no-global theorem. -/
 theorem catalog_grammar : PreparedReflection.actual.initialMemory.globals.all memoryReadonly=true := by decide +kernel
 
-theorem catalog_size : PreparedReflection.actual.initialMemory.globals.size=718 := by rfl
+theorem catalog_size : PreparedReflection.actual.initialMemory.globals.size=691 := by rfl
 
 theorem static_initializers_empty : PreparedReflection.actual.image.initializers=#[] := by rfl
 

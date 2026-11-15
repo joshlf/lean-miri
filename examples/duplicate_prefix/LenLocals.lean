@@ -10,9 +10,14 @@ set_option backward.dsimp.instances true
 
 def inputBody : LoweredBody := PreparedReflection.actual.program.bundle.bodies[LenHelper.body.identity.index]'(by decide +kernel)
 def localSpan (id : Fin 3) : SourceSpanData :=
-  (inputBody.input.locals[id.val]'(by
-    have size : inputBody.input.locals.size = 3 := by rfl
-    omega)).sourceInfo.span
+  let spanId := (inputBody.input.localSources[id.val]'(by
+    have size : inputBody.input.localSources.size = 3 := by rfl
+    omega)).spanId
+  PreparedReflection.actual.program.bundle.spans[spanId]'(by
+    have valid : ∀ i : Fin 3, (inputBody.input.localSources[i.val]'(by
+      have size : inputBody.input.localSources.size = 3 := by rfl
+      omega)).spanId < PreparedReflection.actual.program.bundle.spans.size := by decide +kernel
+    exact valid id)
 def spanQuery (id : Fin 3) := PreparedReflection.actual.program.bundle.spans.toList.idxOf? (localSpan id)
 theorem body_of_frame (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = LenHelper.body.body)
@@ -27,8 +32,8 @@ theorem normalized_local1 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = LenHelper.body.body)
     (identity : frame.bodyIdentity = LenHelper.body.identity)
     (callee : frame.functionInstance = LenHelper.resolved.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 1 = .ok 7 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 1 = .ok 7 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 

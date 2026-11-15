@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallParameters
 import duplicate_prefix.GenericAsMutPtrArgumentCopy
 import duplicate_prefix.RawRootInvocation
@@ -75,7 +76,9 @@ private theorem copy_argument (span : PreparedContracts.FixedSpanQuery)
     (present : machine.memory.live.find? (fun row => row.1 == sourceId) = some (sourceId,sourceEntry))
     (race : machine.dataRace = none)
     (metadata : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime)
-    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false) :
+    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       sourcePointer 2 ActualReferenceMetadata.reference).imm
     let copied := GenericAsMutPtrArgumentCopy.copiedFrame frame 1 value valid
@@ -144,11 +147,11 @@ than a quoted state or a replacement interpreter operation. -/
 def installed (span : PreparedContracts.FixedSpanQuery) (updated : Allocation Provenance BorrowTree) : RootState :=
   let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal global fresh,.Default⟩
   let owned := ({} : FrameState).addProtector sourceId (tag 8)
-  let changed := {(argumentFrame span).frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {(argumentFrame span).frame with location := FrameLocation.unwinding ⟨2⟩}
   let borrowed := ReturnProtection.borrowedState #[] changed owned argumentMachine next (by decide +kernel)
     destinationId destinationEntry (PhysicalMachineWrite.slotTree (tag 7) next.global.nextPointerTag 1 false)
   Storage.withCurrent #[]
-    (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame changed owned destinationId next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+    (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame changed owned destinationId next.global.nextPointerTag with location := .unwinding ⟨0⟩})
     (CanonicalCopy.replaceAllocation borrowed destinationId destinationEntry.kind updated).machine
 
 /-- This exact closed call initializes normally. Only independent metadata
@@ -167,6 +170,9 @@ theorem init_ok_with_slot (span : PreparedContracts.FixedSpanQuery) (cmp : Proje
   obtain ⟨retagCtx⟩ := ActualRetagContext.exists_context options (remaining+1) span rfl rfl
   obtain ⟨ghostBefore,shallowBefore,alignmentBefore,raceBefore,backendBefore,fixedBefore,uncheckedBefore,gcBefore⟩ := profile
   let root := RawRootInvocation.root before place raceBefore
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let machine := RawRootInvocation.machine #[] before
   obtain ⟨memoryEq,trackedEq,raceEq,addressesEq,ghostEq,validationEq,typesEq,backendEq,extrasEq⟩ :=
     RawRootInvocation.preservation #[] before
@@ -177,7 +183,7 @@ theorem init_ok_with_slot (span : PreparedContracts.FixedSpanQuery) (cmp : Proje
   have srcCached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == sourceId) = some ⟨sourceId,4096⟩ := by rw [addressesEq]; exact source_cached
   have slotLive : machine.memory.live.find? (fun row => row.1 == destinationId) = some (destinationId,destinationEntry) := by rw [memoryEq]; exact destination_present
   have slotCached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == destinationId) = some ⟨destinationId,8192⟩ := by rw [addressesEq]; exact destination_cached
-  have slotExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationId) = some (destinationId,⟨none,#[]⟩) := by rw [extrasEq]; exact destination_extras
+  have slotExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationId) = some (destinationId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destinationId) }) := by rw [extrasEq]; exact destination_extras
   have ghost : machine.user.payload.ghost = false := ghostEq.trans ghostBefore
   have shallow : machine.user.payload.validation = .Shallow := validationEq.trans shallowBefore
   have race : machine.dataRace = none := raceEq.trans raceBefore
@@ -277,7 +283,7 @@ theorem init_ok_with_slot (span : PreparedContracts.FixedSpanQuery) (cmp : Proje
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] root.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] root.frame root.frame machine
   have control := RawRootInvocation.control before place raceBefore
-  have preamble : root.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : root.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {root.frame with trackCallerArg := none} = root.frame := by rw [←control.2.1]
   unfold CallEntryFacts.config at push
   unfold RootCallCore.core

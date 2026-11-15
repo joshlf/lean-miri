@@ -20,17 +20,9 @@ def location : Kind → Location
   | .initial => ⟨2,1⟩ | .afterGuard => ⟨6,2⟩ | .afterCopy => ⟨9,4⟩
 
 def sourceSpan : Kind → SpanRef
-  | .initial => ⟨7⟩ | .afterGuard => ⟨20⟩ | .afterCopy => ⟨27⟩
-
-noncomputable def site (kind : Kind) : CompilerConstantQueries.Site :=
-  ⟨RootBody.reflected.body.identity.index,location kind,
-    #[.field "kind",.field "rvalue",.field "operand",.field "constant"]⟩
+  | .initial => ⟨29⟩ | .afterGuard => ⟨34⟩ | .afterCopy => ⟨18⟩
 
 def constant (kind : Kind) : ConstOperand := ⟨sourceSpan kind,none,.Val .ZeroSized 2⟩
-
-theorem normalization (kind : Kind) : normalizationFromEvidence (LiteralConstant.evidence (site kind))
-    RootBody.reflected.functionInstance (.Val .ZeroSized 2) = .ok (.Val .ZeroSized 2) := by
-  cases kind <;> with_unfolding_all rfl
 
 theorem conversion (queries : ConstantValueQueries Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind
       (ConstantMachine.Context MiriMemoryKind Machine.RootUser))
@@ -45,8 +37,8 @@ theorem normalized_local (kind : Kind) (frame : CompilerFrameContext.ActualFrame
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame (localIdOf kind) = .ok 2 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame (localIdOf kind) = .ok 2 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   cases kind <;> with_unfolding_all rfl
 
@@ -81,11 +73,9 @@ theorem evaluate
     with_unfolding_all exact CopyHelperUnit.layout_query
   have query := PointerAddFacts.compute_local framesBefore frame machine (localIdOf kind) 2 CopyHelperUnit.layout
     (normalized_local kind frame body identity callee) lookup
-  have operand := LiteralConstant.operand_at options limits (remaining+1) span source debugOff
-    (site kind) (OperandPath.rvalue "operand") (by simp [site,OperandPath.rvalue])
+  have operand := LiteralConstant.operand_at options limits (remaining+1) span debugOff
     .ZeroSized 2 (sourceSpan kind) (some CopyHelperUnit.layout) .uninit CopyHelperUnit.layout
-    (normalization kind) conversion framesBefore cached machine
-    (congrArg (fun id : BodyIdentity => id.index) identity) located callee
+    conversion (Storage.withCurrent framesBefore cached machine)
   have v : localIdOf kind < cached.locals.size := by simpa [cached,LocalPlaces.cachePlaceLayout] using valid
   have oldLive : cached.locals[localIdOf kind].value = .live (.immediate old) := by
     simpa [cached,LocalPlaces.cachePlaceLayout] using live

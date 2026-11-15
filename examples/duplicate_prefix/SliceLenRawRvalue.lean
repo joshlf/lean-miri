@@ -65,8 +65,8 @@ theorem raw_staged_to_write
     change MachineHooks.withRetagMode .Raw (do
       let result ← TypedRetag.machineRetagPtrValue config.retag limits.retag value value.layout.ty
       pure (result.getD value)) state1 = _
-    rw [show value.layout.ty = 154 from raw_layout_type]
-    exact congrFun (SliceLenRawRetag.raw_scope_unchanged config.retag limits.retag value 154
+    rw [show value.layout.ty = 49 from raw_layout_type]
+    exact congrFun (SliceLenRawRetag.raw_scope_unchanged config.retag limits.retag value 49
       (SliceLenRawRetag.actual_raw_shape options remaining span)) state1
   have scopedRaw' : hooks.withRetagMode () .Raw
       (EStateM.bind (hooks.retagPtrValue () (⟨value.imm,rawLayout⟩ : RvalueImmTy Provenance) rawLayout.ty)

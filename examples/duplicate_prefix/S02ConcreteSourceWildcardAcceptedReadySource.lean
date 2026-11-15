@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteSourceWildcardAcceptedRichPacket
 import duplicate_prefix.S02ConcreteSourceWildcardAcceptedPhysical
 import duplicate_prefix.S02ConcreteSourceWildcardSharedBounds
@@ -70,7 +71,7 @@ theorem after_guard_source
       sourceEntry.allocation.len+64 < 18446744073709551616 ∧
       sourceEntry.allocation.mutability = .Mut ∧
       post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) =
-        some (reference.id,⟨none,#[]⟩) ∧
+        some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) ∧
       initial.borrowTracker = some tracker ∧
       post.borrowTracker = some held ∧ held.retagMode = tracker.retagMode ∧
       post.user.payload.ghost = false ∧ post.user.payload.validation = .Shallow ∧
@@ -116,12 +117,12 @@ theorem after_guard_source
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let entry := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id
     destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   let sourceTree := GeneralBorrowRawFnEntryArgument.finalTree reference.entry.allocation.extra
     reference.tracker tag reference.offset len
   let sourceEntry := {reference.entry with allocation := reference.entry.allocation.setExtra sourceTree}
@@ -266,7 +267,7 @@ theorem after_guard_source
   obtain ⟨storage,maskValid,maskLen,initialized,provenance,storageFits,mutable⟩ :=
     S02ConcreteSourceWildcardAcceptedPhysical.source id tag address len count input reference within
   have sourceExtras : guardPost.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (guardPost.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [ledger.2.2.2.2.2.2.1,postExtras,tickExtras]
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == reference.id) = _

@@ -21,7 +21,7 @@ theorem same_live (same : out.physical.id=id) :
     out.finalMachine.memory.live.find? (fun row=>row.1==id)=some (id,{out.physical.entry with allocation:=out.updated}) := by
   rw [out.finalMachineEq]
   have found := MemoryCopyBridge.live_lookup_replaced
-    (borrowedState frames (RootFrameData.atSpan out.argsRoot ⟨601⟩).frame out.sourceOutput.frame out.sourceMachine
+    (borrowedState frames (RootFrameData.atSpan out.argsRoot ⟨2⟩).frame out.sourceOutput.frame out.sourceMachine
       ⟨out.sourceOutput.global,tracker.retagMode⟩ out.returnRoom out.physical.id out.physical.entry out.boolOutput.child.tree).machine.memory
     out.physical.id {out.physical.entry with allocation:=out.updated}
   simpa only [same] using found

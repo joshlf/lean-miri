@@ -156,7 +156,7 @@ theorem prepare {profileMode : ProfileMode} (s : InitialFor profileMode) :
     slotSize:=origin.slotSize,slotStorage:=origin.slotLen,slotMask:=origin.slotMask,slotProvenance:=origin.slotProvenance,slotMutable:=origin.slotMutable,
     place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,aligned:=s.aligned,fits:=s.slotFits,
     cached:=by rw [fullRuntime.addresses];exact s.slotCached,
-    extras:=by change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [fullRuntime.extras];exact s.extras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [fullRuntime.extras];exact s.extras,
     destination:=by rw [facts.returnPlace];exact origin.rootReturn }
   exact ⟨result,installed,rfl,rfl,rfl,rfl,call,prefixTrace⟩
 end

@@ -87,6 +87,9 @@ theorem typed_fnentry (span : PreparedContracts.FixedSpanQuery) (cmp : Projectio
       finalMachine.borrowTracker=some ⟨output.global,tracker.retagMode⟩ ∧
       finalFrame.extra.borrowTracker=some output.frame ∧
       finalFrame.returnPlace=.memory place := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   obtain ⟨ctx⟩ := ActualReferenceContext.exists_context options remaining span rfl rfl
   have metadata : (EvalProjectionMachine.arrays.get state).metadata=PreparedReflection.actual.runtime := rfl
   obtain ⟨retag,global,tagEq,frameEq,tracked,_,_,_,_,_⟩ := CurrentCallTypedSourceOperation.typed_of_operation options remaining span ctx

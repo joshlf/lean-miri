@@ -73,7 +73,13 @@ theorem complete {options : EvalConfigurationCore.Options} {limits : ExecutionMa
     dynamicFuel := facts.dynamicFuel,validityFuel := facts.validityFuel,budget := facts.budget,
     dynamicEq := facts.dynamicEq,validityEq := facts.validityEq,dispatchEq := facts.dispatchEq,
     notConstructed := input.slice_not_constructed,
-    extras := (S03MaterializablePreparedState.return_extras original hit.id none packet converted).trans input.return_extras,
+    extras := by
+      have same : prepared.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
+          before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) :=
+        S03MaterializablePreparedState.return_extras original hit.id none packet converted
+      unfold AllocationBacktrace.get
+      rw [same]
+      exact input.return_extras,
     thread := input.contract.thread,active := input.contract.active,noCache := input.contract.emptyHarnessCache }
   obtain ⟨installed,done,entry,trace,terminal,empty,noErrors,noUb,prefixSuccess⟩ := S03WildcardArgumentSeparateWildcardComplete.complete initial count
   have normalized : Pointer.new .wildcard (Size.ofBytes (hit.base+offset)) = pointer := by

@@ -40,7 +40,9 @@ theorem invoke
     (shallow : before.user.payload.validation=.Shallow)
     (localId : MIR.LocalId) (valid : localId<frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value=.live (.immediate old))
-    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none) :
+    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ (entry : LocalAllocation Provenance BorrowTree MiriMemoryKind) (output : GeneralBorrowForestFnEntry.Output) (child : UniIndex),
     let copied := CurrentCallTypedSourceCopy.copiedFrame options remaining span frame localId valid W.pointer.value len
     let validCopied : localId<copied.locals.size := by simpa only [copied,CurrentCallTypedSourceCopy.copiedFrame,Array.size_set] using valid

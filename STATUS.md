@@ -29,30 +29,33 @@ that explicit implementation, whose sources are bound by
 unmodified upstream interpreter. Compiler/exporter correctness remains trusted.
 
 See [the example guide](examples/duplicate_prefix/README.md) for the precise
-premises and reproduction commands. Before the main integration below, the complete
-`Check` source closure compiled against the original PR library.
-Its transitive axiom audit permits only `propext`, `Quot.sound`, and
-`Classical.choice`, including imported theorems and private/generated example
-declarations. Fixed Rust/MIR hashes and source/artifact bindings were checked.
-Quick source/fixture checks and the Tree Borrows component comparisons passed.
-These checks do not establish the missing Rust caller-domain transport or
-Rust/interpreter correspondence. The full `tools/check.sh` suite and independent
-Miri derivative QA were not rerun.
+premises and reproduction commands.
 
+### Latest-main integration and validation
 
-### Latest-main integration validation
+The PR branch includes main `c8daa215`. Both fixed inputs were regenerated
+with the pinned schema-12 exporter without changing their Rust sources. The
+library source manifest and checker pin bind the merged library. The proof port
+uses typed import documents, separate instance/definition/body identities,
+direct constant evaluation, current ABI/span queries and FnEntry
+instance-definition lookups. Extras lemmas preserve arbitrary diagnostic
+backtraces independently of weak-memory and synchronization conditions. The
+public ordinary-input and result requirements are unchanged.
 
-The PR branch now includes main `c8daa215`. The fixed Rust/MIR input hashes
-and all seven DAG-cache Python tests pass. `tools/check-quick.sh` passes
-after fetching the pinned source-analyzer Cargo dependencies; the initial
-attempt stopped because `proc-macro2` was absent from the offline cache.
-The existing `LIBRARY-SHA256SUMS` check fails: 177 hashes differ and seven
-listed files no longer exist after main integration. The manifest and its
-checker pin remain unchanged; the historical proof result above does not
-certify this updated library. Reconcile the proof with current APIs, then
-rebind the library sources and rerun the kernel/axiom audit before claiming
-proof validity on this revision. Lean is not installed in this checkout, so
-the proof closure and Lean regressions were not run.
+On 2026-11-15, the complete frozen `Check` closure passed: 5,638 modules,
+including 4,352 exact source/dependency/artifact-bound reuses from a successful
+independent check. The transitive audit checked 179,879 imported theorems and
+80,972 owned declarations, including private/generated declarations, accepting
+only `propext`, `Quot.sound` and `Classical.choice`. Fixed Rust/MIR hashes,
+library sources, compiler artifacts and snapshot/current-source bindings were
+verified before the successful manifest was written.
+
+`tools/check-quick.sh` passes all 135 Python tests, source lint, fixed-fixture
+integrity and coverage-link checks. `WildcardPostorderDisabled.lean` and
+`CutoffBorrowTraceDiagnostic.lean` compile successfully. The full
+`tools/check.sh` suite, Tree Borrows component differential suite and independent
+Miri derivative QA were not rerun for this integration. These checks do not
+establish Rust caller-domain formation or Rust/interpreter correspondence.
 
 ## Self-contained Lean test entry points
 

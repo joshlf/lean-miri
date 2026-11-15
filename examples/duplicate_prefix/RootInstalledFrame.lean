@@ -5,8 +5,8 @@ namespace DuplicatePrefix.RootInstalledFrame
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.TreeBorrows Miri.Interpreter
 open RootFrameData EmptyRootArguments TypedBorrowSteps
 noncomputable def installed (root : RootFrame) (address n : UInt64) (borrowFrame : FrameState) (id : AllocId) (child : BorTag) :=
-  CallEntryFacts.doneRootFrame {registeredFrame {(result root address n).frame with location := .unwinding ⟨601⟩}
-    borrowFrame id child with location := .unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {registeredFrame {(result root address n).frame with location := .unwinding ⟨2⟩}
+    borrowFrame id child with location := .unwinding ⟨0⟩}
  theorem metadata (root : RootFrame) (address n : UInt64) (borrowFrame : FrameState) (id : AllocId) (child : BorTag) :
     (installed root address n borrowFrame id child).body = root.frame.body ∧
     (installed root address n borrowFrame id child).bodyIdentity = root.frame.bodyIdentity ∧

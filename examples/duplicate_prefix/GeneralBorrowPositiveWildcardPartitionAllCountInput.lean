@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveWildcardPartitionAcceptedInput
 import duplicate_prefix.GeneralBorrowPositiveWildcardPartitionZeroSafety
 import duplicate_prefix.GeneralBorrowPositiveWildcardPartitionRejectedSafety
@@ -51,7 +52,7 @@ structure Initial extends GeneralBorrowPositiveWildcardPartitionOriginalInput.Ba
   bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : (0 : UInt64)<count→count≤len/2→entry.allocation.len+64<18446744073709551616
   bufferMutable : entry.allocation.mutability=.Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
 
 def zero (s : Initial) (zero : s.count=0) : GeneralBorrowPositiveWildcardPartitionZero.Initial :=
   {toBase:=s.toBase,zero:=zero}

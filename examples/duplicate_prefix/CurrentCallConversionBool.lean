@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallConversionSourceCopy
 import duplicate_prefix.CurrentCallLazyBoolTyped
 import duplicate_prefix.CurrentCallLiveBoolTransport
@@ -560,7 +561,7 @@ theorem protect_of_retag (options : EvalConfigurationCore.Options) (remaining : 
     exact done
   obtain ⟨sync, extras, outside⟩ := ready
   have extras' : constructor.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == constructorPhysical.id) =
-      some (constructorPhysical.id, ⟨none, sync⟩) := by rw [idEq]; exact extras
+      some (constructorPhysical.id, { weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (constructor.machine.user.payload.payload.user.runtime.extras.allocations) (constructorPhysical.id) }) := by rw [idEq]; exact extras
   obtain ⟨updated, writeActual, extra, sizeEq, lengthEq, mutable, write⟩ :=
     CurrentCallBoolProtection.write_uninit_concrete options remaining span ctx constructor _ constructorPhysical next tracked
       output.tag concrete ghost race backend sync extras' (by simpa only [offsetEq] using outside) completed
@@ -793,15 +794,18 @@ theorem latent (options : EvalConfigurationCore.Options) (remaining : Nat)
   have ready : CurrentCallBoolProtection.WindowReady constructor.machine P.id P.offset.toNat 1 := by
     rw [idEq]
     refine ⟨#[], ?_, by simp⟩
-    change (((after.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
-      (family.allocation, ⟨none, #[]⟩)).find? (fun row => row.1 == family.allocation)) = _
-    have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
-        decide ((row.1 != family.allocation) = true ∧ (row.1 == family.allocation) = true)) = (fun _ => false) := by
-      funext row
-      by_cases equal : row.1 = family.allocation <;> simp [equal]
-    have emptyFind : after.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
-      simp [Array.find?_eq_none]
-    simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+    have selectedExtras : constructor.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == family.allocation) =
+        some (family.allocation, { weakMemory := none }) := by
+      change (((after.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
+        (family.allocation, { weakMemory := none })).find? (fun row => row.1 == family.allocation)) = _
+      have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
+          decide ((row.1 != family.allocation) = true ∧ (row.1 == family.allocation) = true)) = (fun _ => false) := by
+        funext row
+        by_cases equal : row.1 = family.allocation <;> simp [equal]
+      have emptyFind : after.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
+        simp [Array.find?_eq_none]
+      simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+    simpa only [AllocationBacktrace.of_lookup selectedExtras] using selectedExtras
   have retag' : TypedRetag.retagPlace (config options remaining span).retag options.limits.retag place MachineHooks.protectionPolicy
       (Storage.withCurrent frames frame machine) = .ok (TypedRetagGeneric.retaggedPlace place P.id output.tag) constructor := by
     simpa only [idEq, tag, constructor] using actualRetag

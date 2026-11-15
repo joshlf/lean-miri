@@ -18,90 +18,6 @@ set_option maxHeartbeats 4000000
 
 open Lean Miri Miri.ABI Miri.Input Miri.Interpreter Miri.MIR Miri.Memory
 
--- Local expression quoters for the fixed MIR AST. These are used only to
--- reflect values produced by the pinned production lowerer during elaboration.
-deriving instance ToExpr for MIR.BinOp
-deriving instance ToExpr for MIR.UnOp
-deriving instance ToExpr for MIR.Location
-deriving instance ToExpr for MIR.SpanRef
-deriving instance ToExpr for MIR.Mutability
-deriving instance ToExpr for MIR.Safety
-deriving instance ToExpr for MIR.Variance
-deriving instance ToExpr for MIR.PointerCoercion
-deriving instance ToExpr for MIR.CoercionSource
-deriving instance ToExpr for MIR.CastKind
-deriving instance ToExpr for MIR.FakeBorrowKind
-deriving instance ToExpr for MIR.MutBorrowKind
-deriving instance ToExpr for MIR.BorrowKind
-deriving instance ToExpr for MIR.RawPtrKind
-deriving instance ToExpr for MIR.WithRetag
-deriving instance ToExpr for MIR.RuntimeChecks
-deriving instance ToExpr for MIR.LoopHintAttr
-deriving instance ToExpr for MIR.FakeReadCause
-deriving instance ToExpr for MIR.CallSource
-deriving instance ToExpr for MIR.InlineAsmMacro
-deriving instance ToExpr for MIR.UnwindTerminateReason
-deriving instance ToExpr for MIR.UnwindAction
-deriving instance ToExpr for MIR.CoroutineSource
-deriving instance ToExpr for MIR.CoroutineDesugaring
-deriving instance ToExpr for MIR.Movability
-deriving instance ToExpr for MIR.CoroutineKind
-deriving instance ToExpr for MIR.HirId
-deriving instance ToExpr for MIR.CoveragePointKind
-deriving instance ToExpr for MIR.CoverageKind
-deriving instance ToExpr for MIR.BackwardIncompatibleDropReason
-deriving instance ToExpr for MIR.ProjectionKind
-deriving instance ToExpr for MIR.UserTypeProjection
-deriving instance ToExpr for MIR.AnalysisPhase
-deriving instance ToExpr for MIR.RuntimePhase
-deriving instance ToExpr for MIR.MirPhase
-deriving instance ToExpr for MIR.ConstPointer
-deriving instance ToExpr for MIR.ScalarValue
-deriving instance ToExpr for MIR.ConstValue
-deriving instance ToExpr for MIR.ConstAliasKind
-deriving instance ToExpr for MIR.ConstExpressionCastKind
-deriving instance ToExpr for MIR.ConstExpressionKind
-deriving instance ToExpr for MIR.BoundVarIndexKind
-deriving instance ToExpr for MIR.BoundRegionKind
-deriving instance ToExpr for MIR.BoundTypeKind
-deriving instance ToExpr for MIR.BoundVariableKind
-deriving instance ToExpr for MIR.LateParamRegionKind
-deriving instance ToExpr for MIR.Region
-deriving instance ToExpr for MIR.GenericArg
-deriving instance ToExpr for MIR.ValTreeNode
-deriving instance ToExpr for MIR.ValTree
-deriving instance ToExpr for MIR.TypeConst
-deriving instance ToExpr for MIR.UnevaluatedConst
-deriving instance ToExpr for MIR.MirConst
-deriving instance ToExpr for MIR.ConstOperand
-deriving instance ToExpr for MIR.ProjectionElem
-deriving instance ToExpr for MIR.Place
-deriving instance ToExpr for MIR.Operand
-deriving instance ToExpr for MIR.CopyNonOverlapping
-deriving instance ToExpr for MIR.NonDivergingIntrinsic
-deriving instance ToExpr for MIR.AggregateKind
-deriving instance ToExpr for MIR.Rvalue
-deriving instance ToExpr for MIR.StatementKind
-deriving instance ToExpr for MIR.SwitchTarget
-deriving instance ToExpr for MIR.SwitchTargets
-deriving instance ToExpr for MIR.SpannedOperand
-deriving instance ToExpr for MIR.InlineAsmOptions
-deriving instance ToExpr for MIR.InlineAsmTemplatePiece
-deriving instance ToExpr for MIR.InlineAsmArch
-deriving instance ToExpr for MIR.InlineAsmRegOrRegClass
-deriving instance ToExpr for MIR.InlineAsmOperand
-deriving instance ToExpr for MIR.InlineAsmTerminator
-deriving instance ToExpr for MIR.AssertKind
-deriving instance ToExpr for MIR.TerminatorKind
-deriving instance ToExpr for MIR.SourceInfo
-deriving instance ToExpr for MIR.Statement
-deriving instance ToExpr for MIR.Terminator
-deriving instance ToExpr for MIR.BasicBlock
-deriving instance ToExpr for MIR.Body
-deriving instance ToExpr for CallReifyReason
-deriving instance ToExpr for CallShimKind
-deriving instance ToExpr for CallInstanceKind
-deriving instance ToExpr for CallInstance
 deriving instance ToExpr for BodyIdentity
 deriving instance ToExpr for LoadedBody
 
@@ -135,7 +51,7 @@ private def reflectRoot (path : String) : IO (Except String ReflectedRoot) := do
     let lowered ← Input.lowerProgram decoded.document
     let prepared ← CallResolution.prepare lowered
     let definition ← prepared.program.rootDefinitionId 0
-    let fnInstance : CallInstance := ⟨.Item definition, #[]⟩
+    let fnInstance ← CompilerInstance.item prepared.program.input.instances definition #[]
     let body ← CallResolution.loadedBodyOfInstance prepared fnInstance
     let mut paths := #[]
     for block in [2, 6, 7, 8] do
@@ -191,7 +107,7 @@ private def blockTerminatorAt (body : MIR.Body) (block : Nat) : Option Terminato
 theorem root_guard_zero_test :
     statementKindAt reflected.body.body 0 4 = some
       (.Assign ⟨4, #[]⟩ (.BinaryOp .Eq (.Move ⟨5, #[]⟩)
-        (.Constant ⟨⟨3⟩, none, .Val (.Scalar (.Int 0 8)) 5⟩))) := by
+        (.Constant ⟨⟨25⟩, none, .Val (.Scalar (.Int 0 8)) 5⟩))) := by
   rfl
 
 theorem root_count_copy :
@@ -202,7 +118,7 @@ theorem root_count_copy :
 theorem root_guard_half_length :
     statementKindAt reflected.body.body 4 0 = some
       (.Assign ⟨10, #[]⟩ (.BinaryOp .Div (.Move ⟨11, #[]⟩)
-        (.Constant ⟨⟨17⟩, none, .Val (.Scalar (.Int 2 8)) 5⟩))) := by
+        (.Constant ⟨⟨31⟩, none, .Val (.Scalar (.Int 2 8)) 5⟩))) := by
   rfl
 
 theorem root_guard_comparison :

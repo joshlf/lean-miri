@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallRepaired
 import duplicate_prefix.S05CompletedCopyRootGuardBody
 import duplicate_prefix.CanonicalCopyBound
@@ -35,7 +36,7 @@ theorem complete (span : PreparedContracts.FixedSpanQuery)
     (tracker : input.tracker = copyTracker)
     (live : machine.memory.live.find? (fun row => row.1 == sourceId) = some (sourceId,copyEntry))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) =
-      some (sourceId,⟨none,#[]⟩))
+      some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (sourceId) }))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == sourceId) = some ⟨sourceId,4096⟩) :
     ∃ result finalMachine,
       SuccessfulTrace.Trace (ActualReferenceContext.config options (remaining+1) span) limits

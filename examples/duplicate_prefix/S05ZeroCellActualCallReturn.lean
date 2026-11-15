@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallRepaired
 import duplicate_prefix.S05CompletedRootSuccessExit
 import duplicate_prefix.RootSuccessReleaseProfile
@@ -132,7 +133,7 @@ structure Input where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == destinationId) = some ⟨destinationId,slotBase⟩
-  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == destinationId) = some (destinationId,⟨none,#[]⟩)
+  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == destinationId) = some (destinationId,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get machine.user).allocations) (destinationId) })
   destination : before.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 
 noncomputable def caller (input : Input) : CompilerFrameContext.ActualFrame :=
@@ -279,7 +280,7 @@ theorem complete (input : Input) : Result input := by
     (by rw [popAddresses];exact input.cached) slotReleased input.slotSize input.slotMutable maskValid input.runtimeWidth
     (by rw [input.slotStorage,input.slotSize];rfl) (by rw [input.slotMask,input.slotSize];rfl) input.slotProvenance
     (popFields.2.2.2.trans (account.2.2.1.trans input.noClocks)) popBackend popFields.2.1
-    (by change (popped input).machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [popExtras];exact input.extras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change (popped input).machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [popExtras];exact input.extras)
     tagsFree.1 tagsFree.2 input.slotTree input.slotPointer input.aligned input.runtimeSize input.outerAccessEq popGhost popShallow
     (by rw [ready.destination];exact input.destination) (Size.ofBytes (input.slotBase+1)) endpoint
 

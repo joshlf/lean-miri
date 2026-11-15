@@ -77,6 +77,9 @@ theorem arguments
             borrowTracker := some {(nextTracker effect fresh) with retagMode := tracker.retagMode}}) := by
   dsimp only
   let root := RootFrameData.raw before (CurrentCallArguments.destination place) identity input.machine.settings.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let prepared := firstLive root
   let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
   have rawLocals : root.frame.locals = Array.replicate 25 (⟨.dead,none⟩ : LocalState Provenance LocalLayout) :=

@@ -47,7 +47,9 @@ theorem typed_live
     (entry : LocalAllocation Provenance BorrowTree MiriMemoryKind)
     (present : before.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
-    (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame) :
+    (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
     ∃ tree, ChildEffect entry tracker.global.nextPointerTag tree ∧
       TypedRetag.retagPtrValue (adapted options remaining span ctx.pointers) options.limits.retag
@@ -58,6 +60,7 @@ theorem typed_live
           (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes address)) 0 reference))
           (Storage.withCurrent frames (registeredFrame frame borrowFrame id tracker.global.nextPointerTag)
             (installed before tracker fresh id entry tree)) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   dsimp only
   let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
   have candidate := CurrentCallEmptyTypedEntryInteger.empty_candidate input
@@ -138,7 +141,9 @@ theorem copy_live
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (localId : MIR.LocalId) (valid : localId < frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value = .live (.immediate old))
-    (cached : frame.locals[localId].layout = some reference) (noClocks : frame.extra.dataRace = none) :
+    (cached : frame.locals[localId].layout = some reference) (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new .wildcard (Size.ofBytes address)) 0 reference).imm

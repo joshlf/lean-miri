@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnSameRejectedBody
 import duplicate_prefix.S02SameDestinationAcceptedGuardLedger
 import duplicate_prefix.S02WildcardReturnSameAcceptedPhysical
@@ -445,11 +446,12 @@ theorem result
   have guardNotConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent #[] guard post)).entries.any (·.value.ty == 4) = false := by
     change post.user.payload.payload.user.types.entries.any (·.value.ty == 4) = _
     rw [typesAfter];exact notConstructed
-  have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+  have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [extrasAfter,tickExtras,rawUser,rawExtras,←sourceId,physicalId]
     exact input.return_extras
-  have currentExtras : currentInput.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationInput.id) = some (destinationInput.id,⟨none,#[]⟩) := by
-    change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
+  have currentExtras : currentInput.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationInput.id) = some (destinationInput.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (currentInput.user.payload.payload.user.runtime.extras.allocations) (destinationInput.id) }) := by
+    change machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationInput.id) =
+      some (destinationInput.id, { weakMemory := none, backtrace := AllocationBacktrace.get machine.user.payload.payload.user.runtime.extras.allocations destinationInput.id })
     rw [rawUser,rawExtras,physicalId];exact input.return_extras
   have oldInitialized : InitMaskCopy.InitializedOn destinationInput.entry.allocation.initializationMask (Size.ofBytes reference.offset) (Size.ofBytes (reference.offset+len)) := by
     rw [storageEq];exact reference.storage.initialized
@@ -645,8 +647,8 @@ theorem result
   have doneClocks : done.extra.dataRace = none := by rw [ready.extra];exact guardClocks
   have valid0 : (0 : MIR.LocalId) < done.locals.size := by rw [ready.size];decide
   have cell0 := Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans ready.output)
-  have finalExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
-    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.physical.id) = some (packet.physical.id,⟨none,#[]⟩)
+  have finalExtras : finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
+    change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.physical.id) = some (packet.physical.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (packet.physical.id) })
     rw [packet.physicalId,copyExtras,sourceId];exact sourceExtras
   let copyActiveThread := Classical.choose copyThread
   have copyActive : finalMachine.threads.activeThread? = some copyActiveThread := Classical.choose_spec copyThread

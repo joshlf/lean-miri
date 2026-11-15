@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04ReturnWindowMemory
 import duplicate_prefix.S04ReturnStorage
 import duplicate_prefix.S04ReturnConcreteAccess
@@ -109,7 +110,7 @@ theorem from_input {options : EvalConfigurationCore.Options} {limits : Execution
     (tag : BorTag) (concrete : input.pointer.provenance = .concrete input.id tag)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (state.machine.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (value : Bool) :

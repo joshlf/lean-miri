@@ -46,7 +46,8 @@ def invocation (input : GenericAsMutInvocation.Input) : GenericAsMutInvocation.I
   let s := input.start
   have fields := CanonicalConfigFacts.actual_fields s.options () (s.remaining+1) s.span
   refine {input with start := core s, bufferExtras := ?_, cached := ?_, extras := ?_}
-  · change (AsMutPtrReturn.accountedMachine s.options s.remaining s.span s.machine).user.payload.payload.user.runtime.extras.allocations.find? _ = _
+  · dsimp only [core]
+    change (AsMutPtrReturn.accountedMachine s.options s.remaining s.span s.machine).user.payload.payload.user.runtime.extras.allocations.find? _ = _
     unfold AsMutPtrReturn.accountedMachine SourceControl.accounted
     rw [fields.terminators]
     exact input.bufferExtras
@@ -54,7 +55,8 @@ def invocation (input : GenericAsMutInvocation.Input) : GenericAsMutInvocation.I
     unfold AsMutPtrReturn.accountedMachine SourceControl.accounted
     rw [fields.terminators]
     exact input.cached
-  · change (AsMutPtrReturn.accountedMachine s.options s.remaining s.span s.machine).user.payload.payload.user.runtime.extras.allocations.find? _ = _
+  · dsimp only [core]
+    change (AsMutPtrReturn.accountedMachine s.options s.remaining s.span s.machine).user.payload.payload.user.runtime.extras.allocations.find? _ = _
     unfold AsMutPtrReturn.accountedMachine SourceControl.accounted
     rw [fields.terminators]
     exact input.extras

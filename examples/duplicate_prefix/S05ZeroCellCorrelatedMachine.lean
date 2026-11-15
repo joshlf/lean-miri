@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellCorrelatedTyped
 import duplicate_prefix.S05ZeroCellCorrelatedWrite
 
@@ -493,7 +494,7 @@ structure InitialFields (C F A : Type) where
   mode : machine.user.addresses.provenanceMode = .permissive
   noClocks : machine.dataRace = none
   noBackend : machine.user.payload.payload.user.backend = .none
-  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get machine.user).allocations) (id) })
   allocation : entry.allocation = S05ZeroCellCorrelatedWrite.sourceFor seed
   nonnull : base ≠ 0
   evenBase : base % 2 = 0

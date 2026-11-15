@@ -52,14 +52,12 @@ theorem slice_metadata_tail : CompilerFactAdapters.metadataTail PriorCellMetadat
 
 theorem shared_kind : CompilerFactAdapters.validityKind PriorCellMetadata.facts 6 = .ok (.reference false) := by
   unfold CompilerFactAdapters.validityKind
-  unfold_typed ".CompilerFactAdapters.shape"
   unfold_typed ".CompilerFactAdapters.source"
   simp only [PriorCellMetadata.context_node,PriorCellMetadata.shared_pointee]
   with_unfolding_all rfl
 
 theorem slice_kind : CompilerFactAdapters.validityKind PriorCellMetadata.facts 7 = .ok (.reference true) := by
   unfold CompilerFactAdapters.validityKind
-  unfold_typed ".CompilerFactAdapters.shape"
   unfold_typed ".CompilerFactAdapters.source"
   simp only [PriorCellMetadata.context_node,PriorCellMetadata.slice_pointee]
   with_unfolding_all rfl
@@ -299,7 +297,7 @@ theorem slice_check_from_source {K U C F A : Type} [DecidableEq K]
     · exact (by decide +kernel)
   have tail : hooks.metadataTail choice place.layout.ty = pure .sliceOrStr := by
     rw [tailField]
-    change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).metadataTail choice PriorCellMetadata.sliceLayout.ty = _
+    with_unfolding_all change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).metadataTail choice PriorCellMetadata.sliceLayout.ty = _
     rw [PriorCellMetadata.layout_type_ids.2.2.1]
     unfold CompilerFactAdapters.validityHooks
     dsimp only
@@ -337,7 +335,7 @@ theorem slice_check_from_source {K U C F A : Type} [DecidableEq K]
     · exact nonnull
   have inhabited : hooks.opsemInhabited choice place.layout.ty = pure true := by
     rw [inhabitedField]
-    change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).opsemInhabited choice PriorCellMetadata.sliceLayout.ty = _
+    with_unfolding_all change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).opsemInhabited choice PriorCellMetadata.sliceLayout.ty = _
     rw [PriorCellMetadata.layout_type_ids.2.2.1]
     unfold CompilerFactAdapters.validityHooks
     dsimp only
@@ -414,7 +412,7 @@ theorem shared_check_from_source {K U C F A : Type} [DecidableEq K]
     · exact nonnull
   have inhabited : hooks.opsemInhabited choice place.layout.ty = pure true := by
     rw [inhabitedField]
-    change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).opsemInhabited choice PriorCellMetadata.cellLayout.ty = _
+    with_unfolding_all change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).opsemInhabited choice PriorCellMetadata.cellLayout.ty = _
     have cellTy : PriorCellMetadata.cellLayout.ty = 2 := by decide +kernel
     rw [cellTy]
     unfold CompilerFactAdapters.validityHooks
@@ -474,7 +472,7 @@ theorem slice_validate_from_source {K U C F A : Type} [DecidableEq K]
     exact source_slice_name baseHooks choice
   · change hooks.classify choice PriorCellMetadata.sliceReferenceLayout.ty = _
     rw [PriorCellMetadata.layout_type_ids.2.1]
-    change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).classify choice _ = _
+    dsimp only [hooks,TypedValidityProviders.visitor,ValidityMachine.visitor,CompilerPaths.validityHooks]
     unfold CompilerFactAdapters.validityHooks
     dsimp only
     rw [slice_kind]
@@ -515,7 +513,7 @@ theorem shared_validate_from_source {K U C F A : Type} [DecidableEq K]
     exact source_shared_name baseHooks choice
   · change hooks.classify choice PriorCellMetadata.sharedLayout.ty = _
     rw [PriorCellMetadata.layout_type_ids.1]
-    change (CompilerFactAdapters.validityHooks PriorCellMetadata.facts baseHooks).classify choice _ = _
+    dsimp only [hooks,TypedValidityProviders.visitor,ValidityMachine.visitor,CompilerPaths.validityHooks]
     unfold CompilerFactAdapters.validityHooks
     dsimp only
     rw [shared_kind]

@@ -107,7 +107,7 @@ theorem invoke {options limits remaining span before argument len place}
   let sourceFnTracker : MachineHooks.BorrowState := ⟨output.global, .FnEntry⟩
   let args := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len
     family.allocation input.tracker.global.nextPointerTag) count
-  let boolFrame := (atSpan args ⟨601⟩).frame
+  let boolFrame := (atSpan args ⟨2⟩).frame
   let BF : FrameState := ({} : FrameState).addProtector family.allocation input.tracker.global.nextPointerTag
   have roleId : role.backing.id = family.allocation := role.id.symm.trans (congrArg Family.allocation familyEq)
   have sourceId : S.role.backing.id = family.allocation :=
@@ -302,9 +302,9 @@ theorem invoke {options limits remaining span before argument len place}
   have protectionFinal :
       (ExecutionMachine.callHooks (config options (remaining + 1) span) limits).protectArgument () place
         (Storage.withCurrent #[] (atSpan (RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {}
-          family.value len current.role.backing.id current.tag) count) ⟨601⟩).frame sourceMachine) =
+          family.value len current.role.backing.id current.tag) count) ⟨2⟩).frame sourceMachine) =
         .ok () (Storage.withCurrent #[] (registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len current.role.backing.id current.tag) count) ⟨601⟩).frame
+          (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len current.role.backing.id current.tag) count) ⟨2⟩).frame
           (({} : FrameState).addProtector current.role.backing.id current.tag) R.id R.node.tag) finalMachine) := by
     simpa only [currentIdOld, currentTagOld, R, boolFrame, args, BF, protectedOutput.id, protectedOutput.tag] using protectionBudget
   exact CurrentCallOrdinaryPositiveFinish.invoke input family.value encoding count sourceMachine sourceFnMachine finalMachine

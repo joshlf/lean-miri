@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CopyRootGuardBody
 import duplicate_prefix.CopyRootPhysicalExit
 
@@ -66,7 +67,7 @@ structure Input where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : before.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 
 
@@ -119,6 +120,7 @@ theorem complete (input : Input) : Result input := by
     slotBase := input.slotBase,slotPointer := input.slotPointer,aligned := input.aligned,fits := input.fits
     cached := by rw [addresses]; exact input.cached
     extras := by
+      dsimp only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]
       change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
       rw [extras]
       exact input.extras

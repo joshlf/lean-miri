@@ -37,7 +37,7 @@ def bytes : Allocation CtfeProvenance Unit :=
   (Allocation.fromBytes #[11,22,0] Align.ONE .Mut).toOption.get (by decide +kernel)
 def descriptor : GlobalAllocation := ⟨id,.memory,Size.ofBytes 3,Align.ONE,.Mut,some (.memory bytes)⟩
 /-- All distinct fixed relocation targets; `fixed_ids` checks coverage. -/
-def exportTargets : List Nat := [15,64,73,88,99,155,164,206,218,291,313,319,410,499,624]
+def exportTargets : List Nat := [8,57,66,81,92,124,133,175,187,243,265,271,364,472,597]
 -- The domain allows current descriptors independently of the original catalog.
 def memory : MemoryState Provenance BorrowTree MiriMemoryKind :=
   {((MemoryState.empty.setGlobalEntries #[descriptor]).setIssuedIds #[id]).setImportedGlobalIds
@@ -123,7 +123,7 @@ theorem runtime : DuplicatePrefixRuntimeInput.OrderedState before tracker := by
 
 theorem model (span : PreparedContracts.FixedSpanQuery)
     (cmp : ProjectionMetadataFacts.NullComparator)
-    (sourceMatches : (PreparedReflection.actual.runtime.source.raw == PreparedReflection.actual.runtime.source.raw)=true) :
+    (sourceMatches : PreparedReflection.actual.compiler.program.input = PreparedReflection.actual.runtime.source) :
     DuplicatePrefixCallModel.Model options budget span before where
   debugOff := rfl
   preciseOff := rfl
@@ -291,7 +291,7 @@ theorem resources : DuplicatePrefixCallSpecification.Resources options limits bu
 
 def input (span : PreparedContracts.FixedSpanQuery)
     (cmp : ProjectionMetadataFacts.NullComparator)
-    (sourceMatches : (PreparedReflection.actual.runtime.source.raw == PreparedReflection.actual.runtime.source.raw)=true) :
+    (sourceMatches : PreparedReflection.actual.compiler.program.input = PreparedReflection.actual.runtime.source) :
     OrdinaryInput options limits budget span before (.pointer source.value) 2 place where
   tracker := tracker
   model := model span cmp sourceMatches
@@ -383,7 +383,7 @@ def input (span : PreparedContracts.FixedSpanQuery)
 
 theorem nonempty (span : PreparedContracts.FixedSpanQuery)
     (cmp : ProjectionMetadataFacts.NullComparator)
-    (sourceMatches : (PreparedReflection.actual.runtime.source.raw == PreparedReflection.actual.runtime.source.raw)=true) :
+    (sourceMatches : PreparedReflection.actual.compiler.program.input = PreparedReflection.actual.runtime.source) :
     Nonempty (OrdinaryInput options limits budget span before (.pointer source.value) 2 place) :=
   ⟨input span cmp sourceMatches⟩
 

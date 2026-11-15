@@ -83,7 +83,7 @@ private theorem finish {options limits remaining span before tracker argument pl
   let currentMachine := afterArgumentsMachine effect fresh remaining span #[] prepared.frame {} 1 (prepared.valid i1)
   let currentTracker := afterArgumentsTracker effect fresh
   let argsRoot := RootArgumentsTwo.result firstDone 0
-  let changed := atSpan argsRoot ⟨601⟩
+  let changed := atSpan argsRoot ⟨2⟩
   let retagged := ReturnProtection.borrowedState #[] changed.frame (CurrentCallEmptyEntryRoot.sourceBorrow effect {})
     currentMachine currentTracker room physical.id physical.entry output.child.tree
   let finalMachine : Before := {retagged.machine with memory := {retagged.machine.memory with live :=

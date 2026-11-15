@@ -19,11 +19,11 @@ noncomputable def first (pointer : Scalar Provenance) : OpTy Provenance :=
     CopyCompilerFacts.destPointerLayout⟩
 noncomputable def second (n : UInt64) : OpTy Provenance :=
   ⟨.immediate (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n))), RootCompilerFacts.usizeLayout⟩
-noncomputable def firstCache (root : RootFrame) := cache (atSpan root ⟨616⟩) i1 CopyCompilerFacts.destPointerLayout
+noncomputable def firstCache (root : RootFrame) := cache (atSpan root ⟨81⟩) i1 CopyCompilerFacts.destPointerLayout
 noncomputable def firstLive (root : RootFrame) := live (firstCache root) i1
 noncomputable def firstDone (root : RootFrame) (pointer : Scalar Provenance) := write (firstLive root) i1
   (.scalar pointer)
-noncomputable def secondCache (root : RootFrame) (pointer : Scalar Provenance) := cache (atSpan (firstDone root pointer) ⟨617⟩) i2 RootCompilerFacts.usizeLayout
+noncomputable def secondCache (root : RootFrame) (pointer : Scalar Provenance) := cache (atSpan (firstDone root pointer) ⟨82⟩) i2 RootCompilerFacts.usizeLayout
 noncomputable def secondLive (root : RootFrame) (pointer : Scalar Provenance) := live (secondCache root pointer) i2
 noncomputable def result (root : RootFrame) (pointer : Scalar Provenance) (n : UInt64) := write (secondLive root pointer) i2
   (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n)))
@@ -55,12 +55,12 @@ theorem body (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
       (first pointer) (second n) (Storage.withCurrent frames root.frame machine) =
       .ok (2,2) (Storage.withCurrent frames (result root pointer n).frame (machine)) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
-  let f1 := atSpan root ⟨616⟩
+  let f1 := atSpan root ⟨81⟩
   let c1 := firstCache root
   let l1 := firstLive root
   let d1 := firstDone root pointer
   let m1 := machine
-  let f2 := atSpan d1 ⟨617⟩
+  let f2 := atSpan d1 ⟨82⟩
   let c2 := secondCache root pointer
   let l2 := secondLive root pointer
   let d2 := result root pointer n

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.ActualReturnProtection
 import duplicate_prefix.RootEntryFinish
 set_option maxRecDepth 65536
@@ -33,7 +34,7 @@ theorem protect_and_finish
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : machine.user.payload.ghost = false)
     (body : frame.body = RootBody.reflected.body.body) (localSize : frame.locals.size = 25)
     (dead0 : (frame.locals[0]'(by omega)).value = .dead)
@@ -50,7 +51,7 @@ theorem protect_and_finish
         RootEntryFinish.finish (ExecutionMachine.callHooks (config options remaining span) limits))
         (Storage.withCurrent frames frame machine) =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame frame borrowFrame id child with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame frame borrowFrame id child with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed id entry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree rootTag child 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧

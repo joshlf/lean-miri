@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03NonliveZeroInit
 import duplicate_prefix.PositiveRootInstalledFrame
 import duplicate_prefix.S03ReturnTagFrame
@@ -59,7 +60,7 @@ structure Packet (options : EvalConfigurationCore.Options) (remaining : Nat)
   ghost : machine.user.payload.ghost = false
   shallow : machine.user.payload.validation = .Shallow
   extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-    some (destination.id,⟨none,#[]⟩)
+    some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) })
   metadata : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime
   notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false
   sourceBody : frame.body = RootBody.reflected.body.body
@@ -111,7 +112,7 @@ theorem of_result
     (argumentAbsent : before.memory.live.find? (fun row => row.1 == argumentId) = none)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (updated : Allocation Provenance BorrowTree)
     (treeEq : updated.extra = S03NonliveZeroInit.written input first second tag)

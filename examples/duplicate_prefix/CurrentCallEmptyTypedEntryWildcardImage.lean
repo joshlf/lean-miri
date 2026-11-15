@@ -46,7 +46,9 @@ theorem copy_image
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (localId : MIR.LocalId) (valid : localId < frame.locals.size) (old : Immediate Provenance)
     (live : frame.locals[localId].value = .live (.immediate old))
-    (cached : frame.locals[localId].layout = some reference) (noClocks : frame.extra.dataRace = none) :
+    (cached : frame.locals[localId].layout = some reference) (noClocks : frame.extra.dataRace = none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let fresh := CandidateCurrentLiveRuntime.tag_room options limits remaining before tracker 0 input.machine.resources
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new .wildcard (Size.ofBytes address)) 0 reference).imm

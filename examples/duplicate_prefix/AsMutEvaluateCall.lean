@@ -13,7 +13,7 @@ set_option backward.dsimp.instances true
 
 noncomputable def terminator := (RootBody.reflected.body.body.basicBlocks[6]'(by with_unfolding_all decide +kernel)).terminator
 
-theorem callee_kind : HelperCompilerFacts.asMutPtrCall.callee.kind = .Item 3 := by with_unfolding_all rfl
+theorem callee_kind : (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind = .Item 6 := by with_unfolding_all rfl
 
 noncomputable def argument : MIR.SpannedOperand := match terminator.kind with
   | .Call _ args _ _ _ _ _ => args.getD 0 ⟨⟨0⟩,.Move ⟨16,#[]⟩⟩
@@ -43,18 +43,18 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
         .Rust,some HelperCompilerFacts.asMutPtrAbi,false⟩ (Storage.withCurrent frames frame machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
   let state := Storage.withCurrent frames frame machine
-  have fnOp : h.evalOperandAt () (OperandPath.instruction "function") HelperCompilerFacts.asMutPtrCall.function state =
+  have fnOp : h.evalOperand ()  HelperCompilerFacts.asMutPtrCall.function state =
       .ok ⟨.immediate .uninit,AsMutFunctionFacts.functionLayout⟩ state := by
     rw [function_constant]
     exact AsMutFunctionConstant.function_operand options limits remaining span source debug frames frame machine
       (congrArg (·.index) identity) located callee
-  have argOp : Call.evalFnCallArgumentAt h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨15,#[]⟩)
-      (OperandPath.argument 0) state = .ok (.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩) state := by
+  have argOp : Call.evalFnCallArgument h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨15,#[]⟩)
+       state = .ok (.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩) state := by
     rw [argument_operand,disjoint]
     exact CallMoveLocal.move_cached options limits remaining span debug frames frame machine 16 ActualReferenceMetadata.reference value
-      valid live cached ActualReferenceMetadata.reference_sized noClocks ghost _
-  have resolve : h.resolve () 3 HelperCompilerFacts.asMutPtrCall.callee.args state = .ok HelperCompilerFacts.asMutPtrCall.callee state := by
-    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 3 HelperCompilerFacts.asMutPtrCall.callee.args state = _
+      valid live cached ActualReferenceMetadata.reference_sized noClocks ghost
+  have resolve : h.resolve () 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs state = .ok HelperCompilerFacts.asMutPtrCall.callee state := by
+    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
     exact AsMutCallQueries.resolve_current frames frame machine body identity callee located
   have fnAbi : h.fnAbiOfInstance () HelperCompilerFacts.asMutPtrCall.callee #[] = pure HelperCompilerFacts.asMutPtrAbi := by
@@ -64,10 +64,10 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
     funext state
     exact AsMutCallFacts.actual_as_mut_ptr_caller_location options () remaining span limits state
   exact CallOneArgumentAt.eval_callee_one_at h () HelperCompilerFacts.asMutPtrCall.function argument ⟨15,#[]⟩
-    ⟨.immediate .uninit,AsMutFunctionFacts.functionLayout⟩ state state state .Rust 3 HelperCompilerFacts.asMutPtrCall.callee.args
-    HelperCompilerFacts.asMutPtrCall.callee 3 HelperCompilerFacts.asMutPtrAbi false (.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩)
+    ⟨.immediate .uninit,AsMutFunctionFacts.functionLayout⟩ state state state .Rust 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs
+    HelperCompilerFacts.asMutPtrCall.callee 6 HelperCompilerFacts.asMutPtrAbi false (.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩)
     fnOp argOp (AsMutCalleeLeaves.signature options limits remaining span cmp)
-    (AsMutCalleeLeaves.kind options limits remaining span) resolve callee_kind fnAbi callerLocation
+    (AsMutCalleeLeaves.kind options limits remaining span) resolve (AsMutCalleeLeaves.instance_kind options limits remaining span) fnAbi callerLocation
 end
 end DuplicatePrefix.AsMutEvaluateCall
 open Lean Elab Command in

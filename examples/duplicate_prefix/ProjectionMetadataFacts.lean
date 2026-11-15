@@ -49,10 +49,9 @@ theorem u8_slice_size_at {S C : Type}
 
 open Miri Miri.Input
 noncomputable def sliceLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 4).toOption.getD CopyCompilerFacts.byteLayout
+  ((PreparedReflection.actual.layoutResults[4]'(by decide +kernel))).toOption.getD CopyCompilerFacts.byteLayout
 
-theorem slice_layout_eq : PreparedReflection.actual.runtime.lookup 4 = .ok sliceLayout := by
-  decide +kernel
+theorem slice_layout_eq : PreparedReflection.actual.runtime.lookup 4 = .ok sliceLayout := by decide +kernel
 
 theorem slice_layout_shape : sliceLayout.ty = 4 ∧ sliceLayout.layout.isSized = false ∧
     sliceLayout.layout.align.abi = Align.ONE := by decide +kernel
@@ -69,9 +68,7 @@ run_cmd do
  let declaration := mkIdent `slice_projection_parents
  elabCommand (← `(theorem $declaration (cmp : NullComparator) :
      $helper PreparedReflection.actual.runtime 4 = .ok #[] := by
-   change (if (Lean.Json.null == Lean.Json.null) = true then _ else _) = _
-   rw [cmp]
-   rfl))
+   with_unfolding_all rfl))
 
 theorem slice_field (cmp : NullComparator) :
     PreparedReflection.actual.runtime.field sliceLayout 0 = .ok CopyCompilerFacts.byteLayout := by

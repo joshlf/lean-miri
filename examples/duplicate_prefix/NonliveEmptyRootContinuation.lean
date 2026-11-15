@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.NonliveEmptyRootArgumentScope
 import duplicate_prefix.ConcreteEmptyRootArgumentProperties
 import duplicate_prefix.RootEntryTail
@@ -60,7 +61,7 @@ theorem succeeds
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (dead0 : (root.frame.locals[0]'(root.valid ⟨0,by decide⟩)).value = .dead)
     (dead6 : (root.frame.locals[6]'(root.valid ⟨6,by decide⟩)).value = .dead)
     (dead13 : (root.frame.locals[13]'(root.valid ⟨13,by decide⟩)).value = .dead)
@@ -73,14 +74,14 @@ theorem succeeds
     let argsMachine := NonliveEmptyRootArgumentScope.resultMachine machine tracker fresh
     let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal tracker.global fresh,tracker.retagMode⟩
     let owned := borrowFrame.addProtector id tracker.global.nextPointerTag
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState frames changed owned argsMachine next slotFresh slotId slotEntry
       (PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 false)
     ∃ updated,
       continuation (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
         ⟨.immediate value,ActualReferenceMetadata.reference⟩ n place (Storage.withCurrent frames root.frame machine) =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed slotId slotEntry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧
@@ -95,7 +96,7 @@ theorem succeeds
   let argsMachine := NonliveEmptyRootArgumentScope.resultMachine machine tracker fresh
   let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal tracker.global fresh,tracker.retagMode⟩
   let owned := borrowFrame.addProtector id tracker.global.nextPointerTag
-  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
   let borrowed := ReturnProtection.borrowedState frames changed owned argsMachine next slotFresh slotId slotEntry
       (PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 false)
   have arguments := NonliveEmptyRootArgumentScope.scope options limits remaining span ctx debugOff cmp dynamicFuel validityFuel fuelEq validationEq

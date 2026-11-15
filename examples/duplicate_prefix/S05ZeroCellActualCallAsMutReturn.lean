@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallLenReturn
 import duplicate_prefix.PositiveRootMutablePreparation
 import duplicate_prefix.GeneralBorrowFreshDefaultChild
@@ -402,7 +403,8 @@ private theorem install_data
     (present : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (race : machine.dataRace = none)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+ :
     let cfg := config options remaining span
     let value := (RetagReferencePlace.sliceValue cfg.access.runtime.base
       (Pointer.new (.concrete id exprTag) (Size.ofBytes (base+offset))) len ActualReferenceMetadata.reference).imm
@@ -416,6 +418,9 @@ private theorem install_data
       (Storage.withCurrent frames frame machine) =
       .ok (1,1) (Storage.withCurrent frames
         (AsMutInstall.resultFrame frame valid value output borrowFrame id tracker.global.nextPointerTag) resultMachine) := by
+  have validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [callee]
+    decide +kernel
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (Provenance.concrete id exprTag) (Size.ofBytes (base+offset))) len ActualReferenceMetadata.reference).imm
   let cache := AsMutInstall.cacheFrame frame valid
@@ -472,8 +477,8 @@ private theorem install_data
     (Storage.withCurrent frames cache machine) _ _ _ _
     (by with_unfolding_all rfl) (by with_unfolding_all rfl) compat rfl rfl storage evaluate checked
   have query := AsMutLocalStages.span1 options limits (remaining+1) span frames frame machine body identity callee
-  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨613⟩
-  change AsMutCallCore.spanAt h ⟨613⟩ (Storage.withCurrent frames frame machine) = _ at setspan
+  have setspan := CallEntryLocals.set_span options limits (remaining+1) span frames frame machine ⟨72⟩
+  change AsMutCallCore.spanAt h ⟨72⟩ (Storage.withCurrent frames frame machine) = _ at setspan
   have layout := AsMutLocalStages.layout1 options limits (remaining+1) span frames (AsMutInstall.spanFrame frame) machine
     body identity callee valid uncached
   dsimp only [AsMutInstall.spanFrame] at layout
@@ -937,7 +942,7 @@ theorem initializes_through_as_mut_with_frame (span : PreparedContracts.FixedSpa
         helperMachine.user.addresses.baseAddr.find? (fun row => row.allocId == sourceId) = some ⟨sourceId,4096⟩ ∧
         helperMachine.user.payload.payload.user.types = PreparedReflection.actual.types ∧
         helperMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) =
-          some (sourceId,⟨none,#[]⟩) ∧
+          some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (helperMachine.user.payload.payload.user.runtime.extras.allocations) (sourceId) }) ∧
         helperMachine.user.payload.payload.user.backend = .none ∧
         helperMachine.user.payload.ghost = false ∧ helperMachine.user.payload.validation = .Shallow ∧
         helperMachine.dataRace = none ∧
@@ -1325,7 +1330,7 @@ theorem initializes_through_as_mut_with_frame (span : PreparedContracts.FixedSpa
     unfold PtrMetadataReturn.accountedMachine SourceControl.accounted
     rw [(actual_fields options () (remaining+1) span).terminators]
     change doneMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) =
-      some (sourceId,⟨none,#[]⟩)
+      some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (doneMachine.user.payload.payload.user.runtime.extras.allocations) (sourceId) })
     rw [extras]
     unfold S05ZeroCellActualCallSharedStmt.postMachine S05ZeroCellActualCallSharedStmt.current RootZeroCompleteState.tick SourceControl.accounted
     rw [(actual_fields options () (remaining+1) span).terminators]
@@ -1420,7 +1425,7 @@ theorem initializes_through_as_mut (span : PreparedContracts.FixedSpanQuery)
         helperMachine.user.addresses.baseAddr.find? (fun row => row.allocId == sourceId) = some ⟨sourceId,4096⟩ ∧
         helperMachine.user.payload.payload.user.types = PreparedReflection.actual.types ∧
         helperMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) =
-          some (sourceId,⟨none,#[]⟩) ∧
+          some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (helperMachine.user.payload.payload.user.runtime.extras.allocations) (sourceId) }) ∧
         helperMachine.user.payload.payload.user.backend = .none ∧
         helperMachine.user.payload.ghost = false ∧ helperMachine.user.payload.validation = .Shallow ∧
         helperMachine.dataRace = none ∧

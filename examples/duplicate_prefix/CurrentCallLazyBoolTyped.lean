@@ -350,13 +350,13 @@ theorem protect (options : EvalConfigurationCore.Options) (remaining : Nat)
         (registeredGlobal (allocatedTracker tracker fresh) tracker.global.nextPointerTag) ∧
       post.machine.memory.live=(machine.memory.live.filter (fun row=>row.1!=family.allocation)).push
         (family.allocation,⟨.machine .global,Q.allocation⟩) ∧
-      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation ⟨none,#[]⟩ with
+      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation { weakMemory := none } with
         memory:={machine.memory with live:=((machine.memory.live.filter (fun row=>row.1!=family.allocation)).push (family.allocation,⟨.machine .global,Q.allocation⟩))},
         borrowTracker:=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag)} ∧
       post.machine.user.addresses=machine.user.addresses ∧
       post.machine.user.payload.payload.user.runtime.extras.allocations=
         (machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=family.allocation)).push
-          (family.allocation,⟨none,#[]⟩) ∧
+          (family.allocation,{ weakMemory := none }) ∧
       SpatialDelegation post.machine (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag)
         family.allocation Q.allocation Q.precise.completion allocationRoot ∧
       PointerBinds Q.allocation (family.at allocationRoot) ∧
@@ -401,15 +401,18 @@ theorem protect (options : EvalConfigurationCore.Options) (remaining : Nat)
   have windowReady : CurrentCallBoolProtection.WindowReady initial physical.id physical.offset.toNat 1 := by
     refine ⟨#[],?_,by simp⟩
     rw [idEq]
-    change (((machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=family.allocation)).push
-      (family.allocation,⟨none,#[]⟩)).find? (fun row=>row.1==family.allocation))=some (family.allocation,⟨none,#[]⟩)
-    have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit=>
-        decide ((row.1!=family.allocation)=true ∧(row.1==family.allocation)=true))=(fun _=>false) := by
-      funext row
-      by_cases equal : row.1=family.allocation <;> simp [equal]
-    have emptyFind : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by
-      simp [Array.find?_eq_none]
-    simp [Array.find?_push,Array.find?_filter,noMatch,emptyFind]
+    have selectedExtras : initial.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == family.allocation) =
+        some (family.allocation, { weakMemory := none }) := by
+      change (((machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=family.allocation)).push
+        (family.allocation,{ weakMemory := none })).find? (fun row=>row.1==family.allocation))=some (family.allocation,{ weakMemory := none })
+      have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit=>
+          decide ((row.1!=family.allocation)=true ∧(row.1==family.allocation)=true))=(fun _=>false) := by
+        funext row
+        by_cases equal : row.1=family.allocation <;> simp [equal]
+      have emptyFind : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by
+        simp [Array.find?_eq_none]
+      simp [Array.find?_push,Array.find?_filter,noMatch,emptyFind]
+    simpa only [AllocationBacktrace.of_lookup selectedExtras] using selectedExtras
   obtain ⟨output,child,actual,tag,global,frameEq,⟨witness⟩,updated,protectActual,extra,sizeEq,lengthEq,mutable,write,snapshot,tracked,borrowed,returned⟩:=
     CurrentCallSelectedBoolProtection.protect options options.limits remaining span ctx initial tracker
       (identities family (completion root source.byteSize)) 0 frames frame borrowFrame ready.enabled frameBorrow

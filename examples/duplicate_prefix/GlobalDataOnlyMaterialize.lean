@@ -13,7 +13,7 @@ set_option backward.dsimp.instances true
 def cached {K U P : Type} (extras : MemoryExtras.Hooks K U P)
     (before : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (allocation : Allocation Provenance BorrowTree) : MachineHooks.MachineState K U :=
-  let after := MemoryExtras.putAllocation extras before id ⟨none,#[]⟩
+  let after := MemoryExtras.putAllocation extras before id { weakMemory := none }
   {after with memory := {before.memory with live :=
     (before.memory.live.filter fun old => old.1 != id).push (id,⟨.machine kind,allocation⟩)}}
 

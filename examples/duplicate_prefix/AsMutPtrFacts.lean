@@ -15,10 +15,11 @@ private theorem checkedOk_eq {E V : Type} (value : Except E V) (supported : valu
   cases value with
   | ok value => rfl
   | error error => cases supported
-theorem raw_layout_supported : (PreparedReflection.actual.runtime.lookup 204).isOk = true := by decide +kernel
-def rawLayout := checkedOk (PreparedReflection.actual.runtime.lookup 204) raw_layout_supported
-theorem raw_layout_eq : PreparedReflection.actual.runtime.lookup 204 = .ok rawLayout := checkedOk_eq _ _
-theorem raw_type : rawLayout.ty = 204 := by with_unfolding_all rfl
+theorem raw_layout_supported : (PreparedReflection.actual.runtime.lookup 99).isOk = true := by decide +kernel
+def rawLayout := checkedOk (PreparedReflection.actual.layoutResults[99]'(by decide +kernel)) (by decide +kernel)
+theorem raw_layout_eq : PreparedReflection.actual.runtime.lookup 99 = .ok rawLayout := by decide +kernel
+
+theorem raw_type : rawLayout.ty = 99 := by with_unfolding_all rfl
 theorem raw_sized : rawLayout.layout.isSized = true := by with_unfolding_all rfl
 theorem raw_size : rawLayout.layout.size = Size.ofBytes 16 := by with_unfolding_all rfl
 theorem raw_data : rawLayout.layout = PtrMetadataHelper.rawLayout.layout := by with_unfolding_all rfl
@@ -29,12 +30,12 @@ theorem raw_readable : ∃ pa pb ra rb offset, rawLayout.layout.backendRepr =
   exact PtrMetadataHelper.raw_readable
 theorem raw_no_padding : CompilerCopy.hasPadding PreparedReflection.actual.compiler.runtime false rawLayout = .ok false := by decide +kernel
 theorem raw_slice_kind : CompilerFactAdapters.validityKind
-    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 204 = .ok (.rawPointer 4 false) := by
+    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 99 = .ok (.rawPointer 4 false) := by
   unfold CompilerFactAdapters.validityKind
   unfold_raw_validity_helpers
   dsimp only
   have nodes (id : TypeId) : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node id =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node id :=
+      PreparedReflection.actual.runtime.node id :=
     RootMetadataQueries.context_node id
   simp only [nodes]
   change (do
@@ -44,7 +45,7 @@ theorem raw_slice_kind : CompilerFactAdapters.validityKind
   rfl
 theorem hooks_raw_slice_kind (base : ValidityVisitor.Hooks P S C E F A Pad) (choice : C) :
     (CompilerFactAdapters.validityHooks PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts base).classify
-      choice 204 = pure (.rawPointer 4 false) := by
+      choice 99 = pure (.rawPointer 4 false) := by
   unfold CompilerFactAdapters.validityHooks
   dsimp only
   rw [raw_slice_kind]
@@ -52,24 +53,24 @@ theorem hooks_raw_slice_kind (base : ValidityVisitor.Hooks P S C E F A Pad) (cho
 
 theorem hooks_raw_slice_name (base : ValidityVisitor.Hooks P S C E F A Pad) (choice : C) :
     (CompilerFactAdapters.validityHooks PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts base).typeName
-      choice 204 = pure "*mut [u8]" := by
+      choice 99 = pure "*mut [u8]" := by
   unfold CompilerFactAdapters.validityHooks
   dsimp only
   unfold_validity_source
-  have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 204 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 204 :=
-    RootMetadataQueries.context_node 204
+  have node : PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 99 =
+      PreparedReflection.actual.runtime.node 99 :=
+    RootMetadataQueries.context_node 99
   rw [node]
   with_unfolding_all rfl
 
-theorem context_raw_layout : CompilerFacts.layoutOf RootMetadataQueries.context 204 = .ok rawLayout := by
+theorem context_raw_layout : CompilerFacts.layoutOf RootMetadataQueries.context 99 = .ok rawLayout := by
   unfold CompilerFacts.layoutOf
-  rw [show RootMetadataQueries.context.runtime.lookup 204 = PreparedReflection.actual.runtime.lookup 204 from
-    LayoutLookupProof.indexed_lookup_eq PreparedReflection.actual.runtime none 204]
+  rw [show RootMetadataQueries.context.runtime.lookup 99 = PreparedReflection.actual.runtime.lookup 99 from
+    by rfl]
   rw [raw_layout_eq]
   rfl
 
-theorem raw_builtin_deref : CompilerFacts.builtinDeref RootMetadataQueries.context 204 true = .ok (some 4) := by
+theorem raw_builtin_deref : CompilerFacts.builtinDeref RootMetadataQueries.context 99 true = .ok (some 4) := by
   unfold CompilerFacts.builtinDeref CompilerFacts.optionalType
   unfold_fact_helpers
   simp only [RootMetadataQueries.context_node]
@@ -77,7 +78,7 @@ theorem raw_builtin_deref : CompilerFacts.builtinDeref RootMetadataQueries.conte
 
 theorem compiler_raw_deref {K U C : Type} (choice : C) :
     (CompilerExecutionProviders.pointerCompiler (K := K) (U := U)
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts).builtinDeref choice 204 = pure (some 4) := by
+      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts).builtinDeref choice 99 = pure (some 4) := by
   simp only [CompilerExecutionProviders.pointerCompiler]
   rw [show PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context = RootMetadataQueries.context from rfl,
     raw_builtin_deref]
@@ -86,19 +87,19 @@ theorem compiler_raw_deref {K U C : Type} (choice : C) :
   rfl
 
 theorem cast_raw_info : CompilerFactAdapters.castTypeInfo
-    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 204 = .ok (.rawPointer 4) := by decide +kernel
+    PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 99 = .ok (.rawPointer 4) := by decide +kernel
 
 theorem cast_thin_info : CompilerFactAdapters.castTypeInfo
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts 8 = .ok (.rawPointer 1) := by decide +kernel
 
-theorem raw_retag_shape : CompilerFacts.retagTypeShape RootMetadataQueries.context 204 =
+theorem raw_retag_shape : CompilerFacts.retagTypeShape RootMetadataQueries.context 99 =
     .ok ⟨false, false, true, false⟩ := by
   unfold CompilerFacts.retagTypeShape CompilerFacts.boolean
   unfold_fact_helpers
   simp only [RootMetadataQueries.context_node]
   with_unfolding_all rfl
 
-theorem body_locals : HelperCompilerFacts.asMutPtrBody.body.locals = #[8,3,8,204,204] := by with_unfolding_all rfl
+theorem body_locals : HelperCompilerFacts.asMutPtrBody.body.locals = #[8,3,8,99,99] := by with_unfolding_all rfl
 
 def block := HelperCompilerFacts.asMutPtrBody.body.basicBlocks[0]'(by decide +kernel)
 

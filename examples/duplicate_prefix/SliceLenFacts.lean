@@ -8,7 +8,7 @@ set_option maxHeartbeats 16000000
 
 def body := HelperCompilerFacts.lenBody
 
-theorem body_shape : (body.body.argumentCount,body.body.locals,body.body.basicBlocks.size) = (1,#[5,7,154],2) := by decide +kernel
+theorem body_shape : (body.body.argumentCount,body.body.locals,body.body.basicBlocks.size) = (1,#[5,7,49],2) := by decide +kernel
 
 theorem statements :
     CopyPreconditions.Bodies.statementKindAt body.body 0 0 = some (.StorageLive 2) ∧
@@ -31,12 +31,12 @@ theorem call_shape :
 theorem normalized_local2 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = body.body) (identity : frame.bodyIdentity = body.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.lenCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 2 = .ok 154 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 2 = .ok 49 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
-theorem raw_type_shape : CompilerFacts.retagTypeShape RootMetadataQueries.context 154 =
+theorem raw_type_shape : CompilerFacts.retagTypeShape RootMetadataQueries.context 49 =
     .ok {isReference := false,isRawPointer := true} := by
   unfold CompilerFacts.retagTypeShape CompilerFacts.boolean
   unfold_fact_helpers

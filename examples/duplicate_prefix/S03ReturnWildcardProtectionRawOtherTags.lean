@@ -1,3 +1,5 @@
+import duplicate_prefix.ReturnMemoryWrite
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnConstructorOtherTag
 import duplicate_prefix.S04ReturnWildcardProtection
 import duplicate_prefix.S04ReturnRetaggedInput
@@ -157,7 +159,7 @@ theorem invoke_other_tags
     (borrowFrame : FrameState) (frameBorrow : frame.extra.borrowTracker = some borrowFrame)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat) :
     ∃ tree updated,
@@ -199,17 +201,14 @@ theorem invoke_other_tags
   have configuredWrite : (config options remaining span).retag.writeUninit
       (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag) current = .ok () after := by
     obtain ⟨ctx⟩ := ActualRetagContext.exists_context options remaining span model.preciseOff model.implicitOff
-    rw [ctx.construction]
-    change (do
-      let access ← ValidityMachine.scopedAccess (config options remaining span).access
-      PlaceMachine.writeMemory access (fun _ => false) .uninit
-        (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag)) current = .ok () after
-    have accessGhost : (config options remaining span).access.ghostMode = false := by
-      rw [(DuplicatePrefixPhysicalContexts.canonical options remaining span).accessEq]
-      rfl
-    have scope := S04ProtectUninitWrite.scopedAccess_of_not_ghost
-      (config options remaining span).access current accessGhost model.ghostOff
-    simp only [bind,EStateM.bind,scope]
+    have fields := CanonicalConfigFacts.actual_fields options () remaining span
+    obtain ⟨context,accessEq,_,_⟩ := fields.canonicalCopy
+    have sized : (TypedRetagGeneric.retaggedPlace place input.id input.tracker.global.nextPointerTag).layout.layout.backendRepr.isUnsized = false := by
+      change place.layout.layout.backendRepr.isUnsized = false
+      rw [input.layout]
+      decide +kernel
+    rw [ReturnMemoryWrite.actual_uninit_eq options remaining span ctx context accessEq _ current model.ghostOff sized]
+    rw [←accessEq]
     exact write
   let written := (tree.performBorrowAccessRange (.concrete input.tracker.global.nextPointerTag)
     (Size.ofBytes input.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree

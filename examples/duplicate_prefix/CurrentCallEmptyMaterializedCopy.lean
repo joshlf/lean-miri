@@ -53,7 +53,9 @@ theorem concrete (options : EvalConfigurationCore.Options) (limits : ExecutionMa
       let active:={machine with user:={machine.user with payload:={machine.user.payload with ghost:=true}}}
       let registered:=registeredState frames copied borrow (allocatedMachine active ⟨global,.FnEntry⟩ fresh)
         (allocatedTracker ⟨global,.FnEntry⟩ fresh) id global.nextPointerTag
-      (config options remaining span).retag.ensureTreeExtra id registered=.ok () (materialized registered after id root converted)) :
+      (config options remaining span).retag.ensureTreeExtra id registered=.ok () (materialized registered after id root converted))
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new (.concrete id root) (Size.ofBytes (base+offset))) 0 reference).imm
     let updated:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base

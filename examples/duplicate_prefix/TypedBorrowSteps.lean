@@ -21,7 +21,7 @@ private def sourceName (suffix : String) : CoreM Name := do
 elab "typed_checked" : term => do
   Lean.Meta.mkConstWithFreshMVarLevels (← sourceName ".TypedRetag.checked")
 elab "typed_access_error" : term => do
-  Lean.Meta.mkConstWithFreshMVarLevels (← sourceName ".TypedRetag.accessError")
+  Lean.Meta.mkConstWithFreshMVarLevels (← sourceName ".TypedRetag.reborrowAccessError")
 
 /-- This is the unchanged suffix of TypedRetag.reborrow, factored only to
 share its kernel proof between protected and unprotected policies. -/

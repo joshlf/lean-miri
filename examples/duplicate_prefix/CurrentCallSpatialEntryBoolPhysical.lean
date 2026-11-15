@@ -43,14 +43,14 @@ operation and entry control result. This adds no interpreter step. -/
 theorem mutation : Allocation.writeUninit (allocRange (Size.ofBytes out.physical.offset) (Size.ofBytes 1)) (Size.ofBytes 8)
     (out.physical.entry.allocation.setExtra out.updated.extra)=.ok () out.updated := by
   obtain ⟨retagCtx⟩:=(DuplicatePrefixCallModel.contexts options remaining span before C.model).2.2.2
-  have frameBool : (atSpan (argsRoot C count) ⟨601⟩).frame.extra.borrowTracker=some (sourceOutput C).frame := by
+  have frameBool : (atSpan (argsRoot C count) ⟨2⟩).frame.extra.borrowTracker=some (sourceOutput C).frame := by
     exact CurrentCallSourceArguments.result_borrowFrame options remaining span root C.borrowFrame source.family.value len count source.backing.id tracker.global.nextPointerTag
   have short : out.physical.entry.allocation.extra.nodes.size+1<65536 := by
     rw [(spatial_install_rule ".CurrentCallSpatialEntryBoolCurrent.allocation_eq") out]
     exact (spatial_install_rule ".CurrentCallSpatialEntryBoolCurrent.old_runtime") out |>.2.2
   obtain ⟨output,child,actual,tag,global,frame,⟨witness⟩,updated,protect,extra,size,length,mutable,mutation,snapshot,tracked,frameTracked,returnPlace⟩ :=
     CurrentCallSpatialBoolActivation.activate options limits (remaining+1) span retagCtx (sourceMachine out)
-      ⟨(sourceOutput C).global,tracker.retagMode⟩ _ returnOffset out.dst frames (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame
+      ⟨(sourceOutput C).global,tracker.retagMode⟩ _ returnOffset out.dst frames (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame
       out.sourceTracked ((spatial_install_rule ".CurrentCallSpatialEntryBoolCurrent.source_highwater") out) frameBool
       place out.physical out.physicalId out.physicalOffset out.physicalPointer (initial_binding out) out.fresh short
       rfl C.model.noDataRace C.model.noBackend (initial_ready out)

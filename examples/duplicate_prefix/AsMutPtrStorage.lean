@@ -28,7 +28,7 @@ theorem initial_storage [DecidableEq K]
     (dead4 : (frame.locals[4]'(by omega)).value = .dead)
     (noClocks : frame.extra.dataRace = none)
     (trivial8 : config.lifecycle.storage.veryTriviallySized 8 = .ok true)
-    (trivial204 : config.lifecycle.storage.veryTriviallySized 204 = .ok true)
+    (trivial204 : config.lifecycle.storage.veryTriviallySized 99 = .ok true)
  :
     ∃ first second third,
       ExecutionMachine.step config limits firstChoice
@@ -49,12 +49,12 @@ theorem initial_storage [DecidableEq K]
     (by rw [body]; rfl) (by rfl) (by rfl) (by rw [size]; decide)
     (by rw [body]; rfl) trivial8 dead2 noClocks
   have second := SourceSteps.storage_live_exact config limits secondChoice framesBefore one machine
-    ⟨0,1⟩ block (block.statements[1]'(by decide)) 3 204 (by rfl)
+    ⟨0,1⟩ block (block.statements[1]'(by decide)) 3 99 (by rfl)
     (by change frame.body.basicBlocks[0]? = _; rw [body]; rfl) (by rfl) (by rfl)
     (by rw [sizeOne]; decide) (by change frame.body.locals[3]? = _; rw [body]; rfl) trivial204
     (by simpa [one, SourceSteps.liveFrame, Array.getElem_set] using dead3) (by simpa [one, SourceSteps.liveFrame] using noClocks)
   have third := SourceSteps.storage_live_exact config limits thirdChoice framesBefore two machine
-    ⟨0,2⟩ block (block.statements[2]'(by decide)) 4 204 (by rfl)
+    ⟨0,2⟩ block (block.statements[2]'(by decide)) 4 99 (by rfl)
     (by change frame.body.basicBlocks[0]? = _; rw [body]; rfl) (by rfl) (by rfl)
     (by rw [sizeTwo]; decide) (by change frame.body.locals[4]? = _; rw [body]; rfl) trivial204
     (by simpa [two, one, SourceSteps.liveFrame, Array.getElem_set] using dead4)
@@ -64,7 +64,7 @@ theorem initial_storage [DecidableEq K]
   · simp [Storage.withCurrent, Stack.currentFrame?, three, SourceSteps.liveFrame]
 
 theorem trivial_thin : CompilerStorage.veryTriviallySized PreparedReflection.actual.compiler.runtime 8 = .ok true := by decide +kernel
-theorem trivial_fat : CompilerStorage.veryTriviallySized PreparedReflection.actual.compiler.runtime 204 = .ok true := by decide +kernel
+theorem trivial_fat : CompilerStorage.veryTriviallySized PreparedReflection.actual.compiler.runtime 99 = .ok true := by decide +kernel
 
 theorem actual_initial_storage
     (options : EvalConfigurationCore.Options) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)

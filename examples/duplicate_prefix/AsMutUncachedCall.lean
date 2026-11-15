@@ -18,8 +18,8 @@ theorem compute_local15 (frames : Array CompilerFrameContext.ActualFrame) (frame
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler 15
       (Storage.withCurrent frames frame machine) = .ok CopyCompilerFacts.destPointerLayout (Storage.withCurrent frames frame machine) := by
-  have normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 15 = .ok 8 := by
-    unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  have normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler frame 15 = .ok 8 := by
+    unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
     rw [body,identity,callee]
     with_unfolding_all rfl
   unfold CompilerFrameContext.computeLocalLayout

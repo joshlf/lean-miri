@@ -35,8 +35,8 @@ def finishedFrame {options before tracker argument} (effect : Effect options bef
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (root : RootFrame) (count : UInt64)
     (borrowFrame : FrameState) (sourceId boolId : AllocId) (boolTag : BorTag) :=
   CallEntryFacts.doneRootFrame
-    {registeredFrame (atSpan (RootArgumentsTwo.result (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨601⟩).frame
-      (borrowFrame.addProtector sourceId tracker.global.nextPointerTag) boolId boolTag with location:=.unwinding ⟨559⟩}
+    {registeredFrame (atSpan (RootArgumentsTwo.result (CurrentCallEmptySourceArguments.doneRoot effect remaining span root borrowFrame) count) ⟨2⟩).frame
+      (borrowFrame.addProtector sourceId tracker.global.nextPointerTag) boolId boolTag with location:=.unwinding ⟨0⟩}
 
 /-- Both actual ABI arguments, source zero protector and Bool protector have
 the existing installed-frame shape, with the exact original return place. -/

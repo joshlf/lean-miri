@@ -80,7 +80,7 @@ theorem invoke {options limits remaining span before argument len place}
   let sourceTracker : MachineHooks.BorrowState := ⟨result.global, input.tracker.retagMode⟩
   let args := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {} ptr len
     family.allocation input.tracker.global.nextPointerTag) count
-  let boolFrame := (atSpan args ⟨601⟩).frame
+  let boolFrame := (atSpan args ⟨2⟩).frame
   let BF : FrameState := ({} : FrameState).addProtector family.allocation input.tracker.global.nextPointerTag
   obtain ⟨B⟩ := CurrentCallOrdinaryReturnLive.form input liveReturn
   have different : family.allocation ≠ B.physical.id := by
@@ -111,9 +111,9 @@ theorem invoke {options limits remaining span before argument len place}
     exact (result.bases _ _ B.physical.cachedBase).trans B.physical.cachedBase.symm
   have extrasRows : sourceMachine.user.payload.payload.user.runtime.extras.allocations =
       (before.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
-        (family.allocation, ⟨none, #[]⟩) := by
+        (family.allocation, { weakMemory := none }) := by
     change (result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
-      (family.allocation, ⟨none, #[]⟩) = _
+      (family.allocation, { weakMemory := none }) = _
     rw [result.frame, CurrentCallConversionFiniteFold.state_eq]
     rfl
   have extras : sourceMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == B.physical.id) =
@@ -275,9 +275,9 @@ theorem invoke {options limits remaining span before argument len place}
   have protectionFinal :
       (ExecutionMachine.callHooks (config options (remaining + 1) span) limits).protectArgument () place
         (Storage.withCurrent #[] (atSpan (RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {}
-          ptr len currentSource.role.backing.id currentSource.tag) count) ⟨601⟩).frame sourceMachine) =
+          ptr len currentSource.role.backing.id currentSource.tag) count) ⟨2⟩).frame sourceMachine) =
         .ok () (Storage.withCurrent #[] (registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallSourceArguments.doneRoot options remaining span root {} ptr len currentSource.role.backing.id currentSource.tag) count) ⟨601⟩).frame
+          (CurrentCallSourceArguments.doneRoot options remaining span root {} ptr len currentSource.role.backing.id currentSource.tag) count) ⟨2⟩).frame
           (({} : FrameState).addProtector currentSource.role.backing.id currentSource.tag) R.id R.node.tag) post.machine) := by
     simpa only [currentIdOld, currentTagOld, returnId, returnTag, boolFrame, args, BF] using protectionBudget
   exact CurrentCallOrdinaryPositiveFinish.invoke input ptr encoding' count sourceMachine sourceFnMachine post.machine

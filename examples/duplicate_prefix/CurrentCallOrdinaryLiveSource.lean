@@ -111,6 +111,9 @@ theorem copy {options limits remaining span before argument len place}
   dsimp only
   let machine:=CurrentCallPush.preparedMachine before #[]
   let root:=CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let first:=(firstLive root).frame
   have preparedRole : LiveRole machine input.tracker family offset len capacity true := by
     obtain ⟨entry,live,size,physical,cap,owned⟩:=liveRole

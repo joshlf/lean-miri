@@ -69,7 +69,9 @@ theorem protected_reference_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) len place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes len,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes len,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base
         (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) len reference)
@@ -175,6 +177,9 @@ theorem unprotected_reference_pointer {K U C F A : Type} [DecidableEq K]
       (Storage.withCurrent frames frame
         {allocatedMachine machine tracker fresh
           with memory := RetagEntry.updatedMemory machine.memory id entry finalTree}) := by
+  have definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+    intro same
+    exact False.elim (TypedRetagPolicyFields.unprotected_not_fn_entry mutability mode policy created protection same)
   subst tag
   let before := Storage.withCurrent frames frame machine
   let after := Storage.withCurrent frames frame

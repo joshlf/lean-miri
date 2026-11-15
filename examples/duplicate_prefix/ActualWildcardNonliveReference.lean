@@ -51,7 +51,9 @@ theorem validate_nonlive (options : EvalConfigurationCore.Options) (remaining : 
       LocalPlaces.localRuntimePlace frames.size afterFrame localId reference)
     (ghostAfter : afterMachine.user.payload.ghost = true)
     (afterState : nonliveRetagState frames frame machine borrowFrame global fresh id =
-      Storage.withCurrent frames afterFrame afterMachine) :
+      Storage.withCurrent frames afterFrame afterMachine)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ValidityVisitor.validatePlace (config options remaining span).validity () (validityFuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) false true
       (Storage.withCurrent frames frame machine) =
@@ -62,6 +64,7 @@ theorem validate_nonlive (options : EvalConfigurationCore.Options) (remaining : 
            layout := (afterFrame.locals[localId]'(by simpa [sameLocals] using valid)).layout}
           (by simpa [sameLocals] using valid))}
         {afterMachine with user := {afterMachine.user with payload := {afterMachine.user.payload with ghost := false}}}) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}
@@ -172,7 +175,9 @@ theorem validate_runtime_nonlive (options : EvalConfigurationCore.Options) (rema
       LocalPlaces.localRuntimePlace frames.size afterFrame localId reference)
     (ghostAfter : afterMachine.user.payload.ghost = true)
     (afterState : nonliveRetagState frames frame machine borrowFrame global fresh id =
-      Storage.withCurrent frames afterFrame afterMachine) :
+      Storage.withCurrent frames afterFrame afterMachine)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ValidityMachine.validateRuntime (config options remaining span).validity () (validityFuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) true
       (Storage.withCurrent frames frame machine) =

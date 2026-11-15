@@ -66,6 +66,9 @@ theorem profile {before after : Before} {id : AllocId} {offset length : Nat}
       before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id)) :
     CurrentCallBoolProtection.WindowReady after id offset length := by
   obtain ⟨sync, found, outside⟩ := ready
-  exact ⟨sync, selected.trans found, outside⟩
+  refine ⟨sync, ?_, outside⟩
+  unfold AllocationBacktrace.get
+  rw [selected]
+  exact found
 
 end DuplicatePrefix.CurrentCallConversionEntryFrame

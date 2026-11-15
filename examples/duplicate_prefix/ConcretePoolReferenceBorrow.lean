@@ -51,7 +51,9 @@ theorem fnentry_pointer {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let finalTree := entryInput.after
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base

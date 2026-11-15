@@ -39,8 +39,8 @@ def machine : Before := CurrentCallSpatialEntry.finalMachine place _ out.physica
   (protectedState C count out.entry out.physical out.fresh out.boolOutput) out.updated
 
 def finishedFrame : CompilerFrameContext.ActualFrame := CallEntryFacts.doneRootFrame
-  {registeredFrame (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame
-    out.physical.id (sourceOutput C).global.nextPointerTag with location:=.unwinding ⟨559⟩}
+  {registeredFrame (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame
+    out.physical.id (sourceOutput C).global.nextPointerTag with location:=.unwinding ⟨0⟩}
 
 /-- The actual generic resource entry ends at the existing installed-frame
 representation, preserving the original return place and exact source value. -/

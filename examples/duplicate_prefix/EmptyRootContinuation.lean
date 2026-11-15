@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootEntryTail
 import duplicate_prefix.EmptyRootArgumentScope
 import duplicate_prefix.EmptyRootArgumentProperties
@@ -38,7 +39,7 @@ theorem succeeds
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : machine.user.payload.ghost = false)
     (dead0 : (rootFrame.frame.locals[0]'(rootFrame.valid ⟨0,by decide⟩)).value = .dead)
     (dead6 : (rootFrame.frame.locals[6]'(rootFrame.valid ⟨6,by decide⟩)).value = .dead)
@@ -59,14 +60,14 @@ theorem succeeds
     let argsFrame := EmptyRootArguments.result rootFrame address n
     let argsMachine := allocatedMachine machine tracker initialFresh
     let next := allocatedTracker tracker initialFresh
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState frames changed borrowFrame argsMachine next fresh id entry
       (PhysicalMachineWrite.slotTree rootTag next.global.nextPointerTag 1 false)
     ∃ updated,
       continuation (ExecutionMachine.callHooks (config options (remaining+1) span) limits) address n place
         (Storage.withCurrent frames rootFrame.frame machine) =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed id entry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree rootTag next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧
@@ -90,11 +91,11 @@ theorem succeeds
   obtain ⟨updated, tail, props⟩ := RootEntryTail.actual_tail options limits (remaining+1) span ctx place layout
     frames argsFrame.frame borrowFrame argsMachine next rfl frameBorrow fresh id entry base rootTag pointer aligned cached root size present
     race distinct unprotected mutable storage maskLength provenance noBackend extras ghost argsFrame.body argsFrame.size d0 d6 d13 d14 argsFrame.noClocks argsFrame.identity argsFrame.callee
-  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
   let borrowed := ReturnProtection.borrowedState frames changed borrowFrame argsMachine next fresh id entry
     (PhysicalMachineWrite.slotTree rootTag next.global.nextPointerTag 1 false)
   let final := Storage.withCurrent frames
-    (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+    (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨0⟩})
     (CanonicalCopy.replaceAllocation borrowed id entry.kind updated).machine
   refine ⟨updated, ?_, props⟩
   unfold continuation

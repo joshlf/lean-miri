@@ -33,7 +33,7 @@ theorem result
   let root := RawRootInvocation.root before place input.contract.model.noDataRace
   let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes address)) len ActualReferenceMetadata.reference).imm
-  let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨601⟩}
+  let changed := {(RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted {} reference.id reference.tracker.global.nextPointerTag) count).frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have below := GeneralBorrowForestTagHighWater.mapped data.destination.entry.allocation.extra data.destination.tracker.global.protectedTags
     data.destination.tracker.global.nextPointerTag data.node.tag data.runtime.below data.child

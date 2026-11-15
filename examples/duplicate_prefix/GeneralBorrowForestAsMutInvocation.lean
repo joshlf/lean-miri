@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestAsMutInvocationCore
 import duplicate_prefix.GeneralBorrowForestAsMutEntryPaths
 namespace DuplicatePrefix.GeneralBorrowForestAsMutInvocation
@@ -34,7 +35,7 @@ structure Input where
   provenance : ProvenanceCopy.WellFormed start.entry.allocation.provenanceMap start.entry.allocation.len
   storageFits : start.entry.allocation.len+64 < 18446744073709551616
   mutable : start.entry.allocation.mutability = .Mut
-  bufferExtras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == start.id) = some (start.id,⟨none,#[]⟩)
+  bufferExtras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == start.id) = some (start.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (start.machine.user.payload.payload.user.runtime.extras.allocations) (start.id) })
   bounded : start.count ≤ (PreparedContracts.actualConfig start.options () (start.remaining+1) start.span).projection.maxSizeOfVal.bytes
   zero : start.caller.locals[0]? = some ⟨.live (.immediate .uninit),none⟩
   continuation : start.caller.returnContinuation = .stop true
@@ -75,7 +76,7 @@ structure Input where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   cached : start.machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (start.machine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : start.caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 
 
@@ -201,7 +202,8 @@ theorem complete_full (input : Input) :
         change (s.id,node.tag) ∈ ((({} : FrameState).addProtector s.id s.tracker.global.nextPointerTag).protectedTags.toList)
         simpa only [FrameState.addProtector,Array.toList_push,Array.toList_empty,List.nil_append,List.mem_cons,List.not_mem_nil,
           or_false,Prod.mk.injEq] using (show s.id = s.id ∧ node.tag = s.tracker.global.nextPointerTag from ⟨rfl,fresh⟩)
-    · change (GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations.find? _ = _
+    · change (GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations.find? _ =
+        some (s.id, { weakMemory := none, backtrace := AllocationBacktrace.get ((GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations) s.id })
       rw [user]
       exact input.bufferExtras
     · have present : (GeneralBorrowForestAsMutInvocationCore.pushed s).memory.live.find? (fun row => row.1 == input.slotId) = some (input.slotId,input.slot) := by
@@ -217,7 +219,8 @@ theorem complete_full (input : Input) :
     · change (GeneralBorrowForestAsMutInvocationCore.pushed s).user.addresses.baseAddr.find? _ = _
       rw [addresses]
       exact input.cached
-    · change (GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations.find? _ = _
+    · change (GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations.find? _ =
+        some (input.slotId, { weakMemory := none, backtrace := AllocationBacktrace.get ((GeneralBorrowForestAsMutInvocationCore.pushed s).user.payload.payload.user.runtime.extras.allocations) input.slotId })
       rw [user]
       exact input.extras
   exact ⟨ready,rfl,rfl,rfl,GeneralBorrowForestAsMutInvocationCore.actual_entry s release,GeneralBorrowForestAsMutPhysicalReturn.complete ready⟩

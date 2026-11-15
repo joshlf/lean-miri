@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootProtectedFinish
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
@@ -38,7 +39,7 @@ theorem actual_tail
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : machine.user.payload.ghost = false)
     (body : frame.body = RootBody.reflected.body.body) (localSize : frame.locals.size = 25)
     (dead0 : (frame.locals[0]'(by omega)).value = .dead)
@@ -49,21 +50,21 @@ theorem actual_tail
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     let child := tracker.global.nextPointerTag
-    let changed := {frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState frames changed borrowFrame machine tracker fresh id entry
       (PhysicalMachineWrite.slotTree rootTag child 1 false)
     ∃ updated,
       tail (ExecutionMachine.callHooks (config options remaining span) limits) place
         (Storage.withCurrent frames frame machine) =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id child with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id child with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed id entry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree rootTag child 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧
       updated.initializationMask = InitMask.new (Size.ofBytes 1) false ∧
       updated.provenanceMap = ProvenanceMap.new ∧ AllocationCopy.snapshot updated = AllocationCopy.snapshot entry.allocation ∧
       updated.mutability = .Mut := by
-  let changed := {frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {frame with location := FrameLocation.unwinding ⟨2⟩}
   obtain ⟨updated, protect, properties⟩ := RootProtectedFinish.protect_and_finish options limits remaining span ctx place layout
     frames changed borrowFrame machine tracker enabled frameBorrow fresh id entry base rootTag pointer aligned cached root size present
     race distinct unprotected mutable storage maskLength provenance noBackend extras ghost body localSize dead0 dead6 dead13 dead14 noClocks

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.WildcardPoolHitRootInvocationEntry
 import duplicate_prefix.RootZeroInvocationState
 import duplicate_prefix.PositiveRootInstalledFrame
@@ -57,7 +58,7 @@ theorem invoke
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -103,9 +104,9 @@ theorem invoke
     let arguments := RootArgumentsTwo.result
       (ConcreteEmptyRootArguments.firstDone raw adjusted {} id tracker.global.nextPointerTag) 0
     let owned := ({} : FrameState).addProtector id tracker.global.nextPointerTag
-    let changed := {arguments.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {arguments.frame with location := FrameLocation.unwinding ⟨2⟩}
     let actualFrame := CallEntryFacts.doneRootFrame
-      {registeredFrame changed owned slotId tag with location := .unwinding ⟨559⟩}
+      {registeredFrame changed owned slotId tag with location := .unwinding ⟨0⟩}
     have frameEq : actualFrame = frame := rfl
     have machineEq := WildcardPoolHitRootInvocationState.entered_eq rawMachine tracker fresh id entry rootSlot
       slotFresh slotId slotEntry slotRoot slotAllocation changed owned
@@ -248,7 +249,7 @@ theorem invoke
     (congrArg (fun row=>row.value) slot0) (congrArg (fun row=>row.layout) slot0) rfl layout outerWidth (by decide) (by decide)
     (by rw [addrState];exact slotCached) initialPresent releasedPresent protectedSize protectedMutable maskValid (by rw [outerRuntime];rfl)
     (by rw [protectedLen,protectedSize];rfl) (by rw [protectedMask,protectedSize];rfl) protectedProv raceState backendState rfl
-    (by change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
     rootFree childFree protectedTree slotPointer aligned (by rw [outerRuntime];rfl) outerAccess ghostState shallowState
     (by rw [frameReturn];rfl) (Size.ofBytes (slotBase+1)) endpoint
   exact ⟨Storage.withCurrent #[] frame initialMachine,CanonicalCopy.replaceAllocation state slotId slotEntry.kind result,call',trace,terminal,rfl,safe⟩

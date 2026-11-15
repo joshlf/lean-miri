@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.PositiveRootSuccessInvocation
 import duplicate_prefix.PositiveRootCopyEntry
 import duplicate_prefix.PositiveRootCopyData
@@ -57,7 +58,7 @@ theorem invoke
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -92,7 +93,7 @@ theorem invoke
     (bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len)
     (bufferStorageFits : entry.allocation.len+64 < 18446744073709551616)
     (bufferMutable : entry.allocation.mutability = .Mut)
-    (bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (statementFuel : limits.validation = validityFuel+1) :
     let config := PreparedContracts.actualConfig options () (remaining+1) span
     ∃ installed done updated,
@@ -127,7 +128,7 @@ theorem invoke
     shape finalTracker {thread with topUserRelevantFrame := some 0} tags id entry capacity offset len post
     debugOff validityFuel validationEq budget dispatchFuel source cmp metadata.body metadata.identity metadata.callee metadata.trackNone
     metadata.noClocks metadata.relevant rfl initialBackend
-  have bufferExtrasNow : initialMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩) := by
+  have bufferExtrasNow : initialMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (initialMachine.user.payload.payload.user.runtime.extras.allocations) (id) }) := by
     rw [machineMetadata.extras]
     exact bufferExtras
   have initialCached : initialMachine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩ := by
@@ -169,7 +170,7 @@ theorem invoke
   have slotCachedNow : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩ := by
     rw [post.addresses,machineMetadata.addresses]
     exact slotCached
-  have slotExtrasNow : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩) := by
+  have slotExtrasNow : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) }) := by
     rw [post.extras,machineMetadata.extras]
     exact extras
   let input : PositiveRootCopyReturn.Input := {

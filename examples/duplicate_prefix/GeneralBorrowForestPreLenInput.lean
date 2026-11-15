@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestRejectedAfterLen
 namespace DuplicatePrefix.GeneralBorrowForestPreLenInput
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows Miri.TreeBorrows.Tree Miri.Concurrency
@@ -142,7 +143,7 @@ structure Initial where
   aligned : place.mplace.misaligned = none
   slotFits : slotBase.toNat+1 < 2^64
   slotCached : beforeMachine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  slotExtras : beforeMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (beforeMachine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
   writeContext : PhysicalMachineWrite.Context
   validationContext : PhysicalMachineWrite.Context

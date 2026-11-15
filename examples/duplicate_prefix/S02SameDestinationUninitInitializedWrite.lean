@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationUninitInitializedMutation
 import duplicate_prefix.S03UninitProvenance
 import duplicate_prefix.S04ProtectUninitWrite
@@ -122,7 +123,7 @@ theorem from_current
     (backend : state.machine.user.payload.payload.user.backend = .none)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (state.machine.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat + 1 ≤ row.1.bytes.toNat) :
     let cfg := PreparedContracts.actualConfig options () remaining span
@@ -172,9 +173,9 @@ theorem from_current
     (Size.ofBytes input.offset) (Size.ofBytes 1) .Write .VisitChildrenOfAccessed input.offset 1 positive
     distinct (fun _ _ => order) short (Nat.le_refl _) (Nat.le_refl _)
   have present : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩) := extras
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (input.id) }) := extras
   have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras state.machine input.id
-    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true ⟨none,sync⟩ present outside
+    (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1)) true _ present outside
   have actual := S04ReturnExtrasAccess.source_write_access_exact context.prepared context.image
     context.maximum context.fuel context.globalHooks context.pointers context.extras state.machine input.tracker
     input.entry.allocation.extra input.id (.concrete tag) (allocRange (Size.ofBytes input.offset) (Size.ofBytes 1))

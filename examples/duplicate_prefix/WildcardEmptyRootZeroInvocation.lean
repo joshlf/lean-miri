@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootZeroInvocationState
 import duplicate_prefix.WildcardEmptyRootInstalledFrame
 set_option maxRecDepth 65536
@@ -31,7 +32,7 @@ theorem invoke
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : before.user.payload.ghost = false)
     (target : TargetDataLayout)
     (targetEq : target = (ActualReferenceContext.config options remaining span).access.runtime.base)
@@ -194,7 +195,7 @@ theorem invoke
     (congrArg (fun row=>row.value) slot0) (congrArg (fun row=>row.layout) slot0) rfl layout outerWidth (by decide) (by decide)
     (by rw [addrState];exact cached) initialPresent protectedSize protectedMutable maskValid (by rw [outerRuntime];rfl)
     (by rw [protectedLen,protectedSize];rfl) (by rw [protectedMask,protectedSize];rfl) protectedProv race backendState rfl
-    (by change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
+    (by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change state.machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [extrasState];exact extras)
     rootFree childFree protectedTree pointer aligned (by rw [outerRuntime];rfl) outerAccess ghostState shallowState
     (by rw [frameReturn];rfl) (Size.ofBytes (base+1)) endpoint
   exact ⟨Storage.withCurrent #[] frame initialMachine,CanonicalCopy.replaceAllocation state id entry.kind result,call',trace,terminal,safe⟩

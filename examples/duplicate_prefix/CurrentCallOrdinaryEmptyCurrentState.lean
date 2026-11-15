@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallOrdinaryEmptyCurrentCopy
 import duplicate_prefix.CurrentCallEmptyMaterializedSourceFacts
 import duplicate_prefix.CurrentCallResourcePreparedEntry
@@ -16,7 +17,7 @@ def closed (options : EvalConfigurationCore.Options) (after : Before) (id : Allo
   let entry : LocalAllocation Provenance BorrowTree MiriMemoryKind:=
     ⟨.machine .global,converted.mapExtra (fun _=>BorrowTree.new root converted.byteSize)⟩
   let installed:=CurrentCallConversionMaterialize.installed
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id ⟨none,#[]⟩) id .global entry.allocation
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id { weakMemory := none }) id .global entry.allocation
   let raw:={installed with memory:=RetagEntry.updatedMemory installed.memory id entry tree}
   {raw with borrowTracker:=some ⟨global,mode⟩,user:={raw.user with payload:={raw.user.payload with ghost:=false}}}
 
@@ -127,10 +128,13 @@ theorem wildcard_runtime (older : root.value.toNat<input.tracker.global.nextPoin
     (held input id pointer source externStatic tail finalAddresses finalTape result) offset
 
 
-theorem registry : (closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,⟨none,#[]⟩) := by
-  change ((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=id)).push (id,⟨none,#[]⟩)).find? (fun row=>row.1==id)=_
-  have noMatch : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by simp [Array.find?_eq_none]
-  simp [Array.find?_push,Array.find?_filter,noMatch]
+theorem registry : (closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get ((closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.payload.payload.user.runtime.extras.allocations) (id) }) := by
+  have selectedExtras : (closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
+      some (id, { weakMemory := none }) := by
+    change ((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=id)).push (id,{ weakMemory := none })).find? (fun row=>row.1==id)=_
+    have noMatch : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by simp [Array.find?_eq_none]
+    simp [Array.find?_push,Array.find?_filter,noMatch]
+  simpa only [AllocationBacktrace.of_lookup selectedExtras] using selectedExtras
 
 theorem base (base : UInt64) (cached : before.user.addresses.baseAddr.find? (fun row=>row.allocId==id)=some ⟨id,base⟩) :
     (closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.addresses.baseAddr.find? (fun row=>row.allocId==id)=some ⟨id,base⟩ := by
@@ -189,7 +193,7 @@ theorem live_other (query : AllocId) (different : query≠id) :
 theorem extras_other (query : AllocId) (different : query≠id) :
     (closed options result.machine id root result.converted tree result.global input.tracker.retagMode).user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==query)=before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==query) := by
   rw [result.frame,CurrentCallConversionFiniteFold.state_eq]
-  change ((before.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=id)).push (id,⟨none,#[]⟩)).find? (fun row=>row.1==query)=_
+  change ((before.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=id)).push (id,{ weakMemory := none })).find? (fun row=>row.1==query)=_
   have unequal : (id==query)=false:=beq_eq_false_iff_ne.mpr different.symm
   simp [Array.find?_push,Array.find?_filter,unequal]
   congr 1

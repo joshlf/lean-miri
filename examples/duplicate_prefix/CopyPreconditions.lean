@@ -450,7 +450,7 @@ private def readHelpers (path : String) : IO (Except String (Array SourceBody)) 
     let program ← Input.lowerProgram decoded.document
     let prepared ← CallResolution.prepare program
     let mut rows := #[]
-    for sourceId in #[27, 28, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 44, 50, 54, 13, 26, 5] do
+    for sourceId in #[22, 23, 28, 29, 30, 32, 33, 34, 35, 36, 38, 39, 41, 47, 51, 9, 20, 5] do
       let some candidate := prepared.bodies.find? (·.sourceInstanceId == sourceId)
         | throw s!"missing source helper instance {sourceId}"
       let some source := prepared.program.input.instances.find? (·.id == sourceId)

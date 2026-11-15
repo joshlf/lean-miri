@@ -12,8 +12,8 @@ theorem normalized_local0 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = PtrMetadataHelper.body.body)
     (identity : frame.bodyIdentity = PtrMetadataHelper.body.identity)
     (callee : frame.functionInstance = PtrMetadataHelper.resolved.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 5 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 5 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -236,12 +236,12 @@ theorem actual_four_statements
   have kind1 : stmt1.kind = .Assign ⟨2,#[]⟩ (.Use (.Copy ⟨1,#[]⟩) .Yes) := by with_unfolding_all rfl
   have kind2 : stmt2.kind = .Assign ⟨0,#[]⟩ (.UnaryOp .PtrMetadata (.Move ⟨2,#[]⟩)) := by with_unfolding_all rfl
   have kind3 : stmt3.kind = .StorageDead 2 := by with_unfolding_all rfl
-  have trivial : config.lifecycle.storage.veryTriviallySized 154 = .ok true := by
+  have trivial : config.lifecycle.storage.veryTriviallySized 49 = .ok true := by
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).storage]
     decide +kernel
   let first := SourceSteps.liveFrame frame ⟨0,0⟩ 2 valid2
   have step1 := SourceSteps.storage_live_exact config limits () framesBefore frame machine ⟨0,0⟩ block stmt0
-    2 154 location (by rw [sourceBody];exact blockAt) stmtAt0 kind0 valid2
+    2 49 location (by rw [sourceBody];exact blockAt) stmtAt0 kind0 valid2
     (by rw [sourceBody];with_unfolding_all rfl) trivial dead2 noClocks
   have firstSize : first.locals.size = 3 := by simp [first,SourceSteps.liveFrame,size]
   have firstValid0 : (0 : Miri.MIR.LocalId) < first.locals.size := by rw [firstSize];decide

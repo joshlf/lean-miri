@@ -43,6 +43,9 @@ theorem copy (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
         .ok () (Storage.withCurrent frames (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame).frame post) ∧
       post.memory=before.memory ∧post.user=before.user ∧post.threads=before.threads ∧post.dataRace=before.dataRace ∧
       post.borrowTracker=some ⟨(GeneralBorrowFnEntryRegistration.registered tracker.global borrow id fresh).1,.FnEntry⟩ := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   dsimp only
   let input:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 ActualReferenceMetadata.reference).imm

@@ -23,8 +23,8 @@ theorem normalized_local2 (frame : CompilerFrameContext.ActualFrame)
     (sourceBody : frame.body = PtrMetadataHelper.body.body)
     (identity : frame.bodyIdentity = PtrMetadataHelper.body.identity)
     (callee : frame.functionInstance = PtrMetadataHelper.resolved.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 2 = .ok 154 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 2 = .ok 49 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [sourceBody,identity,callee]
   with_unfolding_all rfl
 
@@ -42,7 +42,7 @@ theorem compute_local2
   simp only [MachineHooks.currentFrame,Storage.withCurrent,Stack.currentFrame?,Array.back?_push,
     bind,EStateM.bind,get,getThe,MonadStateOf.get,EStateM.get,pure,EStateM.pure]
   rw [normalized]
-  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 154 with
+  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 49 with
     | .ok value => EStateM.Result.ok value (Storage.withCurrent framesBefore frame machine)
     | .error error => EStateM.Result.error (StepError.unsupported s!"compiler frame query: {toString error}")
         (Storage.withCurrent framesBefore frame machine)) = _
@@ -172,7 +172,7 @@ theorem copy_assignment_uncached
     simpa [cachedFrame,cached2,LocalPlaces.cachePlaceLayout,Array.getElem_set,show (2 : Nat) ≠ 1 by decide] using cached1
   have sourceClocks : cachedFrame.extra.dataRace = none := noClocks
   have operand := RootOperandCopy.copy_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    1 value rawLayout (OperandPath.rvalue "operand") (some rawLayout) sourceValid sourceLive sourceCached
+    1 value rawLayout  (some rawLayout) sourceValid sourceLive sourceCached
     (by with_unfolding_all rfl) sourceClocks ghostFalse
   have destValid : (2 : Miri.MIR.LocalId) < cachedFrame.locals.size := by
     simpa [cachedFrame,cached2,LocalPlaces.cachePlaceLayout] using valid2
@@ -228,9 +228,9 @@ theorem metadata_assignment_cached
   have sourceLive : frame.locals[2].value = .live (.immediate input.imm) := by
     simpa only [input,sameTarget] using live2
   have copy := RootOperandCopy.copy_cached_local options limits (remaining+1) span debugOff framesBefore frame machine
-    2 input.imm rawLayout (OperandPath.rvalue "operand") none valid2 sourceLive cached2
+    2 input.imm rawLayout  none valid2 sourceLive cached2
     (by with_unfolding_all rfl) noClocks ghostFalse
-  have operand : hooks.evalOperandAt () (OperandPath.rvalue "operand") (.Move ⟨2,#[]⟩) none state = .ok op state := by
+  have operand : hooks.evalOperand ()  (.Move ⟨2,#[]⟩) none state = .ok op state := by
     exact copy
   have read : hooks.readImmediate () op state = .ok input state := by
     change PlaceMachine.readImmediate config.access op state = _

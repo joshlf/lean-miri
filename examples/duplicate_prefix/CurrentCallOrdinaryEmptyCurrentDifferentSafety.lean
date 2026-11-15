@@ -63,7 +63,7 @@ private theorem finish_source {options limits remaining span before argument pla
   let prepared:=CurrentCallPush.preparedMachine before #[]
   let sourceMachine:=closed options result.machine id rootTag result.converted tree result.global input.tracker.retagMode
   let tracker : MachineHooks.BorrowState:=⟨result.global,input.tracker.retagMode⟩
-  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨601⟩).frame
+  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨2⟩).frame
   have sourceModel:=model input id pointer rootTag source externStatic _ finalAddresses finalTape result tree
   have sourceOrigins:=origins input id pointer rootTag source externStatic _ finalAddresses finalTape result tree
   have sourceThreads:=threads input id pointer rootTag source externStatic _ finalAddresses finalTape result tree

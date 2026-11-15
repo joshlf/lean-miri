@@ -68,13 +68,13 @@ theorem concrete_positive_installed
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone raw adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag
   let installed := PositiveRootInstalledFrame.installed raw adjusted count {}
     reference.id reference.tracker.global.nextPointerTag destination.id destination.tracker.global.nextPointerTag
-  have installedEq : installed = CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩} := rfl
+  have installedEq : installed = CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩} := rfl
   have shape := PositiveRootInstalledFrame.metadata raw adjusted count {}
     reference.id reference.tracker.global.nextPointerTag destination.id destination.tracker.global.nextPointerTag
   have size := PositiveRootInstalledFrame.size raw adjusted count {}
@@ -134,7 +134,7 @@ theorem concrete_positive_installed
       (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits)
       (Storage.withCurrent #[] protectedFrame after.machine) =
         .ok () (Storage.withCurrent #[]
-          (CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}) after.machine)
+          (CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}) after.machine)
     exact finish
   obtain ⟨preambleAfter,preambleArg,preambleContinue⟩ :=
     S02ConcreteCallPreamble.prefix_and_continuation id tag address len count input nonempty

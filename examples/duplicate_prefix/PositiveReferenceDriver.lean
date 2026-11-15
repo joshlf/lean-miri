@@ -85,7 +85,9 @@ theorem positive_validate_from_fields {K U C F A : Type} [DecidableEq K]
       frames frame borrowFrame id entry parentTag global fresh capacity addressOffset len =
       Storage.withCurrent frames afterFrame afterMachine)
     (named : hooks.typeName choice reference.ty = pure name)
-    (classified : hooks.classify choice reference.ty = pure (.reference true)) :
+    (classified : hooks.classify choice reference.ty = pure (.reference true))
+    (definitionReady : ∃ definition, retag.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     ValidityVisitor.validatePlace hooks choice (fuel + 1)
       (LocalPlaces.localRuntimePlace frames.size frame localId reference) false true
       (Storage.withCurrent frames frame machine) =

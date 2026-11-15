@@ -34,7 +34,7 @@ theorem span0 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       HelperCompilerFacts.asMutPtrBody.body 0 (Storage.withCurrent frames frame machine) =
-      .ok ⟨612⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨71⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact AsMutSpans.local0_span frames frame machine body identity callee
@@ -50,7 +50,7 @@ theorem span1 (options : Input.EvalConfigurationCore.Options) (limits : Executio
     (callee : frame.functionInstance = HelperCompilerFacts.asMutPtrCall.callee) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits).localSpan
       HelperCompilerFacts.asMutPtrBody.body 1 (Storage.withCurrent frames frame machine) =
-      .ok ⟨613⟩ (Storage.withCurrent frames frame machine) := by
+      .ok ⟨72⟩ (Storage.withCurrent frames frame machine) := by
   change (PreparedContracts.actualConfig options () remaining span).compiler.localSpan _ _ _ = _
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).compilerLocalSpan]
   exact AsMutSpans.local1_span frames frame machine body identity callee

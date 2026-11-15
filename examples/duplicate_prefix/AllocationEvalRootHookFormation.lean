@@ -36,7 +36,7 @@ theorem init_extra
     (noExtras : ((extras.get before.user).allocations.any (fun row=>row.1==id))=false) :
     PlaceMachine.initStackExtra (EvalAllocationMachine.allocation pointers extras base).allocationTail id size align before=
       .ok (BorrowTree.new BorTag.one size)
-        (MemoryExtras.putAllocation extras (AllocationRootHookFormation.rooted before tracker id) id ⟨none,#[]⟩) := by
+        (MemoryExtras.putAllocation extras (AllocationRootHookFormation.rooted before tracker id) id { weakMemory := none }) := by
   have allocated : tracker.global.rootPointerTag id=.ok (AllocationRootHookFormation.global id,BorTag.one) := by
     rw [initial];exact AllocationRootHookFormation.root id
   have literal := AllocationRootHookFormation.init_extra extras before tracker id size align enabled initial race noExtras

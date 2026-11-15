@@ -34,9 +34,9 @@ theorem dispatch [DecidableEq K]
     (kind : terminator.kind = .SwitchInt discriminant ⟨#[.Case 0 matched],otherwise⟩)
     (read : MachineHooks.run (do
       PlaceMachine.readImmediate (ExecutionMachine.withValidation config limits).access
-        (← OperandMachine.evalOperandAt
+        (← OperandMachine.evalOperand
           (ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits)) choice
-          (OperandPath.instruction "discriminant") discriminant none)) before =
+           discriminant none)) before =
           (evaluated,.ok (ScalarOperations.boolImmediate value layout)))
     (classification : (ExecutionMachine.scalarHooks (ExecutionMachine.withValidation config limits)).classify
       choice layout.ty = pure .boolean)

@@ -70,6 +70,9 @@ theorem body
       ∃ child,output.child.tree.indexOfTag global.nextPointerTag = some child ∧
         Nonempty (DuplicatePrefixBorrowAuthorization.Positive output.child.tree output.global.protectedTags
           (some child) (some child) (some global.nextPointerTag) 0 len) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let l1 := firstLive root
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new .wildcard (Size.ofBytes (base))) len ActualReferenceMetadata.reference).imm

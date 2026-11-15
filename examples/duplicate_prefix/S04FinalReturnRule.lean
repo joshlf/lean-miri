@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04FinalReturnRuleDriver
 
 namespace DuplicatePrefix.S04FinalReturnRule
@@ -50,7 +51,7 @@ theorem step
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) =
-      some (destination.id,⟨none,sync⟩))
+      some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat + 1 ≤ row.1.bytes.toNat)
     (value : Bool) (fuel : Nat)
@@ -85,7 +86,7 @@ theorem step
   let currentDestination := S04FinalReturnRuleAccounting.destination options remaining span frame machine place destination
   have metadata := S04FinalReturnRuleAccounting.metadata options remaining span frame machine
   have currentExtras : accounted.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,sync⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (accounted.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [metadata.2.2.2.2]
     exact extras
   obtain ⟨updated,returned,size,length,mutable⟩ := S04FinalReturnRuleDriver.return_effect options limits remaining span

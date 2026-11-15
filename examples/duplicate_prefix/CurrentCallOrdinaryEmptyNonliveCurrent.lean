@@ -227,7 +227,7 @@ private theorem invoke {options limits remaining span before argument place}
     (Pointer.new (.concrete sourceId parentTag) (Size.ofBytes (base+sourceOffset))) 0 ActualReferenceMetadata.reference).imm
   let updated:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete sourceId input.tracker.global.nextPointerTag) (Size.ofBytes (base+sourceOffset))) 0 ActualReferenceMetadata.reference).imm
-  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨601⟩).frame
+  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨2⟩).frame
   have sourceModel : DuplicatePrefixCallModel.Model options remaining span source:=
     model_move preparedModel sourceUser sourceThreads sourceRace rfl input.defaultMode
   have args:=CurrentCallEmptyProtocolControl.arguments options limits remaining span input.model.debugOff validationFuel validationEq #[] root raw

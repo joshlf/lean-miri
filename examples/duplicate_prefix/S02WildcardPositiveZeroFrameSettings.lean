@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSeparateConcreteJoined
 import duplicate_prefix.PositiveRootInstalledFrame
 import duplicate_prefix.AsMutPushPreserves
@@ -61,7 +62,7 @@ theorem ready_from_protect
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) 0).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
       TypedRetag.protectInPlaceFunctionArgument (config options (remaining+1) span).retag
@@ -100,7 +101,7 @@ theorem ready_from_protect
       machine.user.payload.payload.user.runtime.extras = before.user.payload.payload.user.runtime.extras ∧
       machine.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == input.contract.destination.id) =
-          some (input.contract.destination.id,⟨none,#[]⟩) ∧
+          some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) ∧
       options.place.debugAssertions = false ∧ options.limits.validation = fuel+1 := by
   let rawMachine := RawRootInvocation.machine #[] before
   let current := GeneralBorrowRawWildcardWindowFunctionScope.resultMachine rawMachine reference.tracker firstFresh
@@ -112,7 +113,7 @@ theorem ready_from_protect
   let args := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) 0).frame
-  let changed := {args with location := .unwinding ⟨601⟩}
+  let changed := {args with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let frame := PositiveRootInstalledFrame.installed root adjusted 0 {}
@@ -171,7 +172,7 @@ theorem ready_from_protect
     exact (RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2
   have returnExtras : after.machine.user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) =
-        some (input.contract.destination.id,⟨none,#[]⟩) := by
+        some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) := by
     rw [extras]
     exact input.return_extras
   let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
@@ -262,7 +263,7 @@ theorem ready
       machine.user.payload.payload.user.runtime.extras = before.user.payload.payload.user.runtime.extras ∧
       machine.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == input.contract.destination.id) =
-          some (input.contract.destination.id,⟨none,#[]⟩) ∧
+          some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) ∧
       options.place.debugAssertions = false ∧ options.limits.validation = fuel+1 := by
   obtain ⟨reference,output,firstFresh,argument,ready⟩ :=
     S02WildcardSeparateConcreteProtectSource.source_after_protect address len 0 input nonempty

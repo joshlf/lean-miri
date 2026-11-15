@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroInitTail
 
 namespace DuplicatePrefix.S03IntegerZeroInit
@@ -38,9 +39,9 @@ def frame {before : Before} {place : MPlaceTy Provenance}
     (address count : UInt64) (first : input.tracker.global.nextPointerTag.value < 18446744073709551615) :=
   let args := EmptyRootArguments.result (RawRootInvocation.root before place race) address count
   CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-    {args.frame with location := .unwinding ⟨601⟩} {} input.id
+    {args.frame with location := .unwinding ⟨2⟩} {} input.id
     (ReferenceBorrowDriver.allocatedTracker input.tracker first).global.nextPointerTag
-      with location := .unwinding ⟨559⟩}
+      with location := .unwinding ⟨0⟩}
 
 def installed {before : Before} {place : MPlaceTy Provenance}
     (input : DuplicatePrefixReturnPlaceInput.Input before place) (race : before.dataRace = none)
@@ -50,7 +51,7 @@ def installed {before : Before} {place : MPlaceTy Provenance}
   let args := EmptyRootArguments.result (RawRootInvocation.root before place race) address count
   Storage.withCurrent #[] (frame input race address count first)
     (S04ProtectUninit.finished (S03IntegerZeroState.argumentsMachine before input.tracker first) place
-      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨601⟩} {}
+      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨2⟩} {}
       second (tree input first tag) updated).machine
 
 /-- The original integer/NoProv empty argument initStackFrame for arbitrary count,
@@ -74,7 +75,7 @@ theorem enters
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     ∃ updated,
@@ -129,7 +130,7 @@ theorem enters
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] raw.frame rawMachine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame rawMachine
   have control := RawRootInvocation.control before place model.noDataRace
-  have preamble : raw.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : raw.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {raw.frame with trackCallerArg := none} = raw.frame := by rw [←control.2.1]
   simp only [preamble] at unchanged
   refine ⟨updated,?_,properties⟩

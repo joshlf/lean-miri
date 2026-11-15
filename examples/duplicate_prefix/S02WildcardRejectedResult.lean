@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardActualRejectedLedgerAligned
 import duplicate_prefix.S02SeparateDestinationRejectedDestinationCapability
 import duplicate_prefix.S02SeparateDestinationRejectedPhysicalTransport
@@ -68,7 +69,7 @@ theorem result
   obtain ⟨_rawMemory,_rawBorrow,_rawRace0,_rawAddresses,_rawGhost,_rawShallow,_rawTypes,
     _rawBackend,rawExtras⟩ := RawRootInvocation.preservation #[] before
   have returnExtras : post.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destinationId,physicalId,extras]
     obtain ⟨_,_,_,_,_,_,_,tickExtras⟩ :=
       S02SeparateDestinationTickLedger.preserved options remaining span machine

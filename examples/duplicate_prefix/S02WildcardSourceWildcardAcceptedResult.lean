@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSourceWildcardAcceptedResultGuard
 import duplicate_prefix.S02WildcardSourceWildcardAcceptedResultPhysical
 import duplicate_prefix.S02ConcreteSourceWildcardAcceptedDestinationCopy
@@ -125,7 +126,7 @@ theorem result
     S02WildcardSourceWildcardAcceptedResultPhysical.source address len count input reference output.child.tree within
   rw [←sourceEntryEq] at storage maskValid maskLen initialized provenance storageFits mutable
   have sourceExtras : guardPost.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == reference.id) = some (reference.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == reference.id) = some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (guardPost.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [ledger.2.2.2.2.2.2.1,postExtras,tickExtras]
     rw [machineUser]
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
@@ -446,17 +447,17 @@ theorem result
       row.1.bytes.toNat < destCopy.offset.toNat ∨
         destCopy.offset.toNat + 1 ≤ row.1.bytes.toNat := by simp
   have copyExtrasFound : finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destCopy.id) = some (destCopy.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destCopy.id) = some (destCopy.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (destCopy.id) }) := by
     obtain ⟨settings⟩ := S02WildcardSourceWildcardControl.at_protection
       address len count input reference output firstFresh destination destId secondFresh tree updated
     have entryExtras : machine.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == returnPacket.destination.id) =
-          some (returnPacket.destination.id,⟨none,#[]⟩) := by
+          some (returnPacket.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (returnPacket.destination.id) }) := by
       rw [packetId]
       rw [machineEq]
       exact settings.extras
     change finalMachine.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == returnPacket.destination.id) = some (returnPacket.destination.id,⟨none,#[]⟩)
+      (fun row => row.1 == returnPacket.destination.id) = some (returnPacket.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (finalMachine.user.payload.payload.user.runtime.extras.allocations) (returnPacket.destination.id) })
     rw [copyExtras,guardExtrasEq,postExtras]
     have tick := RootZeroInvocationState.tick_fields options remaining span machine
     rw [tick.2.2.2.2.2.2]

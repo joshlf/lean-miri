@@ -169,7 +169,10 @@ theorem canonical_new_permission {K U C F A : Type} [DecidableEq K]
     (shape : state.stack.frames = frames.push frame)
     (unpin : CompilerFacts.boolean prepared.context pointee "is_unpin" = .ok true)
     (unsafeUnpin : CompilerFacts.boolean prepared.context pointee "is_unsafe_unpin" = .ok true)
-    (freeze : CompilerFacts.boolean prepared.context pointee "is_freeze" = .ok true) :
+    (freeze : CompilerFacts.boolean prepared.context pointee "is_freeze" = .ok true)
+    {definition : DefId}
+    (definitionQuery : CompilerInstance.definitionOf prepared.context.loweringContext.instances
+      frame.functionInstance = .ok definition) :
     TypedRetag.newPermission (EvalRetagMachine.hooks prepared runtime
       (CompilerRetagOptions.make compiler ⟨false, false⟩) access projection vtable pointers choice)
       pointee .Mutable .FnEntry state = .ok (some ChildBorrow.fnEntryPolicy) state := by
@@ -181,7 +184,7 @@ theorem canonical_new_permission {K U C F A : Type} [DecidableEq K]
   rw [current_frame_pushed state frames frame shape]
   have policy : RetagPolicy.create ⟨true, true, true⟩ .Mutable .FnEntry ⟨false, false⟩ =
       some ChildBorrow.fnEntryPolicy := by decide
-  simp only [bind, EStateM.bind, pure, EStateM.pure, Bool.false_eq_true, ↓reduceIte, policy]
+  simp only [bind, EStateM.bind, pure, EStateM.pure, Bool.false_eq_true, ↓reduceIte, policy, definitionQuery]
 
 /-- Immutable type/layout and fat-pointer metadata used by the actual DST
 size computation; no retag or memory success appears in this contract. -/
@@ -534,7 +537,10 @@ theorem canonical_retag_pointer {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
     (unpin : CompilerFacts.boolean prepared.context place.layout.ty "is_unpin" = .ok true)
     (unsafeUnpin : CompilerFacts.boolean prepared.context place.layout.ty "is_unsafe_unpin" = .ok true)
-    (race : ambient.machine.dataRace = none) :
+    (race : ambient.machine.dataRace = none)
+    {definition : DefId}
+    (definitionQuery : CompilerInstance.definitionOf prepared.context.loweringContext.instances
+      frame.functionInstance = .ok definition) :
     let h := EvalRetagMachine.hooks prepared runtime
       (CompilerRetagOptions.make compiler ⟨false, false⟩) access projection vtable pointers choice
     TypedRetag.retagPtrValue h budget
@@ -560,7 +566,7 @@ theorem canonical_retag_pointer {K U C F A : Type} [DecidableEq K]
     rw [referencePointee]
   have policy := canonical_new_permission prepared runtime compiler access projection vtable pointers choice
     place.layout.ty (beforeTagState ambient frames frame borrowFrame id) frames
-    (frameWithBorrow frame borrowFrame) rfl unpin unsafeUnpin frozen
+    (frameWithBorrow frame borrowFrame) rfl unpin unsafeUnpin frozen definitionQuery
   have construct : h.immPtrToMPlace value = pure place := by
     change PointerPlaceMachine.fromImmediate access (CompilerExecutionProviders.pointerCompiler prepared)
       choice value = pure place

@@ -17,7 +17,7 @@ noncomputable def root (before : MachineHooks.MachineState MiriMemoryKind Machin
       Storage.withCurrent frames (root before place race).frame (machine frames before) := rfl
  theorem control (before : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
     (place : MPlaceTy Provenance) (race : before.dataRace = none) :
-    (root before place race).frame.location = .unwinding ⟨559⟩ ∧
+    (root before place race).frame.location = .unwinding ⟨0⟩ ∧
     (root before place race).frame.trackCallerArg = none ∧
     (root before place race).frame.returnContinuation = .stop true ∧
     (root before place race).frame.returnPlace = .memory place := ⟨rfl,rfl,rfl,rfl⟩

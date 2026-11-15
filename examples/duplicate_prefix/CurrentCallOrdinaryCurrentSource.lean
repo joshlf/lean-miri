@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallOrdinaryConversionEnsure
 import duplicate_prefix.CurrentCallConversionSourceCopy
 import duplicate_prefix.CurrentCallConversionSourceCheckpoint
@@ -130,6 +131,9 @@ theorem copy {options limits remaining span before place len argument}
         (rawPost options result.machine id rootTag input.tracker.global.nextPointerTag result.converted result.global.protectedTags offset len).user.payload.validation = .Shallow := by
   dsimp only
   let root := CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let frame := (firstLive root).frame
   let machine := CurrentCallPush.preparedMachine before #[]
   let ptr := Pointer.new (Provenance.concrete id rootTag) (Size.ofBytes (base + offset))
@@ -206,16 +210,19 @@ theorem copy {options limits remaining span before place len argument}
     change result.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id, base⟩
     rw [result.frame, CurrentCallConversionFiniteFold.state_eq]
     exact result.bases id ⟨id, base⟩ cachedBase
-  have extras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id, ⟨none, #[]⟩) := by
-    change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != id)).push
-      (id, ⟨none, #[]⟩)).find? (fun row => row.1 == id)) = _
-    have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
-        decide ((row.1 != id) = true ∧ (row.1 == id) = true)) = (fun _ => false) := by
-      funext row
-      by_cases equal : row.1 = id <;> simp [equal]
-    have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
-      simp [Array.find?_eq_none]
-    simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+  have extras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id, { weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (id) }) := by
+    have selectedExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
+        some (id, { weakMemory := none }) := by
+      change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != id)).push
+        (id, { weakMemory := none })).find? (fun row => row.1 == id)) = _
+      have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
+          decide ((row.1 != id) = true ∧ (row.1 == id) = true)) = (fun _ => false) := by
+        funext row
+        by_cases equal : row.1 = id <;> simp [equal]
+      have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
+        simp [Array.find?_eq_none]
+      simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+    simpa only [AllocationBacktrace.of_lookup selectedExtras] using selectedExtras
   let data : CandidateCurrentJointCall.Identities := ⟨⟨#[], #[], #[], fun _ _ => none⟩, #[], #[]⟩
   obtain ⟨S, ready, sourceId, sourcePointer, sourceAllocation, sourceGrant, sourceTag⟩ :=
     CurrentCallConversionSourceCheckpoint.at_post input.tracker.global {} id rootTag source result.converted result.attributes offset len physicalSource

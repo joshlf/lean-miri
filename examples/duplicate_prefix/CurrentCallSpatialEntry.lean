@@ -79,7 +79,7 @@ def protectedState (count : UInt64) (entry : LocalAllocation Provenance BorrowTr
     (physical : CandidateCurrentBoolUninitWrite.PhysicalWindow (copiedMachine source C.borrowFrame
       C.fresh (UInt64.ofNat offset) len entry) place)
     (fresh : (sourceOutput C).global.nextPointerTag.value<18446744073709551615)
-    (boolOutput : GeneralBorrowForestFnEntry.Output) : RootState := borrowedState frames (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame
+    (boolOutput : GeneralBorrowForestFnEntry.Output) : RootState := borrowedState frames (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame
     (copiedMachine source C.borrowFrame C.fresh (UInt64.ofNat offset) len entry)
     ⟨(sourceOutput C).global,tracker.retagMode⟩ fresh physical.id physical.entry boolOutput.child.tree
 
@@ -146,13 +146,13 @@ structure Output (limits : ExecutionMachine.Limits) (count : UInt64) where
   actual : CurrentCallSpatialEntryControl.action (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
     (value options remaining span source.family.value len).imm count place (Storage.withCurrent frames root.frame before)=
     .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-      {registeredFrame (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame physical.id (sourceOutput C).global.nextPointerTag
-        with location:=.unwinding ⟨559⟩}) (finalMachine place _ physical (protectedState C count entry physical fresh boolOutput) updated))
+      {registeredFrame (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame physical.id (sourceOutput C).global.nextPointerTag
+        with location:=.unwinding ⟨0⟩}) (finalMachine place _ physical (protectedState C count entry physical fresh boolOutput) updated))
   tail : RootEntryTail.tail (ExecutionMachine.callHooks (config options (remaining+1) span) limits) place
     (Storage.withCurrent frames (argsRoot C count).frame (copiedMachine source C.borrowFrame C.fresh (UInt64.ofNat offset) len entry))=
     .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-      {registeredFrame (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame physical.id (sourceOutput C).global.nextPointerTag
-        with location:=.unwinding ⟨559⟩}) (finalMachine place _ physical (protectedState C count entry physical fresh boolOutput) updated))
+      {registeredFrame (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame physical.id (sourceOutput C).global.nextPointerTag
+        with location:=.unwinding ⟨0⟩}) (finalMachine place _ physical (protectedState C count entry physical fresh boolOutput) updated))
   sourceFrames : ∀(i : Fin src.backing.cells.size) (overlap : CurrentCallSpatialSourceCover.Active src i)
     (byte : AllocId×Nat) (request : Window src.backing.id offset len.toNat byte)
     (cell : Window src.backing.id src.backing.cells[i].offset src.backing.cells[i].length byte),
@@ -181,6 +181,9 @@ private theorem runtime_present {before : Before} {tracker : MachineHooks.Borrow
 /-- Both selected roles drive the actual source-copy/Bool-protection sequence.
 The output's pointwise certificates use one deterministic source-stage context. -/
 theorem body (limits : ExecutionMachine.Limits) (count : UInt64) : Nonempty (Output C limits count) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let role := source
   let cover := ctx
   have contexts := DuplicatePrefixCallModel.contexts options remaining span before C.model
@@ -318,8 +321,8 @@ theorem body (limits : ExecutionMachine.Limits) (count : UInt64) : Nonempty (Out
     rw [sourceGlobal]
     change (TypedRetagEmpty.successorTag tracker.global.nextPointerTag room).value.toNat<18446744073709551615
     omega
-  have frameBool : (atSpan (argsRoot C count) ⟨601⟩).frame.extra.borrowTracker=some (sourceOutput C).frame := by
-    change (atSpan (argsRoot C count) ⟨601⟩).frame.extra.borrowTracker=some (CurrentCallSpatialEntryRead.output role borrowFrame room (UInt64.ofNat offset) len).frame
+  have frameBool : (atSpan (argsRoot C count) ⟨2⟩).frame.extra.borrowTracker=some (sourceOutput C).frame := by
+    change (atSpan (argsRoot C count) ⟨2⟩).frame.extra.borrowTracker=some (CurrentCallSpatialEntryRead.output role borrowFrame room (UInt64.ofNat offset) len).frame
     rw [sourceFrame]
     exact CurrentCallSourceArguments.result_borrowFrame options remaining span root borrowFrame role.family.value len count role.backing.id tracker.global.nextPointerTag
   have ready : CurrentCallBoolProtection.WindowReady sourceMachine physical.id physical.offset.toNat 1 := by
@@ -332,7 +335,7 @@ theorem body (limits : ExecutionMachine.Limits) (count : UInt64) : Nonempty (Out
   obtain ⟨boolOutput,boolChild,boolActual,boolTag,boolGlobal,boolFrame,boolWitness,updated,protection,extra,bytes,byteLength,mutable,mutation,snapshot,retaggedTracked,frameTracked,destination,ctorState,writeDone,writeRuntime,writeParents,writeOwned,writeNodes,writeRoots,writeTags,writeCapacity,sourceFrames⟩ :=
     CurrentCallSpatialBoolActivation.activate_sources options limits (remaining+1) span retagCtx sourceMachine
       ⟨(sourceOutput C).global,tracker.retagMode⟩ _ returnOffset dst offset len.toNat src disjoint
-      frames (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame postState postHighwater frameBool
+      frames (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame postState postHighwater frameBool
       place physical physicalDst physicalNat physicalValue physicalBinding returnRoom boolShort
       sourceGhost (dataRace.trans race) C.model.noBackend ready
   have finish := CurrentCallSpatialEntryControl.finish_of_arguments options limits remaining span frames root C.rawLocals
@@ -413,8 +416,8 @@ theorem invoke {options remaining span frames before tracker ctx offset len sour
         #[.Copy ⟨.immediate (value options remaining span source.family.value len).imm,ActualReferenceMetadata.reference⟩,
           .Copy (second count)] false (.memory place) (.stop true) (⟨⟨frames⟩,before⟩ : RootState)=
         .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-          {registeredFrame (atSpan (argsRoot (prepared C) count) ⟨601⟩).frame (sourceOutput (prepared C)).frame out.physical.id
-            (sourceOutput (prepared C)).global.nextPointerTag with location:=.unwinding ⟨559⟩})
+          {registeredFrame (atSpan (argsRoot (prepared C) count) ⟨2⟩).frame (sourceOutput (prepared C)).frame out.physical.id
+            (sourceOutput (prepared C)).global.nextPointerTag with location:=.unwinding ⟨0⟩})
           (finalMachine place _ out.physical (protectedState (prepared C) count out.entry out.physical out.fresh out.boolOutput) out.updated)) := by
   obtain ⟨out⟩ := body (prepared C) limits count
   refine ⟨out,?_⟩
@@ -469,8 +472,8 @@ theorem Output.formed {limits count actual occurrence oldFamily} (out : Output C
 keeps the ORIGINAL return destination for the later post-pop store. -/
 theorem Output.original_returnPlace {limits count} (out : Output C limits count) :
     (CallEntryFacts.doneRootFrame
-      {registeredFrame (atSpan (argsRoot C count) ⟨601⟩).frame (sourceOutput C).frame out.physical.id
-        (sourceOutput C).global.nextPointerTag with location:=.unwinding ⟨559⟩}).returnPlace=root.frame.returnPlace := by
+      {registeredFrame (atSpan (argsRoot C count) ⟨2⟩).frame (sourceOutput C).frame out.physical.id
+        (sourceOutput C).global.nextPointerTag with location:=.unwinding ⟨0⟩}).returnPlace=root.frame.returnPlace := by
   change (argsRoot C count).frame.returnPlace=root.frame.returnPlace
   exact CurrentCallSourceArguments.result_returnPlace options remaining span root C.borrowFrame source.family.value len count
     source.backing.id tracker.global.nextPointerTag
@@ -492,8 +495,8 @@ theorem invoke_formed {options remaining span frames before tracker ctx offset l
         #[.Copy ⟨.immediate (value options remaining span source.family.value len).imm,ActualReferenceMetadata.reference⟩,
           .Copy (second count)] false (.memory place) (.stop true) (⟨⟨frames⟩,before⟩ : RootState)=
         .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-          {registeredFrame (atSpan (argsRoot (prepared C) count) ⟨601⟩).frame (sourceOutput (prepared C)).frame out.physical.id
-            (sourceOutput (prepared C)).global.nextPointerTag with location:=.unwinding ⟨559⟩})
+          {registeredFrame (atSpan (argsRoot (prepared C) count) ⟨2⟩).frame (sourceOutput (prepared C)).frame out.physical.id
+            (sourceOutput (prepared C)).global.nextPointerTag with location:=.unwinding ⟨0⟩})
           (finalMachine place _ out.physical (protectedState (prepared C) count out.entry out.physical out.fresh out.boolOutput) out.updated)) ∧
       (out.assignment a).Binds actual.size (CurrentCallSpatialFamilyFormation.role a out.src).family ∧
       (out.assignment a).Binds (actual.size+1) ((out.sourceAssignment a).newFamily out.boolPayload) ∧

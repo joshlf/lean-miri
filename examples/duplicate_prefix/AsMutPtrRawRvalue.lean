@@ -46,7 +46,7 @@ theorem raw_staged_to_write
     change MachineHooks.withRetagMode .Raw (do
       let result ← TypedRetag.machineRetagPtrValue config.retag limits.retag value value.layout.ty
       pure (result.getD value)) state1 = _
-    rw [show value.layout.ty = 204 from raw_type]
+    rw [show value.layout.ty = 99 from raw_type]
     exact AsMutPtrRawRetag.actual_raw_scope_identity options limits remaining span value state1
 
   have scopedRaw' : hooks.withRetagMode () .Raw

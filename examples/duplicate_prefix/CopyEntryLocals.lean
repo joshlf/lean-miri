@@ -10,11 +10,15 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 noncomputable def inputBody : LoweredBody :=
   PreparedReflection.actual.program.bundle.bodies[HelperCompilerFacts.copyBody.identity.index]'(by decide +kernel)
-noncomputable def localSpan (index : Fin 17) :=
-  (inputBody.input.locals[index.val]'(by
-    have size : inputBody.input.locals.size = 17 := by rfl
-    rw [size]
-    exact index.isLt)).sourceInfo.span
+noncomputable def localSpan (index : Fin 17) : SourceSpanData :=
+  let spanId := (inputBody.input.localSources[index.val]'(by
+    have size : inputBody.input.localSources.size = 17 := by rfl
+    omega)).spanId
+  PreparedReflection.actual.program.bundle.spans[spanId]'(by
+    have valid : ∀ i : Fin 17, (inputBody.input.localSources[i.val]'(by
+      have size : inputBody.input.localSources.size = 17 := by rfl
+      omega)).spanId < PreparedReflection.actual.program.bundle.spans.size := by decide +kernel
+    exact valid index)
  theorem body_of_frame (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
@@ -27,9 +31,9 @@ noncomputable def localSpan (index : Fin 17) :=
     (body : frame.body = HelperCompilerFacts.copyBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.copyBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) (index : Fin 3) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame (index.val+1) =
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame (index.val+1) =
       .ok (CopyArgumentStage.layout index).ty := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   rcases CopyArgumentStage.cases_three index with rfl | rfl | rfl <;> with_unfolding_all rfl
  theorem runtime_argument (index : Fin 3) :

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.WildcardEmptyRootContinuation
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
@@ -33,7 +34,7 @@ theorem actual_entry
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : machine.user.payload.ghost = false)
     (dead0 : (rootFrame.frame.locals[0]'(rootFrame.valid ⟨0,by decide⟩)).value = .dead)
     (dead6 : (rootFrame.frame.locals[6]'(rootFrame.valid ⟨6,by decide⟩)).value = .dead)
@@ -60,12 +61,12 @@ theorem actual_entry
     (noCache : thread.topUserRelevantFrame = none)
     (rawEq : CallEntryFacts.rawPushedState initial.stack.frames initial.machine (.memory place) =
       Storage.withCurrent frames rootFrame.frame machine)
-    (preamble : rootFrame.frame.location = .unwinding ⟨559⟩)
+    (preamble : rootFrame.frame.location = .unwinding ⟨0⟩)
     (trackNone : rootFrame.frame.trackCallerArg = none) :
     let argsFrame := WildcardEmptyRootArguments.result rootFrame target address n
     let argsMachine := allocatedMachine machine tracker initialFresh
     let next := allocatedTracker tracker initialFresh
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState frames changed borrowFrame argsMachine next fresh id entry
       (PhysicalMachineWrite.slotTree rootTag next.global.nextPointerTag 1 false)
     ∃ updated,
@@ -73,7 +74,7 @@ theorem actual_entry
         RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
         #[.Copy (WildcardEmptyRootArguments.first target address), .Copy (WildcardEmptyRootArguments.second n)] false (.memory place) (.stop true) initial =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed borrowFrame id next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed id entry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree rootTag next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧

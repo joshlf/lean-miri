@@ -58,7 +58,9 @@ theorem pointer_append {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : mode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     let finalTree := WildcardHitZeroConstructor.installed entry.allocation.extra
       ⟨entry.allocation.extra.tagMapping.mapping.push (tracker.global.nextPointerTag,
         ⟨UInt32.ofNat entry.allocation.extra.tagMapping.mapping.size⟩),entry.allocation.extra.tagMapping.deassigned⟩
@@ -154,7 +156,9 @@ theorem fnentry_pointer_append {K U C F A : Type} [DecidableEq K]
     (placeShape : place = RetagReferencePlace.slicePlace
       (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 place.layout)
     (sizing : h.sizeAndAlign place (Storage.withCurrent frames frame machine) =
-      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine)) :
+      .ok (some (Size.ofBytes 0,Align.ONE)) (Storage.withCurrent frames frame machine))
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | exact ⟨_, by with_unfolding_all rfl⟩) :
     let finalTree := WildcardHitZeroConstructor.installed entry.allocation.extra
       ⟨entry.allocation.extra.tagMapping.mapping.push (tracker.global.nextPointerTag,
         ⟨UInt32.ofNat entry.allocation.extra.tagMapping.mapping.size⟩),entry.allocation.extra.tagMapping.deassigned⟩

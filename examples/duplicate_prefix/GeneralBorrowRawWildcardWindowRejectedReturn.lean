@@ -61,7 +61,7 @@ theorem invoke (s : Initial) (n : UInt64) (nonzeroCount : n ≠ 0) (rejected : n
     slotMask:=p.entry.slotProperties.2.2.2.1,slotProvenance:=p.entry.slotProperties.2.2.2.2.1,slotMutable:=p.entry.slotProperties.2.2.2.2.2.2,
     place:=s.place,layout:=s.layout,slotBase:=s.slotBase,slotPointer:=s.slotPointer,aligned:=s.aligned,fits:=s.slotFits,
     cached:=by rw [p.flags.addresses];exact s.slotCached,
-    extras:=by change p.post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [p.flags.extras];exact s.extras,
+    extras:=by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change p.post.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [p.flags.extras];exact s.extras,
     destination:=by rw [p.metadata.returnPlace];change (PositiveRootInstalledFrame.installed raw (adjusted s) n {} s.id s.tracker.global.nextPointerTag s.slotId tag).returnPlace.toRuntimePlace = _;rw [frp];rfl }
   obtain ⟨result⟩ := GeneralBorrowFreshRootScopedRootCurrentBoolReturn.complete input
   obtain ⟨updated,exitTrace,terminal,_,rest⟩ := result.returned

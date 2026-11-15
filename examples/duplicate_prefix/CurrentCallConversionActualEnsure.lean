@@ -38,7 +38,7 @@ theorem ensure (options : EvalConfigurationCore.Options) (remaining : Nat)
     (noExtras : (after.user.payload.payload.user.runtime.extras.allocations.any (fun row => row.1 == id)) = false) :
     (PreparedContracts.actualConfig options () remaining span).retag.ensureTreeExtra id before =
       .ok () {before with machine := (installed
-        (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id ⟨none, #[]⟩)
+        (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id { weakMemory := none })
         id .global (converted.mapExtra (fun _ => BorrowTree.new root converted.byteSize)))} := by
   let compiler := PreparedReflection.actual.compiler
   let image := PreparedReflection.actual.image
@@ -56,7 +56,7 @@ theorem ensure (options : EvalConfigurationCore.Options) (remaining : Nat)
       GlobalMemoryHookResult Provenance BorrowTree MiriMemoryKind _ (Allocation CtfeProvenance Unit))
   have actual : GlobalAllocationMachine.ensure .global
       (GlobalAllocationMachine.hooks compiler.runtime.target.base extras leaves initializer) id before =
-        .ok () {before with machine := (installed (MemoryExtras.putAllocation extras after id ⟨none, #[]⟩)
+        .ok () {before with machine := (installed (MemoryExtras.putAllocation extras after id { weakMemory := none })
           id .global (converted.mapExtra (fun _ => BorrowTree.new root converted.byteSize)))} := by
     cases current with
     | memory descriptor =>

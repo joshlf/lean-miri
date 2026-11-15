@@ -8,8 +8,8 @@ open DuplicatePrefix
 theorem runtime_call_terminator :
     CopyPreconditions.Bodies.checkLanguage.loaded.body.basicBlocks[0]?.map
       (·.terminator.kind) = some (.Call
-        (.Constant ⟨⟨158⟩, none, .Val .ZeroSized 243⟩) #[] ⟨1, #[]⟩ (some 1)
-        .Continue .Misc ⟨159⟩) := by
+        (.Constant ⟨⟨191⟩, none, .Val .ZeroSized 127⟩) #[] ⟨1, #[]⟩ (some 1)
+        .Continue .Misc ⟨185⟩) := by
   with_unfolding_all rfl
 
 theorem parent_unit_prefix_source :

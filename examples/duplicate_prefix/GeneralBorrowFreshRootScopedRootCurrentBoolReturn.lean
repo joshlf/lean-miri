@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowFreshRootScopedRootCurrentRelease
 import duplicate_prefix.GeneralBorrowFreshRootScopedRootBoolReturn
 namespace DuplicatePrefix.GeneralBorrowFreshRootScopedRootCurrentBoolReturn
@@ -95,7 +96,7 @@ structure Input where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get machine.user).allocations) (slotId) })
   destination : before.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 
 /-- Concrete physical return input and its proved actual execution. The source

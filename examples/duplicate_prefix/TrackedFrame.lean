@@ -17,7 +17,7 @@ noncomputable def raw (callee : CallInstance) (body : LoadedBody) (preamble : Sp
    trackCallerArg := frame.trackCallerArg, location := frame.location}
  theorem user_relevance {K User Extra : Type} (crates : Array Nat)
     (callee : CallInstance) (inlineAttr : CompilerVirtualFacts.inlineAttribute
-      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = .ok none)
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = none)
     (requires : CompilerRuntimeQueries.requiresCallerLocation
       PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime callee = .ok true)
     (frame : Frame Provenance LocalLayout Extra) (state : MachineHooks.State K User)
@@ -32,7 +32,7 @@ noncomputable def raw (callee : CallInstance) (body : LoadedBody) (preamble : Sp
   rfl
  theorem init_frame (crates : Array Nat) (callee : CallInstance) (body : LoadedBody) (preamble : SpanRef)
     (inlineAttr : CompilerVirtualFacts.inlineAttribute
-      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = .ok none)
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = none)
     (requires : CompilerRuntimeQueries.requiresCallerLocation
       PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime callee = .ok true)
     (state : MachineHooks.State MiriMemoryKind Machine.RootUser)
@@ -78,7 +78,7 @@ noncomputable def pushed (frames : Array (Frame Provenance LocalLayout MachineHo
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (debug : options.place.debugAssertions = false)
     (callee : CallInstance) (body : LoadedBody) (preamble : SpanRef)
     (inlineAttr : CompilerVirtualFacts.inlineAttribute
-      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = .ok none)
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes callee = none)
     (requires : CompilerRuntimeQueries.requiresCallerLocation
       PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime callee = .ok true)
     (preambleEq : CompilerLifecycle.preambleSpan PreparedReflection.actual.compiler.lifecycle.lifecycle body =

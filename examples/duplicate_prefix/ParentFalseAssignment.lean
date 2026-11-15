@@ -29,8 +29,8 @@ theorem language_local0_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = CopyPreconditions.Bodies.checkLanguage.loaded.body)
     (identity : frame.bodyIdentity = CopyPreconditions.Bodies.checkLanguage.loaded.identity)
     (callee : frame.functionInstance = CopyPreconditions.Bodies.checkLanguage.fnInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 0 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   with_unfolding_all rfl
 
@@ -175,11 +175,11 @@ theorem evaluate
     simpa [cachedFrame, cacheReturnLayout, LocalPlaces.cachePlaceLayout] using location
   have operand := CopyLanguageGuard.canonical_parent_false_operand options limits (remaining+1) span source debugOff
     framesBefore cachedFrame machine cachedBodyIndex cachedLocation callee
-  have evalSource : hooks.evalOperandAt () (OperandPath.rvalue "operand")
+  have evalSource : hooks.evalOperand ()
       (.Constant CopyPreconditions.Bodies.languageFalseConstant) (some (hooks.placeLayout dest)) state1 = .ok sourceOp state1 := by
-    change OperandMachine.evalOperandAt
+    change OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits)) ()
-      (OperandPath.rvalue "operand") (.Constant CopyPreconditions.Bodies.languageFalseConstant)
+       (.Constant CopyPreconditions.Bodies.languageFalseConstant)
       (some RootCompilerFacts.boolLayout) state1 = .ok sourceOp state1
     exact operand
   have writer := RootGenericBoolWrite.write_bool_shallow options limits remaining span debugOff fuel fuelEq

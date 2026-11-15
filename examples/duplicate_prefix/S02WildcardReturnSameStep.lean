@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04ActiveSameReturnPop
 import duplicate_prefix.S04ActiveSeparateWildcardReturnStep
 namespace DuplicatePrefix.S02WildcardReturnSameStep
@@ -49,7 +50,7 @@ theorem step
     (race : machine.dataRace = none) (backend : machine.user.payload.payload.user.backend = .none)
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (sync : Array (Size × MemoryExtras.Entry Unit))
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,sync⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) }))
     (outside : ∀ row ∈ sync, row.1.bytes.toNat < destination.offset.toNat ∨ destination.offset.toNat+1 ≤ row.1.bytes.toNat)
     (value : Bool) (fuel : Nat) (debugOff : options.place.debugAssertions = false)
     (validationFuel : options.limits.validation = fuel+1)
@@ -142,8 +143,8 @@ theorem step
         rw [sourceShape]
   have nextDistinct : next.entry.allocation.extra.roots.toList.Nodup := by change released.roots.toList.Nodup;rw [congrArg BorrowTree.roots finalShape];exact distinct
   have nextShort : next.entry.allocation.extra.nodes.size < 65536 := by change released.nodes.size < 65536;rw [congrArg BorrowTree.nodes finalShape];exact short
-  have nextExtras : after.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == next.id) = some (next.id,⟨none,sync⟩) := by
-    change after.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,sync⟩)
+  have nextExtras : after.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == next.id) = some (next.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (next.id) }) := by
+    change after.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (after.machine.user.payload.payload.user.runtime.extras.allocations) (destination.id) })
     rw [fields.1,metadata.2.2.2.2];exact extras
   obtain ⟨updated,copied,size,length,mutable⟩ := S04FinalReturnWildcardCopy.from_current (options := options) limits (remaining := remaining) span after place next
     afterRuntime nextDistinct nextShort destination.wildcard (by rw [fields.2];exact race)

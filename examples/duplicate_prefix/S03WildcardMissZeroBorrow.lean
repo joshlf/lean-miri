@@ -89,7 +89,9 @@ theorem pointer {K U C F A : Type} [DecidableEq K]
     (miss : state.machine.user.addresses.allocIdFromAddr address 0
       (GlobalAddressLiveErrorExclusion.lookup state.machine.memory) = .ok none)
     (sizingAt : h.sizeAndAlign (RetagReferencePlace.slicePlace (Pointer.new .wildcard (Size.ofBytes address)) 0 pointee) state =
-      .ok (some (Size.ZERO, Align.ONE)) state) :
+      .ok (some (Size.ZERO, Align.ONE)) state)
+    (definitionReady : retagMode = .FnEntry → ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.machineRetagPtrValue h budget (RetagReferencePlace.sliceValue access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 reference)
       reference.ty state = .ok (some (RetagReferencePlace.sliceValue access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 reference))
         (TypedRetagEmpty.afterTag state tracker fresh) := by

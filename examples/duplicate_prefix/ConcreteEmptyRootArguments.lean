@@ -51,6 +51,9 @@ theorem body
       ⟨.immediate value,ActualReferenceMetadata.reference⟩ (second n) (Storage.withCurrent frames root.frame machine) =
       .ok (2,2) (Storage.withCurrent frames (RootArgumentsTwo.result (firstDone root adjusted borrowFrame id global.nextPointerTag) n).frame
         (ConcreteEmptyRootCopy.changedMachine machine global fresh id entry parentTag capacity)) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let l1 := firstLive root
   let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 ActualReferenceMetadata.reference).imm

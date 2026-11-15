@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallConversionBoolModel
 
 /-! Allocation metadata of the SAME actual Bool retag and primitive uninit
@@ -129,15 +130,18 @@ theorem mutation (ctx : ActualRetagContext.Context options remaining span)
       (Size.ofBytes physical.offset) (Size.ofBytes 1) .Write afterTracker.global.protectedTags .VisitChildrenOfAccessed).status=.Completed := by
     rw [entryPhysical,offsetPhysical,flagsOutput];exact done
   have selectedExtras : constructor.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==physical.id)=
-      some (physical.id,⟨none,#[]⟩) := by
+      some (physical.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (constructor.machine.user.payload.payload.user.runtime.extras.allocations) (physical.id) }) := by
     rw [idPhysical,idEq]
-    change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=D.family.allocation)).push
-      (D.family.allocation,⟨none,#[]⟩)).find? (fun row=>row.1==D.family.allocation))=_
-    have noMatch : (fun row : AllocId×MemoryExtras.AllocationExtra Unit=>
-      decide ((row.1!=D.family.allocation)=true ∧(row.1==D.family.allocation)=true))=(fun _=>false) := by
-      funext row;by_cases equal : row.1=D.family.allocation <;> simp [equal]
-    have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by simp [Array.find?_eq_none]
-    simp [Array.find?_push,Array.find?_filter,noMatch,emptyFind]
+    have freshExtras : constructor.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == D.family.allocation) =
+        some (D.family.allocation, { weakMemory := none }) := by
+      change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=D.family.allocation)).push
+        (D.family.allocation,{ weakMemory := none })).find? (fun row=>row.1==D.family.allocation))=_
+      have noMatch : (fun row : AllocId×MemoryExtras.AllocationExtra Unit=>
+        decide ((row.1!=D.family.allocation)=true ∧(row.1==D.family.allocation)=true))=(fun _=>false) := by
+        funext row;by_cases equal : row.1=D.family.allocation <;> simp [equal]
+      have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _=>false)=none := by simp [Array.find?_eq_none]
+      simp [Array.find?_push,Array.find?_filter,noMatch,emptyFind]
+    simpa only [AllocationBacktrace.of_lookup freshExtras] using freshExtras
   have tracked : constructor.machine.borrowTracker=some afterTracker := afterEnabled
   have ghost : constructor.machine.user.payload.ghost=false:=afterGhost
   have race : constructor.machine.dataRace=none:=afterRace

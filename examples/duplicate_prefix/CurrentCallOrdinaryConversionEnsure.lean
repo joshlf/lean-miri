@@ -52,7 +52,7 @@ theorem first {options limits remaining span before argument length place}
       (rest.flatMap CurrentCallConversionFiniteFold.targets) (addressCharge before) reserve finalAddresses finalTape,
       (PreparedContracts.actualConfig options () remaining span).retag.ensureTreeExtra id current=
         .ok () {current with machine:=(CurrentCallConversionMaterialize.installed
-          (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩)
+          (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none })
           id .global (result.converted.mapExtra (fun _=>BorrowTree.new root result.converted.byteSize)))} := by
   obtain ⟨externStatic,wiring⟩:=root_wiring options
   obtain ⟨finalAddresses,finalTape,⟨result⟩⟩:=CurrentCallOrdinaryConversionInitial.convert_first_phase input current.machine tracker
@@ -115,7 +115,7 @@ theorem next {options limits remaining span before argument length place}
       (rest.flatMap CurrentCallConversionFiniteFold.targets) (addressCharge before) reserve finalAddresses finalTape,
       (PreparedContracts.actualConfig options () remaining span).retag.ensureTreeExtra id current=
         .ok () {current with machine:=(CurrentCallConversionMaterialize.installed
-          (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩)
+          (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none })
           id .global (result.converted.mapExtra (fun _=>BorrowTree.new root result.converted.byteSize)))} := by
   have protocol:=CurrentCallConversionMaterialize.protocol_memory infoEq
     (UInt32.ofNat initial.threads.activeThread.toNat) previous.protocol

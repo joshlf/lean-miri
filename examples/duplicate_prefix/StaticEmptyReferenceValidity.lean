@@ -49,7 +49,8 @@ theorem validate_global (options : EvalConfigurationCore.Options) (remaining : N
       PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any
       (·.value.ty == 4) = false)
-    : ∃ converted : Allocation Provenance Unit,
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) : ∃ converted : Allocation Provenance Unit,
       GlobalAllocationAttributes.Attributes source converted ∧
       let afterFrame := TypedBorrowSteps.registeredFrame frame borrowFrame id global.nextPointerTag
       let afterMachine := (StaticEmptyReferencePointer.resultState options frames frame borrowFrame
@@ -174,7 +175,8 @@ theorem validate_runtime_global (options : EvalConfigurationCore.Options) (remai
       PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any
       (·.value.ty == 4) = false)
-    : ∃ converted : Allocation Provenance Unit,
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) : ∃ converted : Allocation Provenance Unit,
       GlobalAllocationAttributes.Attributes source converted ∧
       let afterFrame := TypedBorrowSteps.registeredFrame frame borrowFrame id global.nextPointerTag
       let afterMachine := (StaticEmptyReferencePointer.resultState options frames frame borrowFrame

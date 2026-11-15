@@ -95,7 +95,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
         #[.Copy (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base (.pointer (Pointer.new .wildcard (Size.ofBytes address))) 0),.Copy (second count)]
         false (.memory place) (.stop true) (⟨⟨frames⟩,before⟩ : RootState)=
         .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
-          {registeredFrame (atSpan args ⟨601⟩).frame {} physical.id next.global.nextPointerTag with location:=.unwinding ⟨559⟩}) finalMachine) ∧
+          {registeredFrame (atSpan args ⟨2⟩).frame {} physical.id next.global.nextPointerTag with location:=.unwinding ⟨0⟩}) finalMachine) ∧
       finalMachine.memory.live=
         ((((source.memory.live.filter (fun row=>row.1!=physical.id)).push
           (physical.id,{physical.entry with allocation:=physical.entry.allocation.setExtra boolOutput.child.tree})).filter
@@ -106,9 +106,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
       updated.extra=(boolOutput.child.tree.performBorrowAccessRange (.concrete next.global.nextPointerTag)
         (Size.ofBytes physical.offset) (Size.ofBytes 1) .Write boolOutput.global.protectedTags .VisitChildrenOfAccessed).tree ∧
       updated.byteSize=physical.entry.allocation.byteSize ∧ updated.len=physical.entry.allocation.len ∧
-      (registeredFrame (atSpan args ⟨601⟩).frame {} physical.id next.global.nextPointerTag).extra.borrowTracker=
+      (registeredFrame (atSpan args ⟨2⟩).frame {} physical.id next.global.nextPointerTag).extra.borrowTracker=
         some (({} : FrameState).addProtector physical.id next.global.nextPointerTag) ∧
-      (registeredFrame (atSpan args ⟨601⟩).frame {} physical.id next.global.nextPointerTag).returnPlace=args.frame.returnPlace ∧
+      (registeredFrame (atSpan args ⟨2⟩).frame {} physical.id next.global.nextPointerTag).returnPlace=args.frame.returnPlace ∧
       InitMaskCopy.WellFormed updated.initializationMask ∧
       updated.initializationMask.len=updated.byteSize ∧
       updated.mutability=.Mut ∧
@@ -126,6 +126,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
   let fresh := firstFresh tracker tagRoom
   let prepared := CurrentCallPush.preparedMachine before frames
   let root := CurrentCallSpatialEntryControl.root before frames place model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let effect : Effect options prepared tracker (.pointer (Pointer.new .wildcard (Size.ofBytes address))) := .miss address miss
   let d1 := CurrentCallEmptySourceArguments.doneRoot effect remaining span root {}
   let fnMachine := sourceFnMachine options remaining span before tracker frames place model.noDataRace address miss fresh
@@ -161,19 +164,19 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     change (TypedRetagEmpty.successorTag tracker.global.nextPointerTag fresh).value.toNat<18446744073709551615
     rw [GenericFunctionEntryNumerics.successor_value]
     exact tagRoom
-  have protectedFrameBorrow : (atSpan args ⟨601⟩).frame.extra.borrowTracker=some {} := frameBorrow
+  have protectedFrameBorrow : (atSpan args ⟨2⟩).frame.extra.borrowTracker=some {} := frameBorrow
   obtain ⟨ctx⟩ := (DuplicatePrefixCallModel.contexts options remaining span before model).2.2.2
   obtain ⟨boolOutput,boolChild,actual,tag,global,frameEq,⟨witness⟩,updated,protection,extra,bytes,length,mutable,write,snapshot,tracked,registeredBorrow,returnPlace⟩ :=
     CurrentCallSelectedBoolProtection.protect options limits (remaining+1) span ctx source next data owner frames
-      (atSpan args ⟨601⟩).frame {} rfl protectedFrameBorrow place P Q (pointer.trans (congrArg PointerInstance.value pointerQ).symm)
+      (atSpan args ⟨2⟩).frame {} rfl protectedFrameBorrow place P Q (pointer.trans (congrArg PointerInstance.value pointerQ).symm)
       (allocation.trans allocationQ.symm) runtimeQ binding (by rw [allocationQ];exact distinct) freshAfter
       (by rw [allocationQ];exact nodeRoom) model.ghostOff model.noDataRace model.noBackend ready
-  let retagged := borrowedState frames (atSpan args ⟨601⟩).frame {} source next freshAfter physical.id physical.entry boolOutput.child.tree
+  let retagged := borrowedState frames (atSpan args ⟨2⟩).frame {} source next freshAfter physical.id physical.entry boolOutput.child.tree
   let finalMachine : Before := {retagged.machine with memory:={retagged.machine.memory with live:=
     ((retagged.machine.memory.live.filter (fun row=>row.1!=physical.id)).push (physical.id,{physical.entry with allocation:=updated}))}}
   have protectedStep : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan args ⟨601⟩).frame source)=
-      .ok () (Storage.withCurrent frames (registeredFrame (atSpan args ⟨601⟩).frame {} physical.id next.global.nextPointerTag) finalMachine) := protection
+      (Storage.withCurrent frames (atSpan args ⟨2⟩).frame source)=
+      .ok () (Storage.withCurrent frames (registeredFrame (atSpan args ⟨2⟩).frame {} physical.id next.global.nextPointerTag) finalMachine) := protection
   have entered := CurrentCallEmptyEntryControl.init_of_copy_protect options limits remaining span frames root rawLocals
     prepared tracker (.pointer (Pointer.new .wildcard (Size.ofBytes address))) effect {} count source finalMachine {} physical.id next.global.nextPointerTag place
     fnTracker fnMachine enabled rfl model.ghostOff model.shallow model.ghostOff model.shallow validationFuel validationEq rfl copyStep

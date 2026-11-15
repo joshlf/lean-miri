@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationRejectedResultOrder
 import duplicate_prefix.S02SameDestinationAcceptedGuardReady
 import duplicate_prefix.S02SameDestinationAcceptedEntryFrameControl
@@ -125,7 +126,7 @@ theorem ready_control
           post.memory.live.find? (fun row => row.1 == reference.id) =
             some (reference.id,{sourceEntry with allocation := sourceEntry.allocation.setExtra finalTree}) ∧
           post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) =
-            some (reference.id,⟨none,#[]⟩) ∧
+            some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) ∧
           finalTree.locations.size = sourceEntry.allocation.byteSize ∧ finalTree.nodes.size+2 < 65536 ∧
           held.global.nextPointerTag.value.toNat+1 < 18446744073709551615 ∧
           (0 : UInt64) < len ∧ reference.base+reference.offset ≠ 0 ∧ len.toNat < 9223372036854775808 ∧
@@ -192,7 +193,7 @@ theorem ready_control
     simp only [DuplicatePrefixReferenceInput.Binding,Pointer.new] at binding
     exact binding.1.symm
   have sourceExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == reference.id) =
-      some (reference.id,⟨none,#[]⟩) := by
+      some (reference.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (reference.id) }) := by
     rw [extras,tickExtras,←extraSame,refId,sameAllocation]
     exact initialExtras
   obtain ⟨installedTrack,installedRelevant⟩ := S02SameDestinationAcceptedEntryFrameControl.at_actual_call id tag address len count

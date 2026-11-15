@@ -43,7 +43,9 @@ theorem retag_pointer (options : EvalConfigurationCore.Options) (remaining : Nat
     (descriptor : machine.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (metadata : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime)
-    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false) :
+    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ∃ converted : Allocation Provenance Unit,
       GlobalAllocationAttributes.Attributes source converted ∧
       TypedRetag.retagPtrValue (adapted options remaining span ctx.pointers) options.limits.retag
@@ -74,6 +76,7 @@ theorem retag_pointer (options : EvalConfigurationCore.Options) (remaining : Nat
   let after := resultState options frames frame borrowFrame machine tracker fresh id root source converted
   have retag := TypedBorrowSteps.retag_place_at_of_reborrow h options.limits.retag place ChildBorrow.fnEntryPolicy
     Size.ZERO Align.ONE before after tracker enabled fresh id (.concrete id root) rfl sizing reborrow
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h pointee.ty .Mutable .FnEntry before frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ =

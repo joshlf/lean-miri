@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellActualCallCopyEntry
 import duplicate_prefix.S05ZeroCellActualCallCopy
 import duplicate_prefix.S05ZeroCellActualCallReturn
@@ -187,7 +188,7 @@ theorem result (span : PreparedContracts.FixedSpanQuery)
   have machinePresent : machine.memory.live.find? (fun row => row.1 == sourceId) = some (sourceId,S05ZeroCellActualCallRepaired.copyEntry) := by
     rw [machineMemory,finalMemoryEq]
     exact StackPopRelease.lookup_commit_same _ _ _ _
-  have machineExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) = some (sourceId,⟨none,#[]⟩) := by
+  have machineExtras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) = some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (sourceId) }) := by
     rw [machineUser,account.2.2.2.2.2.2];exact helperExtras
   have machineControl : (config options (remaining+1) span).terminators.getControl machine.user =
       (config options (remaining+1) span).terminators.getControl accounted.user := by rw [machineUser]
@@ -278,7 +279,7 @@ theorem result (span : PreparedContracts.FixedSpanQuery)
     slotSize := slotSize,slotStorage := slotLen,slotMask := slotMask,slotProvenance := slotProv,slotMutable := slotMutable,
     place := place,layout := rfl,slotBase := 8192,slotPointer := rfl,aligned := rfl,fits := by decide,
     cached := by rw [finalAddresses];exact destination_cached,
-    extras := by change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [finalExtras];exact destination_extras,
+    extras := by dsimp (config := { failIfUnchanged := false }) only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]; change finalMachine.user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [finalExtras];exact destination_extras,
     destination := frameReturn }
   obtain ⟨returned,returnTrace,terminal,_,properties⟩ := S05ZeroCellActualCallReturn.complete returnInput
   let finalState := CanonicalCopy.replaceAllocation (S05ZeroCellActualCallReturn.popped returnInput)

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallOrdinaryCurrentSource
 import duplicate_prefix.CurrentCallOrdinarySameAllocationBool
 import duplicate_prefix.CurrentCallConversionSourceAfterBool
@@ -78,7 +79,7 @@ theorem same {options limits remaining span before argument len place}
   let sourceFnTracker : MachineHooks.BorrowState := ⟨result.global, .FnEntry⟩
   let args := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len
     family.allocation input.tracker.global.nextPointerTag) count
-  let boolFrame := (atSpan args ⟨601⟩).frame
+  let boolFrame := (atSpan args ⟨2⟩).frame
   let BF : FrameState := ({} : FrameState).addProtector family.allocation input.tracker.global.nextPointerTag
   have facts := CurrentCallOrdinarySameAllocationBool.physical_data input latentReturn source
     (by simpa only [same] using current) rootTag (by simpa only [same] using rootCached) base (by simpa only [same] using baseCached)
@@ -97,16 +98,19 @@ theorem same {options limits remaining span before argument len place}
     change result.machine.user.addresses.baseAddr.find? _ = _
     rw [result.frame, CurrentCallConversionFiniteFold.state_eq]
     exact result.bases _ _ baseCached
-  have sourceExtra : sourceMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == family.allocation) = some (family.allocation, ⟨none, #[]⟩) := by
-    change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
-      (family.allocation, ⟨none, #[]⟩)).find? (fun row => row.1 == family.allocation)) = _
-    have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
-        decide ((row.1 != family.allocation) = true ∧ (row.1 == family.allocation) = true)) = (fun _ => false) := by
-      funext row
-      by_cases equal : row.1 = family.allocation <;> simp [equal]
-    have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
-      simp [Array.find?_eq_none]
-    simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+  have sourceExtra : sourceMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == family.allocation) = some (family.allocation, { weakMemory := none, backtrace := AllocationBacktrace.get (sourceMachine.user.payload.payload.user.runtime.extras.allocations) (family.allocation) }) := by
+    have freshExtras : sourceMachine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == family.allocation) =
+        some (family.allocation, { weakMemory := none }) := by
+      change (((result.machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
+        (family.allocation, { weakMemory := none })).find? (fun row => row.1 == family.allocation)) = _
+      have noMatch : (fun row : AllocId × MemoryExtras.AllocationExtra Unit =>
+          decide ((row.1 != family.allocation) = true ∧ (row.1 == family.allocation) = true)) = (fun _ => false) := by
+        funext row
+        by_cases equal : row.1 = family.allocation <;> simp [equal]
+      have emptyFind : result.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun _ => false) = none := by
+        simp [Array.find?_eq_none]
+      simp [Array.find?_push, Array.find?_filter, noMatch, emptyFind]
+    simpa only [AllocationBacktrace.of_lookup freshExtras] using freshExtras
   have rootHere : sourceTracker.global.rootTag? input.returnFamily.allocation = some rootTag := by
     rw [← same]
     exact result.roots _ _ rootCached
@@ -266,7 +270,7 @@ theorem different {options limits remaining span before argument len place}
   let sourceFnTracker : MachineHooks.BorrowState := ⟨result.global, .FnEntry⟩
   let args := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len
     family.allocation input.tracker.global.nextPointerTag) count
-  let boolFrame := (atSpan args ⟨601⟩).frame
+  let boolFrame := (atSpan args ⟨2⟩).frame
   let BF : FrameState := ({} : FrameState).addProtector family.allocation input.tracker.global.nextPointerTag
   have freshB : sourceTracker.global.nextPointerTag.value < 18446744073709551615 := by
     apply UInt64.lt_iff_toNat_lt.mpr
@@ -291,7 +295,7 @@ theorem different {options limits remaining span before argument len place}
     exact (result.roots _ _ oldCached).trans oldCached.symm
   have extraRows : sourceMachine.user.payload.payload.user.runtime.extras.allocations =
       (before.user.payload.payload.user.runtime.extras.allocations.filter (fun row => row.1 != family.allocation)).push
-        (family.allocation, ⟨none, #[]⟩) := by
+        (family.allocation, { weakMemory := none }) := by
     change ((result.machine.user.payload.payload.user.runtime.extras.allocations.filter _).push _) = _
     rw [result.frame, CurrentCallConversionFiniteFold.state_eq]
     rfl
@@ -510,9 +514,9 @@ theorem different {options limits remaining span before argument len place}
   have protectionFinal :
       (ExecutionMachine.callHooks (config options (remaining + 1) span) limits).protectArgument () place
         (Storage.withCurrent #[] (atSpan (RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root {}
-          family.value len current.role.backing.id current.tag) count) ⟨601⟩).frame sourceMachine) =
+          family.value len current.role.backing.id current.tag) count) ⟨2⟩).frame sourceMachine) =
         .ok () (Storage.withCurrent #[] (registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len current.role.backing.id current.tag) count) ⟨601⟩).frame
+          (CurrentCallSourceArguments.doneRoot options remaining span root {} family.value len current.role.backing.id current.tag) count) ⟨2⟩).frame
           (({} : FrameState).addProtector current.role.backing.id current.tag) R.id R.node.tag) finalMachine) := by
     simpa only [currentIdOld, currentTagOld, R, boolFrame, args, BF, protectedOutput.id, protectedOutput.tag] using protectionBudget
   exact CurrentCallOrdinaryPositiveFinish.invoke input family.value encoding count sourceMachine sourceFnMachine finalMachine

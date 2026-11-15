@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03WildcardArgumentSeparateWildcardInit
 import duplicate_prefix.S03WildcardArgumentSeparateState
 import duplicate_prefix.S03ConcreteLiveCandidate
@@ -67,7 +68,7 @@ structure Initial (options : EvalConfigurationCore.Options) (limits : ExecutionM
   validityEq : options.limits.validation = validityFuel+1
   dispatchEq : limits.callDispatch = budget+1
   notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false
-  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩)
+  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (destination.id) })
   thread : Miri.Concurrency.ThreadRecord
   active : before.threads.activeThread? = some thread
   noCache : thread.topUserRelevantFrame = none
@@ -138,12 +139,12 @@ theorem enters
     (Size.ofBytes original.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
   let frame := PositiveRootInstalledFrame.installed rawFrame adjusted count {} argumentId original.tracker.global.nextPointerTag
     original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag
-  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨601⟩}
+  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨2⟩}
     argumentFrame second protectedTree updated).machine
   let tracker : MachineHooks.BorrowState := ⟨global,original.tracker.retagMode⟩
   let borrowFrame := argumentFrame.addProtector original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag
   have currentRuntime := (S03SeparateEmptyArgument.facts original initialRuntime first argumentId).1
-  let destination := S03ReturnWildcardMetadata.of_protection currentInput wildcard #[] {args.frame with location := .unwinding ⟨601⟩}
+  let destination := S03ReturnWildcardMetadata.of_protection currentInput wildcard #[] {args.frame with location := .unwinding ⟨2⟩}
     argumentFrame second protectedTree updated written treeEq byteSize bytes mutable maskValid maskLength pointerBounds capacity
   have initialPositive := original.borrow
   have binding := original.binding
@@ -166,7 +167,7 @@ theorem enters
   let argEntry : LocalAllocation Provenance BorrowTree MiriMemoryKind := {argumentEntry with allocation := argumentEntry.allocation.setExtra (slot.after original.tracker.global.nextPointerTag)}
   have argumentCurrent : current.memory.live.find? (fun row => row.1 == argumentId) = some (argumentId,argEntry) :=
     MemoryCopyBridge.live_lookup_replaced _ _ _
-  have argumentAfter := other_live currentInput #[] {args.frame with location := .unwinding ⟨601⟩} argumentFrame second protectedTree updated
+  have argumentAfter := other_live currentInput #[] {args.frame with location := .unwinding ⟨2⟩} argumentFrame second protectedTree updated
     argumentId argEntry (Ne.symm separate) argumentCurrent
   obtain ⟨afterArgRuntime,⟨zero⟩,argGrowth⟩ := S03WildcardArgumentSeparateState.facts argumentEntry.allocation.extra original.tracker argRuntime argumentId original.id
     first second slot room

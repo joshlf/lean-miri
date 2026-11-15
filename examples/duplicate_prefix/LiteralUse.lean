@@ -24,10 +24,10 @@ theorem uncached
     (defaultMode : tracker.retagMode = .Default)
     (operand :
       let cached := LocalPlaces.cachePlaceLayout frame destId layout valid
-      OperandMachine.evalOperandAt
+      OperandMachine.evalOperand
         (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
           (PreparedContracts.actualConfig options () (remaining+1) span) limits))
-        () (OperandPath.rvalue "operand") (.Constant constant) (some layout)
+        ()  (.Constant constant) (some layout)
         (Storage.withCurrent framesBefore cached machine) =
         .ok ⟨.immediate value,layout⟩ (Storage.withCurrent framesBefore cached machine))
     (copied :

@@ -61,7 +61,7 @@ theorem after_tail
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] raw.frame rawMachine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] raw.frame raw.frame rawMachine
   have control := RawRootInvocation.control before place model.noDataRace
-  have preamble : raw.frame.location = .unwinding ⟨559⟩ := control.1
+  have preamble : raw.frame.location = .unwinding ⟨0⟩ := control.1
   have unchanged : {raw.frame with trackCallerArg := none} = raw.frame := by rw [←control.2.1]
   simp only [preamble] at unchanged
   rw [RootCallCore.actual_entry_eq]

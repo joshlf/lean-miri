@@ -21,14 +21,17 @@ elab "unfold_frame_meta_languagezero" : tactic => do
 
 theorem inline_attr : CompilerVirtualFacts.inlineAttribute
     PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes GuardCompilerFacts.languageCall.callee =
-    .ok none := by decide +kernel
+    none := by
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  decide +kernel
 
 theorem language_frame_caller_location : CompilerRuntimeQueries.requiresCallerLocation
     PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime GuardCompilerFacts.languageCall.callee =
     .ok false := by with_unfolding_all rfl
 
 noncomputable def definitionQuery := PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[
-  GuardCompilerFacts.languageCall.callee.defId]?
+  (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId]?
 theorem definition_supported : definitionQuery.isSome = true := by decide +kernel
 noncomputable def definition := definitionQuery.get (by simpa using definition_supported)
 theorem definition_eq : definitionQuery = some definition := Option.eq_some_of_isSome definition_supported
@@ -49,8 +52,14 @@ theorem language_user_relevance {K User Extra : Type} (crates : Array Nat)
   rw [inline_attr]
   unfold_frame_meta_languagezero
   rw [language_frame_caller_location]
+  have instanceQuery : CompilerInstance.definitionOf
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.input.instances
+      GuardCompilerFacts.languageCall.callee = .ok
+      (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId := by
+    with_unfolding_all rfl
+  simp only [instanceQuery,bind,Except.bind,Except.pure]
   rw [show PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[
-      GuardCompilerFacts.languageCall.callee.defId]? = some definition from definition_eq]
+      (PreparedReflection.fixedInstance GuardCompilerFacts.languageCall.callee).instanceKind.defId]? = some definition from definition_eq]
   simp [rank, bind, EStateM.bind, pure, EStateM.pure, Except.pure]
   split <;> simp_all [bind, EStateM.bind, pure, EStateM.pure]
   split <;> rfl

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05FixedProfileMetadata
 
 /-! Explicit initial-domain refinement for the fixed duplicate_prefix profile.
@@ -55,7 +56,7 @@ theorem ConsistentContract.return_extras
     {argument : DuplicatePrefixSliceArgument.Argument} {len : UInt64} {place : MPlaceTy Provenance}
     (input : ConsistentContract options limits remaining span before argument len place) :
     before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.contract.destination.id) =
-      some (input.contract.destination.id,⟨none,#[]⟩) :=
+      some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) :=
   input.metadata.return_extras input.contract.destination input.contract.model.noDataRace
 
 /-- The slice field query used by initial FnEntry and the empty shared/len

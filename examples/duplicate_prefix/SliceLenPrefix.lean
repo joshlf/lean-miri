@@ -54,11 +54,11 @@ theorem two_statements
   have stmtAt1 : block.statements[1]? = some stmt1 := by simp [stmt1]
   have kind0 : stmt0.kind = .StorageLive 2 := by with_unfolding_all rfl
   have kind1 : stmt1.kind = .Assign ⟨2,#[]⟩ (.RawPtr .Const ⟨1,#[.Deref]⟩) := by with_unfolding_all rfl
-  have trivial : cfg.lifecycle.storage.veryTriviallySized 154 = .ok true := by
+  have trivial : cfg.lifecycle.storage.veryTriviallySized 49 = .ok true := by
     rw [(CanonicalConfigFacts.actual_fields options () (remaining+1) span).storage]
     decide +kernel
   let first := SourceSteps.liveFrame frame ⟨0,0⟩ 2 valid2
-  have step1 := SourceSteps.storage_live_exact cfg limits () frames frame machine ⟨0,0⟩ block stmt0 2 154
+  have step1 := SourceSteps.storage_live_exact cfg limits () frames frame machine ⟨0,0⟩ block stmt0 2 49
     located (by rw [body];exact blockAt) stmtAt0 kind0 valid2 (by rw [body];with_unfolding_all rfl) trivial dead2 noClocks
   have firstSize : first.locals.size = 3 := by simp [first,SourceSteps.liveFrame,size]
   have firstValid1 : 1 < first.locals.size := by rw [firstSize];decide

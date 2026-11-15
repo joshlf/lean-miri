@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveWildcardSparseNonzeroLenMetadata
 import duplicate_prefix.GeneralBorrowExposedScopedAcceptedCallInput
 import duplicate_prefix.GeneralBorrowExposedScopedAsMutCallReturnReady
@@ -36,6 +37,6 @@ structure Initial extends GeneralBorrowPositiveWildcardSparseNonzeroInput.Initia
   bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : entry.allocation.len+64<18446744073709551616
   bufferMutable : entry.allocation.mutability=.Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row=>row.1==id)=some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
 end
 end DuplicatePrefix.GeneralBorrowPositiveWildcardSparseAcceptedInput

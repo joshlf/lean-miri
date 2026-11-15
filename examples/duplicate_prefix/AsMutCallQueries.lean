@@ -13,7 +13,7 @@ theorem resolve_current
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (function : frame.functionInstance = RootBody.reflected.functionInstance)
     (location : frame.location = .mir ⟨6,8⟩) :
-    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 3 HelperCompilerFacts.asMutPtrCall.callee.args
+    CompilerProviders.resolveCurrent PreparedReflection.actual.compiler 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs
       (Storage.withCurrent framesBefore frame machine) =
       .ok HelperCompilerFacts.asMutPtrCall.callee (Storage.withCurrent framesBefore frame machine) := by
   obtain ⟨input,sourceAt,sameInput⟩ := Option.map_eq_some_iff.mp PreparedContracts.fixed_root_body
@@ -28,12 +28,12 @@ theorem resolve_current
     rw [sameInput]
     exact Array.getElem?_eq_getElem blockBound
   have atEnd : (8 : Nat) = block.statements.size := by with_unfolding_all rfl
-  have id : HelperCompilerFacts.asMutPtrCall.callee.defId = 3 := by with_unfolding_all rfl
+  have id : (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind.defId = 6 := by with_unfolding_all rfl
   have kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 28 =
-      .ok (.FnDef 3 HelperCompilerFacts.asMutPtrCall.callee.args) := by
+      .ok (.FnDef 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs) := by
     simpa only [id] using function_kind
   apply ResolveCurrentMetadata.resolve PreparedReflection.actual.compiler framesBefore frame machine ⟨6,8⟩
-    input RootBody.reflected.body block HelperCompilerFacts.asMutPtrCall 3 HelperCompilerFacts.asMutPtrCall.callee.args 28
+    input RootBody.reflected.body block HelperCompilerFacts.asMutPtrCall 6 (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).genericArgs 28
     location sourceAtFrame
   · exact sameInput.trans body.symm
   · rw [function]

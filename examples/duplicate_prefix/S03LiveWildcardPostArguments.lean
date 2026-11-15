@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03LiveWildcardInitTail
 import duplicate_prefix.S03LiveWildcardPacket
 import duplicate_prefix.S03ReturnWildcardMetadata
@@ -38,7 +39,7 @@ theorem run
     (rootContinuation : root.frame.returnContinuation = .stop true) (rootVarargs : root.frame.vaList = #[])
     (address count : UInt64)
     (syncEmpty : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (topZero : thread.topUserRelevantFrame = some 0) :
@@ -75,12 +76,12 @@ theorem run
   let written := (tree.performBorrowAccessRange (.concrete input.tracker.global.nextPointerTag)
     (Size.ofBytes input.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
   let frame := PositiveRootInstalledFrame.installed root adjusted count {} input.id zeroTag input.id input.tracker.global.nextPointerTag
-  let machine := (S04ProtectUninit.finished before place input #[] {args.frame with location := .unwinding ⟨601⟩}
+  let machine := (S04ProtectUninit.finished before place input #[] {args.frame with location := .unwinding ⟨2⟩}
     argumentFrame fresh tree updated).machine
   let tracker := TypedBorrowSteps.registeredTracker (ReferenceBorrowDriver.allocatedTracker input.tracker fresh) input.tracker.global.nextPointerTag
   let borrowFrame := argumentFrame.addProtector input.id input.tracker.global.nextPointerTag
   let destination := S03ReturnWildcardMetadata.of_protection input wildcard #[]
-    {args.frame with location := .unwinding ⟨601⟩} argumentFrame fresh tree updated written
+    {args.frame with location := .unwinding ⟨2⟩} argumentFrame fresh tree updated written
     treeEq byteSize bytes mutable maskValid maskLength pointerBounds capacity
   have differentTags : zeroTag ≠ input.tracker.global.nextPointerTag := Ne.symm
     (S03EmptyReturnConstructorFacts.fresh_ne input.entry.allocation.extra input.tracker.global.nextPointerTag zeroTag zeroIndex

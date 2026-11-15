@@ -1,3 +1,4 @@
+import duplicate_prefix.LenCalleeLeaves
 import duplicate_prefix.LenEvaluateCall
 import duplicate_prefix.LenDispatch
 import duplicate_prefix.CallItemDispatch
@@ -30,7 +31,7 @@ theorem dispatch_of_entry (options : EvalConfigurationCore.Options) (limits : Ex
     rfl
   apply CallItemDispatch.dispatch_one h _ state _ budget
   rw [CallItemDispatch.item_step h LenHelper.resolved.callee 1 LenHelper.abi args false destination
-    (some 3) .Continue .Rust LenHelper.callee_kind LenCallFacts.abi_flags.2.1 rust]
+    (some 3) .Continue .Rust (LenCalleeLeaves.instance_kind options limits remaining span) LenCallFacts.abi_flags.2.1 rust]
   unfold CallItemDispatch.itemStage
   simp only [bind,EStateM.bind]
   rw [find]

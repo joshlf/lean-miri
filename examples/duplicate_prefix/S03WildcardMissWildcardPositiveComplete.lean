@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03WildcardMissLookupFrame
 import duplicate_prefix.S03WildcardMissFrame
 import duplicate_prefix.S03WildcardMissWildcardInit
@@ -41,7 +42,7 @@ theorem complete
     (budget : Nat) (dispatchEq : limits.callDispatch = budget+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     DuplicatePrefixArgumentCallResult.Result options limits remaining span before (.pointer (Pointer.new .wildcard (Size.ofBytes address))) 0 count place := by
@@ -59,7 +60,7 @@ theorem complete
   let currentInput := S03IntegerZeroState.input input first
   let args := S03WildcardMissArguments.result (RawRootInvocation.root before place model.noDataRace) (config options remaining span).access.runtime.base address count
   let destination := S03ReturnWildcardMetadata.of_protection currentInput wildcard #[]
-    {args.frame with location := .unwinding ⟨601⟩} {} second tree updated
+    {args.frame with location := .unwinding ⟨2⟩} {} second tree updated
     (S03WildcardMissWildcardInit.written input first second tree) treeEq byteSize bytes mutable maskValid maskLength pointerBounds capacity
   have initialPositive := input.borrow
   have binding := input.binding
@@ -133,12 +134,12 @@ theorem complete
     simpa only [show ¬(14 = index ∨ 13 = index ∨ 6 = index ∨ 0 = index) from by omega,
       show ¬2 = index from by omega,show ¬1 = index from by omega,ite_false] using actual
   have hooks := S03WildcardMissLookupFrame.lookup_finished currentInput #[]
-    {args.frame with location := .unwinding ⟨601⟩} {} second tree updated byteSize
+    {args.frame with location := .unwinding ⟨2⟩} {} second tree updated byteSize
   have currentMiss : start.machine.user.addresses.allocIdFromAddr address 0
       (GlobalAddressLiveErrorExclusion.lookup start.machine.memory) = .ok none := by
     change before.user.addresses.allocIdFromAddr address 0
       (GlobalAddressLiveErrorExclusion.lookup (S04ProtectUninit.finished _ _ currentInput #[]
-        {args.frame with location := .unwinding ⟨601⟩} {} second tree updated).machine.memory) = .ok none
+        {args.frame with location := .unwinding ⟨2⟩} {} second tree updated).machine.memory) = .ok none
     rw [hooks]
     exact miss
   have sourceOne : (frame.locals[1]'(by change 1 < 25;decide)).value = .live (.immediate

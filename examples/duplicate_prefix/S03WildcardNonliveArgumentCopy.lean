@@ -54,7 +54,9 @@ theorem copy_nonlive_argument (options : EvalConfigurationCore.Options) (limits 
         (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 reference).imm valid) machine borrowFrame global fresh id =
       Storage.withCurrent frames afterFrame afterMachine)
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining + 1) span) limits).copyAllowTransmute ()
       ⟨.immediate (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new .wildcard (Size.ofBytes (base+offset))) 0 reference).imm, reference⟩ view (Storage.withCurrent frames frame machine) =

@@ -48,7 +48,9 @@ theorem copy
     (root : entry.allocation.extra = BorrowTree.new parentTag (Size.ofBytes capacity))
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
-    (view : RuntimeStackPlace Provenance) (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (view : RuntimeStackPlace Provenance) (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 reference).imm
     let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
@@ -106,7 +108,9 @@ theorem copy_nonlive
     (nonlive : info.kind ≠ .liveData)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
-    (view : RuntimeStackPlace Provenance) (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (view : RuntimeStackPlace Provenance) (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new (.concrete id parentTag) (Size.ofBytes (base+offset))) 0 reference).imm
     let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base

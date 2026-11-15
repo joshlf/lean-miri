@@ -3,7 +3,7 @@ namespace DuplicatePrefix.CopyEntrySpans
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.Interpreter
 set_option maxRecDepth 1000000
 set_option maxHeartbeats 16000000
-noncomputable def spanAt (index : Fin 4) : Nat := #[619,620,621,622][index.val]
+noncomputable def spanAt (index : Fin 4) : Nat := #[90,91,92,93][index.val]
  theorem cases_four (index : Fin 4) : index=0 ∨ index=1 ∨ index=2 ∨ index=3 := by
   by_cases h0 : index=0
   · exact .inl h0
@@ -31,15 +31,17 @@ noncomputable def inputIndex (index : Fin 4) : Fin 17 := ⟨index.val,by have :=
     (callee : frame.functionInstance = HelperCompilerFacts.copyCall.callee) (index : Fin 4) :
     CompilerFrameContext.localSpan PreparedReflection.actual.compiler HelperCompilerFacts.copyBody.body index.val
       (Storage.withCurrent frames frame machine) = .ok ⟨spanAt index⟩ (Storage.withCurrent frames frame machine) := by
-  have valid : index.val < CopyEntryLocals.inputBody.input.locals.size := by
-    have size : CopyEntryLocals.inputBody.input.locals.size = 17 := by rfl
+  have valid : index.val < CopyEntryLocals.inputBody.input.localSources.size := by
+    have size : CopyEntryLocals.inputBody.input.localSources.size = 17 := by rfl
     rw [size]
     have := index.isLt
     omega
-  let decl := CopyEntryLocals.inputBody.input.locals[index.val]'valid
-  have present : CopyEntryLocals.inputBody.input.locals[index.val]? = some decl := by simp [decl,valid]
-  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ CopyEntryLocals.inputBody decl _ (spanAt index) body.symm
-    (CopyEntryLocals.body_of_frame frame body identity callee) present rfl (span_index index)
+  let decl := CopyEntryLocals.inputBody.input.localSources[index.val]'valid
+  have present : CopyEntryLocals.inputBody.input.localSources[index.val]? = some decl := by simp [decl,valid]
+  exact MetadataSpans.local_span_from_metadata _ _ _ _ _ _ CopyEntryLocals.inputBody decl (spanAt index) body.symm
+    (CopyEntryLocals.body_of_frame frame body identity callee) present
+      (by rcases cases_four index with rfl | rfl | rfl | rfl <;> with_unfolding_all rfl)
+      (by rcases cases_four index with rfl | rfl | rfl | rfl <;> decide +kernel)
 end DuplicatePrefix.CopyEntrySpans
 open Lean Elab Command in
 run_cmd do

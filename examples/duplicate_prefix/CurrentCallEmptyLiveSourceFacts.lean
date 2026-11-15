@@ -102,7 +102,8 @@ theorem same (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
     (ready : CurrentCallBoolProtection.WindowReady initial physical.id physical.offset.toNat 1)
     (dynamicFuel validationFuel : Nat) (dynamicEq : options.place.dynamicFuel=dynamicFuel+1)
     (validationEq : options.limits.validation=validationFuel+1)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types)
+    :
     ∃(output : GeneralBorrowForestFnEntry.Output) (child : UniIndex) (machine : Before) (frame : CompilerFrameContext.ActualFrame),
     ∃nextData nextOwner,∃Q : UniformWindow machine ⟨output.global,tracker.retagMode⟩ nextData nextOwner physical.id physical.offset.toNat 1 .ret,
       Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
@@ -138,6 +139,9 @@ theorem same (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
       GeneralBorrowFreshActiveWithin.ActiveWithin Q.allocation.extra child .Write physical.offset (physical.offset+1) := by
   let prepared:=CurrentCallPush.preparedMachine initial frames
   let root:=CurrentCallSpatialEntryControl.root initial frames place model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let activeInput:=ScopedFrame.entered prepared tracker .FnEntry
   let fresh : tracker.global.nextPointerTag.value<18446744073709551615:=UInt64.lt_iff_toNat_lt.mpr (by change tracker.global.nextPointerTag.value.toNat<18446744073709551615;omega)
   let room : physical.entry.allocation.extra.nodes.size+1≤4294967295:=by rw [allocation];omega
@@ -352,7 +356,8 @@ theorem different (options : EvalConfigurationCore.Options) (limits : ExecutionM
     (ready : CurrentCallBoolProtection.WindowReady initial physical.id physical.offset.toNat 1)
     (dynamicFuel validationFuel : Nat) (dynamicEq : options.place.dynamicFuel=dynamicFuel+1)
     (validationEq : options.limits.validation=validationFuel+1)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types)
+    :
     ∃(output : GeneralBorrowForestFnEntry.Output) (child : UniIndex) (machine : Before) (frame : CompilerFrameContext.ActualFrame),
     ∃nextData nextOwner,∃Q : UniformWindow machine ⟨output.global,tracker.retagMode⟩ nextData nextOwner physical.id physical.offset.toNat 1 .ret,
       Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
@@ -388,6 +393,9 @@ theorem different (options : EvalConfigurationCore.Options) (limits : ExecutionM
       GeneralBorrowFreshActiveWithin.ActiveWithin Q.allocation.extra child .Write physical.offset (physical.offset+1) := by
   let prepared:=CurrentCallPush.preparedMachine initial frames
   let root:=CurrentCallSpatialEntryControl.root initial frames place model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let activeInput:=ScopedFrame.entered prepared tracker .FnEntry
   let fresh : tracker.global.nextPointerTag.value<18446744073709551615:=UInt64.lt_iff_toNat_lt.mpr (by change tracker.global.nextPointerTag.value.toNat<18446744073709551615;omega)
   let input:=ConcreteEmptyRuntimeEntry.form entry.allocation.extra tracker.global.protectedTags parentTag tracker.global.nextPointerTag
@@ -601,7 +609,8 @@ theorem same (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
     (ready : CurrentCallBoolProtection.WindowReady initial physical.id physical.offset.toNat 1)
     (dynamicFuel validationFuel : Nat) (dynamicEq : options.place.dynamicFuel=dynamicFuel+1)
     (validationEq : options.limits.validation=validationFuel+1)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types)
+    :
     ∃(output : GeneralBorrowForestFnEntry.Output) (child : UniIndex) (machine : Before) (frame : CompilerFrameContext.ActualFrame),
     ∃nextData nextOwner,∃Q : UniformWindow machine ⟨output.global,tracker.retagMode⟩ nextData nextOwner physical.id physical.offset.toNat 1 .ret,
       Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
@@ -637,6 +646,9 @@ theorem same (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
       GeneralBorrowFreshActiveWithin.ActiveWithin Q.allocation.extra child .Write physical.offset (physical.offset+1) := by
   let prepared:=CurrentCallPush.preparedMachine initial frames
   let root:=CurrentCallSpatialEntryControl.root initial frames place model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let activeInput:=ScopedFrame.entered prepared tracker .FnEntry
   let fresh : tracker.global.nextPointerTag.value<18446744073709551615:=UInt64.lt_iff_toNat_lt.mpr (by change tracker.global.nextPointerTag.value.toNat<18446744073709551615;omega)
   let room : physical.entry.allocation.extra.nodes.size+1≤4294967295:=by rw [allocation];omega
@@ -850,7 +862,8 @@ theorem different (options : EvalConfigurationCore.Options) (limits : ExecutionM
     (ready : CurrentCallBoolProtection.WindowReady initial physical.id physical.offset.toNat 1)
     (dynamicFuel validationFuel : Nat) (dynamicEq : options.place.dynamicFuel=dynamicFuel+1)
     (validationEq : options.limits.validation=validationFuel+1)
-    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types) :
+    (origins : DuplicatePrefixTypeCacheOrigins.Origins initial.user.payload.payload.user.types)
+    :
     ∃(output : GeneralBorrowForestFnEntry.Output) (child : UniIndex) (machine : Before) (frame : CompilerFrameContext.ActualFrame),
     ∃nextData nextOwner,∃Q : UniformWindow machine ⟨output.global,tracker.retagMode⟩ nextData nextOwner physical.id physical.offset.toNat 1 .ret,
       Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
@@ -886,6 +899,9 @@ theorem different (options : EvalConfigurationCore.Options) (limits : ExecutionM
       GeneralBorrowFreshActiveWithin.ActiveWithin Q.allocation.extra child .Write physical.offset (physical.offset+1) := by
   let prepared:=CurrentCallPush.preparedMachine initial frames
   let root:=CurrentCallSpatialEntryControl.root initial frames place model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let activeInput:=ScopedFrame.entered prepared tracker .FnEntry
   let fresh : tracker.global.nextPointerTag.value<18446744073709551615:=UInt64.lt_iff_toNat_lt.mpr (by change tracker.global.nextPointerTag.value.toNat<18446744073709551615;omega)
   let slot : WildcardHitPoolRoot.Slot entry.allocation.extra:=WildcardHitPoolRoot.factory entry.allocation.extra

@@ -60,7 +60,9 @@ theorem live_zero
     (child : entry.allocation.extra.newChild (Size.ofBytes offset) (.concrete parentTag) tracker.global.nextPointerTag
       (Miri.DataStructures.DedupRangeMap.new (Size.ofBytes 0) initial) policy.outsidePermission true = ⟨finalTree,.ok ()⟩)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let resultMachine := {TypedBorrowSteps.registeredMachine (ReferenceBorrowDriver.allocatedMachine machine tracker fresh)
       (ReferenceBorrowDriver.allocatedTracker tracker fresh) tracker.global.nextPointerTag with
@@ -71,6 +73,7 @@ theorem live_zero
         {value := .live (.immediate (RetagReferencePlace.sliceValue cfg.access.runtime.base
           (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes (base+offset))) 0 reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}
@@ -166,7 +169,9 @@ theorem integer_zero
     (cached : frame.locals[localId].layout = some reference)
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let resultMachine := ReferenceBorrowDriver.allocatedMachine machine tracker fresh
     ValidityMachine.validateRuntime cfg.validity () (validityFuel+1)
@@ -174,6 +179,7 @@ theorem integer_zero
       .ok () (Storage.withCurrent frames {frame with locals := (frame.locals.set localId
         {value := .live (.immediate (RetagReferencePlace.integerSliceValue address 0 reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}
@@ -262,7 +268,9 @@ theorem nonlive_zero
     (ghost : machine.user.payload.ghost = false) (shallow : machine.user.payload.validation = .Shallow)
     (cachedAddress : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let resultMachine := TypedBorrowSteps.registeredMachine (ReferenceBorrowDriver.allocatedMachine machine tracker fresh)
       (ReferenceBorrowDriver.allocatedTracker tracker fresh) tracker.global.nextPointerTag
@@ -272,6 +280,7 @@ theorem nonlive_zero
         {value := .live (.immediate (RetagReferencePlace.sliceValue cfg.access.runtime.base
           (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes (base+offset))) 0 reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}

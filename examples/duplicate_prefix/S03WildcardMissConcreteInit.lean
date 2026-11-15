@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03IntegerZeroInitTail
 import duplicate_prefix.S03WildcardMissEntry
 import duplicate_prefix.S03WildcardMissFrame
@@ -41,9 +42,9 @@ def frame (target : TargetDataLayout) {before : Before} {place : MPlaceTy Proven
     (address count : UInt64) (first : input.tracker.global.nextPointerTag.value < 18446744073709551615) :=
   let args := S03WildcardMissArguments.result (RawRootInvocation.root before place race) target address count
   CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-    {args.frame with location := .unwinding ⟨601⟩} {} input.id
+    {args.frame with location := .unwinding ⟨2⟩} {} input.id
     (ReferenceBorrowDriver.allocatedTracker input.tracker first).global.nextPointerTag
-      with location := .unwinding ⟨559⟩}
+      with location := .unwinding ⟨0⟩}
 
 def installed (target : TargetDataLayout) {before : Before} {place : MPlaceTy Provenance}
     (input : DuplicatePrefixReturnPlaceInput.Input before place) (race : before.dataRace = none)
@@ -53,7 +54,7 @@ def installed (target : TargetDataLayout) {before : Before} {place : MPlaceTy Pr
   let args := S03WildcardMissArguments.result (RawRootInvocation.root before place race) target address count
   Storage.withCurrent #[] (frame target input race address count first)
     (S04ProtectUninit.finished (S03IntegerZeroState.argumentsMachine before input.tracker first) place
-      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨601⟩} {}
+      (S03IntegerZeroState.input input first) #[] {args.frame with location := .unwinding ⟨2⟩} {}
       second (tree input first tag) updated).machine
 
 /-- The original unresolved wildcard empty argument initStackFrame for arbitrary count,
@@ -80,7 +81,7 @@ theorem enters
     (validityEq : options.limits.validation = validityFuel+1)
     (notConstructed : before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (thread : Miri.Concurrency.ThreadRecord) (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none) :
     ∃ updated,

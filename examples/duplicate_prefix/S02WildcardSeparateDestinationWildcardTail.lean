@@ -57,7 +57,7 @@ theorem wildcard_after_argument
   let args := RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count
-  let changed := {args.frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {args.frame with location := FrameLocation.unwinding ⟨2⟩}
   let h := ExecutionMachine.callHooks (config options (remaining+1) span) limits
   refine ⟨reference,output,firstFresh,?_⟩
   dsimp only

@@ -36,7 +36,7 @@ theorem after_protection
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits).withRetagMode () .FnEntry
         (RootCallCore.argumentBody (ExecutionMachine.callHooks
@@ -110,7 +110,7 @@ theorem after_protection
           (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag)
             (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
         ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame
-      with location := .unwinding ⟨601⟩})
+      with location := .unwinding ⟨2⟩})
     (({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag)
     secondFresh tree updated written extra bytes length mutable maskWf maskLen pointers shape.1 shape.2
   exact ⟨reference,firstFresh,argument,destination,secondFresh,updated,protect,⟨physical⟩⟩

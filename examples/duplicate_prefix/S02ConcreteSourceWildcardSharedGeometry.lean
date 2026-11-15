@@ -36,7 +36,7 @@ theorem after_tick
     let frame := (RootArgumentsTwo.result
       (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) count).frame
-    let changed := {frame with location := .unwinding ⟨601⟩}
+    let changed := {frame with location := .unwinding ⟨2⟩}
     let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
     let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
     let machine := RootZeroCompleteState.tick options remaining span after.machine
@@ -57,7 +57,7 @@ theorem after_tick
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   obtain ⟨settings⟩ := S02ConcreteSourceWildcardControl.at_protection_any_count

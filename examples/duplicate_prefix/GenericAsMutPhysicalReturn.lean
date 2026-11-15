@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GenericAsMutBodyToCopy
 import duplicate_prefix.GenericCopyReturn
 import duplicate_prefix.GeneralBorrowFreshReleaseData
@@ -41,7 +42,7 @@ structure Input where
   provenance : ProvenanceCopy.WellFormed start.entry.allocation.provenanceMap start.entry.allocation.len
   storageFits : start.entry.allocation.len+64 < 18446744073709551616
   mutable : start.entry.allocation.mutability = .Mut
-  bufferExtras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == start.id) = some (start.id,⟨none,#[]⟩)
+  bufferExtras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == start.id) = some (start.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (start.machine.user.payload.payload.user.runtime.extras.allocations) (start.id) })
   bounded : start.count ≤ (PreparedContracts.actualConfig start.options () (start.remaining+1) start.span).projection.maxSizeOfVal.bytes
   zero : start.caller.locals[0]? = some ⟨.live (.immediate .uninit),none⟩
   continuation : start.caller.returnContinuation = .stop true
@@ -81,7 +82,7 @@ structure Input where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   cached : start.machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : start.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (start.machine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : start.caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 
 

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowForestGeneratedTagHistory
 import duplicate_prefix.GeneralBorrowForestRawAllCountSafety
 namespace DuplicatePrefix.GeneralBorrowForestGeneratedAllCountInput
@@ -31,7 +32,7 @@ structure Initial extends toOriginal : GeneralBorrowForestFunctionEntryZero.Init
   provenanceBuffer : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   storageFitsBuffer : entry.allocation.len+64 < 18446744073709551616
   mutableBuffer : entry.allocation.mutability = .Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
   bounded : count ≤ len/2 → count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
 
   slotBelow : slotRoot.value.toNat < tracker.global.nextPointerTag.value.toNat

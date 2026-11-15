@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardSameDestinationRejectedInitial
 import duplicate_prefix.S02WildcardRejectedSiteFrame
 import duplicate_prefix.S02WildcardRejectedSiteSlots
@@ -254,8 +255,8 @@ theorem result
     intro valid different;rw [literalEq]
     exact S02SameDestinationRejectedResultOrder.literal sourceEntry.allocation.extra tracker reference.id packet.sourceRuntime raw nodes nodeRoom tagRoom initialOrder
   have physicalId : packet.destination.id = input.contract.destination.id := sourceId.trans sameId
-  have finalExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
-    change post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.destination.id) = some (packet.destination.id,⟨none,#[]⟩)
+  have finalExtras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
+    change post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.destination.id) = some (packet.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (packet.destination.id) })
     rw [extrasAfter,tickExtras,rawUser,rawExtras,physicalId];exact input.return_extras
   have valid0 : 0 < done.locals.size := by rw [sizeDone];decide
   have cell0 := Option.some.inj ((Array.getElem?_eq_getElem valid0).symm.trans slotFalse)

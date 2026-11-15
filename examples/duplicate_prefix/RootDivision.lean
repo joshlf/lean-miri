@@ -61,7 +61,7 @@ theorem evaluate
   have lenCached' : cachedFrame.locals[11].layout = some RootCompilerFacts.usizeLayout := by
     simpa [cachedFrame,LocalPlaces.cachePlaceLayout,Array.getElem_set] using lenCached
   have leftOperand := RootOperandMove.move_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    11 left.imm RootCompilerFacts.usizeLayout (OperandPath.rvalue "left") (some RootCompilerFacts.usizeLayout)
+    11 left.imm RootCompilerFacts.usizeLayout  (some RootCompilerFacts.usizeLayout)
     lenValid lenLive' lenCached' (by decide +kernel) noClocks ghostFalse
   have rightOperand := RootDivisor.operand options limits (remaining+1) span source debugOff framesBefore cachedFrame machine
     (congrArg (fun b : BodyIdentity => b.index) identity) location callee

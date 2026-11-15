@@ -39,7 +39,7 @@ theorem raw_scope_unchanged [DecidableEq K]
 
 theorem actual_raw_shape (options : EvalConfigurationCore.Options) (remaining : Nat)
     (span : PreparedContracts.FixedSpanQuery) :
-    (PreparedContracts.actualConfig options () remaining span).retag.typeShape 154 = pure rawShape := by
+    (PreparedContracts.actualConfig options () remaining span).retag.typeShape 49 = pure rawShape := by
   rw [(CanonicalConfigFacts.actual_fields options () remaining span).retagTypeShape]
   funext state
   rw [show PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context = RootMetadataQueries.context from rfl]

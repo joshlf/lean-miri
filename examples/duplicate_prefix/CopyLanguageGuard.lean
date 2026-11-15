@@ -19,24 +19,6 @@ set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
-def runtimeSite : CompilerConstantQueries.Site :=
-  ⟨Bodies.languageRuntime.loaded.identity.index, ⟨0,0⟩,
-    #[.field "kind", .field "rvalue", .field "operand", .field "constant"]⟩
-def parentFalseSite : CompilerConstantQueries.Site :=
-  ⟨Bodies.checkLanguage.loaded.identity.index, ⟨3,0⟩,
-    #[.field "kind", .field "rvalue", .field "operand", .field "constant"]⟩
-
-def runtimeEvidence : Array CompilerConstantEvidence :=
-  (PreparedReflection.actual.compiler.constants.evidence.filter (·.site == runtimeSite)).map (·.query)
-def parentFalseEvidence : Array CompilerConstantEvidence :=
-  (PreparedReflection.actual.compiler.constants.evidence.filter (·.site == parentFalseSite)).map (·.query)
-
-theorem runtime_normalization : normalizationFromEvidence runtimeEvidence Bodies.languageRuntime.fnInstance
-    (.Val (.Scalar (.Int 1 1)) 0) = .ok (.Val (.Scalar (.Int 1 1)) 0) := by with_unfolding_all rfl
-
-theorem parent_false_normalization : normalizationFromEvidence parentFalseEvidence Bodies.checkLanguage.fnInstance
-    (.Val (.Scalar (.Int 0 1)) 0) = .ok (.Val (.Scalar (.Int 0 1)) 0) := by with_unfolding_all rfl
-
 theorem scalar_bool (runtime : RuntimeMetadata)
     (queries : ConstantValueQueries Provenance BorrowTree K H)
     (state : ConstantState Provenance BorrowTree K H) (layout : LocalLayout) (value : Bool) :
@@ -58,20 +40,6 @@ theorem scalar_false (runtime : RuntimeMetadata)
       .ok ⟨.immediate (.scalar (Scalar.fromBool false)),layout⟩ state :=
   scalar_bool runtime queries state layout false
 
-open Lean Elab Tactic in
-elab "simp_language_constant" : tactic => do
-  let names := (← getEnv).constants.toList.filterMap fun (name, _) =>
-    if name.toString.endsWith "Miri.Interpreter.constantType" then some (mkIdent name) else none
-  let names := names.toArray
-  evalTactic (← `(tactic| simp_all (config := {maxSteps := 1000000}) [
-    CompilerConstantMachine.evalAtBound, ConstantMachine.fromCompiler,
-    ConstantMachine.evalOperandWithLayout, evalConstOperandWithLayout,
-    evalMirConstantWithLayout, constValueToOpWithLayout,
-    ConstantQueries.valueQueries, MachineHooks.currentFrame,
-    Storage.withCurrent, Stack.currentFrame?, bind, EStateM.bind,
-    get, getThe, MonadStateOf.get, EStateM.get, pure, EStateM.pure,
-    Except.bind, Except.pure, runtimeSite, parentFalseSite, scalar_true, scalar_false, $[$names:ident],*]))
-
 theorem runtime_true_eval_at_bound
     (source : PreparedContracts.SourceComparator)
     (functions : FunctionPointers.Hooks MiriMemoryKind Machine.RootUser Unit)
@@ -83,21 +51,14 @@ theorem runtime_true_eval_at_bound
     (bodyIndex : frame.bodyIdentity.index = Bodies.languageRuntime.loaded.identity.index)
     (location : frame.location = .mir ⟨0,0⟩)
     (fnInstance : frame.functionInstance = Bodies.languageRuntime.fnInstance) :
-    CompilerConstantMachine.evalAtBound PreparedReflection.actual.compiler.constantBinding
-      runtimeSite functions arithmetic externStatic MemoryErrors.constant
+    ConstantMachine.evalOperandWithLayout PreparedReflection.actual.compiler.runtime functions arithmetic externStatic MemoryErrors.constant
       Bodies.languageTrueConstant (some RootCompilerFacts.boolLayout) none
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (Scalar.fromBool true)),RootCompilerFacts.boolLayout⟩
       (Storage.withCurrent framesBefore frame machine) := by
-  have compatible := RootCompilerFacts.constant_binding_compatible source
-  have norm : normalizationFromEvidence
-      ((PreparedReflection.actual.compiler.constants.evidence.filter (·.site == runtimeSite)).map (·.query))
-      Bodies.languageRuntime.fnInstance Bodies.languageTrueConstant.value =
-      .ok Bodies.languageTrueConstant.value := by
-    rw [Bodies.language_runtime_literal.2.1]
-    exact runtime_normalization
-  have literal := Bodies.language_runtime_literal.2.1
-  simp_language_constant
+  simp only [ConstantMachine.evalOperandWithLayout, Bodies.language_runtime_literal.2.1,
+    ConstantMachine.evalValueWithLayout, Option.map_none]
+  rw [scalar_true]
 
 theorem parent_false_eval_at_bound
     (source : PreparedContracts.SourceComparator)
@@ -110,21 +71,14 @@ theorem parent_false_eval_at_bound
     (bodyIndex : frame.bodyIdentity.index = Bodies.checkLanguage.loaded.identity.index)
     (location : frame.location = .mir ⟨3,0⟩)
     (fnInstance : frame.functionInstance = Bodies.checkLanguage.fnInstance) :
-    CompilerConstantMachine.evalAtBound PreparedReflection.actual.compiler.constantBinding
-      parentFalseSite functions arithmetic externStatic MemoryErrors.constant
+    ConstantMachine.evalOperandWithLayout PreparedReflection.actual.compiler.runtime functions arithmetic externStatic MemoryErrors.constant
       Bodies.languageFalseConstant (some RootCompilerFacts.boolLayout) none
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (Scalar.fromBool false)),RootCompilerFacts.boolLayout⟩
       (Storage.withCurrent framesBefore frame machine) := by
-  have compatible := RootCompilerFacts.constant_binding_compatible source
-  have norm : normalizationFromEvidence
-      ((PreparedReflection.actual.compiler.constants.evidence.filter (·.site == parentFalseSite)).map (·.query))
-      Bodies.checkLanguage.fnInstance Bodies.languageFalseConstant.value =
-      .ok Bodies.languageFalseConstant.value := by
-    rw [Bodies.language_parent_false_literal.2]
-    exact parent_false_normalization
-  have literal := Bodies.language_parent_false_literal.2
-  simp_language_constant
+  simp only [ConstantMachine.evalOperandWithLayout, Bodies.language_parent_false_literal.2,
+    ConstantMachine.evalValueWithLayout, Option.map_none]
+  rw [scalar_false]
 
 theorem canonical_runtime_true_operand
     [DecidableEq MiriMemoryKind]
@@ -138,10 +92,10 @@ theorem canonical_runtime_true_operand
     (bodyIndex : frame.bodyIdentity.index = Bodies.languageRuntime.loaded.identity.index)
     (location : frame.location = .mir ⟨0,0⟩)
     (fnInstance : frame.functionInstance = Bodies.languageRuntime.fnInstance) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "operand") (.Constant Bodies.languageTrueConstant)
+      ()  (.Constant Bodies.languageTrueConstant)
       (some RootCompilerFacts.boolLayout) (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (.fromBool true)),RootCompilerFacts.boolLayout⟩
       (Storage.withCurrent framesBefore frame machine) := by
@@ -149,24 +103,10 @@ theorem canonical_runtime_true_operand
   let state := Storage.withCurrent framesBefore frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have site : CompilerOperandSites.current
-      ((OperandPath.rvalue "operand").push (.field "constant")) state = .ok runtimeSite state := by
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame,
-      state, Storage.withCurrent, Stack.currentFrame?, runtimeSite, bodyIndex, location,
-      Bind.bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get, Pure.pure, EStateM.pure,
-      OperandPath.rvalue]
-  have siteLit : CompilerOperandSites.current
-      #[.field "kind", .field "rvalue", .field "operand", .field "constant"]
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok runtimeSite (Storage.withCurrent framesBefore frame machine) := by
-    simpa [OperandPath.rvalue, state] using site
-  have result := runtime_true_eval_at_bound source config.functions config.arithmetic externStatic
-    framesBefore frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-    ((OperandPath.rvalue "operand").push (.field "constant")) Bodies.languageTrueConstant
-    (some RootCompilerFacts.boolLayout) state = _
+  change config.operands.constant () Bodies.languageTrueConstant (some RootCompilerFacts.boolLayout) state = _
   rw [constantAt]
-  simpa [siteLit, state, config, OperandPath.rvalue, Bind.bind, EStateM.bind, Pure.pure, EStateM.pure] using result
+  exact runtime_true_eval_at_bound source config.functions config.arithmetic externStatic
+    framesBefore frame machine bodyIndex location fnInstance
 
 theorem canonical_parent_false_operand
     [DecidableEq MiriMemoryKind]
@@ -180,10 +120,10 @@ theorem canonical_parent_false_operand
     (bodyIndex : frame.bodyIdentity.index = Bodies.checkLanguage.loaded.identity.index)
     (location : frame.location = .mir ⟨3,0⟩)
     (fnInstance : frame.functionInstance = Bodies.checkLanguage.fnInstance) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "operand") (.Constant Bodies.languageFalseConstant)
+      ()  (.Constant Bodies.languageFalseConstant)
       (some RootCompilerFacts.boolLayout) (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (.fromBool false)),RootCompilerFacts.boolLayout⟩
       (Storage.withCurrent framesBefore frame machine) := by
@@ -191,24 +131,10 @@ theorem canonical_parent_false_operand
   let state := Storage.withCurrent framesBefore frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have site : CompilerOperandSites.current
-      ((OperandPath.rvalue "operand").push (.field "constant")) state = .ok parentFalseSite state := by
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame,
-      state, Storage.withCurrent, Stack.currentFrame?, parentFalseSite, bodyIndex, location,
-      Bind.bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get, Pure.pure, EStateM.pure,
-      OperandPath.rvalue]
-  have siteLit : CompilerOperandSites.current
-      #[.field "kind", .field "rvalue", .field "operand", .field "constant"]
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok parentFalseSite (Storage.withCurrent framesBefore frame machine) := by
-    simpa [OperandPath.rvalue, state] using site
-  have result := parent_false_eval_at_bound source config.functions config.arithmetic externStatic
-    framesBefore frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-    ((OperandPath.rvalue "operand").push (.field "constant")) Bodies.languageFalseConstant
-    (some RootCompilerFacts.boolLayout) state = _
+  change config.operands.constant () Bodies.languageFalseConstant (some RootCompilerFacts.boolLayout) state = _
   rw [constantAt]
-  simpa [siteLit, state, config, OperandPath.rvalue, Bind.bind, EStateM.bind, Pure.pure, EStateM.pure] using result
+  exact parent_false_eval_at_bound source config.functions config.arithmetic externStatic
+    framesBefore frame machine bodyIndex location fnInstance
 
 theorem canonical_return_place
     [DecidableEq MiriMemoryKind] [PointerProvenance Provenance]
@@ -253,14 +179,14 @@ theorem unary_to_write
     (destValue : RuntimePlace Provenance) (source : OpTy Provenance)
     (input result : RvalueImmTy Provenance) (state : MachineHooks.State K User)
     (evalDest : hooks.evalPlace choice dest true state = .ok destValue state)
-    (evalSource : hooks.evalOperandAt choice (OperandPath.rvalue "operand") operand
+    (evalSource : hooks.evalOperand choice  operand
       (if operator.homogeneous then some (hooks.placeLayout destValue) else none) state = .ok source state)
     (readSource : hooks.readImmediate choice source state = .ok input state)
     (unary : hooks.unaryOp choice operator input state = .ok result state)
     (resultLayout : result.layout = hooks.placeLayout destValue) :
     evalRvalueIntoPlace hooks choice (.UnaryOp operator operand) dest state =
       hooks.writeImmediate choice result.imm destValue state := by
-  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind, OperandPath.rvalue]
+  simp_all [evalRvalueIntoPlace, Bind.bind, EStateM.bind]
   simp_rvalue_assert
   simp [Bind.bind, EStateM.bind, Pure.pure, EStateM.pure]
 
@@ -324,7 +250,7 @@ theorem use_to_copy
     (choice : Choice) (operand : MIR.Operand) (dest : Place) (destValue : RuntimePlace Provenance)
     (sourceOp : OpTy Provenance) (state : MachineHooks.State K User)
     (evalDest : hooks.evalPlace choice dest true state = .ok destValue state)
-    (evalSource : hooks.evalOperandAt choice (OperandPath.rvalue "operand") operand
+    (evalSource : hooks.evalOperand choice  operand
       (some (hooks.placeLayout destValue)) state = .ok sourceOp state) :
     evalRvalueIntoPlace hooks choice (.Use operand .Yes) dest state =
       hooks.withRetagMode choice .Default (hooks.copyOp choice sourceOp destValue) state := by
@@ -361,7 +287,7 @@ theorem canonical_parent_false_to_copy
     RootCompilerFacts.boolLayout valid0 cached0 sized
   have operand := canonical_parent_false_operand options limits remaining span source debugOff framesBefore frame machine bodyIndex location fnInstance
   have evalDest : hooks.evalPlace () ⟨0,#[]⟩ true state = .ok dest state := destination
-  have evalSource : hooks.evalOperandAt () (OperandPath.rvalue "operand") (.Constant Bodies.languageFalseConstant)
+  have evalSource : hooks.evalOperand ()  (.Constant Bodies.languageFalseConstant)
       (some (hooks.placeLayout dest)) state = .ok sourceOp state := by
     simpa [sourceOp, hooks, config, dest, ExecutionMachine.rvalueHooks,
       ExecutionMachine.operandHooks, ExecutionMachine.withValidation, LocalPlaces.localRuntimePlace] using operand
@@ -407,18 +333,18 @@ theorem canonical_false_local_switch
   have typeCheck := RootLocalStages.operand_check_skipped options limits () remaining span debugOff
     (OperandDispatch.wholeLocal localId) op state
   have operand := OperandDispatch.evalOperandAt_move_wholeLocal hooks ()
-    (OperandPath.instruction "discriminant") localId none state state op localRead typeCheck
-  have operand' : OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant")
+     localId none state state op localRead typeCheck
+  have operand' : OperandMachine.evalOperand hooks ()
       (.Move ⟨localId,#[]⟩) none state = .ok op state := by
     simpa only [OperandDispatch.wholeLocal] using operand
   have scalarRead := RootLocalStages.canonical_read_scalar options limits remaining span state
     (.fromBool false) RootCompilerFacts.boolLayout readable
   have read : MachineHooks.run (do
       PlaceMachine.readImmediate (ExecutionMachine.withValidation config limits).access
-        (← OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant") (.Move ⟨localId,#[]⟩) none)) state =
+        (← OperandMachine.evalOperand hooks ()  (.Move ⟨localId,#[]⟩) none)) state =
       (state,.ok (ScalarOperations.boolImmediate false RootCompilerFacts.boolLayout)) := by
     change MachineHooks.run (do
-      let value ← OperandMachine.evalOperandAt hooks () (OperandPath.instruction "discriminant") (.Move ⟨localId,#[]⟩) none
+      let value ← OperandMachine.evalOperand hooks ()  (.Move ⟨localId,#[]⟩) none
       (ExecutionMachine.rvalueHooks config limits).readImmediate () value) state = _
     simp only [MachineHooks.run, Call.run, Bind.bind, EStateM.bind]
     rw [operand']

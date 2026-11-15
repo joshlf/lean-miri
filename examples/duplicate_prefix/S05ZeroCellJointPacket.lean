@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05ZeroCellCorrelatedWrite
 import duplicate_prefix.DuplicatePrefixSliceArgument
 import Miri.Input.InitialMachine
@@ -20,10 +21,10 @@ private def checked {E A : Type} : (result : Except E A) → result.isOk = true 
   | .ok value, _ => value
   | .error _, impossible => False.elim (by cases impossible)
 
-def sourceId : AllocId := ⟨719,by decide⟩
-def destinationId : AllocId := ⟨720,by decide⟩
+def sourceId : AllocId := ⟨692,by decide⟩
+def destinationId : AllocId := ⟨693,by decide⟩
 
-theorem initial_supply : PreparedReflection.actual.initialMemory.nextAllocId = 719 := rfl
+theorem initial_supply : PreparedReflection.actual.initialMemory.nextAllocId = 692 := rfl
 
 def sourceAllocation : Allocation Provenance BorrowTree := S05ZeroCellCorrelatedWrite.sourceFor w.tree
 def destinationAllocation : Allocation Provenance BorrowTree :=
@@ -35,7 +36,7 @@ def destinationEntry : LocalAllocation Provenance BorrowTree MiriMemoryKind := �
 noncomputable def memory : MemoryState Provenance BorrowTree MiriMemoryKind :=
   {PreparedReflection.actual.initialMemory.setIssuedIds
       (PreparedReflection.actual.memoryData.issuedIds ++ #[sourceId,destinationId]) with
-    nextAllocId := 721
+    nextAllocId := 694
     live := #[(sourceId,sourceEntry),(destinationId,destinationEntry)]}
 
 def host : Machine.MinimalHost where
@@ -84,7 +85,7 @@ noncomputable def before : MachineHooks.MachineState MiriMemoryKind Machine.Root
     addressMode := .managed
     generation := some ⟨⟨12288,9223372036854775807⟩,⟨0,0,#[]⟩⟩ }
   let runtime := {machine.user.payload.payload.user.runtime with
-    extras := {allocations := #[(sourceId,⟨none,#[]⟩),(destinationId,⟨none,#[]⟩)]}}
+    extras := {allocations := #[(sourceId,{ weakMemory := none }),(destinationId,{ weakMemory := none })]}}
   let world := {machine.user.payload.payload.user with runtime,types := PreparedReflection.actual.types,backend := .none,host := host,choices := {inputs := #[]}}
   let stored := {machine.user.payload.payload with
     registry := ⟨ThreadId.MAIN_THREAD,#[]⟩
@@ -155,28 +156,28 @@ theorem profile : before.user.payload.ghost = false ∧ before.user.payload.vali
 theorem empty_stack : state.stack.frames = #[] := rfl
 
 theorem source_extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == sourceId) =
-    some (sourceId,⟨none,#[]⟩) := rfl
+    some (sourceId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (sourceId) }) := rfl
 
 theorem destination_extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destinationId) =
-    some (destinationId,⟨none,#[]⟩) := rfl
+    some (destinationId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (destinationId) }) := rfl
 
-theorem next_allocation : before.memory.nextAllocId = 721 := rfl
+theorem next_allocation : before.memory.nextAllocId = 694 := rfl
 
 theorem issued_ids : before.memory.issuedIds = PreparedReflection.actual.memoryData.issuedIds ++ #[sourceId,destinationId] := rfl
 
 
 theorem imported_issued_bounded :
-    PreparedReflection.actual.memoryData.issuedIds.all (fun id => id.value < 719) = true := by decide +kernel
+    PreparedReflection.actual.memoryData.issuedIds.all (fun id => id.value < 692) = true := by decide +kernel
 
 theorem imported_globals_bounded :
-    PreparedReflection.actual.memoryData.globals.all (fun row => row.allocId.value < 719) = true := by decide +kernel
+    PreparedReflection.actual.memoryData.globals.all (fun row => row.allocId.value < 692) = true := by decide +kernel
 
 theorem source_is_issued : sourceId ∈ before.memory.issuedIds := by rw [issued_ids]; simp
 
 theorem destination_is_issued : destinationId ∈ before.memory.issuedIds := by rw [issued_ids]; simp
 
 theorem live_id_bounds : sourceId.value < before.memory.nextAllocId ∧ destinationId.value < before.memory.nextAllocId := by
-  change (719 : UInt64) < 721 ∧ (720 : UInt64) < 721
+  change (692 : UInt64) < 694 ∧ (693 : UInt64) < 694
   decide
 
 

@@ -9,7 +9,7 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
  theorem source_call : AddEvaluateCall.terminator.kind =
     .Call HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1]
-      ⟨21,#[]⟩ (some 8) .Continue .Normal ⟨34⟩ := by with_unfolding_all rfl
+      ⟨21,#[]⟩ (some 8) .Continue .Normal ⟨49⟩ := by with_unfolding_all rfl
  theorem call (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (debug : options.place.debugAssertions = false)
     (frames : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -72,7 +72,7 @@ set_option backward.dsimp.instances true
     simp [after,Storage.withCurrent,Stack.frameIndex,Array.isEmpty_push,bind,EStateM.bind,
       get,getThe,MonadStateOf.get,EStateM.get,pure,Pure.pure,EStateM.pure,Except.pure]
   apply GenericCallStages.call_terminator h () limits.callDispatch AddEvaluateCall.terminator
-    HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1] ⟨21,#[]⟩ 8 .Continue .Normal ⟨34⟩
+    HelperCompilerFacts.addCall.function #[AddEvaluateCall.argument0,AddEvaluateCall.argument1] ⟨21,#[]⟩ 8 .Continue .Normal ⟨49⟩
     state state state after caller frames.size (frames.size+1) dest
     ⟨.Instance HelperCompilerFacts.addCall.callee,
       #[.Copy (AddInstall.first pointer),.Copy (AddInstall.second n)],.Rust,some HelperCompilerFacts.addAbi,true⟩

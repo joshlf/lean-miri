@@ -77,9 +77,9 @@ theorem validate_on_context (context : PhysicalMachineWrite.Context)
     rw [classified]; rfl
   have actualSize : hooks.sizeAndAlign choice ⟨mplace,RootCompilerFacts.boolLayout⟩ activeAfter =
       .ok (some (RootCompilerFacts.boolLayout.layout.size,RootCompilerFacts.boolLayout.layout.align.abi)) activeAfter := by
-    rw [sizing]
+    rw [sizing, RootCompilerFacts.bool_layout_geometry.1, RootCompilerFacts.bool_layout_geometry.2]
     rfl
   exact S04ReturnPrimitiveValidity.validate_boolean_memory hooks choice fuel state after ghost
     mplace RootCompilerFacts.boolLayout value name ghost named ghostField active rfl activeAfter rfl operandAfter
-    classification read clear operand actualSize (by decide +kernel) (by decide +kernel) finish endpoint
+    classification read clear operand actualSize (by decide +kernel) (by decide +kernel) finish (by simpa only [RootCompilerFacts.bool_layout_geometry.1] using endpoint)
 end DuplicatePrefix.S04ReturnBoolValidation

@@ -33,8 +33,7 @@ structure Model (options : EvalConfigurationCore.Options) (remaining : Nat)
   noGc : ((PreparedContracts.actualConfig options () (remaining + 1) span).terminators.getControl
     before.user).gcInterval = 0
   nullComparator : ProjectionMetadataFacts.NullComparator
-  sourceMatches : (PreparedReflection.actual.runtime.source.raw ==
-    PreparedReflection.actual.runtime.source.raw) = true
+  sourceMatches : PreparedReflection.actual.compiler.program.input = PreparedReflection.actual.runtime.source
 
 /-- The reference/retag callback construction certificates follow from the
 fixed configuration. They are not operation-success witnesses supplied by a

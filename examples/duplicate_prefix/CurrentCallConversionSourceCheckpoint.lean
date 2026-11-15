@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallOrdinaryInput
 import duplicate_prefix.CurrentCallConversionSourceFrame
 import duplicate_prefix.CurrentCallPostEntryCheckpoint
@@ -46,7 +47,7 @@ theorem at_post (global : GlobalState) (frame : FrameState) (id : AllocId) (root
       some (id, ⟨.machine .global, converted.mapExtra (fun _ => stage.output.child.tree)⟩))
     (cached : post.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id, base⟩)
     (extras : post.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩)) (data : Identities) :
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get (post.user.payload.payload.user.runtime.extras.allocations) (id) })) (data : Identities) :
     ∃ current : Source post next offset.toNat len,
       CopyReady current ∧ current.role.backing.id = id ∧
       current.role.family.value = Pointer.new (.concrete id global.nextPointerTag) (Size.ofBytes (base + offset)) ∧

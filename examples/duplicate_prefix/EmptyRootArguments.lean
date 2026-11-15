@@ -19,11 +19,11 @@ noncomputable def first (address : UInt64) : OpTy Provenance :=
     ActualReferenceMetadata.reference⟩
 noncomputable def second (n : UInt64) : OpTy Provenance :=
   ⟨.immediate (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n))), RootCompilerFacts.usizeLayout⟩
-noncomputable def firstCache (root : RootFrame) := cache (atSpan root ⟨602⟩) i1 ActualReferenceMetadata.reference
+noncomputable def firstCache (root : RootFrame) := cache (atSpan root ⟨3⟩) i1 ActualReferenceMetadata.reference
 noncomputable def firstLive (root : RootFrame) := live (firstCache root) i1
 noncomputable def firstDone (root : RootFrame) (address : UInt64) := write (firstLive root) i1
   (RetagReferencePlace.integerSliceValue address 0 ActualReferenceMetadata.reference).imm
-noncomputable def secondCache (root : RootFrame) (address : UInt64) := cache (atSpan (firstDone root address) ⟨603⟩) i2 RootCompilerFacts.usizeLayout
+noncomputable def secondCache (root : RootFrame) (address : UInt64) := cache (atSpan (firstDone root address) ⟨4⟩) i2 RootCompilerFacts.usizeLayout
 noncomputable def secondLive (root : RootFrame) (address : UInt64) := live (secondCache root address) i2
 noncomputable def result (root : RootFrame) (address n : UInt64) := write (secondLive root address) i2
   (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 n)))
@@ -51,13 +51,16 @@ theorem body (options : EvalConfigurationCore.Options) (limits : ExecutionMachin
     RootCallCore.argumentBody (ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits)
       (first address) (second n) (Storage.withCurrent frames root.frame machine) =
       .ok (2,2) (Storage.withCurrent frames (result root address n).frame (ReferenceBorrowDriver.allocatedMachine machine tracker fresh)) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () (remaining+1) span) limits
-  let f1 := atSpan root ⟨602⟩
+  let f1 := atSpan root ⟨3⟩
   let c1 := firstCache root
   let l1 := firstLive root
   let d1 := firstDone root address
   let m1 := ReferenceBorrowDriver.allocatedMachine machine tracker fresh
-  let f2 := atSpan d1 ⟨603⟩
+  let f2 := atSpan d1 ⟨4⟩
   let c2 := secondCache root address
   let l2 := secondLive root address
   let d2 := result root address n

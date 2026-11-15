@@ -113,7 +113,7 @@ theorem enters
     have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span #[] root.frame rawMachine
     have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span #[] root.frame root.frame rawMachine
     have control := RawRootInvocation.control before place model.noDataRace
-    have preamble : root.frame.location = .unwinding ⟨559⟩ := control.1
+    have preamble : root.frame.location = .unwinding ⟨0⟩ := control.1
     have unchanged : {root.frame with trackCallerArg := none} = root.frame := by rw [←control.2.1]
     simp only [preamble] at unchanged
     rw [RootCallCore.actual_entry_eq]

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawCopyRootGuardBody
 import duplicate_prefix.CopyRootGuardBodyIndependentFuel
 import duplicate_prefix.S02SameDestinationAcceptedCopyPhysicalRootComplete
@@ -36,7 +37,7 @@ structure CopyData (options : EvalConfigurationCore.Options) (remaining : Nat)
   valid : S02SameDestinationUninitProvenanceInput.DirectInput allocation.provenanceMap allocation.len
   storageFits : allocation.len+64 < 18446744073709551616
   mutable : allocation.mutability = .Mut
-  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) })
   live : machine.memory.live.find? (fun row => row.1 == id) = some (id,⟨kind,allocation⟩)
   cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩
   borrow : GeneralBorrowRawCopyInput.Input allocation.extra tracker.global tag offset sliceLen n

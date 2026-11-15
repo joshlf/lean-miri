@@ -22,6 +22,13 @@ name, for example `bash tools/check-duplicate-prefix.sh GeneralBorrowRange`.
 Multiple module names select the union of their closures. Selected-root runs
 also audit every imported example theorem; they do not certify unselected drafts.
 
+The parallel checker freezes the full source graph and verifies input, library
+and artifact hashes around the kernel compilation and transitive axiom audit:
+
+```bash
+python3 tools/check-duplicate-prefix-dag.py --jobs 4 Check
+```
+
 The example proves complete function calls inside the pinned Lean interpreter
 for the declared current valid-call-input domain and older explicit caller
 contracts, including every UInt64 count, normal physical return and finite-prefix
@@ -62,7 +69,8 @@ equivalence and extra Bool-value guarantees are outside this completed goal.
 Check the final theorem with
 `bash tools/check-duplicate-prefix.sh CurrentCallOrdinarySafety`.
 `CurrentCallOrdinaryWitness.nonempty` constructs one concrete positive input,
-conditional only on the existing fixed span and two JSON-comparator contracts.
+conditional only on the existing fixed-span, typed source-coherence and JSON-null
+comparator contracts.
 Its CURRENT source and return share a three-byte allocation: source [0,2), Bool
 [2,3), initial bytes [11,22,0]. `CurrentCallOrdinaryWitness.positive_result`
 applies the original theorem at length 2/count 1, whose nonzero accepted-copy
@@ -136,6 +144,14 @@ Disabled when unprotected or unaccessed, or unprotected ReservedIM, and only
 when the postchildren skip predicate permits it. Local kernel proofs establish
 same-state normal return and preserve excluded protected errors.
 Compiler/export correctness and fidelity to Rust remain trust boundaries.
+
+The fixed inputs use the current schema-12 exporter. `Prepared` and
+`S05PriorCellPrepared` reflect typed import documents and preparation products;
+source coherence and each used compiler-query result are checked in the kernel.
+Instance IDs, definition IDs and body IDs are kept distinct. FnEntry proofs
+obtain instance-definition readiness from the selected callee metadata. Runtime
+extras proofs preserve the selected allocation's diagnostic backtrace while
+checking weak-memory and synchronization fields independently.
 
 The auxiliary `prior_cell_context/` source obtains caller type metadata from
 `UnsafeCell<()>` and `&mut [u8]`. Regenerate it with

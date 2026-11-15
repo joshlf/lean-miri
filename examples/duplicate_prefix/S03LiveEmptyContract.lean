@@ -44,9 +44,9 @@ theorem enters
       (Size.ofBytes original.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
     let after := Storage.withCurrent #[]
       (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-        {args.frame with location := .unwinding ⟨601⟩} owned original.id
-          (S03LiveEmptyState.next original.tracker first).global.nextPointerTag with location := .unwinding ⟨559⟩})
-      (S04ProtectUninit.finished current place input #[] {args.frame with location := .unwinding ⟨601⟩}
+        {args.frame with location := .unwinding ⟨2⟩} owned original.id
+          (S03LiveEmptyState.next original.tracker first).global.nextPointerTag with location := .unwinding ⟨0⟩})
+      (S04ProtectUninit.finished current place input #[] {args.frame with location := .unwinding ⟨2⟩}
         owned second tree updated).machine
     Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
       RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi

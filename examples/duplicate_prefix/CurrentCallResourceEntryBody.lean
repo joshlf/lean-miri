@@ -138,20 +138,20 @@ structure Output {options remaining span frames root before tracker data owner i
     physical.offset (physical.offset+1) updated.extra.locations
   finalMachine : Before
   finalMachineEq : finalMachine=
-    let retagged := borrowedState frames (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame sourceMachine
+    let retagged := borrowedState frames (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame sourceMachine
       ⟨sourceOutput.global,tracker.retagMode⟩ returnRoom physical.id physical.entry boolOutput.child.tree
     {retagged.machine with memory:={retagged.machine.memory with live:=
       ((retagged.machine.memory.live.filter (fun row=>row.1!=physical.id)).push (physical.id,{physical.entry with allocation:=updated}))}}
   protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
-    (Storage.withCurrent frames (atSpan argsRoot ⟨601⟩).frame sourceMachine)=.ok () (Storage.withCurrent frames
-      (registeredFrame (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag) finalMachine)
+    (Storage.withCurrent frames (atSpan argsRoot ⟨2⟩).frame sourceMachine)=.ok () (Storage.withCurrent frames
+      (registeredFrame (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag) finalMachine)
   tail : RootEntryTail.tail (ExecutionMachine.callHooks (config options (remaining+1) span) limits) place
     (Storage.withCurrent frames argsRoot.frame sourceMachine)=.ok () (Storage.withCurrent frames
-      (CallEntryFacts.doneRootFrame {registeredFrame (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag with location:=.unwinding ⟨559⟩}) finalMachine)
+      (CallEntryFacts.doneRootFrame {registeredFrame (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag with location:=.unwinding ⟨0⟩}) finalMachine)
   actual : action (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
     (CurrentCallTypedSourceCopy.value options remaining span W.pointer.value len).imm count place
     (Storage.withCurrent frames root.frame before)=.ok () (Storage.withCurrent frames
-      (CallEntryFacts.doneRootFrame {registeredFrame (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag with location:=.unwinding ⟨559⟩}) finalMachine)
+      (CallEntryFacts.doneRootFrame {registeredFrame (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame physical.id sourceOutput.global.nextPointerTag with location:=.unwinding ⟨0⟩}) finalMachine)
   finalTracked : finalMachine.borrowTracker=some ⟨boolOutput.global,tracker.retagMode⟩
   finalIds : (finalMachine.memory.live.toList.map Prod.fst).Nodup
   finalRuntime : ∀ row∈finalMachine.memory.live.toList,DuplicatePrefixBorrowContract.RuntimeFacts row.2.allocation.extra boolOutput.global
@@ -172,25 +172,25 @@ private theorem finish_of_arguments (options : EvalConfigurationCore.Options) (l
         (RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count).frame sourceMachine))
     (protection : (ExecutionMachine.callHooks (config options (remaining+1) span) limits).protectArgument () place
       (Storage.withCurrent frames (atSpan (RootArgumentsTwo.result
-        (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨601⟩).frame sourceMachine)=
+        (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨2⟩).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (registeredFrame (atSpan (RootArgumentsTwo.result
-        (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨601⟩).frame sourceFrame boolId boolTag) finalMachine)) :
+        (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨2⟩).frame sourceFrame boolId boolTag) finalMachine)) :
     action (ExecutionMachine.callHooks (config options (remaining+1) span) limits)
       (CurrentCallTypedSourceCopy.value options remaining span pointer len).imm count place
       (Storage.withCurrent frames root.frame before)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) ∧
+          (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) ∧
     RootEntryTail.tail (ExecutionMachine.callHooks (config options (remaining+1) span) limits) place
       (Storage.withCurrent frames (RootArgumentsTwo.result
         (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count).frame sourceMachine)=
       .ok () (Storage.withCurrent frames (CallEntryFacts.doneRootFrame
         {registeredFrame (atSpan (RootArgumentsTwo.result
-          (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨601⟩).frame
-          sourceFrame boolId boolTag with location:=.unwinding ⟨559⟩}) finalMachine) := by
+          (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count) ⟨2⟩).frame
+          sourceFrame boolId boolTag with location:=.unwinding ⟨0⟩}) finalMachine) := by
   let argsRoot := RootArgumentsTwo.result (CurrentCallSourceArguments.doneRoot options remaining span root borrowFrame pointer len sourceId sourceTag) count
-  let protectedFrame := registeredFrame (atSpan argsRoot ⟨601⟩).frame sourceFrame boolId boolTag
+  let protectedFrame := registeredFrame (atSpan argsRoot ⟨2⟩).frame sourceFrame boolId boolTag
   have dead : ∀ slot : Fin 25,slot.val≠1 → slot.val≠2 →
       (protectedFrame.locals[slot.val]'(by simpa only [protectedFrame,registeredFrame,TypedRetagEntry.frameWithBorrow,atSpan] using argsRoot.valid slot)).value=.dead := by
     intro slot ne1 ne2
@@ -217,6 +217,9 @@ theorem invoke {options remaining span frames root before tracker data owner id 
     (limits : ExecutionMachine.Limits)
     (C : Conditions options remaining span frames root before tracker data owner id offset len W place)
     (count : UInt64) : Nonempty (Output limits C count) := by
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   obtain ⟨runtime,distinct⟩ := window_runtime W C.state C.highwater
   obtain ⟨returnRuntime,_⟩ := window_runtime C.V C.state C.highwater
   have contexts := DuplicatePrefixCallModel.contexts options remaining span before C.model
@@ -291,7 +294,7 @@ theorem invoke {options remaining span frames root before tracker data owner id 
     rw [sourceGlobal]
     change (TypedRetagEmpty.successorTag tracker.global.nextPointerTag C.fresh).value.toNat<18446744073709551615
     omega
-  have frameSource : (atSpan argsRoot ⟨601⟩).frame.extra.borrowTracker=some sourceOutput.frame := by
+  have frameSource : (atSpan argsRoot ⟨2⟩).frame.extra.borrowTracker=some sourceOutput.frame := by
     rw [sourceFrame]
     exact CurrentCallSourceArguments.result_borrowFrame options remaining span root C.borrowFrame W.pointer.value len count id tracker.global.nextPointerTag
   have ready : CurrentCallBoolProtection.WindowReady sourceMachine physical.id physical.offset.toNat 1 := by
@@ -302,10 +305,10 @@ theorem invoke {options remaining span frames root before tracker data owner id 
     updatedRuntime,updatedParents,updatedOwned,updatedNodes,updatedRoots,updatedTags,updatedCapacity,
     finalTracked,finalIds,finalTags,finalRuntime,finalRoots,finalHighwater,finalActual⟩ :=
     CurrentCallPostRole.protect_role options limits (remaining+1) span retagCtx sourceMachine ⟨sourceOutput.global,tracker.retagMode⟩
-      frames (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame sourceState sourceHighwater frameSource place physical C.V R
+      frames (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame sourceState sourceHighwater frameSource place physical C.V R
       physicalId (congrArg UInt64.toNat physicalOffset) (physicalPointer.trans C.returnPointer) allocation binding returnRoom boolShort
       sourceGhost (dataRace.trans C.model.noDataRace) C.model.noBackend ready
-  let retagged := borrowedState frames (atSpan argsRoot ⟨601⟩).frame sourceOutput.frame sourceMachine
+  let retagged := borrowedState frames (atSpan argsRoot ⟨2⟩).frame sourceOutput.frame sourceMachine
     ⟨sourceOutput.global,tracker.retagMode⟩ returnRoom physical.id physical.entry boolOutput.child.tree
   let finalMachine : Before := {retagged.machine with memory:={retagged.machine.memory with live:=
     ((retagged.machine.memory.live.filter (fun row=>row.1!=physical.id)).push (physical.id,{physical.entry with allocation:=updated}))}}

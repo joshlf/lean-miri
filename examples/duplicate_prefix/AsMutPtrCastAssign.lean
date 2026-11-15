@@ -21,8 +21,8 @@ theorem move_cached_local
     (cached : frame.locals[localId].layout = some layout)
     (sized : layout.layout.backendRepr.isUnsized = false)
     (noClocks : frame.extra.dataRace = none) (ghost : machine.user.payload.ghost = false) :
-    (ExecutionMachine.rvalueHooks (PreparedContracts.actualConfig options () remaining span) limits).evalOperandAt
-      () (OperandPath.rvalue "operand") (.Move ⟨localId,#[]⟩) none (Storage.withCurrent frames frame machine) =
+    (ExecutionMachine.rvalueHooks (PreparedContracts.actualConfig options () remaining span) limits).evalOperand
+      () (.Move ⟨localId,#[]⟩) none (Storage.withCurrent frames frame machine) =
       .ok ⟨.immediate value,layout⟩ (Storage.withCurrent frames frame machine) := by
   let config := PreparedContracts.actualConfig options () remaining span
   let hooks := ExecutionMachine.operandHooks (ExecutionMachine.withValidation config limits)
@@ -36,7 +36,7 @@ theorem move_cached_local
     valid live cached sized noClocks false validationGetter
   have check := RootLocalStages.operand_check_skipped options limits () remaining span debugOff
     (OperandDispatch.wholeLocal localId) ⟨.immediate value,layout⟩ state
-  exact OperandDispatch.evalOperandAt_move_wholeLocal hooks () (OperandPath.rvalue "operand")
+  exact OperandDispatch.evalOperand_move_wholeLocal hooks ()
     localId none state state _ read check
 
 theorem actual_cast_assignment
@@ -85,7 +85,6 @@ theorem actual_cast_assignment
   have operand := move_cached_local options limits (remaining+1) span debugOff frames cached machine 3
     (RetagReferencePlace.sliceValue cfg.access.runtime.base pointer len AsMutPtrFacts.rawLayout).imm AsMutPtrFacts.rawLayout
     valid3' live3' cache3' (by simpa [LayoutData.isSized,BackendRepr.isSized] using AsMutPtrFacts.raw_sized) noClocks ghost
-  have normalized := AsMutPtrLayouts.normalize_cast options (remaining+1) span frames cached machine body identity callee location
   have valid2' : (2 : Miri.MIR.LocalId) < cached.locals.size := by simpa [cached,LocalPlaces.cachePlaceLayout] using valid2
   have live2' : cached.locals[2].value = .live (.immediate .uninit) := by simpa [cached,LocalPlaces.cachePlaceLayout] using live2
   have cache2' : cached.locals[2].layout = some CopyCompilerFacts.destPointerLayout := by simp [cached,LocalPlaces.cachePlaceLayout]
@@ -97,12 +96,6 @@ theorem actual_cast_assignment
   simp only
   rw [operand]
   simp only
-  change (do let ty ← cfg.rvalues.normalize () 8
-             hooks.cast () ⟨.immediate (RetagReferencePlace.sliceValue cfg.access.runtime.base pointer len AsMutPtrFacts.rawLayout).imm,AsMutPtrFacts.rawLayout⟩ .PtrToPtr ty
-               (LocalPlaces.localRuntimePlace frames.size cached 2 CopyCompilerFacts.destPointerLayout)) state = _
-  simp only [bind,Bind.bind,EStateM.bind]
-  have normalized' : cfg.rvalues.normalize () 8 state = .ok 8 state := normalized
-  rw [normalized']
   simpa only [ActualLocalCopy.written,cached] using cast
 
 #print axioms actual_cast_assignment

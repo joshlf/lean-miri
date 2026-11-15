@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SeparateDestinationAuthorization
 import duplicate_prefix.S02SeparateDestinationReady
 import duplicate_prefix.S03ReturnWildcardProtectionRawOtherTags
@@ -73,7 +74,7 @@ theorem after_protection
       let frame := (RootArgumentsTwo.result
         (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
           reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
       let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
@@ -94,7 +95,7 @@ theorem after_protection
   let frame := (RootArgumentsTwo.result
     (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
       reference.id reference.tracker.global.nextPointerTag) count).frame
-  let changed := {frame with location := .unwinding ⟨601⟩}
+  let changed := {frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   let borrowFrame := owned.addProtector destination.id destination.tracker.global.nextPointerTag
   have frameBorrow : changed.extra.borrowTracker = some owned := by
@@ -106,7 +107,7 @@ theorem after_protection
     S02SeparateDestinationReady.local_facts_after_argument input reference firstFresh destination destEntry
   have model := S02SeparateDestinationReady.model_after_argument input reference firstFresh
   have extras : current.user.payload.payload.user.runtime.extras.allocations.find?
-      (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+      (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     rw [destId]
     change (RawRootInvocation.machine #[] before).user.payload.payload.user.runtime.extras.allocations.find?
       (fun row => row.1 == input.contract.destination.id) = _

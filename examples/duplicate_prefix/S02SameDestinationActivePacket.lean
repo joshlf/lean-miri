@@ -32,7 +32,7 @@ theorem enters
         len ActualReferenceMetadata.reference).imm
       let frame := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {frame with location := .unwinding ⟨601⟩}
+      let changed := {frame with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       ∃ (destination : DuplicatePrefixReturnPlaceInput.Input current place)
         (secondFresh : destination.tracker.global.nextPointerTag.value < 18446744073709551615)
@@ -46,7 +46,7 @@ theorem enters
           (Size.ofBytes destination.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
         let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
         let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag
-        let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+        let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
         Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
           RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
           #[.Copy (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base

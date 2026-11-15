@@ -31,7 +31,9 @@ theorem retag_pointer (options : EvalConfigurationCore.Options) (remaining : Nat
     (present : after.machine.memory.live.find? (fun row=>row.1==id)=some (id,entry))
     (rootShape : entry.allocation.extra=BorrowTree.new root (Size.ofBytes capacity))
     (metadata : machine.user.payload.payload.user.types.metadata = PreparedReflection.actual.runtime)
-    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false) :
+    (notConstructed : machine.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     TypedRetag.retagPtrValue (adapted options remaining span ctx.pointers) options.limits.retag
         (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
           (Pointer.new (.concrete id root) (Size.ofBytes (base+offset))) 0 reference)
@@ -60,6 +62,7 @@ theorem retag_pointer (options : EvalConfigurationCore.Options) (remaining : Nat
     (TypedRetagConcreteEmpty.lazyTree root tracker.global.nextPointerTag capacity)
   have retag := TypedBorrowSteps.retag_place_at_of_reborrow h options.limits.retag place ChildBorrow.fnEntryPolicy
     Size.ZERO Align.ONE before final tracker enabled fresh id (.concrete id root) rfl sizing reborrow
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h pointee.ty .Mutable .FnEntry before frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ =

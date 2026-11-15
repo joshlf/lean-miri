@@ -21,14 +21,17 @@ elab "unfold_frame_meta_runtime" : tactic => do
 
 theorem inline_attr : CompilerVirtualFacts.inlineAttribute
     PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes GuardCompilerFacts.runtimeCall.callee =
-    .ok none := by decide +kernel
+    none := by
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  decide +kernel
 
 theorem runtime_frame_caller_location : CompilerRuntimeQueries.requiresCallerLocation
     PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime GuardCompilerFacts.runtimeCall.callee =
     .ok false := by with_unfolding_all rfl
 
 def definitionQuery := PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[
-  GuardCompilerFacts.runtimeCall.callee.defId]?
+  (PreparedReflection.fixedInstance GuardCompilerFacts.runtimeCall.callee).instanceKind.defId]?
 theorem definition_supported : definitionQuery.isSome = true := by decide +kernel
 def definition := definitionQuery.get (by simpa using definition_supported)
 theorem definition_eq : definitionQuery = some definition := Option.eq_some_of_isSome definition_supported
@@ -49,8 +52,14 @@ theorem runtime_user_relevance {K User Extra : Type} (crates : Array Nat)
   rw [inline_attr]
   unfold_frame_meta_runtime
   rw [runtime_frame_caller_location]
+  have instanceQuery : CompilerInstance.definitionOf
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.input.instances
+      GuardCompilerFacts.runtimeCall.callee = .ok
+      (PreparedReflection.fixedInstance GuardCompilerFacts.runtimeCall.callee).instanceKind.defId := by
+    with_unfolding_all rfl
+  simp only [instanceQuery,bind,Except.bind,Except.pure]
   rw [show PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[
-      GuardCompilerFacts.runtimeCall.callee.defId]? = some definition from definition_eq]
+      (PreparedReflection.fixedInstance GuardCompilerFacts.runtimeCall.callee).instanceKind.defId]? = some definition from definition_eq]
   simp [rank, bind, EStateM.bind, pure, EStateM.pure, Except.pure]
   split <;> simp_all [bind, EStateM.bind, pure, EStateM.pure]
   split <;> rfl

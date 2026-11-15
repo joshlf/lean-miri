@@ -94,7 +94,7 @@ theorem protect_with_source (options : EvalConfigurationCore.Options) (remaining
       output.id=family.allocation ∧output.offset=offset.toNat ∧output.original=family.at allocationRoot ∧output.node.tag=tracker.global.nextPointerTag ∧output.window.allocation.extra.nodes.size≤2 ∧
       post.machine.borrowTracker=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag) ∧
       post.stack=(Storage.withCurrent frames (registeredFrame frame borrowFrame family.allocation tracker.global.nextPointerTag) machine).stack ∧
-      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation ⟨none,#[]⟩ with
+      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation { weakMemory := none } with
         memory:={machine.memory with live:=((machine.memory.live.filter (fun row=>row.1!=family.allocation)).push (family.allocation,⟨.machine .global,output.window.allocation⟩))},
         borrowTracker:=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag)} ∧
       post.machine.user.addresses=machine.user.addresses ∧
@@ -102,7 +102,7 @@ theorem protect_with_source (options : EvalConfigurationCore.Options) (remaining
         (family.allocation,⟨.machine .global,output.window.allocation⟩) ∧
       post.machine.user.payload.payload.user.runtime.extras.allocations=
         (machine.user.payload.payload.user.runtime.extras.allocations.filter (fun row=>row.1!=family.allocation)).push
-          (family.allocation,⟨none,#[]⟩) := by
+          (family.allocation,{ weakMemory := none }) := by
   obtain ⟨post,data,owner,Q,actual,tracked,stack,runtime,live,machineEq,addresses,extras,issued,binding,output,idEq,offsetEq,originalEq,outputTag,outputAllocation,outputNodes⟩:=
     CurrentCallLazyBoolTyped.protect options remaining span retagCtx frames frame borrowFrame frameBorrow machine tracker
       family root image base offset place ready noFunction noVaList fresh ghost backend

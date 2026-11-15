@@ -22,11 +22,11 @@ theorem eval_callee_zero
     (function : Miri.MIR.Operand) (dest : Place) (fnOp : OpTy P)
     (before after : S) (externAbi : Extern) (definition : DefId) (genericArgs : Array GenericArg)
     (calleeInstance : CallInstance) (item : DefId) (abi : FnABI) (requires : Bool)
-    (operand : h.evalOperandAt choice (OperandPath.instruction "function") function before = .ok fnOp after)
+    (operand : h.evalOperand choice  function before = .ok fnOp after)
     (signature : h.functionSignature choice fnOp.layout = pure (0,externAbi))
     (kind : h.functionKind fnOp.layout.ty = pure (.FnDef definition genericArgs))
     (resolve : h.resolve choice definition genericArgs after = .ok calleeInstance after)
-    (itemKind : calleeInstance.kind = .Item item)
+    (itemKind : h.instanceKind calleeInstance = pure (.Item item))
     (fnAbi : h.fnAbiOfInstance choice calleeInstance #[] = pure abi)
     (callerLocation : h.requiresCallerLocation calleeInstance = pure requires) :
     Call.evalCalleeAndArgs h choice function #[] dest before =

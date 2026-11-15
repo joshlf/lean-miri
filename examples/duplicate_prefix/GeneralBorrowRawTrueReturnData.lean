@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawRootCurrentBoolReturn
 namespace DuplicatePrefix.GeneralBorrowRawTrueReturnData
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows Miri.TreeBorrows.Tree
@@ -49,6 +50,6 @@ structure Data (options : EvalConfigurationCore.Options) (remaining : Nat) (span
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat+1 < 2^64
   cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : (context.extras.get machine.user).allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get machine.user).allocations) (slotId) })
   destination : caller.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
 end DuplicatePrefix.GeneralBorrowRawTrueReturnData

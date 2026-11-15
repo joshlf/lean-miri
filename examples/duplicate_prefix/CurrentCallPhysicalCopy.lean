@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationAcceptedCopyDirectMemoryCore
 import duplicate_prefix.CurrentCallBoolProtection
 import duplicate_prefix.CopyHelperSteps
@@ -29,8 +30,8 @@ private theorem memory_access (context : PhysicalMachineWrite.Context)
         (if write then .Write else .Read) tracker.global.protectedTags .VisitChildrenOfAccessed).tree,.ok ()⟩ := by
   obtain ⟨sync,present,outside⟩ := ready
   have present' : (context.extras.get machine.user).allocations.find? (fun row => row.1 == id) =
-      some (id,⟨none,sync⟩) := present
-  have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras machine id range write ⟨none,sync⟩ present' outside
+      some (id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((context.extras.get machine.user).allocations) (id) }) := present
+  have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras machine id range write _ present' outside
   have diagnostic : context.access.diagnostic write id range machine = .ok () machine := by
     simp [Context.access,EvalAccessMachine.make,EvalBackendMachine.access,EvalBackendMachine.handler,
       noBackend,noClocks,get,getThe,MonadStateOf.get,EStateM.get,bind,EStateM.bind,pure,EStateM.pure,Except.pure,Except.bind]

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowReusableStar
 import duplicate_prefix.GenericFunctionEntryCommon
 namespace DuplicatePrefix.GeneralBorrowReusableCaller
@@ -73,7 +74,7 @@ structure Caller (tree : BorrowTree) (root : UniIndex) (bytes : UInt64)
   maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize
   provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new
   noBackend : before.user.payload.payload.user.backend = .none
-  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   thread : Miri.Concurrency.ThreadRecord
   active : before.threads.activeThread? = some thread
   noCache : thread.topUserRelevantFrame = none
@@ -112,7 +113,7 @@ structure Caller (tree : BorrowTree) (root : UniIndex) (bytes : UInt64)
   bufferProvenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len
   bufferStorageFits : entry.allocation.len+64 < 18446744073709551616
   bufferMutable : entry.allocation.mutability = .Mut
-  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩)
+  bufferExtras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) })
   lenBounded : len ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes
   treeEq : entry.allocation.extra = tree
   parentEq : parentTag = state.node.tag

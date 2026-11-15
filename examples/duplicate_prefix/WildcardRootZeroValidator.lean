@@ -48,7 +48,9 @@ theorem validate
     (addressMode : machine.user.addresses.provenanceMode ≠ .strict)
     (below : ∀ entry ∈ machine.user.addresses.intToPtrMap, address < entry.address)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let resultMachine := ReferenceBorrowDriver.allocatedMachine machine tracker fresh
     ValidityMachine.validateRuntime cfg.validity () (validityFuel+1)
@@ -56,6 +58,7 @@ theorem validate
       .ok () (Storage.withCurrent frames {frame with locals := (frame.locals.set localId
         {value := .live (.immediate (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base (Pointer.new .wildcard (Size.ofBytes address)) 0 reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}

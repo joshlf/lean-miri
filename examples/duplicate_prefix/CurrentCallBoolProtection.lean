@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CurrentCallPush
 import duplicate_prefix.CurrentCallBoolWindow
 import duplicate_prefix.S02SameDestinationUninitInitializedMutation
@@ -664,7 +665,7 @@ The FIRST matching extras row is used. Arbitrary metadata outside the requested
 window and in unrelated allocations remains permitted. -/
 def WindowReady (before : Before) (id : AllocId) (offset length : Nat) : Prop :=
   ∃ sync : Array (Size × MemoryExtras.Entry Unit),
-    before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,sync⟩) ∧
+    before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }) ∧
     ∀ row ∈ sync, row.1.bytes.toNat < offset ∨ offset+length ≤ row.1.bytes.toNat
 
 /-- Execution representation for the selected plain-memory profile, separate
@@ -722,7 +723,7 @@ theorem write_uninit_concrete (options : EvalConfigurationCore.Options) (remaini
     (race : state.machine.dataRace = none) (backend : state.machine.user.payload.payload.user.backend = .none)
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == physical.id) =
-      some (physical.id,⟨none,sync⟩))
+      some (physical.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (state.machine.user.payload.payload.user.runtime.extras.allocations) (physical.id) }))
     (outside : ∀ row ∈ sync, row.1.bytes.toNat < physical.offset.toNat ∨ physical.offset.toNat+1 ≤ row.1.bytes.toNat)
     (completed : (physical.entry.allocation.extra.performBorrowAccessRange (.concrete tag)
       (Size.ofBytes physical.offset) (Size.ofBytes 1) .Write tracker.global.protectedTags .VisitChildrenOfAccessed).status = .Completed) :
@@ -739,9 +740,9 @@ theorem write_uninit_concrete (options : EvalConfigurationCore.Options) (remaini
   let contexts := DuplicatePrefixPhysicalContexts.canonical options remaining span
   let context := contexts.validationContext
   have present : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == physical.id) =
-      some (physical.id,⟨none,sync⟩) := extras
+      some (physical.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (physical.id) }) := extras
   have syncDone := S04ReturnSyncOutside.sync_access_outside context.extras state.machine physical.id
-    (allocRange (Size.ofBytes physical.offset) (Size.ofBytes 1)) true ⟨none,sync⟩ present outside
+    (allocRange (Size.ofBytes physical.offset) (Size.ofBytes 1)) true _ present outside
   have actual := S04ReturnExtrasAccess.source_write_access_exact context.prepared context.image
     context.maximum context.fuel context.globalHooks context.pointers context.extras state.machine tracker
     physical.entry.allocation.extra physical.id (.concrete tag) (allocRange (Size.ofBytes physical.offset) (Size.ofBytes 1))
@@ -1016,8 +1017,8 @@ theorem protect_after_source
   have backend : retagged.machine.user.payload.payload.user.backend = .none := input.machine.settings.noBackend
   obtain ⟨sync,extras,outside⟩ := readiness.bool
   have extraAt : retagged.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == childWindow.id) =
-      some (childWindow.id,⟨none,sync⟩) := by
-    change before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == physical.id) = some (physical.id,⟨none,sync⟩)
+      some (childWindow.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (retagged.machine.user.payload.payload.user.runtime.extras.allocations) (childWindow.id) }) := by
+    change before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == physical.id) = some (physical.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (physical.id) })
     simpa only [idEq] using extras
   have outside' : ∀ row ∈ sync, row.1.bytes.toNat < childWindow.offset.toNat ∨ childWindow.offset.toNat+1 ≤ row.1.bytes.toNat := by
     intro row member

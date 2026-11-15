@@ -41,13 +41,13 @@ theorem actual_operand_reduction
   unfold MachineHooks.run Call.run
   rw [CopyIntrinsic.nondiverging_copy_operands]
   · exact CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
-      14 (.scalar source) CopyCompilerFacts.sourcePointerLayout (OperandPath.instruction "src") none
+      14 (.scalar source) CopyCompilerFacts.sourcePointerLayout  none
       valid14 live14 cache14 (by decide +kernel) noClocks ghost
   · exact CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
-      15 (.scalar dest) CopyCompilerFacts.destPointerLayout (OperandPath.instruction "dst") none
+      15 (.scalar dest) CopyCompilerFacts.destPointerLayout  none
       valid15 live15 cache15 (by decide +kernel) noClocks ghost
   · exact CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
-      16 (.scalar (.fromScalarInt (.ofUInt64 n))) RootCompilerFacts.usizeLayout (OperandPath.instruction "count") none
+      16 (.scalar (.fromScalarInt (.ofUInt64 n))) RootCompilerFacts.usizeLayout  none
       valid16 live16 cache16 (by decide +kernel) noClocks ghost
 
 theorem actual_generic_copy
@@ -87,13 +87,13 @@ theorem actual_generic_copy
   refine ⟨pointers, arithmetic, resolve, ?_⟩
   have sourceRead := CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
     14 (.scalar (Scalar.fromPointer config.access.runtime.base source)) CopyCompilerFacts.sourcePointerLayout
-    (OperandPath.instruction "src") none valid14 live14 cache14 (by decide +kernel) noClocks ghost
+     none valid14 live14 cache14 (by decide +kernel) noClocks ghost
   have destRead := CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
     15 (.scalar (Scalar.fromPointer config.access.runtime.base dest)) CopyCompilerFacts.destPointerLayout
-    (OperandPath.instruction "dst") none valid15 live15 cache15 (by decide +kernel) noClocks ghost
+     none valid15 live15 cache15 (by decide +kernel) noClocks ghost
   have countRead := CopyHelperOperands.move_cached_local options limits remaining span debugOff frames frame machine
     16 (.scalar (.fromScalarInt (.ofUInt64 n))) RootCompilerFacts.usizeLayout
-    (OperandPath.instruction "count") none valid16 live16 cache16 (by decide +kernel) noClocks ghost
+     none valid16 live16 cache16 (by decide +kernel) noClocks ghost
   have pointee : (CopyIntrinsic.statementMemory bound).pointeeType () CopyCompilerFacts.sourcePointerLayout.ty state = .ok 1 state := by
     have sourceTy : CopyCompilerFacts.sourcePointerLayout.ty = 9 := by decide +kernel
     unfold CopyIntrinsic.statementMemory

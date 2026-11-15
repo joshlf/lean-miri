@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowScopedInactiveWritableCopyHelperBody
 import duplicate_prefix.CopyHelperUnitBlock
 import duplicate_prefix.CopyHelperClock
@@ -41,7 +42,7 @@ theorem from_false_guard
     (noBackend : machine.user.payload.payload.user.backend = .none)
     (tracked : machine.borrowTracker = some tracker)
     (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
-      some (id, ⟨none, #[]⟩))
+      some (id, { weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (live : machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
@@ -125,7 +126,7 @@ theorem from_false_guard
     simpa [bb7,written,CopyHelperSteps.advance,ActualLocalCopy.written,LocalPlaces.cachePlaceLayout,bb6,Array.getElem_set] using sourceLive
   have clock2Backend : clock2.user.payload.payload.user.backend = .none := by
     rw [CopyHelperClock.backend,CopyHelperClock.backend];exact noBackend
-  have clock2Extras : clock2.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩) := by
+  have clock2Extras : clock2.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (clock2.user.payload.payload.user.runtime.extras.allocations) (id) }) := by
     rw [CopyHelperClock.runtime,CopyHelperClock.runtime];exact extras
   have clock2Cached : clock2.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩ := by
     rw [CopyHelperClock.addresses,CopyHelperClock.addresses];exact cached

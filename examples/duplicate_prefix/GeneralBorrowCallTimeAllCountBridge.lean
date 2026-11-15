@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowCallTimeStorageBridge
 import duplicate_prefix.GeneralBorrowRawRootAllCount
 namespace DuplicatePrefix.GeneralBorrowCallTimeAllCountBridge
@@ -48,7 +49,7 @@ theorem invoke (s : GeneralBorrowRawRootAllCount.Initial)
     (preciseOff : s.options.retag.preciseInteriorMut=false)
     (implicitOff : s.options.retag.implicitWrites=false)
     (budget : Nat) (dispatch : s.limits.callDispatch=budget+1)
-    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,⟨none,#[]⟩))
+    (bufferExtras : s.before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == s.id) = some (s.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (s.before.user.payload.payload.user.runtime.extras.allocations) (s.id) }))
     (statementFuel : s.limits.validation=s.validityFuel+1) (n : UInt64) :
     DuplicatePrefixArgumentCallResult.Result s.options s.limits s.remaining s.span s.before
       (.pointer (Pointer.new (.concrete s.id s.parentTag) (Size.ofBytes (s.base+s.offset)))) s.len n s.place := by

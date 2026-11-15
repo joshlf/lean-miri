@@ -52,7 +52,7 @@ theorem enters
     (Size.ofBytes original.offset) (Size.ofBytes 1) .Write global.protectedTags .VisitChildrenOfAccessed).tree
   let frame := PositiveRootInstalledFrame.installed rawFrame adjusted count {} original.id original.tracker.global.nextPointerTag
     original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag
-  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨601⟩}
+  let machine := (S04ProtectUninit.finished current place currentInput #[] {args.frame with location := .unwinding ⟨2⟩}
     argumentFrame second protectedTree updated).machine
   let tracker : MachineHooks.BorrowState := ⟨global,original.tracker.retagMode⟩
   let borrowFrame := argumentFrame.addProtector original.id (S03LiveEmptyState.next original.tracker first).global.nextPointerTag

@@ -11,27 +11,7 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
 
 def constant : ConstOperand := (CopyPreconditions.Bodies.useConstantAt HelperCompilerFacts.copyBody 6 0).get (by decide +kernel)
-def site : CompilerConstantQueries.Site := ⟨HelperCompilerFacts.copyBody.identity.index, ⟨6,0⟩,
-  #[.field "kind", .field "rvalue", .field "operand", .field "constant"]⟩
 theorem literal : constant.value = .Val .ZeroSized 2 := by with_unfolding_all rfl
-theorem normalization : normalizationFromEvidence
-    ((PreparedReflection.actual.compiler.constants.evidence.filter (·.site == site)).map (·.query))
-    HelperCompilerFacts.copyCall.callee (.Val .ZeroSized 2) = .ok (.Val .ZeroSized 2) := by with_unfolding_all rfl
-
-open Lean Elab Tactic in
-elab "simp_unit_constant" : tactic => do
-  let found := (← getEnv).constants.toList.filterMap fun (name, _) =>
-    if name.toString.endsWith "Miri.Interpreter.constantType" then some (mkIdent name) else none
-  let names := found.toArray
-  evalTactic (← `(tactic| simp_all (config := {maxSteps := 1000000}) [
-    CompilerConstantMachine.evalAtBound, ConstantMachine.fromCompiler,
-    ConstantMachine.evalOperandWithLayout, evalConstOperandWithLayout,
-    evalMirConstantWithLayout, constValueToOpWithLayout, valueToOpWithLayout,
-    ConstantQueries.valueQueries, MachineHooks.currentFrame,
-    Storage.withCurrent, Stack.currentFrame?, bind, EStateM.bind,
-    get, getThe, MonadStateOf.get, EStateM.get, pure, EStateM.pure,
-    Except.bind, Except.pure, site, literal, $[$names:ident],*]))
-
 theorem unit_eval_at_bound
     (source : PreparedContracts.SourceComparator)
     (functions : FunctionPointers.Hooks MiriMemoryKind Machine.RootUser Unit)
@@ -43,20 +23,13 @@ theorem unit_eval_at_bound
     (bodyIndex : frame.bodyIdentity.index = HelperCompilerFacts.copyBody.identity.index)
     (location : frame.location = .mir ⟨6,0⟩)
     (fnInstance : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    CompilerConstantMachine.evalAtBound PreparedReflection.actual.compiler.constantBinding
-      site functions arithmetic externStatic MemoryErrors.constant
+    ConstantMachine.evalOperandWithLayout PreparedReflection.actual.compiler.runtime functions arithmetic externStatic MemoryErrors.constant
       constant (some CopyHelperUnit.layout) none
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate .uninit,CopyHelperUnit.layout⟩
       (Storage.withCurrent framesBefore frame machine) := by
-  have compatible := RootCompilerFacts.constant_binding_compatible source
-  have norm : normalizationFromEvidence
-      ((PreparedReflection.actual.compiler.constants.evidence.filter (·.site == site)).map (·.query))
-      HelperCompilerFacts.copyCall.callee constant.value =
-      .ok constant.value := by
-    rw [literal]
-    exact normalization
-  simp_unit_constant
+  simp only [ConstantMachine.evalOperandWithLayout, literal, ConstantMachine.evalValueWithLayout,
+    Option.map_none, valueToOpWithLayout] <;> rfl
 
 theorem unit_operand
     [DecidableEq MiriMemoryKind]
@@ -70,10 +43,10 @@ theorem unit_operand
     (bodyIndex : frame.bodyIdentity.index = HelperCompilerFacts.copyBody.identity.index)
     (location : frame.location = .mir ⟨6,0⟩)
     (fnInstance : frame.functionInstance = HelperCompilerFacts.copyCall.callee) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "operand") (.Constant constant)
+      ()  (.Constant constant)
       (some CopyHelperUnit.layout) (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate .uninit,CopyHelperUnit.layout⟩
       (Storage.withCurrent framesBefore frame machine) := by
@@ -81,24 +54,10 @@ theorem unit_operand
   let state := Storage.withCurrent framesBefore frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have currentSite : CompilerOperandSites.current
-      ((OperandPath.rvalue "operand").push (.field "constant")) state = .ok site state := by
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame,
-      state, Storage.withCurrent, Stack.currentFrame?, site, bodyIndex, location,
-      Bind.bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get, Pure.pure, EStateM.pure,
-      OperandPath.rvalue]
-  have siteLit : CompilerOperandSites.current
-      #[.field "kind", .field "rvalue", .field "operand", .field "constant"]
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok site (Storage.withCurrent framesBefore frame machine) := by
-    simpa [OperandPath.rvalue, state] using currentSite
-  have result := unit_eval_at_bound source config.functions config.arithmetic externStatic
-    framesBefore frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-    ((OperandPath.rvalue "operand").push (.field "constant")) constant
-    (some CopyHelperUnit.layout) state = _
+  change config.operands.constant () constant (some CopyHelperUnit.layout) state = _
   rw [constantAt]
-  simpa [siteLit, state, config, OperandPath.rvalue, Bind.bind, EStateM.bind, Pure.pure, EStateM.pure] using result
+  exact unit_eval_at_bound source config.functions config.arithmetic externStatic
+    framesBefore frame machine bodyIndex location fnInstance
 
 theorem assign_unit_cached
     (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)

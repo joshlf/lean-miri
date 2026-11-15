@@ -40,7 +40,7 @@ def finalMachine (options : EvalConfigurationCore.Options) (after : Before)
   let entry : LocalAllocation Provenance BorrowTree MiriMemoryKind:=
     ⟨.machine .global,converted.mapExtra (fun _=>BorrowTree.new root converted.byteSize)⟩
   let installed:=CurrentCallConversionMaterialize.installed
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id ⟨none,#[]⟩) id .global entry.allocation
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id { weakMemory := none }) id .global entry.allocation
   let raw:={installed with memory:=(RetagEntry.updatedMemory installed.memory id entry
     (TypedRetagConcreteEmpty.lazyTree root tag converted.byteSize.bytes))}
   {raw with user:={raw.user with payload:={raw.user.payload with ghost:=false}}}
@@ -103,6 +103,9 @@ theorem concrete {options limits remaining span before place}
         (({} : FrameState).addProtector id input.tracker.global.nextPointerTag)).frame := by
   dsimp only
   let root:=CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let frame:=(firstLive root).frame
   let machine:=ScopedFrame.entered (CurrentCallPush.preparedMachine before #[]) input.tracker .FnEntry
   let value:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
@@ -136,7 +139,7 @@ theorem concrete {options limits remaining span before place}
     cases current with
     | memory descriptor=>exact GlobalDataOnlyMaterialize.alloc_info machine id source absent noFunction noVaList descriptor
     | internalStatic definition descriptor initializer=>exact StaticGlobalAllocInfo.alloc_info machine id source definition absent noFunction noVaList descriptor
-  have afterGhost : (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩).user.payload.ghost=true := by
+  have afterGhost : (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none }).user.payload.ghost=true := by
     rw [result.frame,CurrentCallConversionFiniteFold.state_eq]
     rfl
   have frameBorrow : frame.extra.borrowTracker=some ({} : FrameState) := by
@@ -154,7 +157,7 @@ theorem concrete {options limits remaining span before place}
     #[] frame machine 1 ((firstLive root).valid i1) .uninit live cached (firstLive root).noClocks input.model.ghostOff input.model.shallow
     {} frameBorrow input.tracker.global (by rfl) (fresh input) id rootTag base offset nonnull cachedBase distinct
     _ info rfl result.converted
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩) afterGhost
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none }) afterGhost
     input.model.metadata (DuplicatePrefixTypeCacheOrigins.slice_not_constructed _ input.model.metadata input.cacheOrigins)
     (LocalPlaces.localRuntimePlace 0 frame 1 reference).stackView rfl ensure
   refine ⟨rest,externStatic,finalAddresses,finalTape,result,_,wiring,head,copy,?_⟩
@@ -167,7 +170,7 @@ def finalWildcardMachine (options : EvalConfigurationCore.Options) (after : Befo
   let entry : LocalAllocation Provenance BorrowTree MiriMemoryKind:=
     ⟨.machine .global,converted.mapExtra (fun _=>BorrowTree.new root converted.byteSize)⟩
   let installed:=CurrentCallConversionMaterialize.installed
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id ⟨none,#[]⟩) id .global entry.allocation
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id { weakMemory := none }) id .global entry.allocation
   let raw:={installed with memory:=(RetagEntry.updatedMemory installed.memory id entry
     (CurrentCallEmptyMaterializedWildcard.finalTree root tag converted.byteSize))}
   {raw with user:={raw.user with payload:={raw.user.payload with ghost:=false}}}
@@ -216,6 +219,9 @@ theorem wildcard {options limits remaining span before place}
         (({} : FrameState).addProtector id input.tracker.global.nextPointerTag)).frame := by
   dsimp only
   let root:=CurrentCallSpatialEntryControl.root before #[] place input.model.noDataRace
+  have rootInstanceBound : root.frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+    rw [root.callee]
+    decide +kernel
   let frame:=(firstLive root).frame
   let machine:=ScopedFrame.entered (CurrentCallPush.preparedMachine before #[]) input.tracker .FnEntry
   let value:=(RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
@@ -260,7 +266,7 @@ theorem wildcard {options limits remaining span before place}
     cases current with
     | memory descriptor=>exact GlobalDataOnlyMaterialize.alloc_info machine id source absent noFunction noVaList descriptor
     | internalStatic definition descriptor initializer=>exact StaticGlobalAllocInfo.alloc_info machine id source definition absent noFunction noVaList descriptor
-  have afterGhost : (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩).user.payload.ghost=true := by
+  have afterGhost : (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none }).user.payload.ghost=true := by
     rw [result.frame,CurrentCallConversionFiniteFold.state_eq]
     rfl
   have frameBorrow : frame.extra.borrowTracker=some ({} : FrameState) := by
@@ -278,7 +284,7 @@ theorem wildcard {options limits remaining span before place}
     #[] frame machine 1 ((firstLive root).valid i1) .uninit live cached (firstLive root).noClocks input.model.ghostOff input.model.shallow
     {} frameBorrow input.tracker.global (by rfl) (fresh input) id rootTag base offset nonnull cachedBase distinct
     _ info rfl nonstrict geometry exposed allocLive result.converted
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id ⟨none,#[]⟩) afterGhost
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) result.machine id { weakMemory := none }) afterGhost
     input.model.metadata (DuplicatePrefixTypeCacheOrigins.slice_not_constructed _ input.model.metadata input.cacheOrigins)
     (LocalPlaces.localRuntimePlace 0 frame 1 reference).stackView rfl ensure
   refine ⟨rest,externStatic,finalAddresses,finalTape,result,_,wiring,head,copy,?_⟩

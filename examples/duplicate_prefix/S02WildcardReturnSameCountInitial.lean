@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02WildcardReturnSameCountProtect
 import duplicate_prefix.S02WildcardReturnSameCountEntry
 import duplicate_prefix.S02ConcreteSourceReleasePacket
@@ -33,7 +34,7 @@ theorem enters
       let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
       let args := (RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count).frame
-      let changed := {args with location := .unwinding ⟨601⟩}
+      let changed := {args with location := .unwinding ⟨2⟩}
       let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
       ∃ (destination : DuplicatePrefixReturnPlaceInput.Input current place)
         (secondFresh : destination.tracker.global.nextPointerTag.value < 18446744073709551615)
@@ -62,7 +63,7 @@ theorem enters
   let adjusted := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
     (Pointer.new (.concrete reference.id reference.tracker.global.nextPointerTag) (Size.ofBytes (reference.base+reference.offset))) len ActualReferenceMetadata.reference).imm
   let args := RootArgumentsTwo.result (PositiveRootArguments.firstDone root adjusted ({} : FrameState) reference.id reference.tracker.global.nextPointerTag) count
-  let changed := {args.frame with location := .unwinding ⟨601⟩}
+  let changed := {args.frame with location := .unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
   have binding := reference.binding
   simp only [DuplicatePrefixReferenceInput.Binding,Pointer.new] at binding
@@ -76,7 +77,7 @@ theorem enters
     simp only [changed,args,RootArgumentsTwo.result,RootFrameData.write,RootFrameData.live,RootFrameData.cache,
       RootFrameData.atSpan,LocalOperands.cachedLayoutFrame,PositiveRootArguments.firstDone,PositiveRootArguments.protectedRoot,
       TypedBorrowSteps.registeredFrame,TypedRetagEntry.frameWithBorrow,owned]
-  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,⟨none,#[]⟩) := by
+  have extras : current.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == destination.id) = some (destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (destination.id) }) := by
     change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
     rw [(RawRootInvocation.preservation #[] before).2.2.2.2.2.2.2.2,destId];exact input.return_extras
   obtain ⟨runtime,roots,initialOrder,headroom,_fresh⟩ := S02SameDestinationReady.local_facts_after_argument input reference firstFresh destination destEntry
@@ -115,7 +116,7 @@ theorem enters
   let updated := post.updated
   let after := S04ProtectUninit.finished current place destination #[] changed owned secondFresh tree updated
   let protectedFrame := TypedBorrowSteps.registeredFrame changed owned destination.id destination.tracker.global.nextPointerTag
-  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+  let installed := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
   have finishShape := S02PositiveFinishFrame.after_destination_registration root (RawRootInvocation.locals before place input.contract.model.noDataRace)
     adjusted count reference.id destination.id reference.tracker.global.nextPointerTag destination.tracker.global.nextPointerTag
   obtain ⟨finishBody,finishSize,finishDead,finishClocks⟩ := finishShape

@@ -142,7 +142,7 @@ private theorem finish_source {options limits remaining span before argument pla
   let next : MachineHooks.BorrowState:=⟨(registered input.tracker.global {} sourceId fresh).1,.FnEntry⟩
   let source : Before:={sourceFn with borrowTracker:=some {next with retagMode:=input.tracker.retagMode}}
   let sourceFrame:=({} : FrameState).addProtector sourceId input.tracker.global.nextPointerTag
-  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨601⟩).frame
+  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot root updated sourceFrame) count) ⟨2⟩).frame
   have sourceModel : DuplicatePrefixCallModel.Model options remaining span source:=
     (empty_live_current_rule "CurrentCallOrdinaryEmptyNonliveCurrent.model_move") preparedModel sourceUser sourceThreads sourceRace rfl input.defaultMode
   have args:=CurrentCallEmptyProtocolControl.arguments options limits remaining span input.model.debugOff validationFuel validationEq #[] root raw

@@ -59,7 +59,7 @@ theorem finish_source
     DuplicatePrefixArgumentCallResult.Result options limits remaining span before argument 0 count place := by
   intro rootFrame rawValue updated sourceFrame copy
   let post:=closed options result.machine id root result.converted tree result.global input.tracker.retagMode
-  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot rootFrame updated sourceFrame) count) ⟨601⟩).frame
+  let boolFrame:=(atSpan (RootArgumentsTwo.result (CurrentCallEmptyProtocolControl.sourceRoot rootFrame updated sourceFrame) count) ⟨2⟩).frame
   have sourceModel:=model input id pointer root source externStatic tail finalAddresses finalTape result tree
   let D:=live_data P boolFrame sourceFrame sourceModel rfl rfl
     (fresh input id pointer source externStatic tail finalAddresses finalTape result) (by rw [nodes];decide)

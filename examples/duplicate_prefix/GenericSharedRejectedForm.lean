@@ -113,7 +113,8 @@ def form_data (s : GenericSharedRejectedInput.Base) (frame : CompilerFrameContex
       exact s.frameTracked
     · rw [b.runtime.addresses]
       exact s.slotCached
-    · change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
+    · dsimp only [CanonicalCopy.Context.extras,EvalCoreMachine.extras]
+      change machine.user.payload.payload.user.runtime.extras.allocations.find? _ = _
       rw [b.runtime.extras]
       exact s.extras
   exact ⟨ready,rfl,rfl,rfl,rfl⟩

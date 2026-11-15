@@ -438,6 +438,9 @@ theorem canonical_retag_pointer {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
     (unpin : CompilerFacts.boolean prepared.context place.layout.ty "is_unpin" = .ok true)
     (unsafeUnpin : CompilerFacts.boolean prepared.context place.layout.ty "is_unsafe_unpin" = .ok true)
+    {definition : DefId}
+    (definitionQuery : CompilerInstance.definitionOf prepared.context.loweringContext.instances
+      frame.functionInstance = .ok definition)
     (race : ambient.machine.dataRace = none) :
     let h := EvalRetagMachine.hooks prepared runtime
       (CompilerRetagOptions.make compiler ⟨false, false⟩) access projection vtable pointers choice
@@ -464,7 +467,7 @@ theorem canonical_retag_pointer {K U C F A : Type} [DecidableEq K]
     rw [referencePointee]
   have policy := canonical_new_permission prepared runtime compiler access projection vtable pointers choice
     place.layout.ty (beforeTagState ambient frames frame borrowFrame global) frames
-    (frameWithBorrow frame borrowFrame) rfl unpin unsafeUnpin frozen
+    (frameWithBorrow frame borrowFrame) rfl unpin unsafeUnpin frozen definitionQuery
   have construct : h.immPtrToMPlace value = pure place := by
     change PointerPlaceMachine.fromImmediate access (CompilerExecutionProviders.pointerCompiler prepared)
       choice value = pure place

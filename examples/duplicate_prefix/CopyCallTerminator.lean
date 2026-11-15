@@ -9,7 +9,7 @@ set_option backward.isDefEq.respectTransparency false
 set_option backward.dsimp.instances true
  theorem source_call : CopyEvaluateCall.terminator.kind =
     .Call HelperCompilerFacts.copyCall.function #[CopyEvaluateCall.argument0,CopyEvaluateCall.argument1,CopyEvaluateCall.argument2]
-      ⟨18,#[]⟩ (some 9) .Continue .Normal ⟨28⟩ := by with_unfolding_all rfl
+      ⟨18,#[]⟩ (some 9) .Continue .Normal ⟨19⟩ := by with_unfolding_all rfl
  theorem call (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)
     (remaining : Nat) (span : PreparedContracts.FixedSpanQuery) (debug : options.place.debugAssertions = false)
     (frames : Array (Frame Provenance LocalLayout MachineHooks.FrameExtra))
@@ -74,7 +74,7 @@ set_option backward.dsimp.instances true
     simp [after,Storage.withCurrent,Stack.frameIndex,Array.isEmpty_push,bind,EStateM.bind,
       get,getThe,MonadStateOf.get,EStateM.get,pure,Pure.pure,EStateM.pure,Except.pure]
   apply GenericCallStages.call_terminator h () limits.callDispatch CopyEvaluateCall.terminator
-    HelperCompilerFacts.copyCall.function #[CopyEvaluateCall.argument0,CopyEvaluateCall.argument1,CopyEvaluateCall.argument2] ⟨18,#[]⟩ 9 .Continue .Normal ⟨28⟩
+    HelperCompilerFacts.copyCall.function #[CopyEvaluateCall.argument0,CopyEvaluateCall.argument1,CopyEvaluateCall.argument2] ⟨18,#[]⟩ 9 .Continue .Normal ⟨19⟩
     state state state after caller frames.size (frames.size+1) dest
     ⟨.Instance HelperCompilerFacts.copyCall.callee,
       #[.Copy (CopyInstall.first sourcePointer),.Copy (CopyInstall.second destinationPointer),.Copy (CopyInstall.third n)],.Rust,some HelperCompilerFacts.copyAbi,true⟩

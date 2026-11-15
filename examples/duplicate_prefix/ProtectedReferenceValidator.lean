@@ -65,7 +65,9 @@ theorem positive
     (child : parentTree.newChild (Size.ofBytes offset) (.concrete parentTag) tracker.global.nextPointerTag
       (Miri.DataStructures.DedupRangeMap.new (Size.ofBytes len) initial) policy.outsidePermission true = ⟨finalTree,.ok ()⟩)
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
-    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false) :
+    (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let cfg := config options remaining span
     let resultMachine := {TypedBorrowSteps.registeredMachine (ReferenceBorrowDriver.allocatedMachine machine tracker fresh)
       (ReferenceBorrowDriver.allocatedTracker tracker fresh) tracker.global.nextPointerTag with
@@ -76,6 +78,7 @@ theorem positive
         {value := .live (.immediate (RetagReferencePlace.sliceValue cfg.access.runtime.base
           (Pointer.new (.concrete id tracker.global.nextPointerTag) (Size.ofBytes (base+offset))) len reference).imm),
          layout := frame.locals[localId].layout} valid)} resultMachine) := by
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   let cfg := config options remaining span
   let retag := adapted options remaining span ctx.pointers
   let activeMachine := {machine with user := {machine.user with payload := {machine.user.payload with ghost := true}}}

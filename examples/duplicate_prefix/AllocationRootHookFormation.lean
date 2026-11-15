@@ -25,7 +25,7 @@ theorem init_extra {K U P : Type} [DecidableEq K]
     (noExtras : ((extras.get before.user).allocations.any (fun row=>row.1==id))=false) :
     PlaceMachine.initStackExtra (fun id _ _=>MemoryExtras.initAllocation extras id false) id size align before=
       .ok (BorrowTree.new BorTag.one size)
-        (MemoryExtras.putAllocation extras (rooted before tracker id) id ⟨none,#[]⟩) := by
+        (MemoryExtras.putAllocation extras (rooted before tracker id) id { weakMemory := none }) := by
   have allocated : tracker.global.rootPointerTag id=.ok (global id,BorTag.one) := by rw [initial];exact root id
   simp only [PlaceMachine.initStackExtra,enabled,allocated,rooted,race,
     MemoryExtras.initAllocation,noExtras,MemoryExtras.putAllocation,

@@ -10,9 +10,14 @@ set_option backward.dsimp.instances true
 
 noncomputable def inputBody : LoweredBody := PreparedReflection.actual.program.bundle.bodies[HelperCompilerFacts.addBody.identity.index]'(by decide +kernel)
 noncomputable def localSpan (id : Fin 5) : SourceSpanData :=
-  (inputBody.input.locals[id.val]'(by
-    have size : inputBody.input.locals.size = 5 := by rfl
-    omega)).sourceInfo.span
+  let spanId := (inputBody.input.localSources[id.val]'(by
+    have size : inputBody.input.localSources.size = 5 := by rfl
+    omega)).spanId
+  PreparedReflection.actual.program.bundle.spans[spanId]'(by
+    have valid : ∀ i : Fin 5, (inputBody.input.localSources[i.val]'(by
+      have size : inputBody.input.localSources.size = 5 := by rfl
+      omega)).spanId < PreparedReflection.actual.program.bundle.spans.size := by decide +kernel
+    exact valid id)
 noncomputable def spanQuery (id : Fin 5) := PreparedReflection.actual.program.bundle.spans.toList.idxOf? (localSpan id)
 theorem body_of_frame (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = HelperCompilerFacts.addBody.body)
@@ -27,8 +32,8 @@ theorem normalized_local1 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = HelperCompilerFacts.addBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.addBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 1 = .ok 8 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 1 = .ok 8 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -58,8 +63,8 @@ theorem normalized_local2 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = HelperCompilerFacts.addBody.body)
     (identity : frame.bodyIdentity = HelperCompilerFacts.addBody.identity)
     (callee : frame.functionInstance = HelperCompilerFacts.addCall.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 2 = .ok 5 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 2 = .ok 5 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S03LiveWildcardProtection
 import duplicate_prefix.S03ReturnInitTail
 namespace DuplicatePrefix.S03LiveWildcardInitTail
@@ -27,7 +28,7 @@ theorem run
     (owned : borrowFrame.protectedTags = #[(input.id,zeroTag)])
     (sync : Array (Size × MemoryExtras.Entry Unit))
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,sync⟩))
+      some (input.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (outside : ∀ row ∈ sync,
       row.1.bytes.toNat < input.offset.toNat ∨ input.offset.toNat+1 ≤ row.1.bytes.toNat)
     (body : frame.body = RootBody.reflected.body.body) (localSize : frame.locals.size = 25)
@@ -46,9 +47,9 @@ theorem run
         (Storage.withCurrent frames frame before) =
         .ok () (Storage.withCurrent frames
           (CallEntryFacts.doneRootFrame {TypedBorrowSteps.registeredFrame
-            {frame with location := .unwinding ⟨601⟩} borrowFrame input.id input.tracker.global.nextPointerTag
-              with location := .unwinding ⟨559⟩})
-          (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨601⟩}
+            {frame with location := .unwinding ⟨2⟩} borrowFrame input.id input.tracker.global.nextPointerTag
+              with location := .unwinding ⟨0⟩})
+          (S04ProtectUninit.finished before place input frames {frame with location := .unwinding ⟨2⟩}
             borrowFrame fresh tree updated).machine) ∧
       updated.extra = written ∧ updated.byteSize = input.entry.allocation.byteSize ∧
       updated.len = input.entry.allocation.len ∧ updated.mutability = .Mut ∧
@@ -73,7 +74,7 @@ theorem run
       (borrowFrame.addProtector input.id input.tracker.global.nextPointerTag).protectedTags =
         #[(input.id,zeroTag),(input.id,input.tracker.global.nextPointerTag)] ∧
       S04ReturnReleaseParent.HiddenFrame written (borrowFrame.addProtector input.id input.tracker.global.nextPointerTag) := by
-  let changed := {frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {frame with location := FrameLocation.unwinding ⟨2⟩}
   obtain ⟨tree,updated,⟨protect,properties⟩,zeroAfter,quietAfter,ownedAfter,hiddenAfter⟩ :=
     S03LiveWildcardProtection.invoke limits.retag before model place input runtime distinct order headroom fresh wildcard
       zeroTag zeroIndex zero frames changed borrowFrame frameBorrow owned sync extras outside

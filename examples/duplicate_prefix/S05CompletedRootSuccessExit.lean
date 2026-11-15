@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.RootSuccessToReturn
 import duplicate_prefix.RootZeroCompleteExitState
 import duplicate_prefix.GenericRootPhysicalReturnCore
@@ -77,7 +78,7 @@ theorem complete (context validationContext : Context)
     (noClocks : state.machine.dataRace = none)
     (noBackend : state.machine.user.payload.payload.user.backend = .none)
     (enabled : state.machine.borrowTracker = some tracker)
-    (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : (context.extras.get state.machine.user).allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get ((context.extras.get state.machine.user).allocations) (id) }))
     (rootFree : tracker.global.protectedTags.contains root = false)
     (childFree : tracker.global.protectedTags.contains child = false)
     (initialTree : entry.allocation.extra = slotTree root child count written)

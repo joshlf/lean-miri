@@ -78,7 +78,9 @@ private theorem validate_of_operation
     (readCompleted : output.access.status=.Completed) (childCompleted : output.child.outcome=.ok ())
     (localId : MIR.LocalId) (valid : localId<frame.locals.size)
     (live : frame.locals[localId].value=.live (.immediate (value options remaining span pointer len).imm))
-    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) :
+    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     ValidityMachine.validateRuntime (config options remaining span).validity () options.limits.validation
       (LocalPlaces.localRuntimePlace frames.size frame localId ActualReferenceMetadata.reference) true
       (Storage.withCurrent frames frame (ScopedFrame.entered before tracker .FnEntry)) =
@@ -214,7 +216,9 @@ theorem validate_copy_of_typed_operation
     (readCompleted : output.access.status=.Completed) (childCompleted : output.child.outcome=.ok ())
     (localId : MIR.LocalId) (valid : localId<frame.locals.size)
     (old : Immediate Provenance) (live : frame.locals[localId].value=.live (.immediate old))
-    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none) :
+    (cached : frame.locals[localId].layout=some ActualReferenceMetadata.reference) (noClocks : frame.extra.dataRace=none)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let copied := copiedFrame options remaining span frame localId valid pointer len
     let validCopied : localId<copied.locals.size := by simpa only [copied,copiedFrame,Array.size_set] using valid
     let doneFrame := writtenFrame options remaining span copied borrowFrame localId validCopied pointer len id tracker.global.nextPointerTag

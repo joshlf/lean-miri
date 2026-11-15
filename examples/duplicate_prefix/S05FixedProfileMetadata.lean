@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.DuplicatePrefixCallSpecification
 import duplicate_prefix.DuplicatePrefixTypeCacheOrigins
 
@@ -18,7 +19,8 @@ sync metadata empty. These source observations motivate the static condition;
 no theorem that all histories establish it is asserted here.
 
 Every selected live extras row exists, contains no unsupported synchronization
-metadata, and has no weak buffer when global race clocks are absent. The
+metadata, and has no weak buffer when global race clocks are absent. Diagnostic
+backtraces are unrestricted and preserved by the extras projections. The
 existing array-cache Origins condition permits populated compiler/runtime
 array caches and excludes compiler non-array shadowing. Array layout/key/alias,
 next-ID and other runtime consistency obligations are not defined here.
@@ -40,17 +42,17 @@ theorem Compatible.extras_at {before : DuplicatePrefixCallSpecification.Before}
     (present : before.memory.live.find? (fun row => row.1 == id) = some (id,entry))
     (noClocks : before.dataRace = none) :
     before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
-      some (id,⟨none,#[]⟩) := by
+      some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (id) }) := by
   have member : (id,entry) ∈ before.memory.live.toList :=
     Array.mem_toList_iff.mpr (Array.mem_of_find?_eq_some present)
   obtain ⟨extra,found,sync,weak⟩ := metadata.liveExtras (id,entry) member
   have noWeak := weak noClocks
   cases extra with
-  | mk weakMemory entries =>
+  | mk weakMemory entries backtrace =>
     dsimp only at sync noWeak
     subst weakMemory
     subst entries
-    exact found
+    simpa only [AllocationBacktrace.of_lookup found] using found
 
 /-- The same raw profile evidence supplies the existing return-allocation
 extras leaf, without restricting its size, pointer provenance or borrow tree. -/
@@ -58,7 +60,7 @@ theorem Compatible.return_extras {before : DuplicatePrefixCallSpecification.Befo
     {place : MPlaceTy Provenance} (metadata : Compatible before)
     (input : DuplicatePrefixReturnPlaceInput.Input before place) (noClocks : before.dataRace = none) :
     before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩) :=
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }) :=
   metadata.extras_at input.id input.entry input.live noClocks
 
 /-- Any extras row actually selected for the general return place has no sync
@@ -98,12 +100,12 @@ theorem from_contract {options : EvalConfigurationCore.Options} {limits : Execut
     (metadata : Compatible before) :
     ∃ sync : Array (Size × MemoryExtras.Entry Unit),
       before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == contract.destination.id) =
-        some (contract.destination.id,⟨none,sync⟩) ∧
+        some (contract.destination.id,{ weakMemory := none, sync := sync, backtrace := AllocationBacktrace.get before.user.payload.payload.user.runtime.extras.allocations contract.destination.id }) ∧
       (∀ row ∈ sync, row.1.bytes.toNat < contract.destination.offset.toNat ∨
         contract.destination.offset.toNat+1 ≤ row.1.bytes.toNat) ∧
       before.user.payload.payload.user.types.entries.any (·.value.ty == 4) = false := by
   have extras := metadata.return_extras contract.destination contract.model.noDataRace
-  exact ⟨#[],extras,metadata.return_sync_outside contract.destination ⟨none,#[]⟩ extras,
+  exact ⟨#[],extras,metadata.return_sync_outside contract.destination _ extras,
     metadata.slice_not_constructed contract.model⟩
 
 end DuplicatePrefix.S05FixedProfileMetadata

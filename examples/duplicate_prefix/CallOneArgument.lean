@@ -11,13 +11,13 @@ theorem eval_callee_one
     (function : Miri.MIR.Operand) (argument : SpannedOperand) (dest : Place) (fnOp : OpTy P)
     (before afterFunction afterArgument : S) (externAbi : Extern) (definition : DefId) (genericArgs : Array GenericArg)
     (calleeInstance : CallInstance) (item : DefId) (abi : FnABI) (requires : Bool) (arg : FnArg P)
-    (operand : h.evalOperandAt choice (OperandPath.instruction "function") function before = .ok fnOp afterFunction)
-    (argumentEffect : Call.evalFnCallArgumentAt h choice argument.operand (Call.moveDefinitelyDisjoint #[argument] dest)
-      (OperandPath.argument 0) afterFunction = .ok arg afterArgument)
+    (operand : h.evalOperand choice  function before = .ok fnOp afterFunction)
+    (argumentEffect : Call.evalFnCallArgument h choice argument.operand (Call.moveDefinitelyDisjoint #[argument] dest)
+       afterFunction = .ok arg afterArgument)
     (signature : h.functionSignature choice fnOp.layout = pure (1,externAbi))
     (kind : h.functionKind fnOp.layout.ty = pure (.FnDef definition genericArgs))
     (resolve : h.resolve choice definition genericArgs = pure calleeInstance)
-    (itemKind : calleeInstance.kind = .Item item)
+    (itemKind : h.instanceKind calleeInstance = pure (.Item item))
     (fnAbi : h.fnAbiOfInstance choice calleeInstance #[] = pure abi)
     (callerLocation : h.requiresCallerLocation calleeInstance = pure requires) :
     Call.evalCalleeAndArgs h choice function #[argument] dest before =
@@ -29,13 +29,12 @@ theorem eval_callee_one
     List.range'_succ,List.forIn_cons,List.forIn_nil,argumentEffect]
   simp only [signature,kind,resolve,itemKind,fnAbi,callerLocation,pure,EStateM.pure,bind,EStateM.bind]
 theorem move_immediate
-    (h : CallHooks P S C E Other Extern FnABI ArgABI) (choice : C) (place : Place) (path : OperandPath)
-    (before cached after : S) (destination : RuntimeStackPlace P) (value : Immediate P) (layout : LocalLayout)
+    (h : CallHooks P S C E Other Extern FnABI ArgABI) (choice : C) (place : Place) (before cached after : S) (destination : RuntimeStackPlace P) (value : Immediate P) (layout : LocalLayout)
     (evaluated : h.evalPlace choice place true before = .ok destination cached)
     (read : h.placeToOp choice destination cached = .ok ⟨.immediate value,layout⟩ after) :
-    Call.evalFnCallArgumentAt h choice (.Move place) true path before =
+    Call.evalFnCallArgument h choice (.Move place) true  before =
       .ok (.Copy ⟨.immediate value,layout⟩) after := by
-  simp [Call.evalFnCallArgumentAt, evaluated,read,bind,EStateM.bind,pure,EStateM.pure]
+  simp [Call.evalFnCallArgument, evaluated,read,bind,EStateM.bind,pure,EStateM.pure]
 end DuplicatePrefix.CallOneArgument
 open Lean Elab Command in
 run_cmd do

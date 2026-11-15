@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.NonliveEmptyRootZeroInvocation
 import duplicate_prefix.NonliveEmptyRootSafetyToLen
 import duplicate_prefix.NonliveEmptyRootRejectedAfterLen
@@ -46,7 +47,7 @@ theorem invoke
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -244,7 +245,11 @@ theorem invoke
     (by rw [caller13]) (by rw [caller13]) _ bf slotId {slotEntry with allocation := slotAllocation} slotRoot tag slotBase
     (by simp only [FrameState.addProtector,childEq];rfl) place layout slotPointer aligned (by rw [refAddr];exact slotCached) slotPresent3 separate
     protectedTree protectedSize protectedMutable (by rw [protectedLen,protectedSize];rfl) (by rw [protectedMask,protectedSize];rfl) slotMaskValid protectedProv
-    (by change afterRef.user.payload.payload.user.runtime.extras.allocations.find? _ = _; change (RootZeroCompleteState.tick options remaining span initialMachine).user.payload.payload.user.runtime.extras.allocations.find? _ = _;rw [(RootZeroInvocationState.tick_fields options remaining span _).2.2.2.2.2.2];exact rawFacts.2.2.2.2.2.2.2.2 ▸ extras)
+    (by
+      change (RootZeroCompleteState.tick options remaining span initialMachine).user.payload.payload.user.runtime.extras.allocations.find? _ =
+        some (slotId, { weakMemory := none, backtrace := AllocationBacktrace.get ((RootZeroCompleteState.tick options remaining span initialMachine).user.payload.payload.user.runtime.extras.allocations) slotId })
+      rw [(RootZeroInvocationState.tick_fields options remaining span _).2.2.2.2.2.2]
+      exact rawFacts.2.2.2.2.2.2.2.2 ▸ extras)
     slotFree3 slotHeld3 slotDistinct slotRootNot3 slotChildNot3 (crc.trans (frameContinuation.trans (RawRootInvocation.control before place race).2.2.1))
     (by rw [crp,frameReturn];rfl) (by rw [cva,frameVa];rfl) fits
   have trace : SuccessfulTrace.Trace config limits (Storage.withCurrent #[] frame initialMachine) done := SuccessfulTrace.append prefixTrace tail

@@ -13,9 +13,9 @@ theorem bool_kind : RootMetadataQueries.context.runtime.findKind .bool =
   · decide +kernel
 
 noncomputable def overflowLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.layouts.find? (·.1 == 205)).getD (205, .error (.unknownType 205)) |>.2.toOption.getD RootCompilerFacts.usizeLayout
+  (PreparedReflection.actual.layoutResults[100]'(by decide +kernel)).toOption.getD RootCompilerFacts.usizeLayout
 
-theorem overflow_lookup : RuntimeMetadata.lookup RootMetadataQueries.context.runtime 205 = .ok overflowLayout := by
+theorem overflow_lookup : RuntimeMetadata.lookup RootMetadataQueries.context.runtime 100 = .ok overflowLayout := by
   with_unfolding_all rfl
 
 theorem bool_lookup : RuntimeMetadata.lookup RootMetadataQueries.context.runtime 0 = .ok RootCompilerFacts.boolLayout := by

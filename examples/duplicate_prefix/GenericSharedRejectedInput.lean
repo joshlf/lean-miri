@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowFreshSharedNext
 import duplicate_prefix.ActualReferenceContext
 import duplicate_prefix.ActualReferenceMetadata
@@ -140,7 +141,7 @@ structure Base where
   aligned : place.mplace.misaligned = none
   fits : slotBase.toNat + 1 < 2^64
   slotCached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == slotId) = some ⟨slotId,slotBase⟩
-  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩)
+  extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) })
   destination : frame.returnPlace.toRuntimePlace = ⟨.memory place.mplace,place.layout⟩
   slotRootDifferent2 : (ReferenceBorrowDriver.allocatedTracker tracker fresh).global.nextPointerTag ≠ slotRoot
   slotChildDifferent2 : slotChild ≠ (ReferenceBorrowDriver.allocatedTracker tracker fresh).global.nextPointerTag

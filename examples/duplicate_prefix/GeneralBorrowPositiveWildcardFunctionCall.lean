@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowPositiveWildcardFunctionContinuation
 namespace DuplicatePrefix.GeneralBorrowPositiveWildcardFunctionCall
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
@@ -75,7 +76,7 @@ theorem actual_entry
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (dead0 : (root.frame.locals[0]'(root.valid ⟨0,by decide⟩)).value = .dead)
     (dead6 : (root.frame.locals[6]'(root.valid ⟨6,by decide⟩)).value = .dead)
     (dead13 : (root.frame.locals[13]'(root.valid ⟨13,by decide⟩)).value = .dead)
@@ -85,7 +86,7 @@ theorem actual_entry
     (noCache : thread.topUserRelevantFrame = none)
     (rawEq : CallEntryFacts.rawPushedState initial.stack.frames initial.machine (.memory place) =
       Storage.withCurrent frames root.frame machine)
-    (preamble : root.frame.location = .unwinding ⟨559⟩)
+    (preamble : root.frame.location = .unwinding ⟨0⟩)
     (trackNone : root.frame.trackCallerArg = none) :
     let value := (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
       (Pointer.new .wildcard (Size.ofBytes (base))) len ActualReferenceMetadata.reference).imm
@@ -95,7 +96,7 @@ theorem actual_entry
     let argsMachine := resultMachine machine tracker fresh id entry len
     let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal tracker.global fresh,tracker.retagMode⟩
     let owned := borrowFrame.addProtector id tracker.global.nextPointerTag
-    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+    let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
     let borrowed := ReturnProtection.borrowedState frames changed owned argsMachine next slotFresh slotId slotEntry
       (PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 false)
     ∃ updated,
@@ -103,7 +104,7 @@ theorem actual_entry
         RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
         #[.Copy ⟨.immediate value,ActualReferenceMetadata.reference⟩,.Copy (second n)] false (.memory place) (.stop true) initial =
       .ok () (Storage.withCurrent frames
-        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨559⟩})
+        (CallEntryFacts.doneRootFrame {registeredFrame changed owned slotId next.global.nextPointerTag with location := .unwinding ⟨0⟩})
         (CanonicalCopy.replaceAllocation borrowed slotId slotEntry.kind updated).machine) ∧
       updated.extra = PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 true ∧
       updated.byteSize = Size.ofBytes 1 ∧ updated.len = 1 ∧

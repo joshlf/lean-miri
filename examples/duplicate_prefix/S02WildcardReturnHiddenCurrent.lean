@@ -38,7 +38,7 @@ theorem current
     let frame := (RootArgumentsTwo.result
       (PositiveRootArguments.firstDone root adjusted ({} : FrameState)
         reference.id reference.tracker.global.nextPointerTag) count).frame
-    let changed := {frame with location := .unwinding ⟨601⟩}
+    let changed := {frame with location := .unwinding ⟨2⟩}
     let owned := ({} : FrameState).addProtector reference.id reference.tracker.global.nextPointerTag
     ∃ (secondFresh : destination.tracker.global.nextPointerTag.value < 18446744073709551615)
       (updated : Allocation Provenance BorrowTree) (child : UniIndex),

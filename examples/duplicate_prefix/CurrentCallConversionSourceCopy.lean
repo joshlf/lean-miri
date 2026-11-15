@@ -27,7 +27,7 @@ abbrev rootEntry (root : BorTag) (converted : Allocation Provenance Unit) :
 def rootMachine (options : EvalConfigurationCore.Options) (after : Before)
     (id : AllocId) (root : BorTag) (converted : Allocation Provenance Unit) : Before :=
   CurrentCallConversionMaterialize.installed
-    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id ⟨none, #[]⟩)
+    (MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) after id { weakMemory := none })
     id .global (rootEntry root converted).allocation
 
 def childMachine (options : EvalConfigurationCore.Options) (after : Before)
@@ -170,7 +170,9 @@ theorem pointer (options : EvalConfigurationCore.Options) (remaining : Nat)
     (afterRoot : afterTracker.global.rootTag? id = some root) (afterRace : after.dataRace = none)
     (afterExtras : (after.user.payload.payload.user.runtime.extras.allocations.any (fun row => row.1 == id)) = false)
     (flags : afterTracker.global.protectedTags =
-      (registeredGlobal (allocatedTracker tracker fresh) tracker.global.nextPointerTag).protectedTags) :
+      (registeredGlobal (allocatedTracker tracker fresh) tracker.global.nextPointerTag).protectedTags)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     TypedRetag.retagPtrValue (adapted options remaining span ctx.pointers) options.limits.retag
       (RetagReferencePlace.sliceValue (config options remaining span).access.runtime.base
         (Pointer.new (Provenance.concrete id root) (Size.ofBytes (base + offset))) len ActualReferenceMetadata.reference)
@@ -215,6 +217,7 @@ theorem pointer (options : EvalConfigurationCore.Options) (remaining : Nat)
     simpa only [afterState, flags, h, place, before, TypedRetagEmpty.afterTag, Storage.withCurrent, allocatedMachine, allocatedTracker] using reborrowed
   have retagged := TypedBorrowSteps.retag_place_at_of_reborrow h options.limits.retag place ChildBorrow.fnEntryPolicy
     (Size.ofBytes len) Align.ONE before afterState tracker enabled fresh id (.concrete id root) rfl sizing reborrowedActual
+  have definitionReady := ActualReferenceContext.instance_definition_ready options remaining span ctx.pointers frame validInstance
   have permission := TypedRetagPolicyFields.new_permission_general h pointee.ty .Mutable .FnEntry before frames frame rfl
     queries.unpin queries.unsafeUnpin queries.freeze ctx.source.implicitWrites
   have created : RetagPolicy.create ⟨true,true,true⟩ .Mutable .FnEntry ⟨false,false⟩ =
@@ -422,7 +425,9 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
     (afterExtras : (after.user.payload.payload.user.runtime.extras.allocations.any (fun row => row.1 == id)) = false)
     (afterGhost : after.user.payload.ghost = true)
     (flags : afterTracker.global.protectedTags =
-      (registeredGlobal (allocatedTracker {tracker with retagMode := .FnEntry} room) tracker.global.nextPointerTag).protectedTags) :
+      (registeredGlobal (allocatedTracker {tracker with retagMode := .FnEntry} room) tracker.global.nextPointerTag).protectedTags)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let ptr := Pointer.new (Provenance.concrete id root) (Size.ofBytes (base + offset))
     let copied := CurrentCallTypedSourceCopy.copiedFrame options remaining span frame localId valid ptr len
     let validCopied : localId < copied.locals.size := by simpa only [copied, CurrentCallTypedSourceCopy.copiedFrame, Array.size_set] using valid

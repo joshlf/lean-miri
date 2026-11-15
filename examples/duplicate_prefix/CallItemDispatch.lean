@@ -16,7 +16,7 @@ noncomputable def itemStage (h : RootHooks) (fn : CallInstance) (abi : FnAbi TyI
  theorem item_step (h : RootHooks) (fn : CallInstance) (definition : DefId) (abi : FnAbi TyId)
     (args : Array (FnArg Provenance)) (location : Bool) (destination : RuntimeStackPlace Provenance)
     (target : Option BasicBlockId) (unwind : UnwindAction) (callerAbi : ABI.ExternAbi)
-    (kind : fn.kind = .Item definition) (canUnwind : h.abiCanUnwind abi = true)
+    (kind : h.instanceKind fn = pure (.Item definition)) (canUnwind : h.abiCanUnwind abi = true)
     (rustCall : h.isRustCall callerAbi = false) :
     Call.initFnCallStep h () ⟨.Instance fn, callerAbi, some abi, args, location, destination, target, unwind⟩ =
       itemStage h fn abi args location destination target unwind := by

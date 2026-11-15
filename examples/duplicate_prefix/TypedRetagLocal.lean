@@ -105,7 +105,9 @@ theorem retag_pointer_local {K U C F A : Type} [DecidableEq K]
     (pointeeAlign : place.layout.layout.align.abi = Align.ONE)
     (unpin : h.isUnpin place.layout.ty = pure true)
     (unsafeUnpin : h.isUnsafeUnpin place.layout.ty = pure true)
-    (race : ambient.machine.dataRace = none) :
+    (race : ambient.machine.dataRace = none)
+    (definitionReady : ∃ definition, h.instanceDefinition frame.functionInstance = pure definition := by
+      first | assumption | (intro _; assumption) | exact ⟨_, by with_unfolding_all rfl⟩) :
     TypedRetag.retagPtrValue h budget
       (RetagReferencePlace.sliceValue access.runtime.base
         (Pointer.new (.concrete id rootTag) (Size.ofBytes (base + offset))) len reference)

@@ -70,7 +70,9 @@ theorem integer
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value := (RetagReferencePlace.integerSliceValue address 0 reference).imm
     let copiedFrame := {frame with locals := (frame.locals.set localId
       {value := .live (.immediate value),layout := frame.locals[localId].layout} valid)}
@@ -124,7 +126,9 @@ theorem wildcard_miss
     (metadata : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).metadata = PreparedReflection.actual.runtime)
     (notConstructed : (EvalProjectionMachine.arrays.get (Storage.withCurrent frames frame machine)).entries.any (·.value.ty == 4) = false)
     (view : RuntimeStackPlace Provenance)
-    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference) :
+    (destination : view.toRuntimePlace = LocalPlaces.localRuntimePlace frames.size frame localId reference)
+    (validInstance : frame.functionInstance < PreparedReflection.actual.program.input.instances.size := by
+      first | assumption | (rw [callee]; with_unfolding_all decide +kernel) | (rw [function]; with_unfolding_all decide +kernel) | (rw [fnInstance]; with_unfolding_all decide +kernel) | with_unfolding_all decide +kernel) :
     let value := (RetagReferencePlace.sliceValue (ActualReferenceContext.config options remaining span).access.runtime.base
       (Pointer.new .wildcard (Size.ofBytes address)) 0 reference).imm
     let copiedFrame := {frame with locals := (frame.locals.set localId

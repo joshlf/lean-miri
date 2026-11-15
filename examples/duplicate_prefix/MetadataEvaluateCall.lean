@@ -38,18 +38,18 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
         .Rust,some PtrMetadataHelper.abi,false⟩ (Storage.withCurrent frames frame machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
   let state := Storage.withCurrent frames frame machine
-  have fnOp : h.evalOperandAt () (OperandPath.instruction "function") PtrMetadataHelper.resolved.function state =
+  have fnOp : h.evalOperand ()  PtrMetadataHelper.resolved.function state =
       .ok ⟨.immediate .uninit,MetadataCallQueries.functionLayout⟩ state := by
     rw [function_constant]
     exact MetadataFunctionConstant.function_operand options limits remaining span source debug frames frame machine
       (congrArg (·.index) identity) located callee
-  have argOp : Call.evalFnCallArgumentAt h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨0,#[]⟩)
-      (OperandPath.argument 0) state = .ok (.Copy ⟨.immediate value,PtrMetadataHelper.rawLayout⟩) state := by
+  have argOp : Call.evalFnCallArgument h () argument.operand (Call.moveDefinitelyDisjoint #[argument] ⟨0,#[]⟩)
+       state = .ok (.Copy ⟨.immediate value,PtrMetadataHelper.rawLayout⟩) state := by
     rw [argument_operand,disjoint]
     exact CallMoveLocal.move_cached options limits remaining span debug frames frame machine 2 PtrMetadataHelper.rawLayout value
-      valid live cached RootPointerCopy.raw_sized noClocks ghost _
-  have resolve : h.resolve () 10 PtrMetadataHelper.resolved.callee.args state = .ok PtrMetadataHelper.resolved.callee state := by
-    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 10 PtrMetadataHelper.resolved.callee.args state = _
+      valid live cached RootPointerCopy.raw_sized noClocks ghost
+  have resolve : h.resolve () 13 (PreparedReflection.fixedInstance PtrMetadataHelper.resolved.callee).genericArgs state = .ok PtrMetadataHelper.resolved.callee state := by
+    change (PreparedContracts.actualConfig options () remaining span).calls.compiler.resolve () 13 (PreparedReflection.fixedInstance PtrMetadataHelper.resolved.callee).genericArgs state = _
     rw [(CanonicalConfigFacts.actual_fields options () remaining span).callCompiler]
     exact MetadataCallQueries.resolve_current frames frame machine body identity callee located
   have fnAbi : h.fnAbiOfInstance () PtrMetadataHelper.resolved.callee #[] = pure PtrMetadataHelper.abi := by
@@ -59,10 +59,10 @@ theorem evaluate (options : EvalConfigurationCore.Options) (limits : ExecutionMa
     funext state
     exact MetadataCallFacts.actual_metadata_caller_location options () remaining span limits state
   exact CallOneArgumentAt.eval_callee_one_at h () PtrMetadataHelper.resolved.function argument ⟨0,#[]⟩
-    ⟨.immediate .uninit,MetadataCallQueries.functionLayout⟩ state state state .Rust 10 PtrMetadataHelper.resolved.callee.args
-    PtrMetadataHelper.resolved.callee 10 PtrMetadataHelper.abi false (.Copy ⟨.immediate value,PtrMetadataHelper.rawLayout⟩)
+    ⟨.immediate .uninit,MetadataCallQueries.functionLayout⟩ state state state .Rust 13 (PreparedReflection.fixedInstance PtrMetadataHelper.resolved.callee).genericArgs
+    PtrMetadataHelper.resolved.callee 13 PtrMetadataHelper.abi false (.Copy ⟨.immediate value,PtrMetadataHelper.rawLayout⟩)
     fnOp argOp (MetadataCalleeLeaves.signature options limits remaining span cmp)
-    (MetadataCalleeLeaves.kind options limits remaining span) resolve PtrMetadataHelper.callee_kind fnAbi callerLocation
+    (MetadataCalleeLeaves.kind options limits remaining span) resolve (MetadataCalleeLeaves.instance_kind options limits remaining span) fnAbi callerLocation
 end
 end DuplicatePrefix.MetadataEvaluateCall
 open Lean Elab Command in

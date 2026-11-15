@@ -58,10 +58,10 @@ theorem canonical_move_local
       (PreparedContracts.actualConfig options () remaining span) limits)).compiler.validationInProgress
         (Storage.withCurrent framesBefore frame machine) =
       .ok false (Storage.withCurrent framesBefore frame machine)) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "left") (.Move ⟨5, #[]⟩) none
+      ()  (.Move ⟨5, #[]⟩) none
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate immediate, layout⟩ (Storage.withCurrent framesBefore frame machine) := by
   let hooks := ExecutionMachine.operandHooks (ExecutionMachine.withValidation
@@ -72,7 +72,7 @@ theorem canonical_move_local
     (OperandDispatch.wholeLocal 5) ⟨.immediate immediate, layout⟩
     (Storage.withCurrent framesBefore frame machine)
   exact OperandDispatch.evalOperandAt_move_wholeLocal hooks ()
-    (OperandPath.rvalue "left") 5 none _ _ _ read check
+     5 none _ _ _ read check
 
 theorem place_check_skipped
     [DecidableEq MiriMemoryKind]
@@ -228,7 +228,7 @@ theorem canonical_destination_local_uncached
   change PlaceDynamic.evalPlace projection () ⟨4, #[]⟩ true state = _
   exact evaluated
 
-/-- The root site's actual `OperandMachine.evalOperandAt` selects the exact
+/-- The root site's actual `OperandMachine.evalOperand` selects the exact
 compiler constant site and evaluates literal zero through the prepared
 constant evidence. -/
 theorem canonical_zero_constant_operand
@@ -243,10 +243,10 @@ theorem canonical_zero_constant_operand
     (bodyIndex : frame.bodyIdentity.index = RootBody.reflected.body.identity.index)
     (location : frame.location = .mir ⟨0, 4⟩)
     (fnInstance : frame.functionInstance = RootBody.reflected.functionInstance) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () (OperandPath.rvalue "right")
+      ()
       (.Constant RootConstantStage.zeroConstant) (some RootCompilerFacts.usizeLayout)
       (Storage.withCurrent framesBefore frame machine) =
     .ok ⟨.immediate (.scalar (Scalar.fromScalarInt (ScalarInt.ofUInt64 0))),
@@ -255,31 +255,11 @@ theorem canonical_zero_constant_operand
   let state := Storage.withCurrent framesBefore frame machine
   have fields := CanonicalConfigFacts.actual_fields options () remaining span
   obtain ⟨externStatic, constantAt⟩ := fields.constantAt debugOff
-  have site : CompilerOperandSites.current
-      ((OperandPath.rvalue "right").push (.field "constant"))
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok RootCompilerFacts.zeroGuardSite (Storage.withCurrent framesBefore frame machine) := by
-    change CompilerOperandSites.current
-      ((OperandPath.rvalue "right").push (.field "constant"))
-      (Storage.withCurrent framesBefore frame machine) = _
-    simp [CompilerOperandSites.current, MachineHooks.currentFrame,
-      Storage.withCurrent, Stack.currentFrame?, RootCompilerFacts.zeroGuardSite,
-      bodyIndex, location, bind, EStateM.bind, get, getThe,
-      MonadStateOf.get, EStateM.get, pure, EStateM.pure,
-      OperandPath.rvalue]
-  have siteLit : CompilerOperandSites.current
-      #[.field "kind", .field "rvalue", .field "right", .field "constant"]
-      (Storage.withCurrent framesBefore frame machine) =
-      .ok RootCompilerFacts.zeroGuardSite (Storage.withCurrent framesBefore frame machine) := by
-    simpa [OperandPath.rvalue] using site
-  have result := RootConstantStage.zero_eval_at_bound source config.functions
-    config.arithmetic externStatic framesBefore frame machine bodyIndex location fnInstance
-  change config.operands.constantAt ()
-      ((OperandPath.rvalue "right").push (.field "constant"))
-      RootConstantStage.zeroConstant (some RootCompilerFacts.usizeLayout) state = _
+  change config.operands.constant () RootConstantStage.zeroConstant
+    (some RootCompilerFacts.usizeLayout) state = _
   rw [constantAt]
-  simpa [siteLit, state, config, RootConstantStage.zeroConstant,
-    OperandPath.rvalue, bind, EStateM.bind, pure, EStateM.pure] using result
+  exact RootConstantStage.zero_eval_at_bound source config.functions
+    config.arithmetic externStatic framesBefore frame machine bodyIndex location fnInstance
 
 /-- Every pre-write stage of the root's `n == 0` guard assignment succeeds
 through the actual assembled hooks. The conclusion is the real final write
@@ -355,11 +335,11 @@ theorem canonical_root_eq_to_write
     RootCompilerFacts.usizeLayout boolLayout n 0 state classification boolQuery usizeWidth
   have destLayout : result.layout = hooks.placeLayout destValue := by
     rfl
-  have evalLeft : hooks.evalOperandAt () (OperandPath.rvalue "left") (.Move ⟨5, #[]⟩) none state =
+  have evalLeft : hooks.evalOperand ()  (.Move ⟨5, #[]⟩) none state =
       .ok leftOp state := by
     simpa [hooks, config, leftOp, nScalar, ExecutionMachine.rvalueHooks,
       ExecutionMachine.operandHooks, ExecutionMachine.withValidation] using left
-  have evalRight : hooks.evalOperandAt () (OperandPath.rvalue "right")
+  have evalRight : hooks.evalOperand ()
       (.Constant RootConstantStage.zeroConstant) (some leftImm.layout) state =
       .ok rightOp state := by
     simpa [hooks, config, rightOp, leftImm, ExecutionMachine.rvalueHooks,

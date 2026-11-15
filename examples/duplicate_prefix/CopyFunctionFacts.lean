@@ -12,42 +12,26 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 
 noncomputable def functionLayout : LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 31).toOption.getD RootCompilerFacts.boolLayout
+  ((PreparedReflection.actual.layoutResults[31]'(by decide +kernel))).toOption.getD RootCompilerFacts.boolLayout
 
-theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 31 = .ok functionLayout := by
-  decide +kernel
+theorem functionLayout_query : PreparedReflection.actual.runtime.lookup 31 = .ok functionLayout := by decide +kernel
 
 theorem functionLayout_shape : functionLayout.ty = 31 ∧ functionLayout.layout.isSized = true ∧
     functionLayout.layout.isZst = true := by
   decide +kernel
 
 theorem function_kind : CompilerFunctionFacts.kind PreparedReflection.actual.compiler.functions 31 =
-    .ok (.FnDef HelperCompilerFacts.copyCall.callee.defId HelperCompilerFacts.copyCall.callee.args) := by
+    .ok (.FnDef (PreparedReflection.fixedInstance HelperCompilerFacts.copyCall.callee).instanceKind.defId (PreparedReflection.fixedInstance HelperCompilerFacts.copyCall.callee).genericArgs) := by
   with_unfolding_all rfl
 
-def rustExternAbiJson : Lean.Json := Lean.Json.mkObj
-  [("source_spelling", Lean.Json.str "Rust"), ("kind", Lean.Json.str "rust"),
-   ("status", Lean.Json.str "supported"), ("unwind", Lean.Json.null)]
+def rustExternAbi : ABI.ExternAbi := .Rust
 
 theorem function_signature_query : CompilerFunctionFacts.signature
-    PreparedReflection.actual.compiler.functions 31 = .ok (3, rustExternAbiJson) := by
+    PreparedReflection.actual.compiler.functions 31 = .ok (3, rustExternAbi) := by
   with_unfolding_all rfl
 
-theorem decode_rust_extern_abi (cmp : ProjectionMetadataFacts.NullComparator) :
-    CompilerExternAbi.decode rustExternAbiJson = .ok .Rust := by
-  have status : rustExternAbiJson.getObjVal? "status" = .ok (.str "supported") := by
-    with_unfolding_all rfl
-  have unwind : rustExternAbiJson.getObjVal? "unwind" = .ok .null := by
-    with_unfolding_all rfl
-  have kind : rustExternAbiJson.getObjVal? "kind" = .ok (.str "rust") := by
-    with_unfolding_all rfl
-  unfold CompilerExternAbi.decode
-  simp [status, unwind, kind, cmp,bind,Except.bind,pure,Except.pure,Lean.Json.getStr?]
-  exact cmp
-
 theorem runtime_function_type_id :
-    (HelperCompilerFacts.copyCall.source.getObjVal? "function_type").bind
-      (fun fnType => (fnType.getObjVal? "type_id").bind Lean.Json.getNat?) = .ok 31 := by
+    HelperCompilerFacts.copyCall.source.functionType = some 31 := by
   with_unfolding_all rfl
 
 theorem function_abi : CompilerInstanceAbi.abiOfInstance
@@ -60,7 +44,8 @@ theorem function_body : CallResolution.loadedBodyOfInstance
       .ok HelperCompilerFacts.copyBody := by
   exact HelperCompilerFacts.copy_body_eq
 
-theorem function_kind_matches_call : HelperCompilerFacts.copyCall.callee = ⟨.Item HelperCompilerFacts.copyCall.callee.defId, HelperCompilerFacts.copyCall.callee.args⟩ := by
+theorem function_kind_matches_call : (PreparedReflection.fixedInstance HelperCompilerFacts.copyCall.callee).instanceKind =
+    .Item (PreparedReflection.fixedInstance HelperCompilerFacts.copyCall.callee).instanceKind.defId := by
   with_unfolding_all rfl
 
 theorem root_bundle_body :
@@ -76,8 +61,7 @@ open Lean Elab Command in
 run_cmd do
   for declaration in [``DuplicatePrefix.CopyFunctionFacts.functionLayout_query,
       ``DuplicatePrefix.CopyFunctionFacts.functionLayout_shape, ``DuplicatePrefix.CopyFunctionFacts.function_kind,
-      ``DuplicatePrefix.CopyFunctionFacts.function_signature_query, ``DuplicatePrefix.CopyFunctionFacts.decode_rust_extern_abi,
-      ``DuplicatePrefix.CopyFunctionFacts.runtime_function_type_id, ``DuplicatePrefix.CopyFunctionFacts.function_abi,
+      ``DuplicatePrefix.CopyFunctionFacts.function_signature_query, ``DuplicatePrefix.CopyFunctionFacts.runtime_function_type_id, ``DuplicatePrefix.CopyFunctionFacts.function_abi,
       ``DuplicatePrefix.CopyFunctionFacts.function_body, ``DuplicatePrefix.CopyFunctionFacts.function_kind_matches_call,
       ``DuplicatePrefix.CopyFunctionFacts.root_bundle_body] do
     for dependency in (←collectAxioms declaration) do

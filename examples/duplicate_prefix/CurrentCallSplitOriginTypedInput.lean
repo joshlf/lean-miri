@@ -4,7 +4,7 @@ import duplicate_prefix.RawRootInvocation
 import duplicate_prefix.OrdinaryPhysicalValidity
 import Miri.Input.InitialMachine
 
-/-! A constructed CURRENT machine packet using the fixed 718-ID catalog.
+/-! A constructed CURRENT machine packet using the fixed 691-ID catalog.
 The source tree is the actual completed split-origin trace; the byte storage
 comes from actual checked allocation constructors. This does not assert a
 historical Rust execution or whole-function admission. -/
@@ -23,10 +23,10 @@ private def checked {E A : Type} : (result : Except E A) → result.isOk = true 
   | .ok value, _ => value
   | .error _, impossible => False.elim (by cases impossible)
 
-def sourceId : AllocId := ⟨719,by decide⟩
-def destinationId : AllocId := ⟨720,by decide⟩
+def sourceId : AllocId := ⟨692,by decide⟩
+def destinationId : AllocId := ⟨693,by decide⟩
 
-theorem initial_supply : PreparedReflection.actual.initialMemory.nextAllocId = 719 := rfl
+theorem initial_supply : PreparedReflection.actual.initialMemory.nextAllocId = 692 := rfl
 
 /-- Actual checked allocation constructors, with explicit zero-storage backend. -/
 def zeroedStorage (size : Size) (_align : Align) : Option (Array UInt8) := some (Array.replicate size.bytes.toNat 0)
@@ -42,7 +42,7 @@ def destinationEntry : LocalAllocation Provenance BorrowTree MiriMemoryKind := �
 noncomputable def memory : MemoryState Provenance BorrowTree MiriMemoryKind :=
   {PreparedReflection.actual.initialMemory.setIssuedIds
       (PreparedReflection.actual.memoryData.issuedIds ++ #[sourceId,destinationId]) with
-    nextAllocId := 721
+    nextAllocId := 694
     live := #[(sourceId,sourceEntry),(destinationId,destinationEntry)]}
 
 def host : Machine.MinimalHost where
@@ -91,7 +91,7 @@ noncomputable def before : MachineHooks.MachineState MiriMemoryKind Machine.Root
     addressMode := .managed
     generation := some ⟨⟨12288,9223372036854775807⟩,⟨0,0,#[]⟩⟩ }
   let runtime := {machine.user.payload.payload.user.runtime with
-    extras := {allocations := #[(sourceId,⟨none,#[]⟩),(destinationId,⟨none,#[]⟩)]}}
+    extras := {allocations := #[(sourceId,{ weakMemory := none }),(destinationId,{ weakMemory := none })]}}
   let world := {machine.user.payload.payload.user with runtime,types := PreparedReflection.actual.types,backend := .none,host := host,choices := {inputs := #[]}}
   let stored := {machine.user.payload.payload with
     registry := ⟨ThreadId.MAIN_THREAD,#[]⟩
@@ -156,10 +156,10 @@ theorem frame_borrow : root.frame.extra.borrowTracker=some ({} : FrameState) :=
 theorem fixed_metadata : machine.user.payload.payload.user.types=PreparedReflection.actual.types := rfl
 
 theorem catalog_ids_bounded :
-    PreparedReflection.actual.memoryData.issuedIds.all (fun id=>id.value<719)=true ∧
-    PreparedReflection.actual.memoryData.globals.all (fun row=>row.allocId.value<719)=true := by decide +kernel
+    PreparedReflection.actual.memoryData.issuedIds.all (fun id=>id.value<692)=true ∧
+    PreparedReflection.actual.memoryData.globals.all (fun row=>row.allocId.value<692)=true := by decide +kernel
 
-theorem current_supply : machine.memory.nextAllocId=721 ∧
+theorem current_supply : machine.memory.nextAllocId=694 ∧
     machine.memory.issuedIds=PreparedReflection.actual.memoryData.issuedIds++#[sourceId,destinationId] ∧
     machine.borrowTracker=some tracker ∧ tracker.global.nextPointerTag=tag 6 ∧
     tracker.global.rootPointerTags=#[(sourceId,tag 1),(destinationId,tag 5)] := ⟨rfl,rfl,rfl,rfl,rfl⟩

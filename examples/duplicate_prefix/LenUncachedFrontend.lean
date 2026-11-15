@@ -17,8 +17,8 @@ theorem compute_local11 (frames : Array CompilerFrameContext.ActualFrame) (frame
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
     CompilerFrameContext.computeLocalLayout PreparedReflection.actual.compiler 11
       (Storage.withCurrent frames frame machine) = .ok RootCompilerFacts.usizeLayout (Storage.withCurrent frames frame machine) := by
-  have normalized : CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 11 = .ok 5 := by
-    unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+  have normalized : CompilerFrameContext.localType PreparedReflection.actual.compiler frame 11 = .ok 5 := by
+    unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
     rw [body,identity,callee]
     with_unfolding_all rfl
   unfold CompilerFrameContext.computeLocalLayout

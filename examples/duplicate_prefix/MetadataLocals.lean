@@ -10,9 +10,14 @@ set_option backward.dsimp.instances true
 
 def inputBody : LoweredBody := PreparedReflection.actual.program.bundle.bodies[PtrMetadataHelper.body.identity.index]'(by decide +kernel)
 def localSpan (id : Fin 3) : SourceSpanData :=
-  (inputBody.input.locals[id.val]'(by
-    have size : inputBody.input.locals.size = 3 := by rfl
-    omega)).sourceInfo.span
+  let spanId := (inputBody.input.localSources[id.val]'(by
+    have size : inputBody.input.localSources.size = 3 := by rfl
+    omega)).spanId
+  PreparedReflection.actual.program.bundle.spans[spanId]'(by
+    have valid : ∀ i : Fin 3, (inputBody.input.localSources[i.val]'(by
+      have size : inputBody.input.localSources.size = 3 := by rfl
+      omega)).spanId < PreparedReflection.actual.program.bundle.spans.size := by decide +kernel
+    exact valid id)
 def spanQuery (id : Fin 3) := PreparedReflection.actual.program.bundle.spans.toList.idxOf? (localSpan id)
 theorem body_of_frame (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = PtrMetadataHelper.body.body)
@@ -27,8 +32,8 @@ theorem normalized_local1 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = PtrMetadataHelper.body.body)
     (identity : frame.bodyIdentity = PtrMetadataHelper.body.identity)
     (callee : frame.functionInstance = PtrMetadataHelper.resolved.callee) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 1 = .ok 154 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 1 = .ok 49 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 
@@ -47,7 +52,7 @@ theorem compute_local1
   simp only [MachineHooks.currentFrame, Storage.withCurrent, Stack.currentFrame?, Array.back?_push,
     bind, EStateM.bind, get, getThe, MonadStateOf.get, EStateM.get, pure, EStateM.pure]
   rw [normalized]
-  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 154 with
+  with_unfolding_all change (match PreparedReflection.actual.runtime.lookup 49 with
     | .ok value => EStateM.Result.ok value (Storage.withCurrent frames frame machine)
     | .error error => EStateM.Result.error (StepError.unsupported s!"compiler frame query: {toString error}")
         (Storage.withCurrent frames frame machine)) = _

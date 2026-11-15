@@ -38,7 +38,7 @@ theorem protect (options : EvalConfigurationCore.Options) (remaining : Nat)
       output.id=family.allocation ∧output.offset=offset.toNat ∧output.original=family.at allocationRoot ∧
       post.machine.borrowTracker=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag) ∧
       post.stack=(Storage.withCurrent frames (registeredFrame frame borrowFrame family.allocation tracker.global.nextPointerTag) machine).stack ∧
-      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation ⟨none,#[]⟩ with
+      post.machine={MemoryExtras.putAllocation (GlobalDataOnlyActualConfig.extras options) machine family.allocation { weakMemory := none } with
         memory:={machine.memory with live:=((machine.memory.live.filter (fun row=>row.1!=family.allocation)).push (family.allocation,⟨.machine .global,output.window.allocation⟩))},
         borrowTracker:=some (registeredTracker (allocatedTracker tracker fresh) tracker.global.nextPointerTag)} := by
   obtain ⟨post,output,newCtx,current,actual,familyEq,allocationEq,cellsEq,idEq,offsetEq,originalEq,outputTag,outputNodes,tracked,stack,machineEq,addresses,live,extras⟩:=
@@ -81,7 +81,7 @@ theorem protect (options : EvalConfigurationCore.Options) (remaining : Nat)
       rw [allocationEq];exact copyReady.storage
     · change CurrentCallBoolProtection.WindowReady post.machine current.backing.id start len.toNat
       rw [currentId]
-      exact CurrentCallOtherAllocationWindow.ready copyReady.profile family.allocation ⟨none,#[]⟩ (Ne.symm different) extras
+      exact CurrentCallOtherAllocationWindow.ready copyReady.profile family.allocation { weakMemory := none } (Ne.symm different) extras
   have tagsDifferent : next.tag≠output.node.tag := by
     have older:=GeneralBorrowParentTagInvariant.parent_below_fresh source.role.backing.allocation.extra tracker.global
       source.runtime source.grant source.node source.nodeAt

@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S05DiagnosticRootInvocation
 import duplicate_prefix.PositiveRootInstalledFrame
 import duplicate_prefix.S02SeparateDestinationRejectedPurePrefix
@@ -54,7 +55,7 @@ theorem reaches_shared_site
     (maskLength : slotEntry.allocation.initializationMask.len = slotEntry.allocation.byteSize)
     (provenance : slotEntry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : before.user.payload.payload.user.backend = .none)
-    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,⟨none,#[]⟩))
+    (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == slotId) = some (slotId,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (slotId) }))
     (thread : Miri.Concurrency.ThreadRecord)
     (active : before.threads.activeThread? = some thread)
     (noCache : thread.topUserRelevantFrame = none)
@@ -99,7 +100,7 @@ theorem reaches_shared_site
   let next : MachineHooks.BorrowState := ⟨TypedRetagGeneric.protectedGlobal tracker.global fresh,tracker.retagMode⟩
   let argsMachine := resultMachine (RawRootInvocation.machine #[] before) tracker fresh id entry parentTag
   let argsFrame := RootArgumentsTwo.result (PositiveRootArguments.firstDone raw adjusted ({} : FrameState) id tracker.global.nextPointerTag) n
-  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨601⟩}
+  let changed := {argsFrame.frame with location := FrameLocation.unwinding ⟨2⟩}
   let owned := ({} : FrameState).addProtector id tracker.global.nextPointerTag
   let borrowed := ReturnProtection.borrowedState #[] changed owned argsMachine next slotFresh slotId slotEntry
     (PhysicalMachineWrite.slotTree slotRoot next.global.nextPointerTag 1 false)

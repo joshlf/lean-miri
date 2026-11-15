@@ -33,11 +33,11 @@ theorem finish (options : EvalConfigurationCore.Options) (limits : ExecutionMach
       (Storage.withCurrent frames frame machine) =
       .ok () (Storage.withCurrent frames (AsMutDone.doneFrame {frame with location := .unwinding preamble}) machine) := by
   let h := ExecutionMachine.callHooks (PreparedContracts.actualConfig options () remaining span) limits
-  let f0 := {frame with location := .unwinding ⟨612⟩}
+  let f0 := {frame with location := .unwinding ⟨71⟩}
   let fp := {frame with location := .unwinding preamble}
   have query := AsMutLocalStages.span0 options limits remaining span frames frame machine body identity callee
-  have set0 := CallEntryLocals.set_span options limits remaining span frames frame machine ⟨612⟩
-  change AsMutCallCore.spanAt h ⟨612⟩ (Storage.withCurrent frames frame machine) = _ at set0
+  have set0 := CallEntryLocals.set_span options limits remaining span frames frame machine ⟨71⟩
+  change AsMutCallCore.spanAt h ⟨71⟩ (Storage.withCurrent frames frame machine) = _ at set0
   have compat : h.checkArgumentCompat () HelperCompilerFacts.asMutPtrAbi.ret HelperCompilerFacts.asMutPtrAbi.ret
       (Storage.withCurrent frames f0 machine) = .ok true (Storage.withCurrent frames f0 machine) := by
     change (PreparedContracts.actualConfig options () remaining span).calls.compiler.checkArgumentCompat () _ _ _ = _

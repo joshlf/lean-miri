@@ -9,10 +9,8 @@ set_option backward.dsimp.instances true
 def candidates (nodes : Array TypeNode) (elements : Array TypeId) : Except RuntimeMetadataError (Array TypeId) := do
   let mut result := #[]
   for node in nodes do
-    if node.shapeKind == .tuple && node.shapeStatus == .supported then
-      let shape ← RuntimeMetadata.jsonField node.payload "shape"
-      let values ← RuntimeMetadata.array shape "elements"
-      let ids ← values.mapM fun value => RuntimeMetadata.number value "type_id"
+    if node.shapeKind == .tuple then
+      let .tuple ids := node.shape | throw (.invalid "tuple type" "shape mismatch")
       if ids == elements then result := result.push node.id
   return result
 
@@ -22,10 +20,10 @@ theorem tuple_eq (metadata : RuntimeMetadata) (elements : Array TypeId) :
       unless values.size == 1 do throw (.unsupported "ambiguous or absent exact tuple type")
       metadata.lookup (← RuntimeMetadata.require values[0]? "tuple type")) := by
   unfold RuntimeMetadata.tupleLayout candidates
-  simp only [bind, Except.bind, pure, Except.pure]
-  split <;> simp_all
+  simp only [bind_assoc, pure_bind, bind_pure]
+  rfl
 
-theorem actual_candidates : candidates RootMetadataQueries.context.runtime.source.types #[5,0] = .ok #[205] := by
+theorem actual_candidates : candidates RootMetadataQueries.context.runtime.source.types #[5,0] = .ok #[100] := by
   with_unfolding_all rfl
 
 theorem find_kind_of_projection (metadata : RuntimeMetadata) (kind : TypeShapeKind) (ty : TypeId)

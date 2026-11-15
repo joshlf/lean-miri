@@ -35,8 +35,8 @@ noncomputable def unitNodeQuery :=
   PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2
 theorem contextNodeEq :
     PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2 =
-      PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.toRuntimeMetadata.node 2 := by
-  change RootMetadataQueries.context.runtime.node 2 = RootMetadataQueries.context.runtime.toRuntimeMetadata.node 2
+      PreparedReflection.actual.runtime.node 2 := by
+  change RootMetadataQueries.context.runtime.node 2 = PreparedReflection.actual.runtime.node 2
   exact RootMetadataQueries.context_node 2
 theorem unit_node_supported : unitNodeQuery.isOk = true := by
   change (PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context.runtime.node 2).isOk = true
@@ -241,8 +241,8 @@ theorem language_local2_normalized (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = CopyPreconditions.Bodies.checkLanguage.loaded.body)
     (identity : frame.bodyIdentity = CopyPreconditions.Bodies.checkLanguage.loaded.identity)
     (callee : frame.functionInstance = CopyPreconditions.Bodies.checkLanguage.fnInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 2 = .ok 2 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 2 = .ok 2 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body, identity, callee]
   with_unfolding_all rfl
 

@@ -103,15 +103,15 @@ theorem step
   have typeCheck := RootLocalStages.operand_check_skipped options limits () (remaining+1) span
     debugOff (OperandDispatch.wholeLocal 13) op accounted
   have operand := OperandDispatch.evalOperandAt_move_wholeLocal hooks ()
-    (OperandPath.instruction "condition") 13 none accounted accounted op localRead typeCheck
-  have operand' : OperandMachine.evalOperandAt hooks () (OperandPath.instruction "condition")
+     13 none accounted accounted op localRead typeCheck
+  have operand' : OperandMachine.evalOperand hooks ()
       (.Move ⟨13,#[]⟩) none accounted = .ok op accounted := by
     simpa only [OperandDispatch.wholeLocal] using operand
   have scalarRead := RootLocalStages.canonical_read_scalar options limits (remaining+1) span
     accounted scalar RootCompilerFacts.boolLayout ⟨primitive, range, readable⟩
   have read : (do
       PlaceMachine.readImmediate (ExecutionMachine.withValidation config limits).access
-        (← OperandMachine.evalOperandAt hooks () (OperandPath.instruction "condition")
+        (← OperandMachine.evalOperand hooks ()
           (.Move ⟨13,#[]⟩) none)) accounted =
       .ok (ScalarOperations.boolImmediate false RootCompilerFacts.boolLayout) accounted := by
     simp only [bind,EStateM.bind,operand']

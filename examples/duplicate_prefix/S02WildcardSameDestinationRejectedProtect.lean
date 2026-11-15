@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02SameDestinationZeroCore
 import duplicate_prefix.S02SameAllocationProtectSource
 import duplicate_prefix.S02ProtectUninitOldActivity
@@ -28,7 +29,7 @@ theorem invoke
     (frame : CompilerFrameContext.ActualFrame) (owned : FrameState)
     (frameBorrow : frame.extra.borrowTracker = some owned)
     (extras : before.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == input.id) =
-      some (input.id,⟨none,#[]⟩))
+      some (input.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (before.user.payload.payload.user.runtime.extras.allocations) (input.id) }))
     (sourceTag : BorTag) (sourceChild sourceSelected : UniIndex) (sourceMaximum : Option BorTag)
     (sourceOffset sourceLen : UInt64) (sourceBefore : TreeNode)
     (sourceTagged : input.entry.allocation.extra.indexOfTag sourceTag = some sourceChild)
@@ -51,7 +52,7 @@ theorem invoke
       ∃ packet : S02SameDestinationZeroCore.Packet
         (CallEntryFacts.doneRootFrame
           {TypedBorrowSteps.registeredFrame frame owned input.id input.tracker.global.nextPointerTag with
-            location := .unwinding ⟨559⟩})
+            location := .unwinding ⟨0⟩})
         (S04ProtectUninit.finished before place input #[] frame owned fresh tree updated).machine place,
         packet.sourceTag = sourceTag ∧ packet.sourceChild = sourceChild ∧ packet.sourceSelected = sourceSelected ∧
         packet.sourceMaximum = sourceMaximum ∧ packet.sourceOffset = sourceOffset ∧ packet.sourceLen = sourceLen ∧
@@ -132,7 +133,7 @@ theorem invoke
     extra bytes len mutable maskWf maskLen pointers shape.1 shape.2
   let after := S04ProtectUninit.finished before place input #[] frame owned fresh tree updated
   let installed := CallEntryFacts.doneRootFrame
-    {TypedBorrowSteps.registeredFrame frame owned input.id input.tracker.global.nextPointerTag with location := .unwinding ⟨559⟩}
+    {TypedBorrowSteps.registeredFrame frame owned input.id input.tracker.global.nextPointerTag with location := .unwinding ⟨0⟩}
   let borrowFrame := owned.addProtector input.id input.tracker.global.nextPointerTag
   let tracker := TypedBorrowSteps.registeredTracker (ReferenceBorrowDriver.allocatedTracker input.tracker fresh)
     input.tracker.global.nextPointerTag

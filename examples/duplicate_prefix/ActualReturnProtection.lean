@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.ReturnMemoryWrite
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
@@ -44,7 +45,7 @@ theorem protect_bool
     (maskLength : entry.allocation.initializationMask.len = entry.allocation.byteSize)
     (provenance : entry.allocation.provenanceMap = ProvenanceMap.new)
     (noBackend : machine.user.payload.payload.user.backend = .none)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (ghost : machine.user.payload.ghost = false) :
     let child := tracker.global.nextPointerTag
     let borrowed := ReturnProtection.borrowedState frames frame borrowFrame machine tracker fresh id entry

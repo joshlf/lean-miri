@@ -13,26 +13,8 @@ theorem normalized_local19 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 19 = .ok 9 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
-  rw [body,identity,callee]
-  with_unfolding_all rfl
-
-theorem normalize_cast (options : EvalConfigurationCore.Options) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
-    (frames : Array CompilerFrameContext.ActualFrame) (frame : CompilerFrameContext.ActualFrame)
-    (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
-    (body : frame.body = RootBody.reflected.body.body)
-    (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
-    (callee : frame.functionInstance = RootBody.reflected.functionInstance)
-    (location : frame.location = .mir ⟨7,6⟩) :
-    (PreparedContracts.actualConfig options () remaining span).rvalues.normalize () 9
-      (Storage.withCurrent frames frame machine) = .ok 9 (Storage.withCurrent frames frame machine) := by
-  rw [(CanonicalConfigFacts.actual_fields options () remaining span).rvalueNormalize]
-  unfold CompilerFrameContext.normalizeCastTarget
-  simp only [MachineHooks.currentFrame,Storage.withCurrent,Stack.currentFrame?,Array.back?_push,
-    bind,EStateM.bind,get,getThe,MonadStateOf.get,EStateM.get,pure,EStateM.pure]
-  rw [location]
-  unfold CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 19 = .ok 9 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   with_unfolding_all rfl
 
@@ -77,8 +59,6 @@ theorem evaluate
     (by simpa [cached,LocalPlaces.cachePlaceLayout,Array.getElem_set] using live20)
     (by simpa [cached,LocalPlaces.cachePlaceLayout,Array.getElem_set] using cached20)
     (by decide +kernel) noClocks ghost
-  have normalized := normalize_cast options (remaining+1) span frames cached machine body identity callee location
-  have normalizeHook : hooks.normalize () 9 state = .ok 9 state := normalized
   have reduced := RootPointerCast.to_write options limits (remaining+1) span value dest rfl state shallow
   have v19 : (19 : Miri.MIR.LocalId) < cached.locals.size := by simpa [cached,LocalPlaces.cachePlaceLayout] using valid19
   have write := RootPointerWrite.write_const_pointer_shallow options limits remaining span debugOff fuel validationFuel
@@ -96,9 +76,6 @@ theorem evaluate
   simp only
   rw [operand]
   simp only
-  change (do let ty ← hooks.normalize () 9
-             hooks.cast () ⟨.immediate (.scalar value),CopyCompilerFacts.destPointerLayout⟩ .PtrToPtr ty dest) state = _
-  simp only [bind,EStateM.bind,normalizeHook]
   exact cast
 
 theorem step

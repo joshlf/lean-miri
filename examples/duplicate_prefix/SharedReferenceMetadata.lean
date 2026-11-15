@@ -32,9 +32,10 @@ theorem shared_dereference : CompilerFacts.builtinDeref context 7 true = .ok (so
   with_unfolding_all rfl
 
 noncomputable def sharedLayout : Miri.Interpreter.LocalLayout :=
-  (PreparedReflection.actual.runtime.lookup 7).toOption.getD RootCompilerFacts.sliceLayout
+  ((PreparedReflection.actual.layoutResults[7]'(by decide +kernel))).toOption.getD RootCompilerFacts.sliceLayout
 
 theorem shared_layout_eq : PreparedReflection.actual.runtime.lookup 7 = .ok sharedLayout := by decide +kernel
+
 theorem shared_layout_type : sharedLayout.ty = 7 := by decide +kernel
 theorem shared_layout_sized : sharedLayout.layout.isSized = true := by decide +kernel
 theorem shared_layout_readable : ∃ (pa pb : Miri.ABI.Primitive) (ra rb : Miri.ABI.WrappingRange)

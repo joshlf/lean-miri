@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S02ConcreteArgumentScope
 
 namespace DuplicatePrefix.S02SeparateDestinationTransport
@@ -70,7 +71,7 @@ theorem destination_data_after_argument
         some ⟨input.contract.destination.id,input.contract.destination.base⟩ ∧
       current.user.payload.payload.user.runtime.extras.allocations.find?
         (fun row => row.1 == input.contract.destination.id) =
-        some (input.contract.destination.id,⟨none,#[]⟩) := by
+        some (input.contract.destination.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (current.user.payload.payload.user.runtime.extras.allocations) (input.contract.destination.id) }) := by
   obtain ⟨reference,fresh,actual⟩ := S02ConcreteArgumentScope.argument_body
     id tag address len count input nonempty
   have idEq : id = reference.id := by

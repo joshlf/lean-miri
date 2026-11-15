@@ -4,9 +4,9 @@ set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 namespace DuplicatePrefix.RootCallerLocation
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter
- theorem scope0 : CompilerScopes.sourceScope PreparedReflection.actual.compiler.lifecycle.calls.scopes 1 0 =
+ theorem scope0 : CompilerScopes.sourceScope PreparedReflection.actual.compiler.lifecycle.calls.scopes RootBody.reflected.body.identity.index 0 =
     .ok ⟨none,none⟩ := by with_unfolding_all rfl
- theorem scope1 : CompilerScopes.sourceScope PreparedReflection.actual.compiler.lifecycle.calls.scopes 1 1 =
+ theorem scope1 : CompilerScopes.sourceScope PreparedReflection.actual.compiler.lifecycle.calls.scopes RootBody.reflected.body.identity.index 1 =
     .ok ⟨none,none⟩ := by with_unfolding_all rfl
  theorem source_scope0 (state : CanonicalConfigFacts.RootState) :
     (CompilerVirtualLeaves.make (C := Unit) PreparedReflection.actual.compiler.lifecycle.calls).sourceScope

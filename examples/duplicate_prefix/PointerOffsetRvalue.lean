@@ -77,11 +77,11 @@ theorem evaluate
   have countCached' : cachedFrame.locals[countId].layout = some RootCompilerFacts.usizeLayout := by
     simpa [cachedFrame,LocalPlaces.cachePlaceLayout,Array.getElem_set,differentCount] using countCached
   have leftOperand := RootOperandMove.move_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    pointerId left.imm CopyCompilerFacts.destPointerLayout (OperandPath.rvalue "left")
+    pointerId left.imm CopyCompilerFacts.destPointerLayout
     (if BinOp.Offset.leftHomogeneous then some (hooks.placeLayout dest) else none)
     pointerValid pointerLive' pointerCached' (by decide +kernel) noClocks ghostFalse
   have rightOperand := RootOperandMove.move_cached_local options limits (remaining+1) span debugOff framesBefore cachedFrame machine
-    countId right.imm RootCompilerFacts.usizeLayout (OperandPath.rvalue "right")
+    countId right.imm RootCompilerFacts.usizeLayout
     (if BinOp.Offset.rightHomogeneous then some left.layout else none)
     countValid countLive' countCached' (by decide +kernel) noClocks ghostFalse
   have retain := CanonicalConfigFacts.actual_retain_touched options () (remaining+1) span

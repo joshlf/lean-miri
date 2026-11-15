@@ -54,9 +54,12 @@ theorem argument_compat {State : Type} (queries : LayoutCompat.Queries MIR.TyId 
       (HelperCompilerFacts.asMutPtrAbi.args.getD 0 HelperCompilerFacts.asMutPtrAbi.ret) state = .ok true state := by
   with_unfolding_all rfl
 theorem inline_attr : CompilerVirtualFacts.inlineAttribute
-    PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes HelperCompilerFacts.asMutPtrCall.callee = .ok none := by decide +kernel
+    PreparedReflection.actual.compiler.lifecycle.frames.calls.scopes HelperCompilerFacts.asMutPtrCall.callee = none := by
+  unfold CompilerVirtualFacts.inlineAttribute
+  erw [Reflection.natMap_getElem]
+  decide +kernel
 
-def definitionQuery := PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[HelperCompilerFacts.asMutPtrCall.callee.defId]?
+def definitionQuery := PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[(PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind.defId]?
 theorem definition_supported : definitionQuery.isSome = true := by decide +kernel
 def definition := definitionQuery.get (by simpa using definition_supported)
 theorem definition_eq : definitionQuery = some definition := Option.eq_some_of_isSome definition_supported
@@ -74,7 +77,12 @@ theorem user_relevance {K User Extra : Type} (crates : Array Nat)
   have caller : CompilerRuntimeQueries.requiresCallerLocation
       PreparedReflection.actual.compiler.lifecycle.frames.calls.runtime HelperCompilerFacts.asMutPtrCall.callee = .ok false := AsMutCallFacts.as_mut_ptr_caller_location
   rw [caller]
-  rw [show PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[HelperCompilerFacts.asMutPtrCall.callee.defId]? = some definition from definition_eq]
+  have instanceQuery : CompilerInstance.definitionOf
+      PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.input.instances
+      HelperCompilerFacts.asMutPtrCall.callee = .ok (PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind.defId := by
+    with_unfolding_all rfl
+  simp only [instanceQuery,bind,Except.bind,Except.pure]
+  rw [show PreparedReflection.actual.compiler.lifecycle.frames.calls.calls.program.compilerTables.definitions[(PreparedReflection.fixedInstance HelperCompilerFacts.asMutPtrCall.callee).instanceKind.defId]? = some definition from definition_eq]
   simp [bind, EStateM.bind, pure, EStateM.pure, Except.pure]
   split <;> simp_all [bind, EStateM.bind, pure, EStateM.pure]
   split <;> rfl

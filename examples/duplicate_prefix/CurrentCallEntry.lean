@@ -38,15 +38,15 @@ private theorem tail_of_steps (options : EvalConfigurationCore.Options) (limits 
     (frames : Array CompilerFrameContext.ActualFrame) (root : RootFrame) (machine : Before)
     (place : MPlaceTy Provenance) (after protectedState : RootState)
     (protect : (ExecutionMachine.callHooks (config options remaining span) limits).protectArgument () place
-      (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine) = .ok () protectedState)
+      (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine) = .ok () protectedState)
     (finish : RootEntryFinish.finish (ExecutionMachine.callHooks (config options remaining span) limits)
       protectedState = .ok () after) :
     RootEntryTail.tail (ExecutionMachine.callHooks (config options remaining span) limits) place
       (Storage.withCurrent frames root.frame machine) = .ok () after := by
   have localSpan := CallEntryLocals.root_span0 options limits remaining span frames root.frame machine root.body root.identity root.callee
   have getFrame := CallEntryLocals.get_frame options limits remaining span frames root.frame machine
-  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨601⟩).frame machine
-  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨601⟩).frame machine)
+  have setFrame := CallEntryLocals.set_frame options limits remaining span frames root.frame (atSpan root ⟨2⟩).frame machine
+  have compat := return_abi options limits remaining span (Storage.withCurrent frames (atSpan root ⟨2⟩).frame machine)
   unfold RootEntryTail.tail RootCallCore.spanAt
   simp only [bind,EStateM.bind]
   rw [localSpan]
@@ -99,13 +99,13 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
       ∃ physical : CandidateCurrentBoolUninitWrite.PhysicalWindow (CurrentCallBoolWindow.after source) place,
       ∃ room : source.base.raw.output.global.nextPointerTag.value < 18446744073709551615,
       ∃ updated : Allocation Provenance BorrowTree,
-      let changed := atSpan (RootArgumentsTwo.result firstDone count) ⟨601⟩
+      let changed := atSpan (RootArgumentsTwo.result firstDone count) ⟨2⟩
       let protectedFrame := TypedBorrowSteps.registeredFrame changed.frame source.base.raw.output.frame physical.id source.base.raw.output.global.nextPointerTag
       let retagged := ReturnProtection.borrowedState frames changed.frame source.base.raw.output.frame (CurrentCallBoolWindow.after source)
         ⟨source.base.raw.output.global,tracker.retagMode⟩ room physical.id physical.entry borrowed.output.child.tree
       let finalMachine := {retagged.machine with memory := {retagged.machine.memory with live :=
         ((retagged.machine.memory.live.filter fun row => row.1 != physical.id).push (physical.id,{physical.entry with allocation := updated}))}}
-      let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨559⟩}
+      let finalFrame := CallEntryFacts.doneRootFrame {protectedFrame with location := .unwinding ⟨0⟩}
       firstDone.frame = CurrentCallReferenceEntry.writtenFrame source 1 validCopied ∧
       Call.initStackFrame (ExecutionMachine.callHooks (config options (remaining+1) span) limits) ()
         RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
@@ -137,7 +137,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
   obtain ⟨source,validCopied,firstDone,frameEq,returnEq,arguments⟩ := CurrentCallArguments.arguments options limits remaining span ctx
     machine tracker argument len place call data transported frames (CallEntryFacts.freshRoot before).2 positive count
   let argsRoot := RootArgumentsTwo.result firstDone count
-  let changed := atSpan argsRoot ⟨601⟩
+  let changed := atSpan argsRoot ⟨2⟩
   have frameBorrow : changed.frame.extra.borrowTracker = some source.base.raw.output.frame :=
     CurrentCallBoolProtection.argument_frame source validCopied firstDone frameEq count
   obtain ⟨borrowed,written,physical,room,updated,idEq,pointerEq,offsetEq,protect,extra,mutation,snapshot,readyAfter,sourceBinding,initialized,returnPlace⟩ :=
@@ -180,7 +180,7 @@ theorem invoke (options : EvalConfigurationCore.Options) (limits : ExecutionMach
   change CallEntryFacts.rawPushedState frames before (.memory place) = Storage.withCurrent frames initialRoot.frame machine at rawEq
   have getFrame := CallEntryLocals.get_frame options limits (remaining+1) span frames initialRoot.frame machine
   have setFrame := CallEntryLocals.set_frame options limits (remaining+1) span frames initialRoot.frame initialRoot.frame machine
-  have preamble : initialRoot.frame.location = .unwinding ⟨559⟩ := rfl
+  have preamble : initialRoot.frame.location = .unwinding ⟨0⟩ := rfl
   have trackNone : initialRoot.frame.trackCallerArg = none := rfl
   have unchanged : {initialRoot.frame with trackCallerArg := none} = initialRoot.frame := by rw [←trackNone]
   refine ⟨ctx,source,validCopied,firstDone,borrowed,physical,room,updated,frameEq,?_,?_,written,extra,sourceBinding,readyAfter,initialized,snapshot,idEq,pointerEq,offsetEq,mutation⟩
@@ -230,11 +230,11 @@ variable {options limits remaining span before tracker argument len place call d
     {frames : Array CompilerFrameContext.ActualFrame}
 
 def protectedFrame (out : Output input frames) (count : UInt64) : CompilerFrameContext.ActualFrame :=
-  TypedBorrowSteps.registeredFrame (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨601⟩).frame
+  TypedBorrowSteps.registeredFrame (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨2⟩).frame
     out.source.base.raw.output.frame out.physical.id out.source.base.raw.output.global.nextPointerTag
 
 def retagged (out : Output input frames) (count : UInt64) : RootState :=
-  ReturnProtection.borrowedState frames (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨601⟩).frame
+  ReturnProtection.borrowedState frames (atSpan (RootArgumentsTwo.result out.firstDone count) ⟨2⟩).frame
     out.source.base.raw.output.frame (CurrentCallBoolWindow.after out.source)
     ⟨out.source.base.raw.output.global,tracker.retagMode⟩ out.room out.physical.id out.physical.entry out.borrowed.output.child.tree
 
@@ -244,7 +244,7 @@ def machine (out : Output input frames) (count : UInt64) : Before :=
       (out.physical.id,{out.physical.entry with allocation := out.updated}))}}
 
 def frame (out : Output input frames) (count : UInt64) : CompilerFrameContext.ActualFrame :=
-  CallEntryFacts.doneRootFrame {out.protectedFrame count with location := .unwinding ⟨559⟩}
+  CallEntryFacts.doneRootFrame {out.protectedFrame count with location := .unwinding ⟨0⟩}
 end Output
 
 /-- Exact already-proved postentry facts, rather than a new input domain. -/

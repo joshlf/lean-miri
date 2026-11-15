@@ -13,20 +13,20 @@ theorem move_cached_local
     (frame : Frame Provenance LocalLayout MachineHooks.FrameExtra)
     (machine : MachineHooks.MachineState MiriMemoryKind Machine.RootUser)
     (localId : Miri.MIR.LocalId) (immediate : Immediate Provenance) (layout : LocalLayout)
-    (path : OperandPath) (known : Option LocalLayout)
+    (known : Option LocalLayout)
     (valid : localId < frame.locals.size)
     (live : frame.locals[localId].value = .live (.immediate immediate))
     (cached : frame.locals[localId].layout = some layout)
     (sized : layout.layout.backendRepr.isUnsized = false)
     (noClocks : frame.extra.dataRace = none)
     (ghostFalse : machine.user.payload.ghost = false) :
-    OperandMachine.evalOperandAt
+    OperandMachine.evalOperand
       (ExecutionMachine.operandHooks (ExecutionMachine.withValidation
         (PreparedContracts.actualConfig options () remaining span) limits))
-      () path (.Move ⟨localId, #[]⟩) known (Storage.withCurrent framesBefore frame machine) =
+      ()  (.Move ⟨localId, #[]⟩) known (Storage.withCurrent framesBefore frame machine) =
       .ok ⟨.immediate immediate, layout⟩ (Storage.withCurrent framesBefore frame machine) := by
   exact RootOperandCopy.copy_cached_local options limits remaining span debugOff framesBefore frame machine
-    localId immediate layout path known valid live cached sized noClocks ghostFalse
+    localId immediate layout  known valid live cached sized noClocks ghostFalse
 
 #print axioms move_cached_local
 end DuplicatePrefix.RootOperandMove

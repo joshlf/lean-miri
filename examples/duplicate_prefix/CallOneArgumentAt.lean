@@ -11,13 +11,13 @@ theorem eval_callee_one_at
     (function : Miri.MIR.Operand) (argument : SpannedOperand) (dest : Place) (fnOp : OpTy P)
     (before afterFunction afterArgument : S) (externAbi : Extern) (definition : DefId) (genericArgs : Array GenericArg)
     (calleeInstance : CallInstance) (item : DefId) (abi : FnABI) (requires : Bool) (arg : FnArg P)
-    (operand : h.evalOperandAt choice (OperandPath.instruction "function") function before = .ok fnOp afterFunction)
-    (argumentEffect : Call.evalFnCallArgumentAt h choice argument.operand (Call.moveDefinitelyDisjoint #[argument] dest)
-      (OperandPath.argument 0) afterFunction = .ok arg afterArgument)
+    (operand : h.evalOperand choice  function before = .ok fnOp afterFunction)
+    (argumentEffect : Call.evalFnCallArgument h choice argument.operand (Call.moveDefinitelyDisjoint #[argument] dest)
+       afterFunction = .ok arg afterArgument)
     (signature : h.functionSignature choice fnOp.layout = pure (1,externAbi))
     (kind : h.functionKind fnOp.layout.ty = pure (.FnDef definition genericArgs))
     (resolve : h.resolve choice definition genericArgs afterArgument = .ok calleeInstance afterArgument)
-    (itemKind : calleeInstance.kind = .Item item)
+    (itemKind : h.instanceKind calleeInstance = pure (.Item item))
     (fnAbi : h.fnAbiOfInstance choice calleeInstance #[] = pure abi)
     (callerLocation : h.requiresCallerLocation calleeInstance = pure requires) :
     Call.evalCalleeAndArgs h choice function #[argument] dest before =

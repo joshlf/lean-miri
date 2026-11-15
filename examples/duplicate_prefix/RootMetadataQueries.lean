@@ -10,8 +10,8 @@ noncomputable def context : CompilerFacts.Context :=
   PreparedReflection.actual.compiler.lifecycle.calls.symbols.facts.context
 
 theorem context_node (id : TypeId) :
-    context.runtime.node id = context.runtime.toRuntimeMetadata.node id := by
-  exact NodeLookupProof.indexed_node _ id none
+    context.runtime.node id = PreparedReflection.actual.runtime.node id := by
+  rfl
 
 open Lean Elab Tactic in
 elab "unfold_fact_helpers" : tactic => do
@@ -66,8 +66,7 @@ theorem byte_freeze : CompilerFacts.boolean context 1 "is_freeze" = .ok true := 
 open Lean Elab Tactic in
 elab "simp_reference_query" : tactic => do
   let env ← getEnv
-  let names ← ([".CompilerFacts.node", ".CompilerFacts.shape", ".CompilerFacts.typeRef",
-    ".CompilerFacts.string", ".CompilerFacts.field"] : List String).mapM fun (suffix : String) => do
+  let names ← ([".CompilerFacts.node"] : List String).mapM fun (suffix : String) => do
     let found := env.constants.toList.filterMap fun (name, _) =>
       if name.toString.endsWith suffix then some (mkIdent name) else none
     match found with

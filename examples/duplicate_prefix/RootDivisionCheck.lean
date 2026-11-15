@@ -17,8 +17,8 @@ theorem normalized_local13 (frame : CompilerFrameContext.ActualFrame)
     (body : frame.body = RootBody.reflected.body.body)
     (identity : frame.bodyIdentity = RootBody.reflected.body.identity)
     (callee : frame.functionInstance = RootBody.reflected.functionInstance) :
-    CompilerFrameContext.normalizedLocalType PreparedReflection.actual.compiler frame 13 = .ok 0 := by
-  unfold CompilerFrameContext.normalizedLocalType CompilerFrameContext.normalizedBody CompilerFrameContext.bodyOfFrame
+    CompilerFrameContext.localType PreparedReflection.actual.compiler frame 13 = .ok 0 := by
+  unfold CompilerFrameContext.localType CompilerFrameContext.bodyOfFrame
   rw [body,identity,callee]
   with_unfolding_all rfl
 

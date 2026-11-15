@@ -1,3 +1,4 @@
+import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.GeneralBorrowRawMutableProtectors
 import duplicate_prefix.GeneralBorrowRawDefaultToTrueReturn
 import duplicate_prefix.GeneralBorrowRawMutableParentRestore
@@ -86,7 +87,7 @@ theorem invoke
     (provenance : ProvenanceCopy.WellFormed entry.allocation.provenanceMap entry.allocation.len)
     (storageFits : entry.allocation.len+64 < 18446744073709551616)
     (mutable : entry.allocation.mutability = .Mut)
-    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,⟨none,#[]⟩))
+    (extras : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{ weakMemory := none, backtrace := AllocationBacktrace.get (machine.user.payload.payload.user.runtime.extras.allocations) (id) }))
     (bounded : count ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes) :
     let cfg := PreparedContracts.actualConfig options () (remaining+1) span
     ∃ packet : GeneralBorrowRawAsMutToCopy.Input, ∃ result done finalMachine,
@@ -138,7 +139,7 @@ theorem invoke
   have packetProvenance : ProvenanceCopy.WellFormed packet.entry.allocation.provenanceMap packet.entry.allocation.len := by rw [metadataLedger.entry];exact provenance
   have packetFits : packet.entry.allocation.len+64 < 18446744073709551616 := by rw [metadataLedger.entry];exact storageFits
   have packetMutable : packet.entry.allocation.mutability = .Mut := by rw [metadataLedger.entry];exact mutable
-  have packetExtras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,⟨none,#[]⟩) := by
+  have packetExtras : packet.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == packet.id) = some (packet.id,{ weakMemory := none, backtrace := AllocationBacktrace.get (packet.machine.user.payload.payload.user.runtime.extras.allocations) (packet.id) }) := by
     rw [metadataLedger.extras,metadataLedger.idEq];exact extras
   have packetBounded : packet.count ≤ (PreparedContracts.actualConfig packet.options () (packet.remaining+1) packet.span).projection.maxSizeOfVal.bytes := by
     rw [metadataLedger.countEq,configuration.optionsEq,configuration.remainingEq,configuration.spanEq];exact bounded
