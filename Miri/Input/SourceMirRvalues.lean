@@ -43,8 +43,8 @@ private def operands (c : Context) (values : Array SourceMir.Operand) :
   return (result,types,facts)
 private def arguments (c : Context) (values : Array SourceTypes.Argument) : Except String (Array MIR.GenericArg) :=
   values.mapM fun value => do
-    let .type ref := value | throw "Unsupported source closure non-type argument"
-    let some id := c.types[ref]?.join | throw "Invalid source closure argument not prepared"
+    let .type ref := value | throw "Unsupported source aggregate non-type argument"
+    let some id := c.types[ref]?.join | throw "Invalid source aggregate argument not prepared"
     return .Type id
 
 /-- The expected destination comes from the independently derived place path.
@@ -91,6 +91,25 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
     let .tuple captures ← shape c tupled | throw "Invalid source closure tupled upvars type"
     unless captures == types do throw "Invalid source closure capture types"
     return (.Aggregate (.Closure definition args) values,facts)
+  | .aggregateAdt definition variant args userType activeField values =>
+    if userType.isSome then throw "Unsupported source aggregate user-type annotation"
+    let some definition := c.definitions[definition]?.join | throw "Invalid source ADT definition not prepared"
+    let args ← arguments c args
+    let (values,types,facts) ← operands c values
+    let .adt actual ← shape c expected | throw "Invalid source ADT aggregate destination type"
+    unless actual.definition == definition && actual.args == args do
+      throw "Invalid source ADT aggregate identity/arguments"
+    let some selected := actual.variants.find? (·.index == variant)
+      | throw "Invalid source ADT aggregate variant"
+    match activeField with
+    | some field =>
+      let some selected := selected.fields.find? (·.index == field)
+        | throw "Invalid source union aggregate field"
+      unless types == #[selected.typeId] do throw "Invalid source union aggregate operand type"
+    | none =>
+      unless selected.fields.map (·.typeId) == types do
+        throw "Invalid source ADT aggregate field types"
+    return (.Aggregate (.Adt definition variant args none activeField) values,facts)
   | .unsize value target source =>
     let (value,sourceType,facts) ← operand c value
     let some target := c.types[target]?.join | throw "Invalid source unsize target not prepared"

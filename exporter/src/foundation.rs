@@ -234,6 +234,13 @@ impl<'tcx> Material<'tcx> {
                 json!({"kind":"ref","region":if matches!(region.kind(),ty::ReStatic){"static"}else{"erased"},"borrow_kind":"shared","place":self.place(tcx,*place)?})
             },
             mir::Rvalue::Aggregate(kind,operands) => match &**kind {
+                mir::AggregateKind::Adt(def,variant,args,user_type,active_field) => {
+                    let _ = self.ty(tcx,ty::Ty::new_adt(tcx,tcx.adt_def(*def),args))?;
+                    json!({"kind":"aggregate_adt","definition":self.definition(tcx,*def),"variant":variant.as_usize(),
+                        "arguments":self.args(tcx,args)?,"user_type":user_type.map(|id|id.as_usize()),
+                        "active_field":active_field.map(|field|field.as_usize()),
+                        "operands":operands.iter().map(|operand|self.operand(tcx,operand)).collect::<Result<Vec<_>>>()?})
+                },
                 mir::AggregateKind::Closure(def,args) => json!({"kind":"aggregate_closure","definition":self.definition(tcx,*def),"arguments":self.args(tcx,args)?,"operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
                 mir::AggregateKind::Tuple => json!({"kind":"aggregate_tuple","operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
                 other => return unsupported("aggregate rvalue",other),

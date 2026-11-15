@@ -88,6 +88,8 @@ inductive Rvalue where
   | repeat (operand : Operand) (count : SourceTypes.ConstExpr)
   | discriminant (place : Place)
   | aggregateTuple (operands : Array Operand)
+  | aggregateAdt (definition : DefinitionRef) (variant : Nat) (arguments : Array SourceTypes.Argument)
+      (userType activeField : Option Nat) (operands : Array Operand)
   | aggregateClosure (definition : DefinitionRef) (arguments : Array SourceTypes.Argument) (operands : Array Operand)
   | unsize (operand : Operand) (target : TypeRef) (source : Operator MIR.CoercionSource)
   | unsupported (kind : String)

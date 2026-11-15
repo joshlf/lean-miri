@@ -102,7 +102,7 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
   let physical ← SourceTypesParser.material document.source
   let material : Input.SourceMaterial := {
     target,declarations,genericLayers := layers,
-    genericMir := some (← SourceMirParser.material document),
+    genericMir := some (← SourceMirParser.material document (some physical)),
     linkSections := some linkSections,
     allocations := some (← sourceAllocationMaterial document),
     allocationIdentity := ← SourceAllocationIdentityParser.material document.source document.types.size,

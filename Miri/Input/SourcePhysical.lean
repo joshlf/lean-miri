@@ -67,6 +67,75 @@ private def mem : BackendRepr := memory
 private def checkRepr (repr : ReprOptions) (allowed : Array Nat) : Except String Unit := do
   unless allowed.contains repr.flagsBits && repr.alignBytes.isNone && repr.packBytes.isNone &&
       repr.integer.isNone && repr.scalableElement.isNone do throw "Unsupported typed source repr options"
+/-- Pinned rustc_abi::layout_of_union. ABI forwarding discards field validity
+ranges; repr(C) inhibits it. Unsupported vector fields remain explicit. -/
+private def unionLayout (target : ABI.RuntimeTargetDataLayout) (repr : ReprOptions)
+    (fields : Array Layout) : Except String Layout := do
+  unless #[0,1,8,9].contains repr.flagsBits && repr.integer.isNone && repr.scalableElement.isNone do
+    throw "Unsupported union representation flags"
+  unless !fields.isEmpty do throw "Invalid empty union"
+  for alignment in #[repr.alignBytes,repr.packBytes] do
+    if let some bytes := alignment then
+      unless bytes > 0 && bytes < 2^64 do throw "Invalid union representation alignment width"
+      let _ ← (ABI.Align.fromBytes (UInt64.ofNat bytes)).mapError toString
+  if repr.alignBytes.isSome && repr.packBytes.isSome then
+    throw "Unsupported union combined packed/aligned representation"
+  let packed := repr.packBytes
+  let align ← (if packed.isSome then target.i8Align else target.aggregateAlign).bytes.mapError toString
+  let mut alignment := align.toNat
+  let mut maxRepr := repr.alignBytes
+  let mut size := 0
+  let mut seed := repr.fieldShuffleSeed
+  let mut common : Option BackendRepr := none
+  let mut mismatch := repr.flagsBits % 2 == 1
+  for field in fields do
+    let (fieldSize,fieldAlign) ← sizeAlign field
+    let some backend := field.backendRepresentation | throw "Invalid union field backend"
+    if backend.kind == .memory && backend.sized != some true then
+      throw "Unsupported unsized union field"
+    alignment := max alignment fieldAlign
+    maxRepr := match maxRepr,field.maxReprAlignBytes with
+      | none,b => b | a,none => a | some a,some b => some (max a b)
+    size := max size fieldSize
+    seed := addSeed seed field.randomizationSeed
+    if fieldSize == 0 then continue
+    if !mismatch then
+      let toUnion := fun (scalar : ScalarLayout) => {scalar with kind := .union, validRange := none}
+      let backend ← match backend.kind with
+        | .memory => pure backend
+        | .scalar =>
+          let some scalar := backend.scalar | throw "Invalid union scalar"
+          pure {backend with scalar := some (toUnion scalar)}
+        | .scalarPair =>
+          let some first := backend.first | throw "Invalid union first scalar"
+          let some second := backend.second | throw "Invalid union second scalar"
+          pure {backend with first := some (toUnion first), second := some (toUnion second)}
+        | _ => throw "Unsupported union vector ABI"
+      if let some previous := common then
+        let previousABI ← (RuntimeMetadata.backend target previous).mapError toString
+        let nextABI ← (RuntimeMetadata.backend target backend).mapError toString
+        if previousABI != nextABI then mismatch := true
+      else common := some backend
+  if let some pack := packed then alignment := min alignment pack
+  let unadjusted := alignment
+  if let some requested := repr.alignBytes then alignment := max alignment requested
+  let mut backend := memory
+  if !mismatch then
+    if let some candidate := common then
+      let runtime ← (RuntimeMetadata.backend target candidate).mapError toString
+      let scalarAlign ← (runtime.scalarPlatformAlign target).mapError reprStr
+      if let some scalarAlign := scalarAlign then
+        if (← scalarAlign.bytes.mapError toString).toNat == alignment then backend := candidate
+      else backend := candidate
+  let rounded := (size+alignment-1)/alignment*alignment
+  unless rounded < target.base.objSizeBound.toNat do throw "Union exceeds target object size bound"
+  let row := base rounded alignment seed ⟨.union,fields.size,some 0,none,#[],#[]⟩
+    (Array.replicate fields.size 0) backend none
+  return {row with
+    maxReprAlignBytes := maxRepr
+    reprC := repr.flagsBits % 2 == 1
+    unadjustedAbiAlignBytes := some unadjusted}
+
 private def dynMetadata (source : Material) : Except String Unit := do
   let some (.declarations m) := source.dynMetadata | throw "Unsupported dyn metadata declaration source unavailable"
   let role := fun id kind => do
@@ -258,7 +327,10 @@ where
         let some a := rows[0]? | throw "Invalid enum success field"
         let some b := rows[1]? | throw "Invalid enum error field"
         nicheResult adt.representation.fieldShuffleSeed a b
-      | .unionKind => throw "Unsupported union source layout"
+      | .unionKind =>
+        let some fields := variants[0]? | throw "Invalid union source fields"
+        unless variants.size == 1 do throw "Invalid union source variants"
+        unionLayout target adt.representation (← fields.mapM (go fuel))
     | .dynamicObject _ =>
       return base 0 (← integerAlign target 8) 0 (fieldsAt #[]) #[] {memory with sized := some false} none
     | .patternNotNull base => nonnullPair (← go fuel base)

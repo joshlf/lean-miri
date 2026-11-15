@@ -16,6 +16,7 @@ structure Context where
   blocks : Nat
   scopes : Nat
   allocations : Nat
+  physical : Option Input.SourceTypes.Material := none
 
 private def typeRef (c : Context) (id : Nat) : Except String Nat := do
   unless id < c.types do throw "source MIR type reference out of bounds"
@@ -141,6 +142,25 @@ private def rvalue (c : Context) (j : Json) : Except String Rvalue := do
   | "aggregate_closure" =>
     return .aggregateClosure (← definitionRef c (← j.getObjValAs? Nat "definition"))
       (← arguments c (← j.getObjVal? "arguments")) (← (← j.getObjValAs? (Array Json) "operands").mapM (operand c))
+  | "aggregate_adt" =>
+    let definition ← definitionRef c (← j.getObjValAs? Nat "definition")
+    let variant ← j.getObjValAs? Nat "variant"
+    let args ← arguments c (← j.getObjVal? "arguments")
+    let userType ← optionalNat j "user_type"
+    let activeField ← optionalNat j "active_field"
+    let values ← (← j.getObjValAs? (Array Json) "operands").mapM (operand c)
+    let some physical := c.physical | throw "Unsupported aggregate ADT declaration capability unavailable"
+    let some declared := physical.definitions[definition]? | throw "source aggregate ADT declaration absent"
+    let some adt := declared.adt | throw "source aggregate owner is not an ADT"
+    let some selected := adt.variants[variant]? | throw "source aggregate ADT variant out of bounds"
+    match adt.kind with
+    | .unionKind =>
+      unless variant == 0 && adt.variants.size == 1 do throw "source union aggregate variant invalid"
+      let some field := activeField | throw "source union aggregate active field absent"
+      unless field < selected.fields.size && values.size == 1 do throw "source union aggregate field/operand invalid"
+    | .structKind | .enumKind =>
+      unless activeField.isNone && values.size == selected.fields.size do throw "source ADT aggregate field/operand mismatch"
+    return .aggregateAdt definition variant args userType activeField values
   | "aggregate_tuple" => return .aggregateTuple (← (← j.getObjValAs? (Array Json) "operands").mapM (operand c))
   | "cast_unsize" =>
     let tag ← j.getObjValAs? String "source"
@@ -213,7 +233,7 @@ private def phase (j : Json) : Except String Phase := do
     | "optimized" => pure (.known (.Runtime .Optimized)) | tag => pure (.unsupported ("runtime:" ++ tag))
   else pure (.unsupported tag)
 
-def body (document : Document) (j : Json) (promoted : Option Nat := none) : Except String Body := do
+def body (document : Document) (j : Json) (promoted : Option Nat := none) (physical : Option Input.SourceTypes.Material := none) : Except String Body := do
   validateSourceMetadata j
   let defId ← j.getObjValAs? Nat "definition"
   let some definition := document.definitions[defId]? | throw "source MIR owner reference absent"
@@ -225,7 +245,7 @@ def body (document : Document) (j : Json) (promoted : Option Nat := none) : Exce
   let locations ← metadata.getObjValAs? (Array Json) "blocks"
   let calls ← metadata.getObjValAs? (Array Json) "call_spans"
   let c : Context := ⟨document.types.size,document.definitions.size,localTypes.size,blocks.size,scopes.size,
-    (← document.source.getObjValAs? (Array Json) "source_allocations").size⟩
+    (← document.source.getObjValAs? (Array Json) "source_allocations").size,physical⟩
   let argCount ← j.getObjValAs? Nat "argument_count"
   unless !blocks.isEmpty && argCount < localTypes.size do throw "source MIR argument/local/block count invalid"
   let registry ← buildSpanRegistry j
@@ -271,11 +291,11 @@ def body (document : Document) (j : Json) (promoted : Option Nat := none) : Exce
     definitionSpan := (← sourceSpan (← metadata.getObjVal? "definition_span")).identity,
     spans, scopes := typedScopes,backtraces,locals,blocks := typedBlocks,requiredConstants := required}
 
-def material (document : Document) : Except String Input.SourceMir.Material :=
+def material (document : Document) (physical : Option Input.SourceTypes.Material := none) : Except String Input.SourceMir.Material :=
   (do
-    let mut bodies ← document.bodies.mapM (body document)
+    let mut bodies ← document.bodies.mapM (fun row => body document row none physical)
     if let .ok closures := document.source.getObjValAs? (Array Json) "closure_templates" then
-      for closure in closures do bodies := bodies.push (← body document closure)
+      for closure in closures do bodies := bodies.push (← body document closure none physical)
     let root ← sourceSpan (← (← document.source.getObjVal? "session").getObjVal? "root_span")
     let rootSpan : Span := {
       identity := root.identity,key := ⟨root.lo,root.hi,root.context,root.parentLocalDefinition⟩,

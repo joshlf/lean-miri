@@ -41,6 +41,8 @@ private def rvalue : SourceMir.Rvalue → Needed
   | .aggregateTuple values => operands values
   | .aggregateClosure definition args values =>
     append (operands values) ⟨(args.map argument).flatten,#[definition],#[]⟩
+  | .aggregateAdt definition _ args _ _ values =>
+    append (operands values) ⟨(args.map argument).flatten,#[definition],#[]⟩
   | .repeat op expr =>
     let ref := match expr with | .value ref _ _ | .parameter _ (some ref) => #[ref] | _ => #[]
     append (operand op) ⟨ref,#[],#[]⟩
