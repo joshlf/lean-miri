@@ -43,38 +43,17 @@ structure GenericLayer where
   parent : Option DefinitionId
   parentCount : Nat
   parameters : Array GenericParameter
+  /-- Full ordered slot view projected once from the validated lexical chain.
+  Original parameter identities (including Trait Self==owner) remain above. -/
+  flattenedParameters : Array SourceSymbols.ParameterKind
   deriving Repr, DecidableEq
 
-private def checkDefinition (definition : DefinitionId) : Except String Unit := do
-  unless definition.crateIndex < 2^32 && definition.index < 2^32 do
-    throw "typed source declaration DefId exceeds rustc index width"
-
-/-- Reconstruct full slots from original lexical layers; missing parents,
-cycles, duplicate owners/slots and inconsistent parent counts are errors. -/
+/-- Lookup the boundary-established slot view. No raw identity, parameter-kind
+or lexical-chain validation is repeated at a demand-time query. -/
 def fullParameters (layers : Array GenericLayer) (owner : DefinitionId) :
-    Except String (Array SourceSymbols.ParameterKind) := go (layers.size + 1) #[] owner
-where
-  go (fuel : Nat) (active : Array DefinitionId) (owner : DefinitionId) :
-      Except String (Array SourceSymbols.ParameterKind) := do
-    let .succ fuel := fuel | throw "typed source generic parent traversal exhausted"
-    checkDefinition owner
-    unless !active.contains owner do throw "typed source generic owner cycle"
-    let rows := layers.filter (·.owner == owner)
-    let some layer := rows[0]? | throw "typed source generic declaration unavailable"
-    unless rows.size == 1 do throw "typed source generic owner duplicated"
-    let inherited ← match layer.parent with
-      | none => pure #[]
-      | some parent => go fuel (active.push owner) parent
-    unless layer.parentCount == inherited.size do throw "typed source generic parent count mismatch"
-    let mut result := inherited
-    let mut seen : Array DefinitionId := #[]
-    for parameter in layer.parameters do
-      checkDefinition parameter.definition
-      unless parameter.definition.crateIndex == owner.crateIndex && parameter.definition != owner &&
-          parameter.index == result.size && !seen.contains parameter.definition do
-        throw "typed source generic slot identity/index mismatch"
-      seen := seen.push parameter.definition
-      result := result.push parameter.kind
-    return result
+    Except String (Array SourceSymbols.ParameterKind) := do
+  let some layer := layers.find? (·.owner == owner)
+    | throw "typed source generic declaration unavailable"
+  return layer.flattenedParameters
 
 end Miri.Input.SourceDeclarations

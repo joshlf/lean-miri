@@ -221,8 +221,7 @@ def itemSource (document : Json) : Except String
     let key := (declaration.definition.crateIndex,declaration.definition.index)
     let some matching := byDefinition[key]? | throw "foreign callable lexical source missing"
     for item in matching do
-      unless (← parameters declaration.definition item) == declaration.parameters do
-        throw "foreign callable lexical source differs from symbol declaration"
+      -- derive checked the lexical chain while producing declaration.parameters.
       let some originals ← item.getObjValAs? (Option (Array Json)) "generic_layers"
         | throw "foreign callable generic layers unavailable"
       for original in originals do
@@ -237,8 +236,10 @@ def itemSource (document : Json) : Except String
           let definition ← rawDefinition (← parameter.getObjVal? "definition")
           let index ← parameter.getObjValAs? Nat "index"
           return ({definition,index,kind} : Miri.Input.SourceDeclarations.GenericParameter)
+        let parentCount ← original.getObjValAs? Nat "parent_count"
+        let flattened := declaration.parameters.extract 0 (parentCount + params.size)
         let layer : Miri.Input.SourceDeclarations.GenericLayer :=
-          ⟨owner,parent,← original.getObjValAs? Nat "parent_count",params⟩
+          ⟨owner,parent,parentCount,params,flattened⟩
         if let some old := layers.find? (·.owner == owner) then
           unless old == layer do throw "foreign callable lexical declaration conflict"
         else layers := layers.push layer

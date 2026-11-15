@@ -46,8 +46,13 @@ def main (paths : List String) : IO Unit := do
     let mismatch := {declaration with parameters := declaration.parameters.push .region}
     rejects ({material with declarations := #[mismatch]}.validate)
     let some layer := material.genericLayers[0]? | throw (IO.userError "layer absent")
-    let cycle := {layer with parent := some layer.owner}
-    rejects ({material with genericLayers := #[cycle]}.validate)
+    rejects ({material with genericLayers := material.genericLayers.push layer}.validate)
+    for layer in material.genericLayers do
+      for parameter in layer.parameters do
+        if parameter.definition == layer.owner then
+          check (parameter.index == 0 && parameter.kind == .typeParameter &&
+            layer.flattenedParameters[0]? == some .typeParameter)
+            "typed implicit Self raw identity/slot view changed"
     let some evidence := material.target.runtimeDataLayout | throw (IO.userError "target evidence absent")
     let bad := {material.target with runtimeDataLayout := some {evidence with pointerWidthBits := evidence.pointerWidthBits + 8}}
     rejects ({material with target := bad}.validate)

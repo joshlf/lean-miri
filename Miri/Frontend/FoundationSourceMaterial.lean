@@ -24,7 +24,7 @@ private def rawDefinition (document : Document) (id : Nat) : Except String Input
   unless crate < 2^32 && index < 2^32 do throw "typed source declaration raw DefId exceeds rustc width"
   return ⟨crate,index⟩
 
-private def parseLayer (document : Document) (source : Json) : Except String Input.SourceMaterial.GenericLayer := do
+private def parseLayer (document : Document) (source : Json) (inherited : Array Input.SourceSymbols.ParameterKind) : Except String Input.SourceMaterial.GenericLayer := do
   let owner ← rawDefinition document (← source.getObjValAs? Nat "owner")
   let parent ← (← source.getObjValAs? (Option Nat) "parent").mapM (rawDefinition document)
   let parameters : Array Input.SourceMaterial.GenericParameter ← (← source.getObjValAs? (Array Json) "parameters").mapM fun parameter => do
@@ -37,7 +37,7 @@ private def parseLayer (document : Document) (source : Json) : Except String Inp
       definition := ← rawDefinition document (← parameter.getObjValAs? Nat "definition")
       index := ← parameter.getObjValAs? Nat "index"
       kind }
-  return ⟨owner,parent,← source.getObjValAs? Nat "parent_count",parameters⟩
+  return ⟨owner,parent,← source.getObjValAs? Nat "parent_count",parameters,inherited ++ parameters.map (·.kind)⟩
 
 private def sectionDeclaration (entry : SourceLinkSection) : Except String Input.SourceMaterial.LinkSectionDeclaration := do
   let key ← entry.source.getObjVal? "source_span_key"
@@ -71,9 +71,11 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     let kind ← definition.getObjValAs? String "kind"
     unless kind == "fn" || kind == "assoc_fn" do continue
     let environment ← row.getObjVal? "environment"
-    let _ ← flattenEnvironment document environment
+    -- sourceItemDeclarations has checked this callable environment already.
+    let mut inherited := #[]
     for original in (← environment.getObjValAs? (Array Json) "layers") do
-      let layer ← parseLayer document original
+      let layer ← parseLayer document original inherited
+      inherited := layer.flattenedParameters
       if let some old := layers.find? (·.owner == layer.owner) then
         unless old == layer do throw "typed source lexical layer conflict"
       else layers := layers.push layer

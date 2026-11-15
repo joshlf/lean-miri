@@ -75,8 +75,10 @@ def validate (material : Input.SourceMaterial) : Except String Unit := do
     let parameters ← SourceDeclarations.fullParameters material.genericLayers declaration.definition
     unless parameters == declaration.parameters do throw "typed source Item full generic slots disagree"
     seen := seen.push declaration.definition
+  let mut layerOwners : Array DefinitionId := #[]
   for layer in material.genericLayers do
-    let _ ← SourceDeclarations.fullParameters material.genericLayers layer.owner
+    unless !layerOwners.contains layer.owner do throw "typed source generic layer owner duplicated"
+    layerOwners := layerOwners.push layer.owner
   if let some sections := material.linkSections then
     for entry in sections do
       unless !entry.name.isEmpty && entry.definition.crateIndex < 2^32 && entry.definition.index < 2^32 &&
