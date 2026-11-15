@@ -94,6 +94,7 @@ where
         | .unsupported tag => throw s!"Unsupported existential source predicate {tag}"
       return .dynamicObject ⟨region,principal,arguments,projections,autoTraits⟩
     | .functionDefinition .. => throw "Unsupported source function-definition type requires declared signature"
+    | .projectionAlias .. => throw "Unsupported source associated type projection normalization"
     | .unsupported tag => throw s!"Unsupported source type {tag}"
   argumentTypes (fuel : Nat) (seen : Array Nat) (contexts : Array (Array BoundVariable))
       (arguments : Array Argument) : Except String (Array Concrete) := do
@@ -163,6 +164,12 @@ def Material.validate (material : Material) : Except String Unit := do
     | .rawPointer id _ | .patternNotNull id => t id
     | .reference id _ region => t id; r region
     | .nominal id values | .functionDefinition id values => d id; args values
+    | .projectionAlias definition parent values =>
+      d definition; d parent; args values
+      let some associated := material.definitions[definition]? | throw "Invalid source associated definition reference"
+      let some owner := material.definitions[parent]? | throw "Invalid source associated parent reference"
+      unless associated.kind == "AssocTy" && owner.kind == "Trait" do
+        throw "Invalid source projection associated declaration/parent kind"
     | .functionPointer sig =>
       for id in sig.inputs do t id
       t sig.output

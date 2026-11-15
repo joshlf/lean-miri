@@ -95,6 +95,7 @@ def expression (j : Json) : Except String Input.SourceTypes.Expr := do
   | "dynamic" => return .dynamicObject (← region (← field j "region")) (← (← array j "predicates").mapM existential)
   | "function_pointer" => return .functionPointer (← signature (← field j "signature"))
   | "function_definition" => return .functionDefinition (← nat j "definition") (← arguments j)
+  | "projection_alias" => return .projectionAlias (← nat j "definition") (← nat j "parent_trait") (← arguments j)
   | "closure" => return .closure ⟨← nat j "definition", ← nat j "parent_definition", ← nat j "parent_count",
       ← arguments j, ← nat j "kind_type", ← nat j "signature_type", ← nat j "tupled_upvars_type"⟩
   | tag => return .unsupported tag

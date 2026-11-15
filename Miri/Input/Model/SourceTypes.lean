@@ -69,6 +69,8 @@ inductive Expr where
   | dynamicObject (region : Region) (predicates : Array ExistentialPredicate)
   | functionPointer (signature : Signature)
   | functionDefinition (definition : DefinitionRef) (arguments : Array Argument)
+  /-- Unnormalized associated type source; retaining it proves no value/layout. -/
+  | projectionAlias (definition parentTrait : DefinitionRef) (arguments : Array Argument)
   | closure (source : Closure)
   | unsupported (tag : String)
   deriving Repr, DecidableEq
