@@ -216,31 +216,93 @@ where
         | _ => throw "typed ABI const clause type unsupported"
       | _ => throw "typed ABI trait/projection/other obligation unsupported"
 
-private def initializedArrayElement (type : SourceTypes.Concrete) : Except String Unit := go 1024 type
+/-- Pinned callconv::layout_is_noundef over the shared canonical geometry. -/
+private def layoutNoUndef (world : World) (id : Nat) : Except String Bool := go 1024 id
 where
-  go (fuel : Nat) (type : SourceTypes.Concrete) : Except String Unit := do
-    let .succ fuel := fuel | throw "typed ABI array initialization traversal exhausted"
-    match type with
-    | .primitive "bool" "" | .primitive "char" "" | .primitive "int" _ | .primitive "uint" _ => pure ()
-    | .array element _ => go fuel element
-    | .tuple fields => unless fields.isEmpty do throw "typed ABI nonempty tuple initialization unsupported"
-    | .pointer tag _ => unless tag == "raw_pointer_const" || tag == "raw_pointer_mut" do throw "typed ABI reference array initialization unsupported"
-    | .functionPointer .. => pure ()
-    | _ => throw "typed ABI array padding/union/nominal initialization unsupported"
+  go (fuel : Nat) (id : Nat) : Except String Bool := do
+    let .succ fuel := fuel | throw "typed ABI initialization recursion exhausted"
+    let some node := world.canonical.types[id]? | throw "typed ABI initialization type absent"
+    let some layout := world.canonical.layouts[node.layoutId]? | throw "typed ABI initialization layout absent"
+    let some backend := layout.backendRepresentation | throw "typed ABI initialization backend absent"
+    match backend.kind with
+    | .scalar =>
+      let some scalar := backend.scalar | throw "typed ABI initialization scalar absent"
+      return scalar.kind == .initialized
+    | .scalarPair =>
+      let some first := backend.first | throw "typed ABI initialization first scalar absent"
+      let some second := backend.second | throw "typed ABI initialization second scalar absent"
+      return first.kind == .initialized && second.kind == .initialized &&
+        layout.sizeBytes == some (first.primitive.sizeBytes + second.primitive.sizeBytes)
+    | .simdVector | .scalableSimdVector => return false
+    | .memory =>
+      let some fields := layout.fields | throw "typed ABI initialization fields absent"
+      match fields.kind with
+      | .primitive | .union => return false
+      | .array =>
+        if fields.fieldCount == 0 then return true
+        let .array element .. := node.shape | throw "typed ABI initialization array element absent"
+        go fuel element
+      | .arbitrary =>
+        let some variants := layout.variantsLayout | throw "typed ABI initialization variants absent"
+        if variants.kind != .single then return false
+        let children ← match node.shape with
+          | .tuple fields => pure fields
+          | .closure _ arguments _ => do
+            let some (.Type tuple) := arguments.back? | throw "typed ABI initialization closure tuple absent"
+            let some node := world.canonical.types[tuple]? | throw "typed ABI initialization closure captures absent"
+            let .tuple fields := node.shape | throw "typed ABI initialization closure captures not tuple"
+            pure fields
+          | .adt data => do
+            let some index := variants.variantIndex | throw "typed ABI initialization variant index absent"
+            let some variant := data.variants.find? (·.index == index)
+              | throw "typed ABI initialization variant fields absent"
+            pure (variant.fields.map (·.typeId))
+          | _ => throw "typed ABI initialization aggregate fields unsupported"
+        let mut cursor := 0
+        for index in fields.memoryOrder do
+          let some child := children[index]? | throw "typed ABI initialization field type absent"
+          let some node := world.canonical.types[child]? | throw "typed ABI initialization child absent"
+          let some childLayout := world.canonical.layouts[node.layoutId]? | throw "typed ABI initialization child layout absent"
+          let some bytes := childLayout.sizeBytes | throw "typed ABI initialization child unsized"
+          if bytes != 0 then
+            unless fields.offsetsBytes[index]? == some cursor do return false
+            unless (← go fuel child) do return false
+            cursor := cursor + bytes
+        return layout.sizeBytes == some cursor
 
 private def passMode (world : World) (physical : SourceTypes.Material) (optimizationDisabled : Bool)
-    (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
+    (definition : DefinitionId) (parameter : Nat) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
   let some node := world.canonical.types[id]? | throw "typed ABI physical type absent"
   let some layout := world.canonical.layouts[node.layoutId]? | throw "typed ABI physical layout absent"
   let some bytes := layout.sizeBytes | throw "typed ABI unsized layout unsupported"
   if layout.backendRepresentation.bind (·.sized) == some false then
     throw "typed ABI unsized value pass mode unsupported"
   match type with
-  | .dynamicObject .. | .closure .. | .patternNotNull .. => throw "typed ABI dyn/closure/constrained type unsupported"
+  | .dynamicObject .. | .patternNotNull .. => throw "typed ABI dyn/constrained type unsupported"
   | _ => pure ()
   let empty : AbiPassMode := ⟨.ignore,#[],none,none,none,none⟩
   if bytes == 0 then return empty
   let attrs (bits : Nat) (extension : ArgumentExtensionKind := .none) : AbiAttributes := ⟨bits,0,none,extension⟩
+  let some backend := layout.backendRepresentation | throw "typed ABI backend unavailable"
+  if backend.kind == .memory then
+    if bytes ≤ 8 then
+      let target ← SourcePhysical.target world
+      -- CastTarget::size rounds the register aggregate to its ABI alignment.
+      -- In particular i24 occupies four bytes, so a three-byte source must not
+      -- forward NoUndef even when every source byte is initialized.
+      let integerAlign := if bytes ≤ 1 then target.i8Align else if bytes ≤ 2 then target.i16Align
+        else if bytes ≤ 4 then target.i32Align else target.i64Align
+      let align := max (← integerAlign.bytes.mapError toString).toNat
+        (← target.aggregateAlign.bytes.mapError toString).toNat
+      let castSize := ((bytes + align - 1) / align) * align
+      let initialized ← layoutNoUndef world id
+      let register : AbiRegister := ⟨.integer,bytes*8,none⟩
+      let cast : AbiCastTarget := ⟨#[],none,register,bytes,false,attrs (if initialized && castSize == bytes then 128 else 0)⟩
+      return {empty with kind := .cast,castTarget := some cast,padI32Count := some 0}
+    unless definition.crateIndex == 0 && optimizationDisabled do
+      throw s!"typed ABI indirect parameter {parameter} requires defining-crate MIR deduction evidence"
+    let some align := layout.abiAlignBytes | throw "typed ABI indirect alignment unavailable"
+    return {empty with kind := .indirect,attributes := #[⟨670,bytes,some align,.none⟩],indirectMode := some .pointer}
   match type with
   | .primitive "bool" "" => return {empty with kind := .direct,attributes := #[attrs 128 .zeroExtend]}
   | .primitive "int" _ | .primitive "uint" _ | .primitive "char" "" =>
@@ -285,12 +347,6 @@ private def passMode (world : World) (physical : SourceTypes.Material) (optimiza
     let some backend := layout.backendRepresentation | throw "typed ABI function pointer backend unavailable"
     unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI function pointer scalar unavailable"
     return {empty with kind := .direct,attributes := #[attrs 144]}
-  | .array element _ =>
-    initializedArrayElement element
-    unless bytes ≤ 8 do throw "typed ABI indirect array requires MIR attribute deduction"
-    let register : AbiRegister := ⟨.integer,bytes*8,none⟩
-    let cast : AbiCastTarget := ⟨#[],none,register,bytes,false,attrs 128⟩
-    return {empty with kind := .cast,castTarget := some cast,padI32Count := some 0}
   | _ => throw "typed ABI aggregate/nominal/dyn pass mode unsupported"
 
 /-- Derive one ordinary Rust Item ABI without MIR capability. Source-table
@@ -357,14 +413,14 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
   let (updated,result) ← SourcePhysical.intern world output
   world := updated
   let some resultNode := world.canonical.types[result]? | throw "typed ABI result type absent"
-  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world physical material.optimizationDisabled output result⟩
+  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world physical material.optimizationDisabled key.definition 0 output result⟩
   let mut inputs := #[]
-  for sourceType in signature.inputs do
+  for (sourceType,index) in signature.inputs.zipIdx do
     let type ← SourceTypes.instantiate physical types constants sourceType signature.boundVariables
     let (updated,id) ← SourcePhysical.intern world type
     world := updated
     let some node := world.canonical.types[id]? | throw "typed ABI input type absent"
-    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world physical material.optimizationDisabled type id))
+    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world physical material.optimizationDisabled key.definition (index+1) type id))
   let abi : FunctionAbi := {
     arguments := inputs,returnValue := result,callingConvention := ⟨.rust,none,none,none⟩,
     canUnwind := !attrs.neverUnwind && material.panicUnwinds,cVariadic := false,fixedCount := inputs.size }
