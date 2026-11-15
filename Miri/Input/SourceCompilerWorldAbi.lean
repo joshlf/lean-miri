@@ -142,12 +142,6 @@ def demandInstanceAbi (access : Access S) (callee : CallInstance) (extra : Array
   if (← query (existingInstanceAbi world callee extra)).isSome then
     return ← query (instanceAbi world callee extra)
   let (updated,abi) ← query (SourceAbi.derive world callee extra)
-  let original ← query (node world callee)
-  let fresh ← query (node updated callee)
-  unless fresh.id == original.id && fresh.instanceKind == original.instanceKind && fresh.genericArgs == original.genericArgs &&
-      fresh.kind == original.kind && fresh.bodyId == original.bodyId && fresh.definitionId == original.definitionId &&
-      fresh.promotedBodies.map (fun p => (p.index,p.bodyId)) == original.promotedBodies.map (fun p => (p.index,p.bodyId)) do
-    throw (.unsupported "typed source ABI demand changed executable body capability")
   let (updated,_) ← query (attachInstanceAbi updated callee extra abi)
   let result ← query (instanceAbi updated callee extra)
   set (access.put state updated)
