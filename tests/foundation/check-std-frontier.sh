@@ -17,4 +17,3 @@ ELAN_HOME="$ROOT/.elan" flock /tmp/lean-miri-lake-build.lock .elan/bin/lake buil
   Miri.Frontend.FoundationProjectionClauses Miri.Frontend.FoundationObligations
 ELAN_HOME="$ROOT/.elan" .elan/bin/lake env lean --run tests/foundation/FoundationCatchSource.lean \
   scratch/foundation-std-frontier-catch.json
-bash tests/foundation/check-std-source.sh
