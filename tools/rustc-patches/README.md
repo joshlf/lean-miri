@@ -50,3 +50,32 @@ The first local build reused an existing matching custom compiler; rebuilding
 its Miri-enabled target std took about 80 seconds. A clean compiler bootstrap
 cost depends on the host and is substantially larger. Artifacts and absolute
 local paths are intentionally excluded from version control.
+
+`defining-compilation-source.patch` additionally records the defining crate's raw
+`Session.opts.optimize` and incremental-directory presence in its metadata root.
+Its read-only external query transports those options, not MIR deductions or ABI
+attributes. The exporter uses this only in the explicit patched-producer build;
+an ordinary compiler leaves external defining options unavailable. Local options
+come directly from that compilation's Session.
+
+Apply both patches before the same isolated compiler build above, then rebuild
+all matching target std metadata. This changes private rustc metadata/query ABI:
+old drivers, rustc-private metadata, and target rmeta must not be mixed with the
+new build. Installed normal toolchains are not modified. Rebuild the exporter
+manifest against the newly produced driver only after compiler and std finish.
+
+The finite MIR-use source is a projection of the generic optimized MIR visitor,
+not a UsageSummary or deduced-attribute table. It retains parameter/return place
+roots, the first projection constructor, raw use contexts, direct Call move
+operands, TailCall occurrences, visitor order, owner, phase and block statement
+counts. The decoder checks the owner/location/count framing once. Completeness
+of this syntactic projection remains part of the exporter extraction TCB, just
+as completeness of the full MIR serializer does; the framing checks do not prove
+that an arbitrary malicious producer emitted every use. Genuine tests compare
+its Call destination events against independently retained full MIR syntax.
+
+For an external declaration, a missing optimized-MIR body means only that the
+metadata does not expose that body. It does **not** prove that the defining crate
+had no MIR or skipped attribute deduction: metadata intentionally retains
+deductions for functions whose MIR is not exported. Such a demand needs genuine
+defining compilation skip evidence or remains Unsupported.
