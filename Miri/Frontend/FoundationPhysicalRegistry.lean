@@ -11,6 +11,7 @@ structure PhysicalTypeRegistry where
   types : Array Input.TypeNode := #[]
   layouts : Array Input.Layout := #[]
   typeConstants : Array MIR.TypeConst := #[]
+  predicates : Array Input.VtablePredicate := #[]
 
 namespace PhysicalTypeRegistry
 
@@ -24,6 +25,16 @@ def lookup (r : PhysicalTypeRegistry) (id : Nat) : Except String (Input.TypeNode
   let some layout := r.layouts[node.layoutId]? | throw "physical layout ID absent"
   return (node, layout)
 
+private def predicatePath (r : PhysicalTypeRegistry) (definition : Nat) : Except String String := do
+  let some row := r.registry.document.definitions[definition]? | throw "dynamic predicate definition absent"
+  row.getObjValAs? String "path"
+
+private def internPredicate (r : PhysicalTypeRegistry) (predicate : Input.VtablePredicate) :
+    PhysicalTypeRegistry × Nat :=
+  match r.predicates.findIdx? (· == predicate) with
+  | some id => (r, id)
+  | none => ({r with predicates := r.predicates.push predicate}, r.predicates.size)
+
 /-- Materialize only supported demanded types, retaining canonical structural
 identity through TypeRegistry. Constants are canonical typed usize valtree leaves. -/
 def intern (r : PhysicalTypeRegistry) (ty : ConcreteType) :
@@ -33,7 +44,7 @@ where
       Except String (PhysicalTypeRegistry × Nat) := do
     let .succ fuel := fuel | throw "physical registry recursion exhausted"
     -- Validate the full parent before adding any recursively demanded material.
-    let layout ← physicalLayoutOf r.registry.document.target ty
+    let layout ← physicalLayoutOfDocument r.registry.document ty
     for i in [:r.registry.entries.size] do
       let some entry := r.registry.entries[i]? | throw "physical registry entry absent"
       if sameConcrete 1024 entry.type ty then
@@ -70,10 +81,54 @@ where
         let (finished, outputId) ← go fuel next output
         pure (finished, some (inputIds, outputId))
       | _ => pure (r, none)
+    let (r, dynamicReferences) ← match ty with
+      | .dynamicObject source => do
+        let mut next := r
+        let mut ids := #[]
+        let mut principal := none
+        if let some definition := source.principal then
+          let mut args := #[]
+          for ty in source.arguments do
+            let (updated, id) ← go fuel next ty
+            next := updated
+            args := args.push (.Type id)
+          let predicate : Input.VtablePredicate := {
+            kind := .trait, definitionId := definition, definitionPath := some (← predicatePath next definition),
+            genericArgs := args, boundVariables := #[], projectionTerm := none }
+          let (updated, id) := internPredicate next predicate
+          next := updated
+          ids := ids.push id
+          principal := some id
+        else
+          unless source.arguments.isEmpty && source.projections.isEmpty do throw "dynamic arguments lack principal"
+        for projection in source.projections do
+          let mut args := #[]
+          for ty in projection.arguments do
+            let (updated, id) ← go fuel next ty
+            next := updated
+            args := args.push (.Type id)
+          let (updated, term) ← go fuel next projection.term
+          next := updated
+          let predicate : Input.VtablePredicate := {
+            kind := .projection, definitionId := projection.definition,
+            definitionPath := some (← predicatePath next projection.definition),
+            genericArgs := args, boundVariables := #[], projectionTerm := some term }
+          let (updated, id) := internPredicate next predicate
+          next := updated
+          ids := ids.push id
+        for definition in source.autoTraits do
+          let predicate : Input.VtablePredicate := {
+            kind := .autoTrait, definitionId := definition, definitionPath := some (← predicatePath next definition),
+            genericArgs := #[], boundVariables := #[], projectionTerm := none }
+          let (updated, id) := internPredicate next predicate
+          next := updated
+          ids := ids.push id
+        pure (next, some (ids, principal))
+      | _ => pure (r, none)
     let (registry, id) ← r.registry.intern ty
     unless id == r.types.size && id == r.layouts.size do
       throw "physical registry pool identity mismatch"
-    let node ← physicalTypeNode ty id id references pointeeReference functionReferences
+    let node ← physicalTypeNode ty id id references pointeeReference functionReferences dynamicReferences
     return ({ r with registry, types := r.types.push node, layouts := r.layouts.push layout }, id)
 
 /-- Resolve source types without changing the identity scheme. -/

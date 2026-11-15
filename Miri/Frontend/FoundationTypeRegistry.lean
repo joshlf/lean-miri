@@ -38,7 +38,7 @@ def TypeRegistry.start (document : Document) : TypeRegistry := { document }
 supported layout can acquire an ID.  The input and answer are immutable values. -/
 def TypeRegistry.intern (registry : TypeRegistry) (ty : ConcreteType) :
     Except String (TypeRegistry × Nat) := do
-  let layout ← layoutOf registry.document.target ty
+  let layout ← layoutOfDocument registry.document ty
   for i in [:registry.entries.size] do
     let some entry := registry.entries[i]? | throw "type registry index invariant"
     if sameConcrete 1024 entry.type ty then

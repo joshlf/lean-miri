@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationTarget
 import Miri.Frontend.FoundationPointer
+import Miri.Frontend.FoundationDynMetadata
 
 /-! Pure size/ABI alignment queries over structural foundation material.
 Target facts use the fixed interpreter runtime target bridge;
@@ -37,7 +38,7 @@ without the complete pinned aggregate algorithm they remain explicit errors.
 Pointers to supported Sized types and str are supported. str has its unsized
 zero-size layout lower bound; floats, other unsized types and nominal types
 remain unsupported. Arrays require a supported Sized element. -/
-def layoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) : Except String FoundationLayout := do
+private def layoutCore (target : ABI.RuntimeTargetDataLayout) (allowDyn : Bool) (ty : ConcreteType) : Except String FoundationLayout := do
   target.validate.mapError toString
   let bound := target.base.objSizeBound.toNat
   go bound 1024 ty
@@ -55,7 +56,9 @@ where
       return ⟨width / 8, align⟩
     | .array element length =>
       unless length < 2 ^ target.base.pointerWidth.bits.toNat do throw "array length exceeds target usize"
-      if let .primitive "str" "" := element then throw "array element is unsized"
+      match element with
+      | .primitive "str" "" | .dynamicObject _ => throw "array element is unsized"
+      | _ => pure ()
       let elem ← go bound remaining element
       let size := elem.size * length
       unless size < bound do throw "foundation array layout size overflow"
@@ -65,6 +68,7 @@ where
         let align ← target.aggregateAlign.bytes.mapError toString
         return ⟨0, align.toNat⟩
       throw "nonempty Rust tuple layout is unsupported"
+    | .dynamicObject _ => return ⟨0, ← integerAlign target 8⟩
     | .functionPointer _ _ safety abi variadic =>
       unless (safety == "safe" || safety == "unsafe") && abi == "rust" && !variadic do
         throw "unsupported physical function-pointer signature"
@@ -76,6 +80,12 @@ where
       let _ ← go bound remaining pointee
       let spec ← (target.pointerSpecIn ABI.AddressSpace.ZERO).mapError toString
       let align ← spec.pointerAlign.bytes.mapError toString
+      if let .dynamicObject _ := pointee then
+        unless allowDyn do throw "dyn pointer requires source metadata declaration evidence"
+        let aggregate ← target.aggregateAlign.bytes.mapError toString
+        unless spec.pointerSize.bytes.toNat == align.toNat && aggregate.toNat == 1 do
+          throw "dyn metadata wrapper layout requires supported pointer/aggregate alignments"
+        return ⟨2 * spec.pointerSize.bytes.toNat, align.toNat⟩
       if let .primitive "str" "" := pointee then
         let bits := target.pointerOffset.bytes.toNat * 8
         let metadataAlign ← integerAlign target bits
@@ -86,6 +96,16 @@ where
         return ⟨(offset + metadataSize + pairAlign - 1) / pairAlign * pairAlign, pairAlign⟩
       return ⟨spec.pointerSize.bytes.toNat, align.toNat⟩
 
+/-- Target-only queries cannot supply a dyn metadata declaration contract. -/
+def layoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) : Except String FoundationLayout :=
+  layoutCore target false ty
+
+/-- Dyn-pointer queries additionally validate finite source declarations. -/
+def layoutOfDocument (d : Document) (ty : ConcreteType) : Except String FoundationLayout := do
+  let needed ← requiresDynMetadata ty
+  if needed then validateDynMetadataSource d
+  layoutCore (← runtimeTargetOfTarget d.target) needed ty
+
 /-- Foundation queries require complete finite target evidence; missing or
 inconsistent evidence cannot recover LLVM parser defaults. -/
 def layoutOf (target : Target) (ty : ConcreteType) : Except String FoundationLayout := do
@@ -94,6 +114,6 @@ def layoutOf (target : Target) (ty : ConcreteType) : Except String FoundationLay
 /-- Resolve and instantiate a finite source type before its demand-time query. -/
 def layoutOfType (d : Document) (id : Nat) (types : Array (Option ConcreteType))
     (constants : Array (Option Nat)) : Except String FoundationLayout := do
-  layoutOf d.target (← instantiate types constants (← typeExpr d id))
+  layoutOfDocument d (← instantiate types constants (← typeExpr d id))
 
 end Miri.Frontend.Foundation

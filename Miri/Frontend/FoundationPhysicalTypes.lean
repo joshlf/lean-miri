@@ -9,7 +9,10 @@ Thin pointer layout follows rustc_ty_utils/src/layout.rs's Ref/RawPtr branch:
 Primitive::Pointer(AddressSpace::ZERO), a full raw range or reference start 1.
 These are representation facts and supply no dereferenceability, allocation,
 provenance or borrow permission evidence.
-They supply no compiler boolean-query catalog or nominal type facts. -/
+Dyn objects use unit(false). Dyn-pointer metadata is a nonnull AS0 vtable
+scalar only after validating the finite DynMetadata/NonNull/PhantomData source
+chain. Scalar-pair niche selection follows layout/simple.rs (data wins ties).
+They supply no vtable allocation, nominal metadata type or method table. -/
 namespace Miri.Frontend.Foundation
 
 private def memoryBackend : Input.BackendRepr :=
@@ -58,14 +61,15 @@ private def scalarLayout (size align : Nat) (signed : Bool) (last : Nat) :
 /-- Exact supported physical layouts; unsupported shapes and missing complete
 material remain errors. Recursion and object bounds use the same checked query
 as size/alignment construction. No rustc process or answer cache is consulted. -/
-def physicalLayoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) :
+private def physicalLayoutCore (target : ABI.RuntimeTargetDataLayout)
+    (query : ConcreteType → Except String FoundationLayout) (ty : ConcreteType) :
     Except String Input.Layout := do
-  let _ ← layoutOfRuntime target ty
+  let _ ← query ty
   go 1024 ty
 where
   go (fuel : Nat) (ty : ConcreteType) : Except String Input.Layout := do
     let .succ fuel := fuel | throw "physical layout recursion exhausted"
-    let basic ← layoutOfRuntime target ty
+    let basic ← query ty
     match ty with
     | .primitive "str" "" =>
       return baseLayout 0 basic.align 0xc1325f37d127be22
@@ -88,6 +92,9 @@ where
       let align ← target.aggregateAlign.bytes.mapError toString
       return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
         (.explicit #[]) memoryBackend none
+    | .dynamicObject _ =>
+      return baseLayout 0 basic.align 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
+        (.explicit #[]) {memoryBackend with sized := some false} none
     | .functionPointer .. =>
       -- rustc_ty_utils::layout_of_uncached uses the instruction address space
       -- and excludes null, independent of the source signature.
@@ -110,6 +117,17 @@ where
       let niche := if first == 0 then none else some (Input.NicheLayout.mk 0 primitive (first, last))
       let rotate (n : Nat) := UInt64.ofNat ((n % 2^64) / 2^16 + (n % 2^16) * 2^48)
       let seed := (UInt64.ofNat basic.size + UInt64.ofNat (4 * 2^32) + rotate first + rotate last).toNat
+      if let .dynamicObject _ := pointee then
+        let pointerSize := (← (target.pointerSizeIn ABI.AddressSpace.ZERO).mapError toString).bytes.toNat
+        let last := 2 ^ (pointerSize * 8) - 1
+        let primitive := {primitive with sizeBytes := pointerSize}
+        let data := {scalar with primitive, validRange := some (first, last)}
+        let metadata : Input.ScalarLayout := ⟨.initialized, primitive, some (1, last)⟩
+        let nicheOffset := if first == 1 then 0 else pointerSize
+        let niche := some (Input.NicheLayout.mk nicheOffset primitive (1, last))
+        return baseLayout basic.size basic.align (2 * pointerSize)
+          ⟨.arbitrary, 2, none, none, #[0, pointerSize], #[0, 1]⟩ (.explicit #[0, pointerSize])
+          ⟨.scalarPair, none, none, some data, some metadata, some pointerSize, none, none, none⟩ niche
       if let .primitive "str" "" := pointee then
         -- Unsized str metadata is the target pointer-offset-sized unsigned integer.
         let metadataSize := target.pointerOffset.bytes.toNat
@@ -132,6 +150,12 @@ where
       return baseLayout basic.size basic.align seed ⟨.primitive, 0, none, none, #[], #[]⟩
         (.explicit #[]) ⟨.scalar, none, some scalar, none, none, none, none, none, none⟩ niche
 
+def physicalLayoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) :
+    Except String Input.Layout := physicalLayoutCore target (layoutOfRuntime target) ty
+
+def physicalLayoutOfDocument (d : Document) (ty : ConcreteType) : Except String Input.Layout := do
+  physicalLayoutCore (← runtimeTargetOfTarget d.target) (layoutOfDocument d) ty
+
 def physicalLayoutOf (target : Target) (ty : ConcreteType) : Except String Input.Layout := do
   physicalLayoutOfRuntime (← runtimeTargetOfTarget target) ty
 
@@ -140,7 +164,8 @@ must bind those IDs in its document-local pools; no compiler facts are invented.
 def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     (arrayReferences : Option (Nat × Nat) := none)
     (pointeeReference : Option Nat := none)
-    (functionReferences : Option (Array Nat × Nat) := none) : Except String Input.TypeNode := do
+    (functionReferences : Option (Array Nat × Nat) := none)
+    (dynamicReferences : Option (Array Nat × Option Nat) := none) : Except String Input.TypeNode := do
   let (shape, display) ← match ty with
     | .primitive "bool" "" => pure (Input.TypeShape.bool, "bool")
     | .primitive "char" "" => pure (Input.TypeShape.char, "char")
@@ -168,6 +193,13 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
       let some (inputs, output) := functionReferences | throw "function-pointer signature identities absent"
       let signature : Input.FunctionSignature := ⟨inputs, output, safety, .Rust, variadic⟩
       pure (.functionPointer signature #[], s!"foundation-function-pointer-{id}")
+    | .dynamicObject source =>
+      let some (predicates, principal) := dynamicReferences | throw "dynamic predicate pool identities absent"
+      let region ← match source.region with
+        | "static" => pure MIR.Region.Static
+        | "erased" => pure MIR.Region.Erased
+        | _ => throw "unsupported dynamic object region"
+      pure (.dynamicTraitObject predicates principal region, s!"foundation-dynamic-{id}")
     | .pointer kind _ =>
       let info ← pointerKindInfo kind
       let some pointee := pointeeReference | throw "pointer pointee identity absent"

@@ -20,6 +20,10 @@ where
           if info.mutability == .Mut then "reference_erased_mut" else "reference_erased_const"
         else kind
       return .pointer kind (← go fuel pointee)
+    | .dynamicObject source =>
+      unless source.region == "static" || source.region == "erased" do throw "dynamic region unsupported"
+      let mapped ← mapExistentialM (go fuel) source
+      return .dynamicObject {mapped with region := "erased"}
     | .functionPointer inputs output safety abi variadic =>
       return .functionPointer (← inputs.mapM (go fuel)) (← go fuel output) safety abi variadic
 
@@ -36,6 +40,12 @@ where
     | .pointer kind pointee =>
       let info ← pointerKindInfo kind
       return info.region == some .Static || (← go fuel pointee)
+    | .dynamicObject source =>
+      unless source.region == "static" || source.region == "erased" do throw "dynamic region unsupported"
+      let args ← source.arguments.mapM (go fuel)
+      let projections ← source.projections.mapM fun p => do
+        return (← go fuel p.term) || (← p.arguments.mapM (go fuel)).any id
+      return source.region == "static" || args.any id || projections.any id
     | .functionPointer inputs output .. =>
       return (← go fuel output) || (← inputs.mapM (go fuel)).any id
 

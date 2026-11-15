@@ -83,6 +83,8 @@ def rustModeShape (target : Target) (architecture : String)
     throw "foundation x86_64 Rust ABI requires 64-bit pointers"
   if let .primitive "str" "" := ty then
     throw "unsized str Rust ABI mode shape is unsupported"
+  if let .dynamicObject _ := ty then
+    throw "unsized dynamic object Rust ABI mode shape is unsupported"
   let layout ← layoutOf target ty
   if layout.size == 0 then return .ignore
   match ty with
@@ -100,6 +102,7 @@ def rustModeShape (target : Target) (architecture : String)
       unless info.region.isSome do throw "wide raw-pointer Rust ABI mode shape is unsupported"
       return .pair
     return .direct false
+  | .dynamicObject _ => throw "dynamic object ABI mode unsupported"
   | .functionPointer .. => return .direct false
 
 /-- Instantiate the requested finite type before computing its mode projection. -/

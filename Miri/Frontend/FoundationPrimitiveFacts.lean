@@ -1,13 +1,16 @@
 import Miri.Frontend.FoundationPhysicalRegistry
 import Miri.Frontend.FoundationRegionErasure
+import Miri.Frontend.FoundationDynamicFacts
 
 /-! Compiler leaves for the closed physical subset, computed from structure.
 Pinned rustc sources: ty/util.rs::{is_trivially_freeze,is_trivially_unpin,
 needs_drop_components_with_async,struct_tail_raw}; ty/sty.rs::{builtin_deref,
 discriminant_ty,ptr_metadata_ty_or_tail,is_like_maybe_dangling};
 ty/inhabitedness/mod.rs::OpSemInhabitedness::is_inhabited_ty.
-All supported leaves are inhabited, Freeze and both Unpin traits. str is
-unsized with canonical usize metadata; the other supported shapes are Sized.
+Primitive/reference leaves are inhabited, Freeze and both Unpin traits. str
+is unsized with canonical usize metadata; the other primitive shapes are Sized.
+Dyn objects use the separate partial DynamicFacts bag: unresolved solver and
+nominal metadata queries remain absent.
 Arrays, shared references and pointer signatures recurse; the only supported
 tuple is empty. No trait solver fallback is taken. Static/Erased region flags
 and erasure are computed structurally; parameter/inference flags are absent.
@@ -27,7 +30,8 @@ where
     | .primitive "uint" name =>
       unless #["u8", "u16", "u32", "u64", "u128", "usize"].contains name do
         throw "unsupported unsigned compiler facts"
-    | .array (.primitive "str" "") _ => throw "unsized str array compiler facts unsupported"
+    | .array (.primitive "str" "") _ | .array (.dynamicObject _) _ =>
+      throw "unsized array compiler facts unsupported"
     | .array element _ => go fuel element
     | .pointer kind pointee =>
       let info ← pointerKindInfo kind
@@ -39,6 +43,11 @@ where
         throw "function-pointer compiler signature unsupported"
       for input in inputs do go fuel input
       go fuel output
+    | .dynamicObject source =>
+      for ty in source.arguments do go fuel ty
+      for projection in source.projections do
+        for ty in projection.arguments do go fuel ty
+        go fuel projection.term
     | .tuple fields =>
       unless fields.isEmpty do throw "nonempty tuple compiler facts unsupported"
     | _ => throw "unsupported primitive compiler facts"
@@ -60,6 +69,7 @@ def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
       let some id := normalized | throw "reference compiler fact lacks erased type identity"
       pure id
     else pure self
+  if let .dynamicObject _ := ty then return ← dynamicCompilerFacts ty self normalized u8
   let explicitDeref ← match ty with
     | .pointer .. => do
       let some pointee := rawPointee | throw "pointer compiler fact lacks physical pointee"
