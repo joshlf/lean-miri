@@ -10,7 +10,7 @@ const VALUE: u8 = 37;
 pub fn scalar() -> u8 { VALUE }
 RS
 flock /tmp/lean-miri-lake-build.lock env ELAN_HOME="$ROOT/.elan" \
-  "$ROOT/.elan/bin/lake" build Miri.Frontend.FoundationConstOperand
+  "$ROOT/.elan/bin/lake" build Miri.Frontend.FoundationConstOperand Miri.Frontend.FoundationConstBindings
 bash tools/export-mir.sh --output "$TASK_DIR/foundation.json" --foundation --root scalar \
   -- "$TASK_DIR/input.rs" --crate-type=lib --crate-name finite_const
 bash tools/export-mir.sh --output "$TASK_DIR/schema12.json" --root scalar \

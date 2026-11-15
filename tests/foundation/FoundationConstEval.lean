@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationConstOperand
+import Miri.Frontend.FoundationConstBindings
 open Lean Miri.Frontend.Foundation
 
 private def checked (value : Except String α) : IO α :=
@@ -24,7 +25,12 @@ def main (args : List String) : IO Unit := do
   | _ => throw (IO.userError "unexpected fixed MIR constant constructor")
   unless result.bits == 37 && result.sizeBytes == 1 do throw (IO.userError "const evaluation mismatch")
   let badValue := Json.mkObj [("kind",toJson "scalar"),("bits",toJson "256"),("size_bytes",toJson (1 : Nat))]
+  let required := body.setObjVal! "required_consts" (toJson (#[operand] : Array Json))
+  let _ ← checked (checkRequiredConstants document required #[])
   let bad := operand.setObjVal! "value" badValue
+  match checkRequiredConstants document (body.setObjVal! "required_consts" (toJson (#[bad] : Array Json))) #[] with
+  | .error _ => pure ()
+  | .ok _ => throw (IO.userError "invalid required constant accepted")
   match evaluateScalarConstant document bad with
   | .error _ => pure ()
   | .ok _ => throw (IO.userError "overflowing scalar constant accepted")
