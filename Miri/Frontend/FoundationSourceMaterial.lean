@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationWorldDeclarations
 import Miri.Frontend.FoundationTarget
+import Miri.Frontend.FoundationLinkSections
 import Miri.Input.Model.SourceMaterial
 
 /-! One-way decoder projection into the typed evaluation-local carrier. JSON is
@@ -33,6 +34,23 @@ private def parseLayer (document : Document) (source : Json) : Except String Inp
       kind }
   return ⟨owner,parent,← source.getObjValAs? Nat "parent_count",parameters⟩
 
+private def sectionDeclaration (entry : SourceLinkSection) : Except String Input.SourceMaterial.LinkSectionDeclaration := do
+  let key ← entry.source.getObjVal? "source_span_key"
+  let position ← entry.source.getObjVal? "source_span"
+  let start ← position.getObjVal? "start"
+  let finish ← position.getObjVal? "end"
+  let parentSource ← key.getObjVal? "parent_local_definition"
+  let parent : Option Nat ← fromJson? parentSource
+  return {
+    name := entry.name, definition := ⟨entry.crateIndex,entry.definitionIndex⟩
+    span := {
+      isDummy := ← position.getObjValAs? Bool "is_dummy"
+      lo := ← key.getObjValAs? Nat "lo", hi := ← key.getObjValAs? Nat "hi"
+      context := ← key.getObjValAs? String "ctxt", parentLocalDefinition := parent
+      file := ← position.getObjValAs? String "file"
+      startLine := ← start.getObjValAs? Nat "line", startColumn := ← start.getObjValAs? Nat "column"
+      endLine := ← finish.getObjValAs? Nat "line", endColumn := ← finish.getObjValAs? Nat "column" } }
+
 /-- Project only callable declaration capabilities, without letting an unrelated
 const/closure body masquerade as a free Item or invalidate known main/start rows.
 Every zero-slot Item still retains its original zero-slot source layer. -/
@@ -61,7 +79,9 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     pointerSizeBits := document.target.pointerSizeBits
     endian := document.target.endian
     runtimeDataLayout := some (← evidenceOfTarget document.target) }
-  let material : Input.SourceMaterial := {target,declarations,genericLayers := layers}
+  let linkSections ← (← sourceLinkSections document.source).mapM sectionDeclaration
+  let material : Input.SourceMaterial := {target,declarations,genericLayers := layers,
+    linkSections := some linkSections}
   material.validate
   return material
 

@@ -19,12 +19,22 @@ an empty known source body/type/constraint table. -/
 inductive Unavailable where
   | unsupported
   deriving Repr, DecidableEq
+/-- Complete selected declaration identity/name; initializer capability is
+separate and may remain unavailable until actual predicate demand. -/
+structure LinkSectionDeclaration where
+  name : String
+  definition : DefinitionId
+  span : SourceSymbols.Span
+  initializer : Unavailable := .unsupported
+  deriving Repr, DecidableEq
 end SourceMaterial
 
 structure SourceMaterial where
   target : SourceMaterial.Target
   declarations : Array SourceMaterial.ItemDeclaration
   genericLayers : Array SourceMaterial.GenericLayer
+  /-- None is unknown coverage; Some retains the complete ordered declaration list. -/
+  linkSections : Option (Array SourceMaterial.LinkSectionDeclaration) := none
   genericMir : SourceMaterial.Unavailable := .unsupported
   typeExpressions : SourceMaterial.Unavailable := .unsupported
   constraints : SourceMaterial.Unavailable := .unsupported
@@ -51,6 +61,10 @@ def validate (material : Input.SourceMaterial) : Except String Unit := do
     seen := seen.push declaration.definition
   for layer in material.genericLayers do
     let _ ← SourceDeclarations.fullParameters material.genericLayers layer.owner
+  if let some sections := material.linkSections then
+    for entry in sections do
+      unless !entry.name.isEmpty && entry.definition.crateIndex < 2^32 && entry.definition.index < 2^32 &&
+          entry.span.lo ≤ entry.span.hi do throw "typed source link-section declaration invalid"
   return ()
 
 end SourceMaterial
