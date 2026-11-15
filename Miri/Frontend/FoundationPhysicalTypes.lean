@@ -75,6 +75,8 @@ where
     | .closure _ arguments =>
       let some (.tuple fields) := arguments.back? | throw "closure upvars tuple absent"
       unless arguments.size ≥ 3 do throw "closure synthetic arguments absent"
+      if fields.size > 1 then
+        return ← scalarAggregateLayout target (← fields.mapM (go fuel)) false
       let layout ← go fuel (.tuple fields)
       if fields.isEmpty then return layout
       let some field := fields[0]? | throw "closure field absent"
@@ -104,7 +106,8 @@ where
         let align ← target.aggregateAlign.bytes.mapError toString
         return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
           (.explicit #[]) memoryBackend none
-      unless elements.size == 1 do throw "multiple-field physical tuple unsupported"
+      if elements.size > 1 then
+        return ← scalarAggregateLayout target (← elements.mapM (go fuel)) true
       let some field := elements[0]? | throw "singleton tuple field absent"
       let child ← go fuel field
       let some backend := child.backendRepresentation | throw "singleton tuple backend absent"

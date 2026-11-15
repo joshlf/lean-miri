@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationTarget
+import Miri.Frontend.FoundationAggregateLayout
 import Miri.Frontend.FoundationPointer
 import Miri.Frontend.FoundationDynMetadata
 
@@ -79,7 +80,17 @@ where
       if elements.isEmpty then
         let align ← target.aggregateAlign.bytes.mapError toString
         return ⟨0, align.toNat⟩
-      unless elements.size == 1 do throw "multiple-field Rust tuple layout unsupported"
+      if elements.size > 1 then
+        let mut fields := #[]
+        for element in elements do
+          match element with
+          | .primitive .. | .pointer .. | .functionPointer .. => pure ()
+          | _ => throw "aggregate sizing supports only scalar/pair fields"
+          let f ← go bound remaining element
+          fields := fields.push (f.size,f.align)
+        let aggregate ← target.aggregateAlign.bytes.mapError toString
+        let (size,align) ← scalarAggregateSize aggregate.toNat bound fields true
+        return ⟨size,align⟩
       let some element := elements[0]? | throw "tuple element absent"
       let layout ← go bound remaining element
       let aggregate ← target.aggregateAlign.bytes.mapError toString
