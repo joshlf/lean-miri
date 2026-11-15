@@ -19,7 +19,8 @@ types and definitions, complete target data, source metadata, signatures,
 compilation settings, required constants and generic predicates as finite material;
 it does not enumerate monomorphic substitutions or emit query-answer catalogs.
 The new Lean reader computes type expansion, generic substitution, a restricted
-`Sized`/`Copy`/`usize` obligation check, supported required-constant checks,
+`Sized`/`Copy`/`usize` obligation check, finite local primitive marker impl
+matching, supported required-constant and scalar const-item evaluation,
 primitive/array layouts and partial ABI components as pure on-demand queries.
 It also derives source span identities, producer/session evidence, primitive
 and foreign catalogs, ordinary item instances and frames, and a restricted
@@ -27,19 +28,28 @@ and foreign catalogs, ordinary item instances and frames, and a restricted
 layouts on demand from imported material. A restricted straight-line fixture
 evaluator remains distinct from the fixed interpreter.
 
-One fresh generic Rust `u8` identity source now passes finite end-to-end
-execution through source-derived assembly, canonical compiler provider
-preparation, a real direct call frame and the fixed interpreter's assignment
-and Return steps. It returns 42 with an empty frame stack under explicit fixed
-scheduling and finite address choices. Missing producer input, unsupported
-type and out-of-domain body controls reject. This is a bounded direct-frame
-observation, not Rust main startup or a Rust safety theorem.
+Fresh generic Rust `u8` identity and scalar const-item sources now pass finite
+end-to-end execution through source-derived assembly, canonical compiler
+provider preparation, real direct frames and the fixed interpreter's assignment
+and Return steps. Identity returns 42; the source `const VALUE: u8 = 37`
+returns 37. Both empty the frame stack under explicit fixed scheduling and
+finite address choices. Every required constant is retained and checked before
+the const frame executes. Missing producer input, unsupported type, cyclic
+constant and out-of-domain body controls reject. These are bounded direct-frame
+observations, not Rust main startup or Rust safety theorems.
 
-The fixed interpreter still consumes schema 11/12 for general programs,
-including precomputed query tables. Full migration requires broader physical
-types/MIR, indirect and call ABIs, trait/const queries, allocation identity and
-provenance, Rust main/startup and external effects from finite source material.
-Current foundation export and assembly fail closed on many MIR, type, lifetime,
+The finite document now also retains Call MIR with exact argument/function
+spans, function-pointer types, and compiler allocation images/raw identities.
+Lean derives direct FnDef callee/ABI evidence and imports source memory graphs
+through the existing checked importer. A genuine two-function `calls(42_u8)`
+now enters the fixed interpreter's callee frame, executes both Returns and
+observes 42 with an empty stack. Byte-literal execution remains blocked by
+missing byte-interner source identity. The fixed interpreter still
+consumes schema 11/12 for general programs, including precomputed query tables.
+Full migration requires wider physical types/MIR, indirect and broader call
+ABIs, trait/const queries, byte-interner identity and provenance semantics,
+Rust main/startup and external effects from finite source material. Current
+foundation export and assembly fail closed on many MIR, type, lifetime,
 allocation and call forms. Neither the foundation path nor the old query
 closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in

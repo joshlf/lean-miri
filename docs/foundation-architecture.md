@@ -21,10 +21,12 @@ abort export. The producer and decoder reject a different pinned rustc commit.
 In Lean, `Foundation.decode` loads this finite document, `typeExpr` resolves a
 requested type, `instantiate` substitutes a requested type/const argument tuple,
 and `checkEnvironment` checks the known `Sized`, `Copy` and `usize` obligations
-for the restricted structural type domain. Each is a pure function of the
-document and explicit arguments. Known scalar required constants are checked
-on frame demand, including unreachable obligations; unevaluated const MIR
-remains unsupported. Unknown obligations are errors. The existing
+for the restricted structural type domain, and matches complete local primitive
+marker impl headers for a narrower domain. Each is a pure function of the
+document and explicit arguments. Scalar free const-item expressions are
+evaluated on demand and every required constant is checked on frame entry,
+including unreachable obligations. Generic/promoted const definitions and
+general const-MIR evaluation remain unsupported. Unknown obligations are errors. The existing
 fixed interpreter also now computes canonical nested-array layouts on demand
 from its imported type graph, with explicit cycle, overflow and contradiction
 errors.
@@ -36,16 +38,23 @@ identities, source spans, session settings, primitive and foreign catalogs, and
 the required input graph from the finite document. For a checked `u8` identity
 body, the canonical compiler provider preparation and the **fixed Miri
 interpreter** execute the actual assignment and Return from a direct call
-frame; the observed return is 42 and the frame stack becomes empty. The run
+frame; the observed return is 42 and the frame stack becomes empty. The same
+source-derived path executes a scalar const-item body using `VALUE: u8 = 37`,
+retaining its required constant before the fixed frame returns 37. A genuine
+two-function `calls(42_u8)` run enters a callee frame and returns 42 through
+both fixed interpreter frames. These runs
 uses an explicit fixed scheduling profile and finite address choices. It is a
 bounded observation, not process startup or a safety proof. The schema-12 path
 still supplies general fixed-interpreter programs. The active missing work is
 tracked in [STATUS.md](../STATUS.md).
 
 Lean rejects demands outside the supported source domain. In particular,
-general trait resolution, const-MIR evaluation, indirect ABI, calls,
-allocations and provenance from source, runtime symbol identities and broader
-MIR are not yet supplied by pure foundation queries. Coroutines, inlined
+general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
+byte-interner identity and provenance, runtime symbol
+identities and broader MIR are not yet supplied by pure foundation queries.
+Finite Call MIR and direct FnDef evidence support the checked two-function
+domain; source allocation images have not yet been joined into executable
+literal cases. Coroutines, inlined
 frames, target features and caller-location tracking also stop. The direct
 identity frame needs none of those facts; its effect-domain check excludes
 their use before constructing the limited program. General migration requires
