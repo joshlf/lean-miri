@@ -24,7 +24,7 @@ private def expectError (r : Except String ExecutionValue) : IO Unit :=
   | .error _ => pure ()
   | .ok v => throw (IO.userError s!"unexpected success {repr v}")
 
-def main : IO Unit := do
+private def synthetic : IO Unit := do
   match run (fixture) with
   | .ok (.scalar 42) => pure ()
   | other => throw (IO.userError s!"identity failed {repr other}")
@@ -51,15 +51,15 @@ private def load (path : String) : IO Document := do
   | .error e => throw (IO.userError e)
 
 /-- Requires fresh `--foundation` exports, rather than committed synthetic query answers. -/
-def integration : IO Unit := do
+private def integration (identityPath arrayPath : String) : IO Unit := do
   let types := #[some (ConcreteType.primitive "uint" "u8")]
-  let identity ← load "scratch/foundation-identity.json"
+  let identity ← load identityPath
   let result := evaluateRestrictedBody identity 2 types #[]
     (checkEnvironment identity types #[]) #[.scalar 73]
   match result with
   | .ok (.scalar 73) => pure ()
   | other => throw (IO.userError s!"fresh identity failed: {repr other}")
-  let d ← load "scratch/foundation-array.json"
+  let d ← load arrayPath
   let constants := #[none, some 3]
   let value := ExecutionValue.aggregate #[.scalar 2, .scalar 3, .scalar 5]
   let result := evaluateRestrictedBody d 2 types constants
@@ -76,4 +76,11 @@ def integration : IO Unit := do
     (checkEnvironment invalid types #[]) #[.scalar 73])
   IO.println "fresh foundation exports: 4 checks passed"
 
-#eval integration
+/-- With no arguments, run self-contained synthetic assertions. Supply fresh
+identity and array_identity foundation JSON paths to additionally check exports. -/
+def main (args : List String) : IO Unit := do
+  synthetic
+  match args with
+  | [] => pure ()
+  | [identityPath, arrayPath] => integration identityPath arrayPath
+  | _ => throw (IO.userError "usage: RestrictedExecution.lean [IDENTITY_JSON ARRAY_JSON]")
