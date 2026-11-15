@@ -352,3 +352,14 @@ not schema12 execution input and does not yet provide general Rust execution.
 
 Run `python3 tests/exporter/test_foundation.py` after building the pinned exporter
 for fresh positive generic/const-generic captures and fail-closed negative cases.
+
+Foundation bodies must have a computed, empty `required_consts` list, emitted
+explicitly as `required_consts: []`. The pinned rustc interpreter checks this
+list on frame entry, including constants removed from reachable control flow;
+foundation has no const evaluator and rejects every nonempty or uncomputed list.
+It also rejects coroutine, promoted/generated, non-runtime, inlined and
+spread-argument bodies, and functions requiring target features or caller
+location metadata. These entry prerequisites must not disappear when selecting
+a smaller MIR subset. Debug spans, user annotations and `mentioned_items` are
+not part of this restricted evaluator's execution data; the pinned MIR definition
+explicitly identifies `mentioned_items` as not soundness-critical.

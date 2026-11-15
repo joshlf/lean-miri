@@ -25,6 +25,7 @@ class FoundationExport(unittest.TestCase):
                 doc = json.loads(output.read_text())
                 self.assertEqual((doc["schema"], doc["schema_version"]), ("lean-miri-foundation", 1))
                 self.assertEqual(len(doc["bodies"]), 1)
+                self.assertEqual(doc["bodies"][0]["required_consts"], [])
                 self.assertFalse(any(key.startswith("compiler_") for key in doc))
                 shapes = [node["shape"] for node in doc["types"]]
                 if root == "identity":
@@ -48,7 +49,10 @@ class FoundationExport(unittest.TestCase):
 
     def test_unsupported_call_and_missing_root_abort(self):
         with tempfile.TemporaryDirectory(prefix="foundation-") as directory:
-            for root, diagnostic in (("calls", "unsupported terminator"), ("missing", "missing MIR root")):
+            for root, diagnostic in (("calls", "unsupported terminator"), ("missing", "missing MIR root"),
+                                     ("requires_const", "unsupported required constants"),
+                                     ("tracked", "unsupported caller location prerequisite"),
+                                     ("feature_identity", "unsupported function target features")):
                 output = Path(directory) / f"{root}.json"
                 result = self.export(root, output)
                 self.assertNotEqual(result.returncode, 0)

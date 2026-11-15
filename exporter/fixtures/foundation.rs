@@ -10,3 +10,12 @@ pub struct Link<T> {
     pub next: *const Link<T>,
 }
 pub fn link_identity(value: Link<u8>) -> Link<u8> { value }
+
+pub fn requires_const<const N: usize>(value: u8) -> u8 {
+    if false { let _ = const { assert!(N != 0); }; }
+    value
+}
+#[track_caller]
+pub fn tracked(value: u8) -> u8 { value }
+#[target_feature(enable = "sse2")]
+pub unsafe fn feature_identity(value: u8) -> u8 { value }

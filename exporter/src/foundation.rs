@@ -171,6 +171,38 @@ impl<'tcx> Material<'tcx> {
     fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
+        // Pinned mir::Body documents required_consts as soundness-critical;
+        // interpret/stack.rs evaluates the whole list before executing a frame.
+        // This first consumer has no const evaluator, so even an unused or
+        // unreachable required constant must reject the entire capture.
+        match &b.required_consts {
+            Some(constants) if constants.is_empty() => {},
+            Some(constants) => return unsupported("required constants", constants),
+            None => return unsupported("uncomputed required constants", def),
+        }
+        // The restricted evaluator initializes ordinary argument locals directly;
+        // coroutine/resume frames, rust-call spreading, inlined frames and
+        // compiler-generated/promoted source identities require more machinery.
+        if b.coroutine.is_some() { return unsupported("coroutine body", def); }
+        if b.spread_arg.is_some() { return unsupported("spread argument", def); }
+        if !matches!(b.phase, mir::MirPhase::Runtime(_)) {
+            return unsupported("non-runtime MIR phase", b.phase);
+        }
+        if b.source.promoted.is_some() || b.source.instance != ty::InstanceKind::Item(def) {
+            return unsupported("non-item MIR source", b.source);
+        }
+        if b.source_scopes.iter().any(|scope| scope.inlined.is_some()) {
+            return unsupported("inlined frame metadata", def);
+        }
+        if !matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn | rustc_hir::def::DefKind::AssocFn) {
+            return unsupported("non-function entry", def);
+        }
+        if !tcx.codegen_fn_attrs(def).target_features.is_empty() {
+            return unsupported("function target features", def);
+        }
+        if ty::InstanceKind::Item(def).requires_caller_location(tcx) {
+            return unsupported("caller location prerequisite", def);
+        }
         let environment = self.environment(tcx,def)?;
         let locals = b.local_decls.iter().map(|l|self.ty(tcx,l.ty)).collect::<Result<Vec<_>>>()?;
         let blocks = b.basic_blocks.iter().map(|bb| {
@@ -190,7 +222,7 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"locals":locals,"blocks":blocks}))
+        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"required_consts":[],"locals":locals,"blocks":blocks}))
     }
 }
 fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
