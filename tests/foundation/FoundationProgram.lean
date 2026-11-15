@@ -24,8 +24,9 @@ def main (paths : List String) : IO Unit := do
     throw (IO.userError "identity local physical types changed")
   unless components.abi.arguments.size == 1 && components.body.backtraceSpans.size > 0 do
     throw (IO.userError "ABI/source component lost")
-  for node in components.physical.types do
-    unless node.compilerFacts.isSome do throw (IO.userError "missing primitive compiler leaves")
+  for typeId in components.body.mir.locals do
+    let (node, _) ← checked (components.physical.lookup typeId)
+    unless node.compilerFacts.isSome do throw (IO.userError "missing demanded primitive compiler leaves")
   let broken := { document with definitions := #[] }
   match buildSourceProgramComponents broken definition #[.type (.primitive "uint" "u8")] with
   | .error _ => pure ()
