@@ -23,6 +23,27 @@ def main (paths : List String) : IO Unit := do
   let pair ← checked (Input.SourceCompilerVTables.erasedPair world closure.id predicates)
   unless pair == (closure.id,predicates) do throw (IO.userError "region-free pair identity changed")
   let _ ← checked (Input.SourceCompilerVTables.ensureMonomorphicPredicates world predicates)
+  let comparison ← checked (Input.SourceCompilerVTables.comparisonPredicates world predicates)
+  let expected := predicates.filter (fun id => match world.canonical.predicates[id]? with
+    | some row => row.kind != .autoTrait | none => false)
+  unless comparison.map (·.id) == expected && comparison.all (!·.autoTrait) do
+    throw (IO.userError "source comparison did not remove exactly the auto traits")
+  for value in comparison do
+    unless (← checked (Input.SourceCompilerVTables.normalizeComparisonPredicate world value)) == value.id do
+      throw (IO.userError "alias-free erased predicate normalization changed identity")
+  let some projectionId := predicates.find? (fun id => match world.canonical.predicates[id]? with
+    | some row => row.kind == .projection | none => false)
+    | throw (IO.userError "genuine associated projection absent")
+  let some projection := world.canonical.predicates[projectionId]? | throw (IO.userError "projection absent")
+  let some traitId := predicates.find? (fun id => match world.canonical.predicates[id]? with
+    | some row => row.kind == .trait | none => false)
+    | throw (IO.userError "genuine principal absent")
+  let some principal := world.canonical.predicates[traitId]? | throw (IO.userError "principal absent")
+  let distinct := world.canonical.predicates.push {projection with definitionId := principal.definitionId}
+  let changed := {world with canonical := {world.canonical with predicates := distinct}}
+  rejects (Input.SourceCompilerVTables.comparisonPredicates changed #[projectionId,world.canonical.predicates.size])
+  rejects (Input.SourceCompilerVTables.normalizeComparisonPredicate world ⟨traitId,1,false⟩)
+  rejects (Input.SourceCompilerVTables.normalizeComparisonPredicate world ⟨traitId,0,true⟩)
   rejects (Input.SourceCompilerVTables.erasedPair world world.canonical.types.size predicates)
   rejects (Input.SourceCompilerVTables.erasedPair world closure.id #[world.canonical.predicates.size])
   let .closure definition arguments count := closure.shape | throw (IO.userError "closure shape absent")
@@ -38,4 +59,5 @@ def main (paths : List String) : IO Unit := do
     else throw (IO.userError "predicate handle absent")
   let changed := {world with canonical := {world.canonical with predicates := predicateRows}}
   rejects (Input.SourceCompilerVTables.erasedPair changed closure.id predicates)
+  rejects (Input.SourceCompilerVTables.normalizeComparisonPredicate changed ⟨predicateId,0,false⟩)
   IO.println "genuine region-free closure/predicate pair preserved; missing handles, static regions and binders reject"

@@ -81,4 +81,37 @@ def ensureMonomorphicPredicates (world : World) (predicates : PredicateList) : E
       | .Lifetime .Erased => pure ()
       | _ => throw "Unsupported source vtable predicate generic argument"
     if let some id := value.projectionTerm then SourceCompilerCasts.ensureMonomorphic world id
+/-- Pinned interpret/traits.rs removes auto traits before stable comparison.
+For the remaining predicates, rustc_middle/ty/predicate.rs:231 orders Trait
+before Projection; Trait/Trait and equal-declaration Projection/Projection are
+Equal. Distinct projection declarations require their actual DefPathHash. -/
+def comparisonPredicates (world : World) (values : PredicateList) : Except String (Array VTablePredicate) := do
+  let mut projectionDefinition : Option Nat := none
+  let mut result := #[]
+  for id in values do
+    let row ← predicate world id
+    match row.kind with
+    | .autoTrait => pure ()
+    | .trait => result := result.push ⟨id,0,false⟩
+    | .projection =>
+      if let some definition := projectionDefinition then
+        unless definition == row.definitionId do
+          throw "Unsupported source predicate ordering: distinct projection DefPathHash unavailable"
+      else projectionDefinition := some row.definitionId
+      result := result.push ⟨id,1,false⟩
+  return result
+
+/-- normalize_erasing_late_bound_regions (normalize_erasing_regions.rs:144)
+instantiates the binder then normalizes aliases. With no binder variables,
+aliases or non-erased regions anywhere in the complete predicate graph, both
+operations are identity. No trait selection result is assumed by this rule. -/
+def normalizeComparisonPredicate (world : World) (value : VTablePredicate) : Except String Nat := do
+  let row ← predicate world value.id
+  let expected ← match row.kind with
+    | .trait => pure 0 | .projection => pure 1
+    | .autoTrait => throw "Invalid source auto trait in normalized comparison list"
+  unless !value.autoTrait && value.stableKey == expected do
+    throw "Invalid source predicate comparison class"
+  erasedPair.checkPredicate world (world.canonical.types.size + world.canonical.predicates.size + 1) #[] value.id
+  return value.id
 end Miri.Input.SourceCompilerVTables

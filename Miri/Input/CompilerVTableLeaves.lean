@@ -48,10 +48,10 @@ def make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
         throw (.unsupported "FullInstance vtable dictionary cannot represent machine extra function")
       FunctionPointers.globalFunction engine.functions id
     predicates := fun _ token => if sourceMode then
-      throw (.unsupported "source vtable predicate stable comparison evidence unavailable")
+      source access (SourceCompilerVTables.comparisonPredicates · token)
       else lift (CompilerVTableFacts.predicates facts token)
     normalizePredicate := fun _ predicate => if sourceMode then
-      throw (.unsupported "source vtable predicate normalization unavailable")
+      source access (SourceCompilerVTables.normalizeComparisonPredicate · predicate)
       else lift (CompilerVTableFacts.normalizePredicate facts predicate)
     layoutOf := fun _ ty => if sourceMode then do
       let runtime ← SourceCompilerRuntime.current p.runtime.target access
