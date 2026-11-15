@@ -43,4 +43,38 @@ def make (p : CompilerCallPipeline.Prepared) (access : SourceCompilerWorld.Acces
       lift (CompilerScopes.sourceScope p.scopes identity.index index)
     unitLayout := lift (CompilerFacts.unitLayout facts.context) }
   if sourceMode then hooks else CompilerVirtualFacts.scopeHooks p.scopes hooks
+/-- Exact live query boundary, including the legacy inline override and all
+missing-World/query errors. No successful machine action is a hypothesis. -/
+theorem requiresCallerLocation_at {C : Type} (p : CompilerCallPipeline.Prepared)
+    (access : SourceCompilerWorld.Access S) (callee : CallInstance) (before : S) :
+    (make (C := C) p access).requiresCallerLocation callee before =
+      if p.calls.program.input.sourceMaterial.isSome then
+        match access.get before with
+        | none => .error (.unsupported "compiler virtual World unavailable") before
+        | some world => match SourceCallerLocation.requiresCallerLocation world callee with
+          | .ok value => .ok value before
+          | .error reason => .error (.unsupported s!"compiler virtual query: {reason}") before
+      else match CompilerVirtualFacts.inlineAttribute p.scopes callee with
+        | some value => .ok value before
+        | none => match CompilerRuntimeQueries.requiresCallerLocation p.runtime callee with
+          | .ok value => .ok value before
+          | .error reason => .error (.unsupported s!"compiler virtual query: {reason}") before := by
+  cases mode : p.calls.program.input.sourceMaterial.isSome with
+  | false =>
+    cases inline : CompilerVirtualFacts.inlineAttribute p.scopes callee with
+    | some value => simp [make, mode, CompilerVirtualFacts.scopeHooks, inline, pure, EStateM.pure]
+    | none =>
+      cases result : CompilerRuntimeQueries.requiresCallerLocation p.runtime callee <;>
+        simp [make, mode, CompilerVirtualFacts.scopeHooks, inline, lift, result,
+          get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+  | true =>
+    cases current : access.get before with
+    | none =>
+      simp [make, mode, source, current, get, getThe, MonadStateOf.get, EStateM.get,
+        bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+    | some world =>
+      cases result : SourceCallerLocation.requiresCallerLocation world callee <;>
+        simp [make, mode, source, lift, current, result, get, getThe, MonadStateOf.get,
+          EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+
 end Miri.Input.CompilerVirtualLeaves

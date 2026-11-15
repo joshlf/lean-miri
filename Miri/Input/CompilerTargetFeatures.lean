@@ -64,4 +64,39 @@ def dictionary (p : CompilerIntrinsicFacts.Prepared) (access : SourceCompilerWor
     {required := fun callee => lift (required p callee)
      available := fun name => lift (available p name)
      isLikeWasm := lift (isLikeWasm p)}
+/-- Pointwise required-feature result, retaining source-mode capability errors
+and the exact pure declaration query. -/
+theorem required_at (p : CompilerIntrinsicFacts.Prepared) (access : SourceCompilerWorld.Access S)
+    (callee : CallInstance) (before : S) :
+    (dictionary p access).required callee before =
+      if p.program.input.sourceMaterial.isSome then
+        match access.get before with
+        | none => .error (.unsupported "source target-feature World unavailable") before
+        | some world =>
+          if world.canonical.sourceMaterial.isSome then match requiredSource world callee with
+            | .ok value => .ok value before
+            | .error reason => .error (.unsupported reason) before
+          else .error (.unsupported "source target-feature material unavailable") before
+      else match required p callee with
+        | .ok value => .ok value before
+        | .error reason => .error (.unsupported reason) before := by
+  cases mode : p.program.input.sourceMaterial.isSome with
+  | false =>
+    cases result : required p callee <;>
+      simp [dictionary, mode, lift, result, pure, EStateM.pure] <;> rfl
+  | true =>
+    cases current : access.get before with
+    | none =>
+      simp [dictionary, mode, source, current, get, getThe, MonadStateOf.get,
+        EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+    | some world =>
+      cases material : world.canonical.sourceMaterial.isSome with
+      | false =>
+        simp [dictionary, mode, source, current, material, get, getThe, MonadStateOf.get,
+          EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+      | true =>
+        cases result : requiredSource world callee <;>
+          simp [dictionary, mode, source, lift, current, material, result,
+            get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+
 end Miri.Input.CompilerTargetFeatures

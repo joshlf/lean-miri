@@ -84,4 +84,39 @@ def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
     let some name := name
       | throw (.invalidProgram "source LLVM intrinsic requires a codegen symbol_name attribute")
     pure name }
+/-- Exact closure-kind query boundary over the current compiler World. -/
+theorem isClosureLike_at {C : Type} (p : CompilerProviders.Prepared) (budget : Nat)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K U))
+    (callee : CallInstance) (before : MachineHooks.State K U) :
+    (make (C := C) p budget access).isClosureLike callee before =
+      if p.runtime.source.sourceMaterial.isSome then
+        match access.get before with
+        | none => .error (.unsupported "source call-facts World unavailable") before
+        | some world =>
+          if world.canonical.sourceMaterial.isSome then match SourceCallFacts.isClosureLike world callee with
+            | .ok value => .ok value before
+            | .error reason => .error (.unsupported reason) before
+          else .error (.unsupported "source call-facts material unavailable") before
+      else match CompilerCallFacts.isClosureLike p.intrinsics callee with
+        | .ok value => .ok value before
+        | .error reason => .error (.unsupported reason) before := by
+  cases mode : p.runtime.source.sourceMaterial.isSome with
+  | false =>
+    cases result : CompilerCallFacts.isClosureLike p.intrinsics callee <;>
+      simp [make, mode, lift, result, pure, EStateM.pure] <;> rfl
+  | true =>
+    cases current : access.get before with
+    | none =>
+      simp [make, mode, source, current, get, getThe, MonadStateOf.get,
+        EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+    | some world =>
+      cases material : world.canonical.sourceMaterial.isSome with
+      | false =>
+        simp [make, mode, source, current, material, get, getThe, MonadStateOf.get,
+          EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+      | true =>
+        cases result : SourceCallFacts.isClosureLike world callee <;>
+          simp [make, mode, source, lift, current, material, result,
+            get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind, pure, EStateM.pure] <;> rfl
+
 end Miri.Input.CompilerExecutionCallLeaves
