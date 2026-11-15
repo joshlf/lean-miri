@@ -1,4 +1,5 @@
 import Miri.Input.SourceCompilerTypes
+import Init.Data.Range.Lemmas
 
 /-! Successful physical interning preserves existing canonical type and layout
 rows. These are local transition properties, with no global World invariant. -/
@@ -69,5 +70,45 @@ theorem internPredicate_preserves_physical_pools (before after : World) (predica
   all_goals simp_all only [reduceCtorEq, Except.ok.injEq, Prod.mk.injEq]
   all_goals rcases result with ⟨rfl, rfl⟩
   all_goals simp
+
+/-- World seeding validates and indexes the input without replacing its canonical
+rows. The loop invariant concerns only this construction, not arbitrary Worlds. -/
+theorem create_canonical (input : ImportDocument) (world : World) (result : create input = .ok world) : world.canonical = input := by
+  have loop_canonical (xs : List Nat)
+      (step : Nat → World → Except String (ForInStep World))
+      (preserves : ∀ i before next, step i before = .ok next →
+        (match next with | .done w | .yield w => w.canonical) = before.canonical)
+      (before after : World) (result : forIn xs before step = .ok after) :
+      after.canonical = before.canonical := by
+    induction xs generalizing before with
+    | nil =>
+      simp only [List.forIn_nil, pure, Except.pure, Except.ok.injEq] at result
+      subst after
+      rfl
+    | cons i xs ih =>
+      simp only [List.forIn_cons, bind, Except.bind] at result
+      split at result
+      · contradiction
+      · rename_i next stepResult
+        cases next with
+        | done w =>
+          simp only [pure, Except.pure, Except.ok.injEq] at result
+          subst after
+          exact preserves i before (.done w) stepResult
+        | yield w =>
+          exact (ih w result).trans (preserves i before (.yield w) stepResult)
+  simp only [create, bind, Except.bind, pure, Except.pure] at result
+  repeat' split at result
+  all_goals simp_all only [reduceCtorEq, Except.ok.injEq]
+  all_goals subst world
+  all_goals
+    simp only [Std.Legacy.Range.forIn_eq_forIn_range'] at *
+    refine loop_canonical _ _ ?_ {canonical := input} _ (by assumption)
+    intro i before next success
+    try simp only [bind, Except.bind, pure, Except.pure] at success
+    repeat' split at success
+    all_goals simp_all only [reduceCtorEq, Except.ok.injEq]
+    all_goals cases success
+    all_goals rfl
 
 end Miri.Input.SourceCompilerWorld
