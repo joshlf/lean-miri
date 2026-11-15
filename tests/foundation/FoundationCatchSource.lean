@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationProjectionClauses
 import Miri.Frontend.FoundationObligations
 open Lean Miri.Frontend.Foundation
@@ -12,7 +13,8 @@ def main (paths : List String) : IO Unit := do
   unless (← checked (row.getObjValAs? String "path")) == "std::panic::catch_unwind" do
     throw (IO.userError "not actual catch source")
   let environment ← checked (body.getObjVal? "environment")
-  let clauses ← checked (environment.getObjValAs? (Array Json) "clauses")
+  let flatEnvironment ← checked (flattenEnvironment document environment)
+  let clauses ← checked (flatEnvironment.getObjValAs? (Array Json) "clauses")
   let projections := clauses.filter fun clause => (clause.getObjValAs? String "kind").toOption == some "projection"
   let [projection] := projections.toList | throw (IO.userError "catch source Output equality absent")
   let result := ConcreteType.primitive "uint" "u8"

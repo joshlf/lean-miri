@@ -6,6 +6,10 @@ arguments, predicates or defaults are supplied by this operation. -/
 namespace Miri.Frontend.Foundation
 open Lean
 
+private def requiredOptionalNat (source : Json) (key : String) : Except String (Option Nat) := do
+  let value ← source.getObjVal? key
+  fromJson? value
+
 /-- Derive the ordered parameter/predicate view. Every owner and original
 parameter index is checked against its captured declaration identity. -/
 def flattenEnvironment (document : Document) (source : Json) : Except String Json := do
@@ -22,14 +26,14 @@ def flattenEnvironment (document : Document) (source : Json) : Except String Jso
     let some row := document.definitions[definition]? | throw "generic source owner absent"
     unless (← row.getObjValAs? Nat "definition_id") == definition do throw "generic source owner identity mismatch"
     let declaration ← row.getObjVal? "generic_declaration"
-    let parent ← layer.getObjValAs? (Option Nat) "parent"
-    unless parent == previous && parent == (← declaration.getObjValAs? (Option Nat) "parent") do
+    let parent ← requiredOptionalNat layer "parent"
+    unless parent == previous && parent == (← requiredOptionalNat declaration "parent") do
       throw "generic source lexical parent mismatch"
     let parentCount ← layer.getObjValAs? Nat "parent_count"
     unless parentCount == parameters.size && parentCount == (← declaration.getObjValAs? Nat "parent_count") do
       throw "generic source inherited count mismatch"
-    let selfType ← layer.getObjValAs? (Option Nat) "self_type"
-    unless selfType == (← declaration.getObjValAs? (Option Nat) "self_type") do throw "generic impl self-type link mismatch"
+    let selfType ← requiredOptionalNat layer "self_type"
+    unless selfType == (← requiredOptionalNat declaration "self_type") do throw "generic impl self-type link mismatch"
     if let some type := selfType then
       unless type < document.types.size do throw "generic impl self-type source absent"
       unless (← row.getObjValAs? String "kind").startsWith "Impl" do throw "self-type link on non-impl owner"

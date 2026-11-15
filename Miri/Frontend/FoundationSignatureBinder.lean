@@ -68,6 +68,13 @@ private def eraseType (document : Document) (variables : Array MIR.BoundVariable
   match kind with
   | "bool" | "char" | "int" | "uint" | "float" | "never" | "str" | "param" => return rows
   | "raw_pointer" => children rows #[← shape.getObjValAs? Nat "pointee"]
+  | "adt" =>
+    let mut ids := #[]
+    for argument in (← shape.getObjValAs? (Array Json) "arguments") do
+      unless (← argument.getObjValAs? String "kind") == "type" do
+        throw "signature nominal non-type argument unsupported"
+      ids := ids.push (← argument.getObjValAs? Nat "type")
+    children rows ids
   | "array" => children rows #[← shape.getObjValAs? Nat "element"]
   | "tuple" => children rows (← shape.getObjValAs? (Array Nat) "elements")
   | "pattern_type" =>

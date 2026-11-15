@@ -1,4 +1,5 @@
 import Miri.Frontend.Foundation
+import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationTraitClaims
 import Miri.Frontend.FoundationExistentialBounds
 import Miri.Frontend.FoundationFnSupertraits
@@ -47,6 +48,7 @@ private def ensureParam (typeArgs : Array (Option ConcreteType))
 domain.  This is a pure, deliberately incomplete trait solver. -/
 def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
     (constArgs : Array (Option Nat)) (environment : Json) : Except String Unit := do
+  let environment ← flattenEnvironment d environment
   let parameters ← arr environment "parameters"
   for param in parameters do ensureParam typeArgs constArgs param
   for (entry, index) in typeArgs.toList.zipIdx do

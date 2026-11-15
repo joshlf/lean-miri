@@ -1,4 +1,5 @@
 import Miri.Frontend.Foundation
+import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationConst
 import Miri.Frontend.FoundationConstEval
 
@@ -10,7 +11,7 @@ open Lean
 
 def requiredScalarArguments (d : Document) (body : Json)
     (constants : Array (Option Nat)) : Except String (Array (Option RequiredScalar)) := do
-  let environment ← body.getObjVal? "environment"
+  let environment ← flattenEnvironment d (← body.getObjVal? "environment")
   let parameters ← environment.getObjValAs? (Array Json) "parameters"
   let mut values := Array.replicate constants.size (none : Option RequiredScalar)
   for param in parameters do

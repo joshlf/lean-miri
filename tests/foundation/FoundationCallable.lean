@@ -103,7 +103,7 @@ def main (paths : List String) : IO Unit := do
   let some item := items[0]? | throw (IO.userError "compiler std closure Item absent")
   let _ ← checked (compareKey document key item definitions types)
   unless normal.parentEnvironment == normal.closure.parentEnvironment &&
-      !(← checked (normal.parentEnvironment.getObjValAs? (Array Json) "clauses")).isEmpty do
+      !(← checked ((← checked (flattenEnvironment document normal.parentEnvironment)).getObjValAs? (Array Json) "clauses")).isEmpty do
     throw (IO.userError "closure parent premises were silently discarded")
   let once ← checked (builtinClosureCandidate document closure parent .fnOnce tuple output)
   let .closureOnce method onceKey false args := once.recipe | throw (IO.userError "FnOnce adapter source recipe differs")

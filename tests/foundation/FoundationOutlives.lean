@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationInstance
 import Miri.Frontend.FoundationOutlives
 import Miri.Input.Decoder
@@ -18,7 +19,8 @@ def main (paths : List String) : IO Unit := do
   let some body := document.bodies[0]? | throw (IO.userError "generic source body absent")
   let definition ← checked (body.getObjValAs? Nat "definition")
   let environment ← checked (body.getObjVal? "environment")
-  let clauses ← checked (environment.getObjValAs? (Array Json) "clauses")
+  let flatEnvironment ← checked (flattenEnvironment document environment)
+  let clauses ← checked (flatEnvironment.getObjValAs? (Array Json) "clauses")
   unless clauses.any (fun clause =>
       (clause.getObjValAs? String "kind").toOption == some "type_outlives" &&
       (clause.getObjValAs? String "region").toOption == some "static") do

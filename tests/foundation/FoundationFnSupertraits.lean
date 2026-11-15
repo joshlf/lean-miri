@@ -34,7 +34,11 @@ def main (paths : List String) : IO Unit := do
     let some principal := predicates[0]? | throw (IO.userError "source principal absent")
     let args ← checked (principal.getObjValAs? (Array Json) "arguments")
     let clause := Json.mkObj [("kind",toJson "trait"),("definition",toJson target),("arguments",toJson (#[selfArg] ++ args))]
-    let environment := Json.mkObj [("parameters",toJson (#[] : Array Json)),("clauses",toJson #[clause])]
+    let some contextBody := document.bodies[0]? | throw (IO.userError "source declaration context absent")
+    let context ← checked (contextBody.getObjVal? "environment")
+    let layers ← checked (context.getObjValAs? (Array Json) "layers")
+    let environment := context.setObjVal! "layers" (toJson (layers.mapIdx fun index layer =>
+      if index + 1 == layers.size then layer.setObjVal! "clauses" (toJson #[clause]) else layer))
     let _ ← checked (checkEnvironment document #[] #[] environment)
   for autoId in source.autoTraits do
     let _ ← checked (checkSourceExistentialTrait document source autoId #[])

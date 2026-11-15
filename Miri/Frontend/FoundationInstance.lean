@@ -36,7 +36,8 @@ def instantiateItem (d : Document) (definition : Nat)
     return (← b.getObjValAs? Nat "definition") == definition
   unless candidates.size == 1 do throw "missing or duplicate item template"
   let some body := candidates[0]? | throw "missing item template"
-  let environment ← body.getObjVal? "environment"
+  let sourceEnvironment ← body.getObjVal? "environment"
+  let environment ← flattenEnvironment d sourceEnvironment
   let parameters ← environment.getObjValAs? (Array Json) "parameters"
   unless parameters.size == arguments.size do throw "item generic argument count mismatch"
   let mut types : Array (Option ConcreteType) := #[]
@@ -53,7 +54,7 @@ def instantiateItem (d : Document) (definition : Nat)
       types := types.push none
       constants := constants.push (some n)
     | _, _ => throw "unsupported or wrong-kind item generic argument"
-  checkEnvironment d types constants environment
+  checkEnvironment d types constants sourceEnvironment
   for parameter in parameters do
     if (← parameter.getObjValAs? String "kind") == "const" then
       let index ← parameter.getObjValAs? Nat "index"

@@ -68,7 +68,7 @@ def main (paths : List String) : IO Unit := do
   for (relocation,index) in candidate.relocations.toList.zipIdx do
     check (relocation.offset == (index + 3) * candidate.pointerBytes &&
       relocation.width == candidate.pointerBytes) "relocation source offset differs"
-  check (!(← checked (candidate.parentEnvironment.getObjValAs? (Array Json) "clauses")).isEmpty)
+  check (!(← checked ((← checked (flattenEnvironment document candidate.parentEnvironment)).getObjValAs? (Array Json) "clauses")).isEmpty)
     "parent obligations discarded"
   match closureVtableImageCandidate document closure #[] .fn (.tuple #[]) (.primitive "int" "i32") with
   | .error _ => pure ()

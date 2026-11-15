@@ -9,10 +9,10 @@ bash tools/export-mir.sh --output scratch/foundation-std-frontier-catch.json --f
 if bash tools/export-mir.sh --output scratch/foundation-std-frontier-unwrap.json --foundation \
     --root 'std::result::Result::<T, E>::unwrap_or_else' -- tests/foundation/fixtures/std-main.rs \
     --crate-name=foundation_std_main > scratch/foundation-std-frontier-unwrap.log 2>&1; then
-  printf 'Expected inherited-environment source boundary for unwrap_or_else\n' >&2
+  printf 'Expected PlaceMention source boundary for unwrap_or_else\n' >&2
   exit 1
 fi
-rg -F 'unsupported inherited generic environment:' scratch/foundation-std-frontier-unwrap.log
+rg -F 'unsupported statement: PlaceMention(' scratch/foundation-std-frontier-unwrap.log
 ELAN_HOME="$ROOT/.elan" flock /tmp/lean-miri-lake-build.lock .elan/bin/lake build \
   Miri.Frontend.FoundationProjectionClauses Miri.Frontend.FoundationObligations
 ELAN_HOME="$ROOT/.elan" .elan/bin/lake env lean --run tests/foundation/FoundationCatchSource.lean \

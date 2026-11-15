@@ -7,17 +7,25 @@ private def fixture (operand := "copy") (source := 1) (retag := true)
     (returnKind := "return") (dest := 0) : Except String Document := do
   let template := "{\"definition\":0,\"argument_count\":1,\"environment\":{\"parameters\":[],\"clauses\":[]},\"required_consts\":[],\"locals\":[0,0,0],\"blocks\":[{\"cleanup\":false,\"statements\":[{\"kind\":\"assign\",\"place\":{\"local\":DEST,\"projection\":[]},\"value\":{\"kind\":\"use\",\"retag\":RETAG,\"operand\":{\"kind\":\"OPERAND\",\"place\":{\"local\":SOURCE,\"projection\":[]}}}}],\"terminator\":{\"kind\":\"RETURN\"}}]}"
   let body ← Json.parse (template.replace "DEST" (toString dest) |>.replace "SOURCE" (toString source) |>.replace "RETAG" (toString retag) |>.replace "OPERAND" operand |>.replace "RETURN" returnKind)
+  let declaration := Json.mkObj [("parent",Json.null),("parent_count",toJson (0 : Nat)),
+    ("own_parameter_count",toJson (0 : Nat)),("self_type",Json.null)]
+  let owner := Json.mkObj [("definition_id",toJson (0 : Nat)),("kind",toJson "fn"),("generic_declaration",declaration)]
+  let layer := Json.mkObj [("owner",toJson (0 : Nat)),("parent",Json.null),("parent_count",toJson (0 : Nat)),
+    ("self_type",Json.null),("parameters",toJson (#[] : Array Json)),("clauses",toJson (#[] : Array Json))]
+  let body := body.setObjVal! "environment" (Json.mkObj [("owner",toJson (0 : Nat)),("layers",toJson #[layer])])
   let row ← Json.parse "{\"type_id\":0,\"shape\":{\"kind\":\"param\",\"index\":0}}"
   let target : Target := { triple := "x86_64-unknown-linux-gnu", dataLayout := "", pointerSizeBits := 64, endian := "little" }
-  return { source := Json.null, target, definitions := #[], types := #[row], bodies := #[body] }
+  return { source := Json.null, target, definitions := #[owner], types := #[row], bodies := #[body] }
 
-private def noObligations (env : Json) : Except String Unit := do
+private def noObligations (document : Document) (source : Json) : Except String Unit := do
+  let env ← flattenEnvironment document source
   let clauses ← env.getObjValAs? (Array Json) "clauses"
   unless clauses.isEmpty do throw "unvalidated obligations"
 
 private def run (doc : Except String Document) (ty := ConcreteType.primitive "uint" "u8")
     (value := ExecutionValue.scalar 42) : Except String ExecutionValue := do
-  evaluateRestrictedBody (← doc) 0 #[some ty] #[] noObligations #[value]
+  let doc ← doc
+  evaluateRestrictedBody doc 0 #[some ty] #[] (noObligations doc) #[value]
 
 private def expectError (r : Except String ExecutionValue) : IO Unit :=
   match r with

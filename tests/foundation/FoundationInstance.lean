@@ -6,6 +6,18 @@ private def fixture (parameters : String := "[{\"kind\":\"type\",\"index\":0}]")
     (required : String := "[]") : Except String Document := do
   let body ← Json.parse ("{\"definition\":0,\"argument_count\":1,\"environment\":{\"parameters\":" ++ parameters ++
     ",\"clauses\":[]},\"required_consts\":" ++ required ++ ",\"locals\":[0,0],\"blocks\":[{}]}")
+  let flat ← body.getObjVal? "environment"
+  let parameters ← flat.getObjValAs? (Array Json) "parameters"
+  let parameters := parameters.mapIdx fun index parameter => parameter.setObjVal! "definition" (toJson (index + 1))
+  let declaration := Json.mkObj [("parent",Json.null),("parent_count",toJson (0 : Nat)),
+    ("own_parameter_count",toJson parameters.size),("self_type",Json.null)]
+  let owner := Json.mkObj [("definition_id",toJson (0 : Nat)),("kind",toJson "fn"),("generic_declaration",declaration)]
+  let definitions := #[owner] ++ parameters.mapIdx fun index parameter => Json.mkObj [
+    ("definition_id",toJson (index + 1)),("kind",toJson (if (parameter.getObjValAs? String "kind").toOption == some "const" then "ConstParam" else "TyParam")),
+    ("generic_parameter",Json.mkObj [("owner",toJson (0 : Nat)),("index",toJson index)])]
+  let layer := Json.mkObj [("owner",toJson (0 : Nat)),("parent",Json.null),("parent_count",toJson (0 : Nat)),
+    ("self_type",Json.null),("parameters",toJson parameters),("clauses",toJson (#[] : Array Json))]
+  let body := body.setObjVal! "environment" (Json.mkObj [("owner",toJson (0 : Nat)),("layers",toJson #[layer])])
   let ty ← Json.parse "{\"type_id\":0,\"shape\":{\"kind\":\"param\",\"index\":0}}"
   let target : Target := {
     triple := "x86_64-unknown-linux-gnu"
@@ -17,7 +29,7 @@ private def fixture (parameters : String := "[{\"kind\":\"type\",\"index\":0}]")
   return {
     source := Json.null
     target := target
-    definitions := #[Json.null]
+    definitions := definitions
     types := #[ty]
     bodies := #[body]
   }

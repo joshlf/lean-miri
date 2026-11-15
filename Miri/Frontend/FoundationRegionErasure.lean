@@ -13,6 +13,8 @@ where
     match ty with
     | .primitive k n => return .primitive k n
     | .patternNotNull base => return .patternNotNull (← go fuel base)
+    | .closure definition arguments => return .closure definition (← arguments.mapM (go fuel))
+    | .nominal definition arguments => return .nominal definition (← arguments.mapM (go fuel))
     | .array element count => return .array (← go fuel element) count
     | .tuple fields => return .tuple (← fields.mapM (go fuel))
     | .pointer kind pointee =>
@@ -37,6 +39,8 @@ where
     match ty with
     | .primitive .. => return false
     | .patternNotNull base => go fuel base
+    | .closure _ arguments => return (← arguments.mapM (go fuel)).any id
+    | .nominal _ arguments => return (← arguments.mapM (go fuel)).any id
     | .array element _ => go fuel element
     | .tuple fields => return (← fields.mapM (go fuel)).any id
     | .pointer kind pointee =>

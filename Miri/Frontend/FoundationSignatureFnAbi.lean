@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationGenericEnvironment
 
 /-! Demand-time FnAbi from one declared generic source signature. This query
 never reads MIR locals, instructions, promoted bodies or required constants and
@@ -26,7 +27,8 @@ private def sourceHeader (d : Document) (definition : Nat) : Except String Json 
 
 private def substitutions (d : Document) (source : Json) (arguments : Array ItemArgument) :
     Except String (Array (Option ConcreteType) × Array (Option Nat)) := do
-  let environment ← source.getObjVal? "environment"
+  let sourceEnvironment ← source.getObjVal? "environment"
+  let environment ← flattenEnvironment d sourceEnvironment
   let parameters ← environment.getObjValAs? (Array Json) "parameters"
   unless parameters.size == arguments.size do throw "signature generic argument count mismatch"
   let mut types := #[]
@@ -39,7 +41,7 @@ private def substitutions (d : Document) (source : Json) (arguments : Array Item
     | "type", .type ty => types := types.push (some ty); constants := constants.push none
     | "const", .constant n => types := types.push none; constants := constants.push (some n)
     | _, _ => throw "signature generic argument kind unsupported"
-  checkEnvironment d types constants environment
+  checkEnvironment d types constants sourceEnvironment
   for parameter in parameters do
     if (← parameter.getObjValAs? String "kind") == "const" then
       let index ← parameter.getObjValAs? Nat "index"

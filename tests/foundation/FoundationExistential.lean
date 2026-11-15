@@ -37,7 +37,11 @@ def main (paths : List String) : IO Unit := do
   let selfArgument := Json.mkObj [("kind",toJson "type"),("type",toJson id)]
   let arguments ← checked (first.getObjValAs? (Array Json) "arguments")
   let clause := first.setObjVal! "arguments" (toJson (#[selfArgument] ++ arguments))
-  let environment := Json.mkObj [("parameters",toJson (#[] : Array Json)),("clauses",toJson #[clause])]
+  let some contextBody := document.bodies[0]? | throw (IO.userError "source declaration context absent")
+  let context ← checked (contextBody.getObjVal? "environment")
+  let layers ← checked (context.getObjValAs? (Array Json) "layers")
+  let environment := context.setObjVal! "layers" (toJson (layers.mapIdx fun index layer =>
+    if index + 1 == layers.size then layer.setObjVal! "clauses" (toJson #[clause]) else layer))
   let _ ← checked (checkEnvironment document #[] #[] environment)
   let badTerm := Json.mkObj [("kind",toJson "const"),("bits",toJson "0")]
   for changed in #[

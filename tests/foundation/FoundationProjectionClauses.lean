@@ -1,3 +1,4 @@
+import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationProjectionClauses
 open Lean Miri.Frontend.Foundation
 private def checked {α : Type} (value : Except String α) : IO α :=
@@ -13,7 +14,8 @@ def main (paths : List String) : IO Unit := do
     | some row => (row.getObjValAs? String "path").toOption == some "identity"
     | none => false) | throw (IO.userError "identity body absent")
   let environment ← checked (body.getObjVal? "environment")
-  let clauses ← checked (environment.getObjValAs? (Array Json) "clauses")
+  let flatEnvironment ← checked (flattenEnvironment document environment)
+  let clauses ← checked (flatEnvironment.getObjValAs? (Array Json) "clauses")
   let some projection := clauses.find? (fun clause =>
     (clause.getObjValAs? String "kind").toOption == some "projection")
     | throw (IO.userError "genuine FnOnce Output projection absent")
