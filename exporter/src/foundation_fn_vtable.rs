@@ -2,6 +2,7 @@
 //! Never calls vtable_entries, object-safety, instance selection or allocation.
 use super::*;
 use std::collections::HashSet;
+use rustc_span::Pos;
 
 impl<'tcx> Material<'tcx> {
     fn fn_vtable_type(&mut self, tcx: TyCtxt<'tcx>, value: ty::Ty<'tcx>) -> Result<Value> {
@@ -29,6 +30,44 @@ impl<'tcx> Material<'tcx> {
             ty::GenericArgKind::Type(value) => Ok(json!({"kind":"type","type":self.fn_vtable_type(tcx,value)?})),
             other => unsupported("Fn declaration generic argument",other),
         }).collect()
+    }
+    // Complete finite declaration predicates, including inherited owners.
+    // No concrete substitution or impossible-clause evaluation is performed.
+    fn fn_method_clause_source(&mut self, tcx: TyCtxt<'tcx>, method: DefId) -> Result<Value> {
+        let mut owners = Vec::new();
+        let mut current = Some(method);
+        while let Some(owner) = current {
+            let predicates = tcx.clauses_of(owner);
+            let mut clauses = Vec::new();
+            for (clause, _) in predicates.clauses {
+                let bound = clause.kind();
+                let value = match bound.skip_binder() {
+                    ty::ClauseKind::Trait(predicate) => {
+                        let target = predicate.trait_ref.def_id;
+                        let kind = if tcx.is_lang_item(target,rustc_attr_ir::LangItem::Fn) {"fn"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::FnMut) {"fn_mut"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::FnOnce) {"fn_once"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::Tuple) {"tuple"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::Sized) {"sized"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::MetaSized) {"meta_sized"}
+                            else if tcx.is_lang_item(target,rustc_attr_ir::LangItem::PointeeSized) {"pointee_sized"}
+                            else {"unsupported"};
+                        json!({"kind":"trait","definition":self.definition(tcx,target),"lang_item":kind,
+                            "core_source":!target.is_local() && tcx.crate_name(target.krate).as_str()=="core",
+                            "arguments":self.fn_vtable_arguments(tcx,predicate.trait_ref.args)?,
+                            "polarity":format!("{:?}",predicate.polarity)})
+                    },
+                    other => json!({"kind":"unsupported","source":format!("{other:?}")}),
+                };
+                let mut value = value;
+                value["bound_variables"] = json!(bound.bound_vars().iter().map(|v|format!("{v:?}")).collect::<Vec<_>>());
+                clauses.push(value);
+            }
+            owners.push(json!({"definition":self.definition(tcx,owner),
+                "parent":predicates.parent.map(|d|self.definition(tcx,d)),"clauses":clauses}));
+            current = predicates.parent;
+        }
+        Ok(json!(owners))
     }
     pub(super) fn fn_vtable_source(&mut self, tcx: TyCtxt<'tcx>) -> Result<Value> {
         let roots = [("fn",tcx.lang_items().fn_trait()),("fn_mut",tcx.lang_items().fn_mut_trait()),("fn_once",tcx.lang_items().fn_once_trait())];
@@ -67,9 +106,12 @@ impl<'tcx> Material<'tcx> {
                 if item.is_fn() {
                     let signature = tcx.fn_sig(item.def_id).instantiate_identity().skip_normalization();
                     let raw = signature.skip_binder();
+                    let span = tcx.def_span(item.def_id);
+                    let start = tcx.sess.source_map().lookup_char_pos(span.lo());
+                    let end = tcx.sess.source_map().lookup_char_pos(span.hi());
                     let params = tcx.generics_of(item.def_id);
                     let own_clauses = tcx.explicit_clauses_of(item.def_id);
-                    record["method"] = json!({"is_method":item.is_method(),"final":item.defaultness(tcx).is_final(),
+                    record["method"] = json!({"source_span":{"file":format!("{:?}",start.file.name),"start":{"line":start.line,"column":start.col.to_usize()},"end":{"line":end.line,"column":end.col.to_usize()}},"source_span_key":{"lo":span.lo().0,"hi":span.hi().0,"ctxt":format!("{:?}",span.ctxt()),"parent_local_definition":span.parent().map(|d|d.local_def_index.as_u32())},"clause_source":self.fn_method_clause_source(tcx,item.def_id)?,"never_unwind":tcx.codegen_fn_attrs(item.def_id).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),"is_foreign":tcx.is_foreign_item(item.def_id),"is_method":item.is_method(),"final":item.defaultness(tcx).is_final(),
                         "parent_count":params.parent_count,"own_parameters":params.own_params.iter().map(|p|format!("{:?}",p.kind)).collect::<Vec<_>>(),
                         "own_clauses":own_clauses.clauses.iter().map(|(c,_)|format!("{c:?}")).collect::<Vec<_>>(),
                         "bound_variables":signature.bound_vars().iter().map(|v|format!("{v:?}")).collect::<Vec<_>>(),

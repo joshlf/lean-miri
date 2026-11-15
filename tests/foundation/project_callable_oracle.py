@@ -34,5 +34,31 @@ projected = {
     'instances': [row for row in source['instances'] if row['instance_id'] in selected],
     'compiler_vtable_queries': queries,
 }
+# Keep actual generated shim MIR and ABI as comparison-only material. IDs
+# remain the original document IDs; no answer is fed to foundation readers.
+shims = [row for row in projected['instances']
+         if row['instance_kind'].get('shim_kind') in ('vtable', 'closure_once')]
+projected['shim_bodies'] = [source['bodies'][row['body']] for row in shims]
+statement_ids = {statement['kind'] for body in projected['shim_bodies']
+                 for block in body['basic_blocks'] for statement in block['statements']}
+projected['shim_statements'] = [{'id': i, 'value': source['statement_kinds'][i]}
+                                for i in sorted(statement_ids)]
+projected['shim_spans'] = [{'id': i, 'value': source['spans'][i]}
+                          for i in sorted({body['span'] for body in projected['shim_bodies']})]
+projected['shim_abis'] = []
+for row in shims:
+    queries = [q for q in source['compiler_instance_abis'] if q['instance_id'] == row['instance_id']]
+    assert len(queries) == 1 and not queries[0]['extra_argument_types']
+    abi = source['fn_abis'][queries[0]['abi_query']]
+    def argument(index):
+        value = dict(source['abi_arguments'][index])
+        layout = source['layout_values'][source['layouts'][value['layout']]]
+        value['layout_size'] = layout['size_bytes']
+        value['layout_align'] = layout['abi_align_bytes']
+        return value
+    value = dict(abi)
+    value['return'] = argument(abi['return'])
+    value['arguments'] = [argument(i) for i in abi['arguments']]
+    projected['shim_abis'].append({'instance_id': row['instance_id'], 'value': value})
 with open(sys.argv[2], 'w') as output:
     json.dump(projected, output, separators=(',', ':'))
