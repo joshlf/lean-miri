@@ -33,7 +33,14 @@ assert len(method_abi['arguments']) == 1
 argument = source['abi_arguments'][method_abi['arguments'][0]]
 argument_type = source['types'][argument['type']]['shape']
 assert argument_type['def_path'] == 'std::process::ExitCode'
+full_method_abi = dict(method_abi)
+full_method_abi['arguments'] = [source['abi_arguments'][i] for i in method_abi['arguments']]
+full_method_abi['return'] = source['abi_arguments'][method_abi['return']]
+return_node = source['types'][full_method_abi['return']['type']]
 method_mode = {'definition': source['definitions'][argument_type['def_id']], 'mode': argument['mode']}
 json.dump({'rustc_commit': source['producer']['rustc_commit'], 'local_layouts': rows,
-           'scalar_wrappers': wrappers, 'exitcode_method_mode': method_mode, 'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
+           'scalar_wrappers': wrappers, 'exitcode_method_mode': method_mode, 'exitcode_method_abi': full_method_abi,
+           'method_definition': source['definitions'][method[0]['def_id']],
+           'method_return_shape': return_node['shape'],
+           'method_return_layout': source['layout_values'][source['layouts'][return_node['layout']]], 'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
           open(sys.argv[2], 'w'))

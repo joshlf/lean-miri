@@ -50,6 +50,28 @@ class FoundationSignatureHeaders(unittest.TestCase):
             self.assertNotIn("abi_query", header)
             self.assertIsNotNone(document["dyn_metadata_source"])
 
+    def test_inherent_header_requires_selected_source_closure(self):
+        with tempfile.TemporaryDirectory(prefix="inherent-signature-") as directory:
+            output = Path(directory) / "source.json"
+            requested = ["--foundation-signature-root", "std::process::ExitCode::to_i32"]
+            result = self.export(output, "exporter/fixtures/foundation_signature_main.rs", "main", requested)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(output.exists())
+            result = self.export(output, "exporter/fixtures/foundation_signature_main.rs",
+                "std::rt::lang_start::{closure#0}", requested)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            document = json.loads(output.read_text())
+            self.assertEqual(len(document["source_function_signatures"]), 1)
+            header = document["source_function_signatures"][0]
+            owner = header["owner_declaration"]
+            self.assertEqual(owner["kind"], "inherent_method")
+            implementation = document["definitions"][owner["impl_definition"]]
+            self.assertEqual(implementation["generic_declaration"]["self_type"], owner["self_type"])
+            self.assertEqual(document["definitions"][header["definition"]]["kind"], "assoc_fn")
+            self.assertFalse(any(row["definition"] == header["definition"] for row in document["bodies"]))
+            self.assertNotIn("locals", header)
+            self.assertNotIn("abi_query", header)
+
     def test_unsupported_or_wrong_mode_signature_demand_rejects(self):
         with tempfile.TemporaryDirectory(prefix="signature-reject-") as directory:
             for foundation, requested, expected in [(False, "std::rt::lang_start_internal", "requires --foundation"),

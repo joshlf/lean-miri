@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationBridge
 import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Input.TableTail
 open Lean Miri Miri.Frontend.Foundation
 private def expect (r : Except String α) : IO α := match r with
@@ -78,4 +79,35 @@ def main (paths : List String) : IO Unit := do
     false (.nominal defId #[]))
   let some result := prepared.item.localTypes[5]? | throw (IO.userError "Result source absent")
   rejects (rustPassModeOfDocument d false result)
-  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers/method mode; unsupported aggregate controls"
+  let methodDefinition ← expect (oracle.getObjVal? "method_definition")
+  let methodCrate ← expect (methodDefinition.getObjValAs? Nat "crate")
+  let methodIndex ← expect (methodDefinition.getObjValAs? Nat "index")
+  let some methodId := closureSource.definitions.findIdx? (fun row =>
+    (row.getObjValAs? Nat "crate_index").toOption == some methodCrate &&
+    (row.getObjValAs? Nat "index").toOption == some methodIndex)
+    | throw (IO.userError "inherent method source definition absent")
+  let (methodRegistry, fullAbi) ← expect (rustFunctionAbiOfSourceSignature closureSource methodId #[])
+  let expectedAbi ← expect (oracle.getObjVal? "exitcode_method_abi")
+  let expectedAbi ← expect (Input.JsonReader.run Input.DecoderValues.decodeCompilerFunctionAbi expectedAbi.compress)
+  check (fullAbi.arguments.size == 1 && expectedAbi.arguments.size == 1) "inherent method argument count"
+  let some argument := fullAbi.arguments[0]? | throw (IO.userError "method argument absent")
+  let (argumentNode, _) ← expect (methodRegistry.lookup argument.typeId)
+  let .adt argumentShape := argumentNode.shape | throw (IO.userError "method argument not nominal")
+  check (argumentShape.definition == defId) "method argument declaration identity"
+  let (returnNode, _) ← expect (methodRegistry.lookup fullAbi.returnValue.typeId)
+  let .int (.known .i32) := returnNode.shape | throw (IO.userError "method output not exact i32")
+  let returnShape ← expect (oracle.getObjVal? "method_return_shape")
+  check ((← expect (returnShape.getObjValAs? String "kind")) == "int" &&
+    (← expect (returnShape.getObjValAs? String "signed_kind")) == "i32") "compiler method output identity"
+  let returnLayout ← expect (methodRegistry.runtimeLayout fullAbi.returnValue.typeId)
+  let compilerReturn ← expect (oracle.getObjVal? "method_return_layout")
+  let compilerReturn ← expect (Input.JsonReader.run Input.DecoderValues.decodeCompilerLayout compilerReturn.compress)
+  let compilerReturn ← expect ((Input.RuntimeMetadata.layout target compilerReturn).mapError toString)
+  check (returnLayout.layout == compilerReturn) "complete method return layout differs"
+  let rebase (a b : Input.AbiArgument) := {a with typeId := b.typeId, layoutId := b.layoutId}
+  let rebased := { fullAbi with
+    arguments := (fullAbi.arguments.zip expectedAbi.arguments).map fun (a,b) => rebase a b
+    returnValue := rebase fullAbi.returnValue expectedAbi.returnValue }
+  check (rebased == expectedAbi) "complete inherent method FnAbi differs"
+  rejects (rustFunctionAbiOfSourceSignature { closureSource with source := (closureSource.source.setObjVal! "source_function_signatures" (.arr #[])) } methodId #[])
+  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers/full inherent FnAbi; unsupported aggregate controls"

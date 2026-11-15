@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationFnAbiRegistry
 import Miri.Frontend.FoundationGenericEnvironment
+import Miri.Frontend.FoundationItemResolution
 
 /-! Demand-time FnAbi from one declared generic source signature. This query
 never reads MIR locals, instructions, promoted bodies or required constants and
@@ -67,7 +68,9 @@ def rustFunctionAbiOfSourceSignatureInRegistry (initial : PhysicalTypeRegistry) 
     (arguments : Array ItemArgument) : Except String (PhysicalTypeRegistry × Input.FunctionAbi) := do
   let d := initial.registry.document
   let some owner := d.definitions[definition]? | throw "signature definition absent"
-  unless (← owner.getObjValAs? String "kind") == "fn" do throw "signature ABI requires ordinary function owner"
+  let kind ← owner.getObjValAs? String "kind"
+  unless kind == "fn" || (kind == "assoc_fn" && (← sourceInherentItem d definition)) do
+    throw "signature ABI requires ordinary function or checked inherent owner"
   let source ← sourceHeader d definition
   let (types, constants) ← substitutions d source arguments
   let signature ← source.getObjVal? "signature"
