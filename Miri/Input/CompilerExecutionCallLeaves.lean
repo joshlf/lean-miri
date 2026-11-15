@@ -1,6 +1,7 @@
 import Miri.Input.SourceCompilerWorldAbi
 import Miri.Input.CompilerProviders
 import Miri.Input.SourceCompilerInstances
+import Miri.Input.SourceCallFacts
 import Miri.Input.CompilerCallFacts
 import Miri.Input.CompilerTargetFeatures
 import Miri.Interpreter.ExecutionCallLeaves
@@ -13,6 +14,12 @@ namespace Miri.Input.CompilerExecutionCallLeaves
 open Lean Miri.ABI Miri.Interpreter
 private def lift (query : Except String A) : MachineHooks.M K U A :=
   match query with | .ok value => pure value | .error error => throw (.unsupported error)
+
+private def source (access : SourceCompilerWorld.Access (MachineHooks.State K U))
+    (query : SourceCompilerWorld.World → Except String A) : MachineHooks.M K U A := do
+  let some world := access.get (← get) | throw (.unsupported "source call-facts World unavailable")
+  unless world.canonical.sourceMaterial.isSome do throw (.unsupported "source call-facts material unavailable")
+  lift (query world)
 
 def tupleFields (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except String (Array MIR.TyId) := do
   let node ← p.runtime.node ty |>.mapError toString
@@ -49,10 +56,15 @@ def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
       compatibilityBudget caller callee
   targetFeatures := CompilerTargetFeatures.dictionary p.intrinsics world
   tupleFields := fun ty => lift (tupleFields p ty)
-  isClosureLike := fun callee => lift (CompilerCallFacts.isClosureLike p.intrinsics callee)
+  isClosureLike := fun callee => if p.runtime.source.sourceMaterial.isSome then
+    source world (SourceCallFacts.isClosureLike · callee)
+    else lift (CompilerCallFacts.isClosureLike p.intrinsics callee)
   closureUpvarCount := fun ty => lift (closureUpvarCount p ty)
   llvmLinkName := fun callee => do
-    let some name ← lift (CompilerCallFacts.codegenSymbolName p.intrinsics callee)
+    let name ← if p.runtime.source.sourceMaterial.isSome then
+      source world (SourceCallFacts.codegenSymbolName · callee)
+      else lift (CompilerCallFacts.codegenSymbolName p.intrinsics callee)
+    let some name := name
       | throw (.invalidProgram "source LLVM intrinsic requires a codegen symbol_name attribute")
     pure name }
 end Miri.Input.CompilerExecutionCallLeaves
