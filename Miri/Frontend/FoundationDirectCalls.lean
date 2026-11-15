@@ -1,7 +1,7 @@
 import Miri.Frontend.FoundationRuntimeInstances
 
-/-! Explicit FnDef demands: only ordinary item templates are resolved. No trait,
-shim, pointer or allocation resolution is guessed. Physical, instance and ABI
+/-! Explicit FnDef demands: ordinary items and the declaration-backed unit trait
+method are resolved. Other trait, shim, pointer or allocation queries reject. Physical, instance and ABI
 pools grow monotonically; FnDef ZST types are appended only at finalization. -/
 namespace Miri.Frontend.Foundation
 open Lean
@@ -11,6 +11,8 @@ structure DirectCallPool where
   abis : Array Input.FunctionAbi := #[]
   instanceAbis : Array Input.Catalog.InstanceAbi := #[]
   functionInstances : Array Nat := #[]
+  functionSourceDefinitions : Array Nat := #[]
+  functionSourceArguments : Array (Array ItemArgument) := #[]
 
 namespace DirectCallPool
 
@@ -40,6 +42,8 @@ private def argumentVectors (arguments : Array ItemArgument) :
 
 structure Demand where
   sourceFunctionType : Nat
+  sourceDefinition : Nat
+  resolvedDefinition : Nat
   functionOrdinal : Nat
   node : Input.InstanceNode
   abiId : Nat
@@ -86,11 +90,28 @@ def demand (pool : DirectCallPool) (callerArguments : Array ItemArgument) (opera
         | _ => throw "direct call unsupported const expression"
       arguments := arguments.push (.constant bits)
     | _ => throw "direct call region or unknown generic argument unsupported"
-  let (pool, node, abiId) ← pool.internItem definition arguments
-  let ordinal := (pool.functionInstances.findIdx? (· == node.id)).getD pool.functionInstances.size
-  let pool := if ordinal == pool.functionInstances.size then
-      { pool with functionInstances := pool.functionInstances.push node.id } else pool
-  return (pool, ⟨typeId, ordinal, node, abiId⟩)
+  let resolved ← resolveSourceItem document definition arguments
+  let (pool, node, abiId) ← pool.internItem resolved.definition resolved.arguments
+  let mut pool := pool
+  -- Retain source FnDef generic arguments separately from selected Item args.
+  for arg in arguments do
+    if let .type ty := arg then
+      let (physical, _) ← pool.registry.physical.intern ty
+      pool := {pool with registry := {pool.registry with physical}}
+  let sameArguments (left right : Array ItemArgument) : Bool :=
+    left.size == right.size && (left.zip right).all fun (a,b) => match a,b with
+      | .type a, .type b => sameConcrete 1024 a b
+      | .constant a, .constant b => a == b
+      | _,_ => false
+  let existing := (List.range pool.functionInstances.size).find? fun i =>
+    pool.functionInstances[i]? == some node.id && pool.functionSourceDefinitions[i]? == some definition &&
+      ((pool.functionSourceArguments[i]?).map (sameArguments arguments)).getD false
+  let ordinal := existing.getD pool.functionInstances.size
+  pool := if existing.isNone then {pool with
+      functionInstances := pool.functionInstances.push node.id
+      functionSourceDefinitions := pool.functionSourceDefinitions.push definition
+      functionSourceArguments := pool.functionSourceArguments.push arguments} else pool
+  return (pool, ⟨typeId, definition, resolved.definition, ordinal, node, abiId⟩)
 
 structure FunctionTypes where
   types : Array Input.TypeNode
@@ -136,7 +157,10 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
   let mut facts := #[]
   let mut typeIds := #[]
   let layoutId := physical.layouts.size
-  for id in pool.functionInstances do
+  for ordinal in [:pool.functionInstances.size] do
+    let some id := pool.functionInstances[ordinal]? | throw "function source ordinal absent"
+    let some sourceDefinition := pool.functionSourceDefinitions[ordinal]? | throw "function source definition absent"
+    let some sourceArguments := pool.functionSourceArguments[ordinal]? | throw "function source arguments absent"
     let some node := pool.registry.instances[id]? | throw "demanded function instance absent"
     let .Item definition := node.instanceKind | throw "demanded function is not ordinary item"
     let some mapping := pool.instanceAbis.find? (·.instanceId == id) | throw "demanded function ABI mapping absent"
@@ -151,6 +175,16 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
       | _ => throw "demanded function safety unsupported"
     let inputs := abi.arguments.map (·.typeId)
     let output := abi.returnValue.typeId
+    let sourceGenericArgs ← if sourceDefinition == definition then pure node.genericArgs else do
+      let mut args : Array MIR.GenericArg := #[]
+      for argument in sourceArguments do
+        match argument with
+        | .type ty =>
+          let some index := physical.registry.entries.findIdx? (fun entry => sameConcrete 1024 entry.type ty)
+            | throw "function source type argument not interned"
+          args := args.push (.Type index)
+        | .constant _ => throw "associated const generic FnDef reconstruction unsupported"
+      pure args
     let typeId := types.size
     let sig : Input.FunctionSignature := ⟨inputs, output, safety, .Rust, false⟩
     let instanceDisplay := (← runtimeInstanceOfItem document (← instantiateItem document definition
@@ -163,7 +197,7 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
     types := types.push {
       id := typeId
       layoutId
-      shape := .functionDefinition definition node.genericArgs sig boundVariables
+      shape := .functionDefinition sourceDefinition sourceGenericArgs sig boundVariables
       display }
     facts := facts.push ⟨typeId, some id, ⟨inputs, output, safety, .Rust, false⟩⟩
     typeIds := typeIds.push typeId

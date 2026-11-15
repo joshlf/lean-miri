@@ -18,7 +18,7 @@ impl<'tcx> Material<'tcx> {
         let trait_definition = self.definition(tcx,definition);
         let declaration = tcx.trait_def(definition);
         let items = tcx.associated_items(definition).in_definition_order().map(|item|json!({
-            "definition":self.definition(tcx,item.def_id),
+            "definition":self.definition(tcx,item.def_id),"name":item.name().as_str(),
             "kind":match item.kind {ty::AssocKind::Fn{..}=>"method",ty::AssocKind::Type{..}=>"type",ty::AssocKind::Const{..}=>"const"},
             "own_parameter_count":tcx.generics_of(item.def_id).own_params.len(),"has_self":item.is_method()})).collect::<Vec<_>>();
         let generics = tcx.generics_of(definition);

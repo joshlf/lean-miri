@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationItemResolution
 import Miri.Frontend.FoundationPhysicalRegistry
 
 /-! Demand-local instance identities for explicitly selected ordinary functions.
@@ -43,8 +44,10 @@ def intern (registry : InstanceRegistry) (definition : Nat)
   let item ← instantiateItem document definition arguments
   let some sourceDefinition := document.definitions[definition]?
     | throw "missing instance source definition"
-  unless (← sourceDefinition.getObjValAs? String "kind") == "fn" do
-    throw "instance registry requires ordinary function source kind"
+  let resolved ← resolveSourceItem document definition arguments
+  unless resolved.definition == definition do throw "instance registry requires selected concrete Item definition"
+  let kind ← sourceDefinition.getObjValAs? String "kind"
+  unless kind == "fn" || kind == "assoc_fn" do throw "instance registry item kind unsupported"
   unless (← item.source.getObjValAs? Nat "promoted_count") == 0 do
     throw "instance registry promoted body construction is unsupported"
   let some _ := registry.definitions[definition]? | throw "missing preserved source DefId"
@@ -74,13 +77,15 @@ def intern (registry : InstanceRegistry) (definition : Nat)
   for node in registry.instances do
     if node.instanceKind == .Item definition && node.genericArgs == genericArgs then
       return ({ registry with physical }, node)
+  let display ← if kind == "assoc_fn" then sourceUnitMethodDisplay document definition
+    else sourceDefinition.getObjValAs? String "path"
   let bodyId := registry.bodyDefinitions.size
   let node : Input.InstanceNode := {
     instanceKind := .Item definition
     genericArgs
     id := registry.instances.size
     kind := .instanceMir
-    defPath := some (← sourceDefinition.getObjValAs? String "path")
+    defPath := some display
     definitionId := some definition
     bodyId := some bodyId
     promotedBodies := #[] }
