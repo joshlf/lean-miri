@@ -13,6 +13,8 @@ for mode in source reference; do
   bash tools/export-mir.sh --output "$RUN/$mode.json" "${extra[@]}" --root "$root" -- \
     exporter/fixtures/foundation_signature_main.rs --crate-name=foundation_signature_main
 done
+bash tools/export-mir.sh --foundation --output "$RUN/closure-source.json" --root 'std::rt::lang_start::{closure#0}' -- \
+  exporter/fixtures/foundation_signature_main.rs --crate-name=foundation_signature_main
 python3 tests/foundation/project_std_physical_oracle.py "$RUN/reference.json" "$RUN/oracle.json"
 flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build Miri.Frontend.FoundationFnAbiRegistry Miri.Frontend.FoundationBridge
-"$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationStdPhysical.lean "$RUN/source.json" "$RUN/oracle.json"
+"$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationStdPhysical.lean "$RUN/source.json" "$RUN/oracle.json" "$RUN/closure-source.json"

@@ -50,8 +50,7 @@ private def wrapperLayout (empty : Input.Layout) (seed : Nat)
   let some first := fs[0]? | throw "missing wrapper field"
   let some backend := first.backendRepresentation | throw "missing wrapper backend"
   let some size := first.sizeBytes | throw "missing wrapper size"
-  unless backend.kind == .scalarPair && size > 0 &&
-      (first.abiAlignBytes.getD 0) > 1 do throw "unsupported nominal non-ZST field"
+  unless (backend.kind == .scalar || backend.kind == .scalarPair) && size > 0 do throw "unsupported nominal non-ZST field"
   for f in fs.extract 1 fs.size do
     unless f.sizeBytes == some 0 && f.abiAlignBytes == some 1 && !f.uninhabited do
       throw "unsupported nominal trailing field"

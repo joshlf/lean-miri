@@ -9,7 +9,7 @@ private def check (b : Bool) (message : String) : IO Unit :=
 private def rejects (r : Except String α) : IO Unit := match r with
 | .error _ => pure () | .ok _ => throw (IO.userError "unsupported aggregate accepted")
 def main (paths : List String) : IO Unit := do
-  let [sourcePath, oraclePath] := paths | throw (IO.userError "usage: source projected-oracle")
+  let [sourcePath, oraclePath, closureSourcePath] := paths | throw (IO.userError "usage: source projected-oracle")
   let d ← expect (Json.parse (← IO.FS.readFile sourcePath) >>= decode)
   let oracle ← expect (Json.parse (← IO.FS.readFile oraclePath))
   check ((← expect (oracle.getObjValAs? String "rustc_commit")) == "8144389c895da997dbdecaa635e41d6a50be6ffd") "oracle compiler revision"
@@ -44,4 +44,21 @@ def main (paths : List String) : IO Unit := do
   check (tuple.randomizationSeed != closure.randomizationSeed) "tuple tail seed accidentally included"
   rejects (physicalLayoutOfDocument d (.tuple (fields.extract 0 2)))
   rejects (physicalLayoutOfDocument d (.tuple #[.tuple #[], .primitive "uint" "u8", .primitive "uint" "u8"]))
-  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi; unsupported aggregate controls"
+  let closureSource ← expect (Json.parse (← IO.FS.readFile closureSourcePath) >>= decode)
+  let wrappers ← expect (oracle.getObjValAs? (Array Json) "scalar_wrappers")
+  check (wrappers.size == 2) "compiler scalar wrapper coverage"
+  for wrapper in wrappers do
+    let defn ← expect (wrapper.getObjVal? "definition")
+    let crate ← expect (defn.getObjValAs? Nat "crate")
+    let index ← expect (defn.getObjValAs? Nat "index")
+    let some sourceDef := closureSource.definitions.findIdx? (fun row =>
+      (row.getObjValAs? Nat "crate_index").toOption == some crate &&
+      (row.getObjValAs? Nat "index").toOption == some index)
+      | throw (IO.userError "source scalar wrapper declaration absent")
+    let (r,id) ← expect ((PhysicalTypeRegistry.start closureSource).intern (.nominal sourceDef #[]))
+    let actual ← expect (r.runtimeLayout id)
+    let expected ← expect (wrapper.getObjVal? "layout")
+    let expected ← expect (Input.JsonReader.run Input.DecoderValues.decodeCompilerLayout expected.compress)
+    let expected ← expect ((Input.RuntimeMetadata.layout target expected).mapError toString)
+    check (actual.layout == expected) "complete source scalar wrapper differs"
+  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers; unsupported aggregate controls"

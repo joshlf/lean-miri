@@ -17,6 +17,13 @@ for local in body['locals']:
 closure = source['types'][body['locals'][6]['type']]
 tuple_id = closure['shape']['generic_args'][-1]['value']
 tuple_row = source['types'][tuple_id]
+wrappers = []
+for t in source['types']:
+    shape = t['shape']
+    if shape.get('kind') == 'adt' and shape.get('def_path') in [
+            'std::process::ExitCode', 'std::sys::process::unix::common::ExitCode']:
+        wrappers.append({'definition': source['definitions'][shape['def_id']],
+                         'layout': source['layout_values'][source['layouts'][t['layout']]]})
 json.dump({'rustc_commit': source['producer']['rustc_commit'], 'local_layouts': rows,
-           'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
+           'scalar_wrappers': wrappers, 'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
           open(sys.argv[2], 'w'))
