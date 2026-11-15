@@ -42,19 +42,24 @@ frame; the observed return is 42 and the frame stack becomes empty. The same
 source-derived path executes a scalar const-item body using `VALUE: u8 = 37`,
 retaining its required constant before the fixed frame returns 37. A genuine
 two-function `calls(42_u8)` run enters a callee frame and returns 42 through
-both fixed interpreter frames. These runs
-uses an explicit fixed scheduling profile and finite address choices. It is a
-bounded observation, not process startup or a safety proof. The schema-12 path
+both fixed interpreter frames. A byte-array literal returns a provenance
+pointer whose four bytes read `Miri` in the fixed memory machine. A separate
+no_std custom `#[lang=start]` executable passes the fixed compiler-selected
+startup path and exits zero after thread/TLS cleanup; its start returns `argc`
+without calling main. These runs use explicit finite scheduling and choice
+profiles. They are bounded observations, not ordinary std startup or safety
+proofs. The schema-12 path
 still supplies general fixed-interpreter programs. The active missing work is
 tracked in [STATUS.md](../STATUS.md).
 
 Lean rejects demands outside the supported source domain. In particular,
 general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
-byte-interner identity and provenance, runtime symbol
+byte-interner identity and general provenance, runtime symbol
 identities and broader MIR are not yet supplied by pure foundation queries.
 Finite Call MIR and direct FnDef evidence support the checked two-function
-domain; source allocation images have not yet been joined into executable
-literal cases. Coroutines, inlined
+domain. Source allocation images support the checked literal read while the
+byte interner is explicitly unavailable; any reservation demand still stops
+Unsupported. Coroutines, inlined
 frames, target features and caller-location tracking also stop. The direct
 identity frame needs none of those facts; its effect-domain check excludes
 their use before constructing the limited program. General migration requires

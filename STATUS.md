@@ -43,12 +43,17 @@ spans, function-pointer types, and compiler allocation images/raw identities.
 Lean derives direct FnDef callee/ABI evidence and imports source memory graphs
 through the existing checked importer. A genuine two-function `calls(42_u8)`
 now enters the fixed interpreter's callee frame, executes both Returns and
-observes 42 with an empty stack. Byte-literal execution remains blocked by
-missing byte-interner source identity. The fixed interpreter still
+observes 42 with an empty stack. A separate no_std custom `#[lang=start]`
+executable reaches the fixed compiler-selected process entry, constructs the
+main function pointer, runs the custom start MIR and exits zero after TLS
+cleanup. That start returns `argc` without invoking main; ordinary std main
+remains unsupported. A byte-array literal direct frame reads `Miri` through
+its imported provenance pointer and returns; byte-interner reservation remains
+explicitly unavailable and rejects both known and unknown byte demands. The fixed interpreter still
 consumes schema 11/12 for general programs, including precomputed query tables.
 Full migration requires wider physical types/MIR, indirect and broader call
 ABIs, trait/const queries, byte-interner identity and provenance semantics,
-Rust main/startup and external effects from finite source material. Current
+ordinary Rust main/startup and external effects from finite source material. Current
 foundation export and assembly fail closed on many MIR, type, lifetime,
 allocation and call forms. Neither the foundation path nor the old query
 closure proves correctness for arbitrary programs. The precise architecture,
