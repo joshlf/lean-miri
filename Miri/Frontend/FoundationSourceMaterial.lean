@@ -1,3 +1,7 @@
+import Miri.Frontend.FoundationSourceAllocations
+import Miri.Frontend.FoundationSourceMir
+import Miri.Frontend.FoundationSourceAbi
+import Miri.Frontend.FoundationSourceTypes
 import Miri.Frontend.FoundationWorldDeclarations
 import Miri.Frontend.FoundationTarget
 import Miri.Frontend.FoundationForeignDeclarations
@@ -6,9 +10,8 @@ import Miri.Input.Model.SourceMaterial
 
 /-! One-way decoder projection into the typed evaluation-local carrier. JSON is
 used only while parsing, never stored in SourceMaterial or reconstructed by a
-runtime query. This slice keeps source declarations and lexical slots; generic
-MIR/type/constraint demand remains explicitly unavailable until its typed
-component is supplied. -/
+runtime query. Unknown typed source constructors remain explicitly unsupported
+at demand. No parser object is retained by a runtime compiler query. -/
 namespace Miri.Frontend.Foundation
 open Lean
 
@@ -92,10 +95,12 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     runtimeDataLayout := some (← evidenceOfTarget document.target) }
   let linkSections ← (← sourceLinkSections document.source).mapM sectionDeclaration
   let material : Input.SourceMaterial := {
-    target := target
-    declarations := declarations
-    genericLayers := layers
-    linkSections := some linkSections }
+    target,declarations,genericLayers := layers,
+    genericMir := some (← SourceMirParser.material document),
+    linkSections := some linkSections,
+    allocations := some (← sourceAllocationMaterial document),
+    physical := some (← SourceTypesParser.material document.source),
+    abi := some (← SourceAbiParser.material document)}
   material.validate
   return material
 

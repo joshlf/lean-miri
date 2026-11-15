@@ -1,3 +1,4 @@
+import Miri.Input.SourceMirLowering
 import Miri.Input.SourceCompilerWorld
 import Miri.Input.LowerMIR
 import Miri.Interpreter.BodyIdentity
@@ -39,6 +40,13 @@ def loadedBodyOfInstance (world : SourceCompilerWorld.World) (fnInstance : CallI
     Except String LoadedBody := do
   let (bodyId,body) ← loweredBodyOfInstance world fnInstance
   return ⟨.ofCanonicalIndex bodyId,body.body⟩
+
+/-- Derive the requested typed source body in the same persistent World before
+loading. No captured document or pre-instantiated body table is consulted. -/
+def demandLoadedBody (world : SourceCompilerWorld.World) (fnInstance : CallInstance) :
+    Except String (SourceCompilerWorld.World × LoadedBody) := do
+  let world ← SourceMirLowering.derive world fnInstance
+  return (world,← loadedBodyOfInstance world fnInstance)
 
 /-- Frame metadata must use this same current World. This rejects accidentally
 combining a frame's old/wrong body identity with another instance's MIR. World

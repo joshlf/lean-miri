@@ -57,6 +57,9 @@ structure Place where
 inductive ConstantValue where
   | zeroSized
   | scalar (bits sizeBytes : Nat)
+  | allocationSlice (sourceAllocation metadata : Nat)
+  | allocationPointer (sourceAllocation offsetBytes : Nat) (immutable sharedRef : Bool)
+  | allocationIndirect (sourceAllocation offsetBytes : Nat)
   | typeConstant (expression : SourceTypes.ConstExpr)
   | unevaluated (definition : DefinitionRef) (arguments : Array SourceTypes.Argument) (promoted : Option Nat)
   | unsupported (kind : String)

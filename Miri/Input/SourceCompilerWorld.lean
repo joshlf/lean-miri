@@ -28,6 +28,8 @@ structure World where
   /-- Evaluation-local ABI answers derived from typed source demands. Imported
   canonical rows alone never establish this capability in source mode. -/
   derivedInstanceAbis : Array Catalog.InstanceAbi := #[]
+  /-- Compiler span identity, including parent, is distinct from diagnostic coordinates. -/
+  derivedSourceSpans : Array (SourceMir.SpanKey × SpanId) := #[]
 
 structure Access (S : Type) where
   get : S → Option World
@@ -57,9 +59,7 @@ def create (canonical : ImportDocument) : Except String World := do
       throw "source material target differs from canonical compilation"
     if let some sourceLayout := source.target.runtimeDataLayout then
       if let some canonicalLayout := canonical.runtimeTargetDataLayout then
-        unless sourceLayout.pointerWidthBits == canonicalLayout.pointerWidthBits &&
-            sourceLayout.endian == canonicalLayout.endian &&
-            sourceLayout.llvmDataLayout == canonicalLayout.llvmDataLayout do
+        unless sourceLayout == canonicalLayout do
           throw "source material physical target differs from canonical layout pools"
   let mut seen := #[]
   for definition in canonical.definitions do

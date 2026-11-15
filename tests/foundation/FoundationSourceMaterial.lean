@@ -22,8 +22,8 @@ def main (paths : List String) : IO Unit := do
     for declaration in material.declarations do
       let slots ← checked (Input.SourceDeclarations.fullParameters material.genericLayers declaration.definition)
       check (slots == declaration.parameters) "typed source full generic slots differ"
-    check (material.genericMir == .unsupported && material.physical.isNone &&
-      material.constraints == .unsupported) "unrepresented typed source material claimed available"
+    check (material.genericMir.isSome && material.physical.isSome && material.abi.isSome &&
+      material.constraints == .unsupported) "typed source components missing or constraints overclaimed"
     rejects ({material with target := {material.target with triple := ""}}.validate)
     rejects ({material with genericLayers := #[]}.validate)
     let some declaration := material.declarations[0]? | throw (IO.userError "declaration absent")
@@ -36,4 +36,4 @@ def main (paths : List String) : IO Unit := do
     let some evidence := material.target.runtimeDataLayout | throw (IO.userError "target evidence absent")
     let bad := {material.target with runtimeDataLayout := some {evidence with pointerWidthBits := evidence.pointerWidthBits + 8}}
     rejects ({material with target := bad}.validate)
-    IO.println s!"typed source {path}: {material.declarations.size} Item declarations, {material.genericLayers.size} lexical layers; MIR/type/constraint availability remains Unsupported"
+    IO.println s!"typed source {path}: {material.declarations.size} Item declarations, {material.genericLayers.size} lexical layers; typed MIR/types/ABI retained; unsupported constructors reject at demand"

@@ -1,3 +1,4 @@
+import Miri.Input.SourceCompilerWorld
 import Miri.Input.CompilerInstance
 import Miri.Interpreter.CallMachine
 
@@ -55,6 +56,61 @@ def requiredConstants (p : Prepared) (body : LoadedBody) : MachineHooks.M K User
   unless frame.bodyIdentity == body.identity && frame.functionInstance == callee do
     throw (.invalidProgram "required-constant current frame identity/instance mismatch")
   pure ()
+
+/-- Metadata for a body installed after preparation is read from the same live
+World that supplied its LoadedBody. It is never recovered by structural search. -/
+private def currentBody (world : SourceCompilerWorld.World) (body : LoadedBody) :
+    Except String Body := do
+  let some actual := world.canonical.bodies[body.identity.index]?
+    | throw "canonical body identity absent"
+  let identity ← SourceCompilerWorld.bodyId world actual.instanceId
+  unless identity == body.identity.index && actual.mir == body.body do
+    throw "canonical body identity/content mismatch"
+  return actual
+
+private def currentWorld (access : SourceCompilerWorld.Access (MachineHooks.State K User)) :
+    MachineHooks.M K User SourceCompilerWorld.World := do
+  let some world := access.get (← get)
+    | throw (.unsupported "compiler lifecycle: source compiler World unavailable")
+  return world
+
+/-- Exact current canonical preamble metadata, independent of preparation. -/
+def sourcePreambleSpan (world : SourceCompilerWorld.World) (body : LoadedBody) :
+    Except String MIR.SpanRef := do
+  let actual ← currentBody world body
+  let some span := world.canonical.spans[actual.preambleDefSpanId]?
+    | throw "current preamble span absent"
+  unless span.lo ≤ span.hi && span.file < world.canonical.files.size do
+    throw "current preamble span payload invalid"
+  return ⟨actual.preambleDefSpanId⟩
+
+def livePreambleSpan (p : Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User))
+    (body : LoadedBody) : MachineHooks.M K User MIR.SpanRef := do
+  let world ← currentWorld access
+  if world.canonical.sourceMaterial.isNone then return ← preambleSpan p body
+  lift (sourcePreambleSpan world body)
+
+def liveRequiredConstants (p : Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User))
+    (body : LoadedBody) : MachineHooks.M K User Unit := do
+  let world ← currentWorld access
+  if world.canonical.sourceMaterial.isNone then return ← requiredConstants p body
+  let actual ← lift (currentBody world body)
+  let frame ← MachineHooks.currentFrame
+  unless frame.bodyIdentity == body.identity && frame.functionInstance == actual.instanceId do
+    throw (.invalidProgram "required-constant current frame identity/instance mismatch")
+  unless actual.requiredConsts.isEmpty do
+    throw (.unsupported "compiler lifecycle: source required-constant evaluation unavailable")
+
+/-- Source mode uses live canonical metadata. Legacy schema12 keeps its checked
+prepared path and the associated theorems below. -/
+def liveHooks (p : Prepared)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K User))
+    (base : CallMachine.Lifecycle K User C) : CallMachine.Lifecycle K User C :=
+  {base with
+    preambleSpan := livePreambleSpan p access
+    requiredConstants := liveRequiredConstants p access}
 
 def hooks (p : Prepared) (base : CallMachine.Lifecycle K User C) : CallMachine.Lifecycle K User C :=
   {base with preambleSpan := preambleSpan p, requiredConstants := requiredConstants p}

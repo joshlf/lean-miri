@@ -58,6 +58,7 @@ impl<'tcx> Material<'tcx> {
             "auto":tcx.trait_is_auto(definition),"marker":declaration.is_marker,"coinductive":declaration.is_coinductive,
             "safety":format!("{:?}",declaration.safety),"constness":format!("{:?}",declaration.constness),
             "meta_sized_definition":tcx.lang_items().meta_sized_trait().map(|def|self.definition(tcx,def)),
+            "meta_sized_core_source":tcx.lang_items().meta_sized_trait().is_some_and(|def|!def.is_local() && tcx.crate_name(def.krate).as_str()=="core" && !rustc_attr_ir::find_attr!(tcx, crate, NoCore)),
             "parameter_count":generics.count(),"has_self":generics.has_self,"generic_parent":generics.parent.map(|def|self.definition(tcx,def)),
             "super_clauses":super_clauses,"associated_items":items,"complete_impl_headers":true,"implementations":implementations}))
     }

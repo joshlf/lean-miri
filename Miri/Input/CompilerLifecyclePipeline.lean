@@ -53,9 +53,10 @@ theorem prepareProfiled_eq_prepare (profile : Lean.Options)
 
 /-- Close all frame compiler leaves with actual exported query results. The
 remaining fields concern machine memory, ghost identity allocation and unwind. -/
-def lifecycleHooks (p : Prepared) (userRelevantCrates : Array Nat)
+def lifecycleHooks (p : Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K User)) (userRelevantCrates : Array Nat)
     (base : CallMachine.Lifecycle K User C) : CallMachine.Lifecycle K User C :=
-  CompilerLifecycle.hooks p.lifecycle {base with
+  CompilerLifecycle.liveHooks p.lifecycle world {base with
     compiler := CompilerFrameMetadata.hooks p.frames userRelevantCrates}
 
 /-- Source query closure composes with BacktraceMachine's actual memory binding.

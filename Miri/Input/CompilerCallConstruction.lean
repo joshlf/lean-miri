@@ -65,7 +65,8 @@ def virtual (p : CompilerProviders.Prepared)
 /-- Source frame metadata, preamble/checks and after-pop unwind processing.
 Storage is the actual shared machine allocation context; no raw-push or
 post-initialization success callback is accepted. -/
-def lifecycle (p : CompilerProviders.Prepared) (userRelevantCrates : Array Nat)
+def lifecycle (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U)) (userRelevantCrates : Array Nat)
     (storage : MachineHooks.StorageHooks K U) (identity : ExecutionCallLeaves.IdentityAccess U)
     (unwind : Unwind.Hooks K U C Other) : CallMachine.Lifecycle K U C where
   compiler := CompilerFrameMetadata.hooks p.lifecycle.frames userRelevantCrates
@@ -73,8 +74,8 @@ def lifecycle (p : CompilerProviders.Prepared) (userRelevantCrates : Array Nat)
   freshLocalsIdentity := fun machine =>
     let (supply,label) := (identity.get machine.user).allocate
     ({machine with user := identity.put machine.user supply},label)
-  preambleSpan := CompilerLifecycle.preambleSpan p.lifecycle.lifecycle
-  requiredConstants := CompilerLifecycle.requiredConstants p.lifecycle.lifecycle
+  preambleSpan := CompilerLifecycle.livePreambleSpan p.lifecycle.lifecycle world
+  requiredConstants := CompilerLifecycle.liveRequiredConstants p.lifecycle.lifecycle world
   afterPop := fun choice frame unwinding => Unwind.afterStackPop unwind choice frame.extra unwinding
 
 /-- Exact existing shared ThreadStacks supply, without a second counter. -/

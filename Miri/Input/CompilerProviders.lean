@@ -220,7 +220,7 @@ def executionHooks (p : Prepared) (image : AllocationImage.Imported)
     usizeLayout := fun _ => lift (p.primitiveLayout "usize")
     pointeeLayout := fun _ ty => lift do
       p.runtime.lookup (← CompilerFacts.requiredType facts ty "builtin_deref_explicit") |>.mapError toString
-    lifecycle := CompilerLifecyclePipeline.lifecycleHooks p.lifecycle userRelevantCrates base.lifecycle
+    lifecycle := CompilerLifecyclePipeline.lifecycleHooks p.lifecycle world userRelevantCrates base.lifecycle
     virtual := CompilerVTableMachine.virtualLeaves p.vtables image vtableEngine base.virtual
     casts := {base.casts with
       vtableType := VTable.getPtrVTableType (CompilerVTableMachine.vtableHooks p.vtables image vtableEngine base.virtual.vtable)

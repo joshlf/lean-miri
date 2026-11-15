@@ -76,7 +76,9 @@ unseeded World, identity-only handle or unavailable body is Unsupported. -/
 def loadMir (access : SourceCompilerWorld.Access S) (fnInstance : CallInstance) :
     EStateM StepError S LoadedBody := do
   let some world := access.get (← get) | throw (.unsupported "source compiler World is unavailable")
-  lift (SourceCompilerBodies.loadedBodyOfInstance world fnInstance)
+  let (world,body) ← lift (SourceCompilerBodies.demandLoadedBody world fnInstance)
+  modify (fun state => access.put state world)
+  return body
 
 def bindFunctionCalls (access : SourceCompilerWorld.Access S)
     (base : FunctionCalls.Hooks P S C E Other Extern FnABI ArgABI) :

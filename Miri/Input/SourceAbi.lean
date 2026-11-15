@@ -1,0 +1,247 @@
+import Miri.Input.SourceConcreteTypes
+import Miri.Input.Model.SourceAbi
+import Miri.Input.SourceCompilerTypes
+import Miri.Input.SourceTypeQueries
+import Miri.Input.SourcePhysical
+
+/-! Demand-time Rust Item ABI from typed finite declarations. No JSON value,
+MIR execution, compiler process, query catalog or private pool participates.
+This initial common domain is scalar/unit/raw-pointer/array signatures and
+source-backed Sized/Copy/MetaSized clauses. Other forms fail at demand. -/
+namespace Miri.Input.SourceAbi
+open Miri.Interpreter
+abbrev World := SourceCompilerWorld.World
+
+private abbrev scalarConstant := SourceConcreteTypes.scalarConstant
+private abbrev concreteType := SourceConcreteTypes.concreteType
+
+private def builtin (role : BuiltinTrait) (type : SourceTypes.Concrete) : Except String Bool := go 1024 type
+where
+  go (fuel : Nat) (type : SourceTypes.Concrete) : Except String Bool := do
+    let .succ fuel := fuel | throw "typed ABI builtin traversal exhausted"
+    match type with
+    | .primitive "bool" "" | .primitive "char" "" => pure true
+    | .primitive kind name =>
+      unless (kind == "int" && #["i8","i16","i32","i64","i128","isize"].contains name) ||
+          (kind == "uint" && #["u8","u16","u32","u64","u128","usize"].contains name) do
+        throw "typed ABI builtin primitive unsupported"
+      pure true
+    | .array element _ => go fuel element
+    | .tuple fields => return (← fields.mapM (go fuel)).all id
+    | .pointer tag _ =>
+      unless tag == "raw_pointer_mut" || tag == "raw_pointer_const" do throw "typed ABI builtin reference unsupported"
+      pure true
+    | .functionPointer .. => pure true
+    | _ => throw s!"typed ABI builtin {reprStr role} type unsupported"
+
+/-- Generic finite unit-head selection. No trait name or language-item target
+selects an implementation; unknown potentially overlapping heads reject. -/
+def unitTraitImpl (material : Material) (definition : DefinitionId) : Except String DefinitionId := do
+  let [declaration] := (material.traits.filter (·.definition == definition)).toList
+    | throw "typed ABI ordinary trait source absent/ambiguous"
+  unless declaration.complete && !declaration.isAuto && !declaration.isMarker && !declaration.isCoinductive &&
+      declaration.isSafe && declaration.nonConst && declaration.parameterCount == 1 && declaration.hasSelf &&
+      declaration.genericParent.isNone do throw "typed ABI ordinary trait declaration unsupported"
+  for parent in declaration.superTraits do
+    let [builtin] := (material.builtins.filter (fun b => b.role == .metaSized)).toList
+      | throw "typed ABI MetaSized source declaration absent/ambiguous"
+    unless builtin.pinnedCore && parent.definition == builtin.definition && parent.argumentCount == 1 && parent.selfParameter == some 0 &&
+        parent.positive && parent.boundVariableCount == 0 do throw "typed ABI ordinary supertrait unsupported"
+  let mut seen : Array DefinitionId := #[]
+  let mut selected : Option DefinitionId := none
+  for header in declaration.implementations do
+    unless !seen.contains header.definition && header.traitDefinition == definition && header.argumentCount == 1 do
+      throw "typed ABI impl header identity/trait mismatch"
+    seen := seen.push header.definition
+    let applies ← match header.selfHead with
+      | .adt _ | .never => pure false
+      | .tuple arity => pure (arity == 0)
+      | .unsupported _ => throw "typed ABI impl head may overlap unit"
+    if applies then
+      unless header.parameterCount == 0 && header.genericParent.isNone && header.clauseCount == 0 &&
+          header.clauseParent.isNone && header.positive && header.nonConst && header.final do
+        throw "typed ABI conditional/negative/specializable unit impl unsupported"
+      unless selected.isNone do throw "typed ABI unit impl ambiguous"
+      selected := some header.definition
+  let some implementation := selected | throw "typed ABI unit trait unsatisfied"
+  return implementation
+
+private def staticOutlives (type : SourceTypes.Concrete) : Except String Unit := go 1024 type
+where
+  go (fuel : Nat) (type : SourceTypes.Concrete) : Except String Unit := do
+    let .succ fuel := fuel | throw "typed ABI outlives traversal exhausted"
+    match type with
+    | .primitive kind _ => unless #["bool","char","int","uint","float","str","never"].contains kind do throw "typed ABI outlives primitive unsupported"
+    | .array element _ => go fuel element
+    | .tuple fields => for field in fields do go fuel field
+    | .pointer tag element =>
+      unless #["raw_pointer_const","raw_pointer_mut","reference_static_const","reference_static_mut"].contains tag do
+        throw "typed ABI erased reference cannot establish static outlives"
+      go fuel element
+    | .functionPointer inputs output .. =>
+      for input in inputs do go fuel input
+      go fuel output
+    | _ => throw "typed ABI nominal/dyn outlives unsupported"
+
+private def checkClauses (source : Input.SourceMaterial) (abi : Material) (physical : SourceTypes.Material)
+    (types : Array (Option SourceTypes.Concrete)) (constants : Array (Option Nat)) (owner : DefinitionId) : Except String Unit :=
+  go (source.genericLayers.size + 1) #[] owner
+where
+  go (fuel : Nat) (active : Array DefinitionId) (owner : DefinitionId) : Except String Unit := do
+    let .succ fuel := fuel | throw "typed ABI generic clause traversal exhausted"
+    unless !active.contains owner do throw "typed ABI generic clause owner cycle"
+    let layers := source.genericLayers.filter (·.owner == owner)
+    let [layer] := layers.toList | throw "typed ABI generic layer absent/ambiguous"
+    let rows := abi.owners.filter (·.owner == owner)
+    let [row] := rows.toList | throw "typed ABI constraint source absent/ambiguous"
+    unless row.parent == layer.parent do throw "typed ABI clause/parameter parent mismatch"
+    if let some parent := row.parent then go fuel (active.push owner) parent
+    for clause in row.clauses do
+      match clause with
+      | .trait definition (some role) arguments =>
+        let [self] := arguments.toList | throw "typed ABI builtin trait arguments unsupported"
+        let declarations := abi.builtins.filter (·.role == role)
+        let [declaration] := declarations.toList | throw "typed ABI builtin language declaration absent/ambiguous"
+        unless declaration.definition == definition do throw "typed ABI builtin language identity mismatch"
+        unless declaration.pinnedCore do throw "typed ABI builtin requires pinned core declaration source"
+        let type ← SourceTypes.instantiate physical types constants self
+        unless (← builtin role type) do throw "typed ABI builtin obligation unsatisfied"
+      | .trait definition none arguments =>
+        let [self] := arguments.toList | throw "typed ABI ordinary trait arguments unsupported"
+        let .tuple fields ← SourceTypes.instantiate physical types constants self
+          | throw "typed ABI ordinary impl matcher supports unit only"
+        unless fields.isEmpty do throw "typed ABI ordinary impl matcher supports unit only"
+        let _ ← unitTraitImpl abi definition
+      | .typeOutlives type .static =>
+        staticOutlives (← SourceTypes.instantiate physical types constants type)
+      | .constHasType parameter type =>
+        let some _ := constants[parameter]?.bind id | throw "typed ABI const clause argument absent"
+        match ← SourceTypes.instantiate physical types constants type with
+        | .primitive "uint" "usize" => pure ()
+        | _ => throw "typed ABI const clause type unsupported"
+      | _ => throw "typed ABI trait/projection/other obligation unsupported"
+
+private def initializedArrayElement (type : SourceTypes.Concrete) : Except String Unit := go 1024 type
+where
+  go (fuel : Nat) (type : SourceTypes.Concrete) : Except String Unit := do
+    let .succ fuel := fuel | throw "typed ABI array initialization traversal exhausted"
+    match type with
+    | .primitive "bool" "" | .primitive "char" "" | .primitive "int" _ | .primitive "uint" _ => pure ()
+    | .array element _ => go fuel element
+    | .tuple fields => unless fields.isEmpty do throw "typed ABI nonempty tuple initialization unsupported"
+    | .pointer tag _ => unless tag == "raw_pointer_const" || tag == "raw_pointer_mut" do throw "typed ABI reference array initialization unsupported"
+    | .functionPointer .. => pure ()
+    | _ => throw "typed ABI array padding/union/nominal initialization unsupported"
+
+private def passMode (world : World) (type : SourceTypes.Concrete) (id : Nat) : Except String AbiPassMode := do
+  let some node := world.canonical.types[id]? | throw "typed ABI physical type absent"
+  let some layout := world.canonical.layouts[node.layoutId]? | throw "typed ABI physical layout absent"
+  let some bytes := layout.sizeBytes | throw "typed ABI unsized layout unsupported"
+  match type with
+  | .nominal .. | .dynamicObject .. | .closure .. | .patternNotNull .. => throw "typed ABI nominal/dyn/constrained type unsupported"
+  | _ => pure ()
+  let empty : AbiPassMode := ⟨.ignore,#[],none,none,none,none⟩
+  if bytes == 0 then return empty
+  let attrs (bits : Nat) (extension : ArgumentExtensionKind := .none) : AbiAttributes := ⟨bits,0,none,extension⟩
+  match type with
+  | .primitive "bool" "" => return {empty with kind := .direct,attributes := #[attrs 128 .zeroExtend]}
+  | .primitive "int" _ | .primitive "uint" _ | .primitive "char" "" =>
+    return {empty with kind := .direct,attributes := #[attrs 128]}
+  | .pointer tag _ =>
+    unless tag == "raw_pointer_const" || tag == "raw_pointer_mut" do throw "typed ABI reference attributes unsupported"
+    let some backend := layout.backendRepresentation | throw "typed ABI pointer backend unavailable"
+    unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI wide raw pointer unsupported"
+    return {empty with kind := .direct,attributes := #[attrs 128]}
+  | .functionPointer .. =>
+    let some backend := layout.backendRepresentation | throw "typed ABI function pointer backend unavailable"
+    unless backend.kind == .scalar && backend.scalar.isSome do throw "typed ABI function pointer scalar unavailable"
+    return {empty with kind := .direct,attributes := #[attrs 144]}
+  | .array element _ =>
+    initializedArrayElement element
+    unless bytes ≤ 8 do throw "typed ABI indirect array requires MIR attribute deduction"
+    let register : AbiRegister := ⟨.integer,bytes*8,none⟩
+    let cast : AbiCastTarget := ⟨#[],none,register,bytes,false,attrs 128⟩
+    return {empty with kind := .cast,castTarget := some cast,padI32Count := some 0}
+  | _ => throw "typed ABI aggregate/nominal/dyn pass mode unsupported"
+
+/-- Derive one ordinary Rust Item ABI without MIR capability. Source-table
+indices and canonical pool handles are kept separate throughout. -/
+def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : Except String (World × FunctionAbi) := do
+  unless extra.isEmpty do throw "typed source ABI variadic/extra arguments unsupported"
+  let some source := initial.canonical.sourceMaterial | throw "typed ABI source universe unavailable"
+  let some material := source.abi | throw "typed source ABI declarations unavailable"
+  let some physical := source.physical | throw "typed source type expressions unavailable"
+  let target := source.target
+  unless target.architecture == "x86_64" && target.pointerSizeBits == 64 do throw "typed Rust ABI target unsupported"
+  let key ← SourceCompilerWorld.keyOf initial callee
+  let declarations := source.declarations.filter (·.definition == key.definition)
+  let [declaration] := declarations.toList | throw "typed ABI Item declaration absent/ambiguous"
+  let functions := material.functions.filter (·.definition == key.definition)
+  let [function] := functions.toList | throw "typed ABI function signature absent/ambiguous"
+  let parameters := declaration.parameters
+  unless parameters.size == key.arguments.size do throw "typed ABI argument count mismatch"
+  let mut world := initial
+  let mut types := #[]
+  let mut constants := #[]
+  for (parameter,argument) in parameters.zip key.arguments do
+    match parameter,argument with
+    | .typeParameter,.Type id =>
+      let type ← concreteType world target.pointerSizeBits id
+      let (updated,actual) ← SourcePhysical.intern world type
+      unless actual == id do throw "typed ABI argument canonical type identity mismatch"
+      world := updated
+      types := types.push (some type); constants := constants.push none
+    | .constParameter,.Const id =>
+      let (type,bits,bytes) ← scalarConstant world target.pointerSizeBits id
+      let concrete ← concreteType world target.pointerSizeBits type
+      let (updated,actual) ← SourcePhysical.intern world concrete
+      unless actual == type do throw "typed ABI const type identity mismatch"
+      let (updated,actual) ← SourceCompilerWorld.internScalarConstant updated type bits bytes
+      unless actual == id do throw "typed ABI canonical const identity mismatch"
+      world := updated
+      types := types.push none; constants := constants.push (some bits)
+    | _,_ => throw "typed ABI generic argument kind/region unsupported"
+  -- Source parameter types remain obligations even if no body reads them.
+  let mut owners : Array DefinitionId := #[]
+  let mut owner := some key.definition
+  while let some current := owner do
+    unless !owners.contains current do throw "typed ABI owner cycle"
+    owners := owners.push current
+    let [layer] := (source.genericLayers.filter (·.owner == current)).toList | throw "typed ABI owner absent/ambiguous"
+    for parameter in layer.parameters do
+      if parameter.kind == .constParameter then
+        let [declared] := (function.constParameterTypes.filter (·.definition == parameter.definition)).toList
+          | throw "typed ABI const parameter type absent/ambiguous"
+        match ← SourceTypes.instantiate physical types constants declared.type with
+        | .primitive "uint" "usize" => pure ()
+        | _ => throw "typed ABI declared const parameter type unsupported"
+    owner := layer.parent
+  checkClauses source material physical types constants key.definition
+  let signature := function.signature
+  unless signature.abi == .Rust && !signature.cVariadic && signature.boundVariables.isEmpty do
+    throw "typed ABI convention/binder/variadic source unsupported"
+  let attrs := function.attributes
+  unless !attrs.trackCaller && !attrs.foreignItem && !attrs.dropGlue do throw "typed ABI function attribute adjustment unsupported"
+  let output ← SourceTypes.instantiate physical types constants signature.output
+  let (updated,result) ← SourcePhysical.intern world output
+  world := updated
+  let some resultNode := world.canonical.types[result]? | throw "typed ABI result type absent"
+  let result : AbiArgument := ⟨result,resultNode.layoutId,← passMode world output result⟩
+  let mut inputs := #[]
+  for sourceType in signature.inputs do
+    let type ← SourceTypes.instantiate physical types constants sourceType
+    let (updated,id) ← SourcePhysical.intern world type
+    world := updated
+    let some node := world.canonical.types[id]? | throw "typed ABI input type absent"
+    inputs := inputs.push (AbiArgument.mk id node.layoutId (← passMode world type id))
+  let abi : FunctionAbi := {
+    arguments := inputs,returnValue := result,callingConvention := ⟨.rust,none,none,none⟩,
+    canUnwind := !attrs.neverUnwind && material.panicUnwinds,cVariadic := false,fixedCount := inputs.size }
+  match world.canonical.compilerAbiLayoutSchema with
+  | some "physical_ty_and_layout_v1" => pure ()
+  | none =>
+    unless world.canonical.functionAbis.isEmpty do throw "typed ABI existing format unavailable"
+    world := {world with canonical := {world.canonical with compilerAbiLayoutSchema := some "physical_ty_and_layout_v1"}}
+  | _ => throw "typed ABI physical format unsupported"
+  return (world,abi)
+end Miri.Input.SourceAbi

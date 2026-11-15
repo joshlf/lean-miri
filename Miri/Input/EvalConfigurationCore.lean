@@ -528,7 +528,7 @@ def makeWithForeignContext {Assembly : Type}
         let helper := ExecutionCalls.helpers config.helpers (ExecutionMachine.callHooks config options.limits)
         FunctionCalls.callFunction helper c callee ABI.ExternAbi.Rust args none continuation
     let unwind := EvalCallRuntime.unwind access projection functions options.panicUnwinds callFunction
-    let lifecycle := CompilerCallConstruction.lifecycle p options.userRelevantCrates
+    let lifecycle := CompilerCallConstruction.lifecycle p EvalCoreMachine.sourceCompilerAccess options.userRelevantCrates
       (CompilerStorage.hooks p allocation projection.dynamic projection.dynamicFuel choice deallocateStack)
       EvalConfiguration.identity unwind
     let ⟨math⟩ ← liftConstruction (EvalMathMachine.hooks p (EvalMathMachine.optionalHost leaves.math) leaves.mathError none access projection.place scalar floats returnToBlock)

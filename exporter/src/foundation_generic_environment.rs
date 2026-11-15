@@ -13,7 +13,11 @@ impl<'tcx> Material<'tcx> {
                     if trait_def.is_local() && self.definitions[definition].get("local_trait").is_none() {
                         self.definitions[definition]["local_trait"] = super::super::foundation_traits::capture(tcx,trait_def)?;
                     }
-                    json!({"kind":"trait","definition":definition,"arguments":self.args(tcx,reference.trait_ref.args)?})
+                    let role = if tcx.is_lang_item(trait_def,rustc_attr_ir::LangItem::Sized) {Some("sized")}
+                        else if tcx.is_lang_item(trait_def,rustc_attr_ir::LangItem::Copy) {Some("copy")}
+                        else if tcx.is_lang_item(trait_def,rustc_attr_ir::LangItem::MetaSized) {Some("meta_sized")}
+                        else {None};
+                    json!({"kind":"trait","definition":definition,"lang_item":role,"pinned_core_builtin":role.is_some() && !trait_def.is_local() && tcx.crate_name(trait_def.krate).as_str()=="core" && !rustc_attr_ir::find_attr!(tcx, crate, NoCore),"arguments":self.args(tcx,reference.trait_ref.args)?})
                 },
                 ty::ClauseKind::Projection(projection) => self.projection_clause(tcx,projection)?,
                 ty::ClauseKind::TypeOutlives(outlives) if matches!(outlives.1.kind(),ty::ReStatic) =>

@@ -1,12 +1,15 @@
+import Miri.Input.Model.SourceAllocations
+import Miri.Input.Model.SourceMir
 import Miri.Input.Model.SourceDeclarations
+import Miri.Input.Model.SourceAbi
 import Miri.Input.Model.SourceTypes
 import Miri.Input.SourceTypeQueries
 
-/-! Evaluation-local typed source carrier. This first slice retains declaration
-identity, target and lexical generic slots. No JSON value is retained. Generic
-MIR, type expressions and semantic constraints are not represented by this
-slice and their demand APIs must return Unsupported; these rows certify neither
-an executable body nor an ABI. -/
+/-! Evaluation-local typed finite source. Declaration identities, lexical layers,
+target evidence and optional typed syntax components remain immutable. Presence
+of source syntax establishes neither an executable body nor an ABI: each demand
+checks its supported constructor domain and extends the current World purely.
+No JSON value or precomputed instance/query answer is retained here. -/
 namespace Miri.Input
 namespace SourceMaterial
 abbrev ItemKind := SourceDeclarations.ItemKind
@@ -37,14 +40,17 @@ structure SourceMaterial where
   genericLayers : Array SourceMaterial.GenericLayer
   /-- None is unknown coverage; Some retains the complete ordered declaration list. -/
   linkSections : Option (Array SourceMaterial.LinkSectionDeclaration) := none
-  genericMir : SourceMaterial.Unavailable := .unsupported
+  abi : Option SourceAbi.Material := none
+  genericMir : Option SourceMir.Material := none
   physical : Option SourceTypes.Material := none
+  allocations : Option SourceAllocations.Material := none
   constraints : SourceMaterial.Unavailable := .unsupported
   deriving Repr, DecidableEq
 
 namespace SourceMaterial
 
 def validate (material : Input.SourceMaterial) : Except String Unit := do
+  if let some allocations := material.allocations then SourceAllocations.validate allocations
   let target := material.target
   unless !target.triple.isEmpty && !target.architecture.isEmpty &&
       !target.dataLayout.isEmpty && target.pointerSizeBits > 0 && target.pointerSizeBits % 8 == 0 &&
