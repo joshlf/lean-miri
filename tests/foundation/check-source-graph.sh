@@ -12,12 +12,15 @@ pub fn first<T>(value: T) -> T { second(value) }
 pub fn second<T>(value: T) -> T { value }
 pub fn unrequested(value: u8) -> u8 { value }
 pub fn unsupported_body(value: u8) -> u8 { value + 1 }
+pub fn apply<F: FnOnce(u8) -> u8>(function: F, value: u8) -> u8 { function(value) }
+pub fn named(value: u8) -> u8 { value }
 pub fn creator(value: u8) -> u8 { let identity = |value: u8| value; identity(value) }
 RUST
 cat > "$TASK_DIR/caller.rs" <<'RUST'
 #![no_std]
 extern crate graph_dependency;
 pub fn caller(value: u8) -> u8 { graph_dependency::first(value) }
+pub fn nested(value: u8) -> u8 { graph_dependency::apply(graph_dependency::named, value) }
 pub fn closure_caller(value: u8) -> u8 { graph_dependency::creator(value) }
 pub fn unsupported_caller(value: u8) -> u8 { graph_dependency::unsupported_body(value) }
 unsafe extern "C" { fn foreign(value: u8) -> u8; }
@@ -32,6 +35,7 @@ export_source() {
     --extern "graph_dependency=$TASK_DIR/libgraph_dependency.rlib"
 }
 export_source chain --root caller --root graph_dependency::first --root graph_dependency::second
+export_source nested --root nested
 export_source closure --root closure_caller --root graph_dependency::creator --root 'graph_dependency::creator::{closure#0}'
 export_source unsupported_header --root unsupported_caller
 export_source foreign --root foreign_caller
@@ -61,6 +65,7 @@ header = json.loads((root/'header.json').read_text())
 closure = json.loads((root/'closure.json').read_text())
 unsupported = json.loads((root/'unsupported_header.json').read_text())
 foreign = json.loads((root/'foreign.json').read_text())
+nested = json.loads((root/'nested.json').read_text())
 assert names(chain,'bodies') == ['caller','graph_dependency::first','graph_dependency::second']
 assert names(partial,'bodies') == ['caller','graph_dependency::first']
 assert set(names(partial,'source_function_signatures')) == {'graph_dependency::first','graph_dependency::second'}
@@ -72,6 +77,8 @@ assert foreign['source_function_signatures'][0]['function_attributes']['is_forei
 assert foreign['source_function_signatures'][0]['owner_declaration']['kind'] == 'foreign_function'
 assert names(header,'bodies') == ['caller']
 assert names(header,'source_function_signatures') == ['graph_dependency::first']
+assert names(nested,'bodies') == ['nested']
+assert set(names(nested,'source_function_signatures')) == {'graph_dependency::apply','graph_dependency::named'}
 assert not chain['closure_templates']
 assert names(closure,'bodies') == ['closure_caller','graph_dependency::creator']
 assert names(closure,'closure_templates') == ['graph_dependency::creator::{closure#0}']

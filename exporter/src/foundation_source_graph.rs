@@ -2,6 +2,8 @@
 //! bodies are traversed; the compiler-selected start is a declaration seed.
 //! Calls contribute their source FnDef, never an implementation selection.
 use super::*;
+use rustc_middle::ty::{TypeSuperVisitable, TypeVisitable};
+use std::collections::HashSet;
 
 pub(super) struct Graph {
     pub selected: Vec<DefId>,
@@ -29,8 +31,34 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)
         || body.coroutine.is_some() || !matches!(body.phase,mir::MirPhase::Runtime(_)) {
         return unsupported("source graph body identity",body.source);
     }
-    let mut result = Vec::new();
-    let mut calls = Vec::new();
+    // Visit only syntax already present in this body. Ty's structural visitor
+    // follows generic arguments/signature children, not FnDef bodies/signatures
+    // obtained through compiler queries or nominal declaration field layouts.
+    struct FunctionTypes<'tcx> {
+        seen: HashSet<ty::Ty<'tcx>>,
+        definitions: Vec<DefId>,
+    }
+    impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for FunctionTypes<'tcx> {
+        type Result = ();
+        fn visit_ty(&mut self, value: ty::Ty<'tcx>) {
+            if !self.seen.insert(value) { return; }
+            if let ty::FnDef(definition,_) = *value.kind() { self.definitions.push(definition); }
+            value.super_visit_with(self);
+        }
+    }
+    struct BodyTypes<'a,'tcx> { functions: &'a mut FunctionTypes<'tcx> }
+    impl<'tcx> mir::visit::Visitor<'tcx> for BodyTypes<'_,'tcx> {
+        fn visit_ty(&mut self, value: ty::Ty<'tcx>, _: mir::visit::TyContext) {
+            value.visit_with(self.functions);
+        }
+        fn visit_ty_const(&mut self, value: ty::Const<'tcx>, _: mir::Location) {
+            value.visit_with(self.functions);
+        }
+    }
+    let mut functions = FunctionTypes {seen:HashSet::new(),definitions:Vec::new()};
+    mir::visit::Visitor::visit_body(&mut BodyTypes {functions:&mut functions},body);
+    let mut result = functions.definitions.clone();
+    let mut calls = functions.definitions;
     for block in body.basic_blocks.iter() {
         if let mir::TerminatorKind::Call {func,..} = &block.terminator().kind {
             if let ty::FnDef(definition,_) = *func.ty(body,tcx).kind() {

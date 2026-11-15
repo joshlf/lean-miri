@@ -48,7 +48,8 @@ for geometry. This domain supports primitive, tuple, array, pointer and
 existential predicate trees, plus instantiated nominal types under an empty
 signature binder; other constructors remain Unsupported rather than silently erase identity. -/
 def intern (initial : SourceCompilerWorld.World) (bindings : Array (Option Concrete))
-    (constants : Array (Option Nat)) (binder : Array BoundVariable) (reference : TypeRef) :
+    (constants : Array (Option Nat)) (binder : Array BoundVariable) (reference : TypeRef)
+    (canonicalBindings : Array (Option TypeId) := #[]) :
     Except String (SourceCompilerWorld.World × TypeId) := go 1024 initial reference
 where
   go (fuel : Nat) (world : SourceCompilerWorld.World) (reference : TypeRef) :
@@ -57,6 +58,16 @@ where
     let some source := world.canonical.sourceMaterial | throw "Unsupported signature source unavailable"
     let some material := source.physical | throw "Unsupported signature types unavailable"
     let some expr := material.types[reference]? | throw "Invalid signature type reference"
+    -- Function-item generic arguments have exact canonical identities even
+    -- though they are intentionally outside the layout-only Concrete syntax.
+    if let .parameter index _ := expr then
+      if let some id := canonicalBindings[index]?.join then
+        unless (bindings[index]?.join).isNone do throw "Invalid conflicting signature bindings"
+        let some node := world.canonical.types[id]? | throw "Invalid canonical signature binding"
+        unless node.id == id do throw "Invalid canonical signature binding identity"
+        let .functionDefinition .. := node.shape | throw "Invalid canonical function-item binding kind"
+        let some _ := world.canonical.layouts[node.layoutId]? | throw "Invalid canonical function-item layout binding"
+        return (world,id)
     let erased ← instantiate material bindings constants reference binder
     let (world,erasedId) ← SourcePhysical.intern world erased
     let some erasedNode := world.canonical.types[erasedId]? | throw "Invalid erased signature type"
