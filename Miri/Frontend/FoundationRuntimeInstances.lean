@@ -65,18 +65,19 @@ use the same source/attribute checks and preserved frame crate table as local
 functions. Declaration-selected associated methods use their checked resolver.
 Symbol mangling is not implemented:
 `symbolName = none` retains the genuine absent-query boundary for later demands. -/
-def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
-    (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
-  let some definition := document.definitions[item.definition]? | throw "runtime source definition absent"
-  unless node.instanceKind == .Item item.definition &&
-      node.definitionId == some item.definition do throw "runtime source instance identity mismatch"
+def runtimeInstanceOfHeader (document : Document) (definitionId : Nat)
+    (arguments : Array ItemArgument) (sourceHeader : Json) (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
+  let some definition := document.definitions[definitionId]? | throw "runtime source definition absent"
+  unless node.instanceKind == .Item definitionId &&
+      node.definitionId == some definitionId do throw "runtime source instance identity mismatch"
   let frame ← frameMetadataOfSource document
   let crateIndex ← definition.getObjValAs? Nat "crate_index"
   unless frame.crates.any (·.1 == crateIndex) do throw "runtime source frame crate absent"
   let kind ← definition.getObjValAs? String "kind"
-  if kind == "assoc_fn" then return ← runtimeUnitMethodOfItem document item node
-  unless kind == "fn" do throw "runtime instance requires free function or checked associated method source"
-  let facts ← item.source.getObjVal? "runtime_source"
+  unless kind == "fn" do throw "runtime header requires ordinary free function source"
+  unless (← sourceHeader.getObjValAs? Nat "definition") == definitionId do
+    throw "runtime header source definition mismatch"
+  let facts ← sourceHeader.getObjVal? "runtime_source"
   let root ← facts.getObjValAs? Bool "is_local_root"
   let some name ← facts.getObjValAs? (Option String) "item_name"
     | throw "runtime instance item name absent"
@@ -85,12 +86,12 @@ def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
     throw "runtime instance definition path/item-name mismatch"
   unless root == (crateIndex == frame.localCrate && path == name) do
     throw "runtime instance local-root source identity mismatch"
-  let arguments ← item.arguments.mapM fun argument => do
+  let arguments ← arguments.mapM fun argument => do
     match argument with
     | .type ty => concreteRuntimeDisplay ty
     | .constant _ => throw "runtime const argument display unsupported"
   let display := path ++ (if arguments.isEmpty then "" else "::<" ++ String.intercalate ", " arguments.toList ++ ">")
-  let attrs ← item.source.getObjVal? "function_attributes"
+  let attrs ← sourceHeader.getObjVal? "function_attributes"
   let track ← attrs.getObjValAs? Bool "track_caller"
   let foreign ← attrs.getObjValAs? Bool "is_foreign"
   unless !track && !foreign && !(← attrs.getObjValAs? Bool "is_drop_glue") do
@@ -117,6 +118,16 @@ def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
     codegenSymbolName := some symbol
     symbolName := none
   }
+
+/-- The ordinary body wrapper and header-only seed share the same declaration
+attribute path. Associated methods retain their independently checked resolver. -/
+def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
+    (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
+  let some definition := document.definitions[item.definition]? | throw "runtime source definition absent"
+  if (← definition.getObjValAs? String "kind") == "assoc_fn" then
+    let _ ← frameMetadataOfSource document
+    return ← runtimeUnitMethodOfItem document item node
+  runtimeInstanceOfHeader document item.definition item.arguments item.source node
 
 structure RuntimeItemComponents where
   registry : InstanceRegistry
