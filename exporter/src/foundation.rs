@@ -28,6 +28,8 @@ mod link_section_material;
 mod dynamic_material;
 #[path = "foundation_dyn_metadata.rs"]
 mod dyn_metadata_material;
+#[path = "foundation_function_headers.rs"]
+mod function_header_material;
 
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
@@ -39,6 +41,7 @@ type Result<T> = std::result::Result<T, String>;
 
 pub(super) struct FoundationCallbacks {
     pub roots: Vec<String>,
+    pub signature_roots: Vec<String>,
     pub rustc_version: String,
     pub rustc_args: Vec<String>,
     pub document: Option<Value>,
@@ -46,7 +49,7 @@ pub(super) struct FoundationCallbacks {
 }
 impl Callbacks for FoundationCallbacks {
     fn after_analysis<'tcx>(&mut self, _: &rustc_interface::interface::Compiler, tcx: TyCtxt<'tcx>) -> Compilation {
-        match export(tcx, &self.roots, &self.rustc_version, &self.rustc_args) {
+        match export(tcx, &self.roots, &self.signature_roots, &self.rustc_version, &self.rustc_args) {
             Ok(document) => self.document = Some(document),
             Err(error) => self.error = Some(error),
         }
@@ -342,7 +345,7 @@ impl<'tcx> Material<'tcx> {
         Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"promoted_count":promoted_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"runtime_source":super::foundation_runtime_instances::item(tcx,def),"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
     }
 }
-fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[String]) -> Result<Value> {
+fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_version: &str, rustc_args: &[String]) -> Result<Value> {
     let mut m = Material::default();
     let items = tcx.hir_crate_items(());
     let mut selected = items.definitions().chain(items.nested_bodies()).map(|d|d.to_def_id()).filter(|d| tcx.is_mir_available(*d) && !super::is_required_trait_method(tcx,*d)).collect::<Vec<_>>();
@@ -383,6 +386,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
     let mut session = super::foundation_session::export(tcx);
     session["root_span"] = source_material::root_span(tcx);
+    let source_function_signatures = function_header_material::capture(tcx,&mut m,signature_roots)?;
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
     let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
     let fn_vtable_source = if has_dynamic || !closure_templates.is_empty() {
@@ -403,6 +407,8 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
         "definitions":m.definitions,"types":m.types,"bodies":bodies,
         "closure_templates":closure_templates,
         "source_allocations":m.allocations,
-        "dyn_metadata_source":dyn_metadata_source
+        "dyn_metadata_source":dyn_metadata_source,
+        "source_function_signatures":source_function_signatures,
+        "source_signature_roots":signature_roots
     }))
 }

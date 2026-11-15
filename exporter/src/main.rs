@@ -92,6 +92,7 @@ const ROOT_SCHEMA_VERSION: u64 = 12;
 
 struct Options {
     foundation: bool,
+    signature_root_paths: Vec<String>,
     output: PathBuf,
     rustc_args: Vec<String>,
     root_paths: Vec<String>,
@@ -630,11 +631,14 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, String>
     let mut args = args.into_iter();
     let mut output = None;
     let mut foundation = false;
+    let mut signature_root_paths = Vec::new();
     let mut root_paths = Vec::new();
     let mut rustc_args = Vec::new();
     while let Some(arg) = args.next() {
         if arg == "--foundation" {
             foundation = true;
+        } else if arg == "--foundation-signature-root" {
+            signature_root_paths.push(args.next().ok_or("--foundation-signature-root requires a path")?);
         } else if arg == "--output" {
             output = Some(PathBuf::from(
                 args.next().ok_or("--output requires a path")?,
@@ -646,7 +650,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, String>
             );
         } else if arg == "--help" || arg == "-h" {
             println!(
-                "Usage:\n  lean-miri-mir-exporter --output FILE [--foundation] [--root DEF-PATH]... [--] RUSTC-ARG...\n  lean-miri-mir-exporter --cargo CARGO-ARGS...\n\nDirect mode exports typed MIR and stops after analysis. --foundation instead exports experimental finite generic source material (not schema12 runner input). Optional --root selects exact non-generic local def-path roots and emits their reachable structural closure. Cargo mode acts as a rustc wrapper, writes one JSON file per compiled crate, and continues normal codegen/metadata emission. Set LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1 to opt into a post-export raw allocation-world snapshot. Both require the pinned rustc revision."
+                "Usage:\n  lean-miri-mir-exporter --output FILE [--foundation] [--root DEF-PATH]... [--foundation-signature-root DEF-PATH]... [--] RUSTC-ARG...\n  lean-miri-mir-exporter --cargo CARGO-ARGS...\n\nDirect mode exports typed MIR and stops after analysis. --foundation instead exports experimental finite generic source material (not schema12 runner input). Optional --root selects exact non-generic local def-path roots and emits their reachable structural closure. Cargo mode acts as a rustc wrapper, writes one JSON file per compiled crate, and continues normal codegen/metadata emission. Set LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1 to opt into a post-export raw allocation-world snapshot. Both require the pinned rustc revision."
             );
             std::process::exit(0);
         } else if arg == "--" {
@@ -655,6 +659,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, String>
         } else {
             rustc_args.push(arg);
         }
+    }
+    if !foundation && !signature_root_paths.is_empty() {
+        return Err("--foundation-signature-root requires --foundation".into());
     }
     let output = output.ok_or("missing --output FILE")?;
     if rustc_args.is_empty() {
@@ -671,6 +678,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, String>
     }
     Ok(Options {
         foundation,
+        signature_root_paths,
         output,
         rustc_args,
         root_paths,
@@ -1920,7 +1928,7 @@ fn run_direct(args: Vec<String>) -> Result<(), String> {
     };
     if options.foundation {
         let mut callbacks = foundation::FoundationCallbacks {
-            roots: options.root_paths, rustc_version,
+            roots: options.root_paths, signature_roots: options.signature_root_paths, rustc_version,
             rustc_args: rustc_args[1..].to_vec(), document: None, error: None,
         };
         let status = rustc_driver::catch_with_exit_code(|| {
