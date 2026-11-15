@@ -13,6 +13,8 @@ mod const_material;
 mod source_material;
 #[path = "foundation_foreign_symbols.rs"]
 mod foreign_symbol_material;
+#[path = "foundation_link_sections.rs"]
+mod link_section_material;
 
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
@@ -314,6 +316,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
     }
     if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(d.to_def_id()))); }
     let bodies = selected.into_iter().map(|d|m.body(tcx,d.to_def_id())).collect::<Result<Vec<_>>>()?;
+    let startup_material = super::foundation_startup::capture(tcx, |def|m.definition(tcx,def))?;
     // Finite source selection/configuration only. No lang_start instance or
     // function allocation is resolved or enumerated here.
     let compiler_entry = tcx.entry_fn(()).map(|(definition, kind)| match kind {
@@ -329,6 +332,8 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
         "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
         "frame_metadata":super::foundation_runtime_instances::frames(tcx),
+        "startup_material":startup_material,
+        "link_section_material":link_section_material::export(tcx),
         "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
         "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
         "session":session,
