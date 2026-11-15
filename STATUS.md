@@ -73,17 +73,21 @@ closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
 [foundation-architecture](docs/foundation-architecture.md).
 
-For ordinary std main, the selected external `std::rt::lang_start` generic MIR
-and its actual promoted table are available as finite material. A `T: 'static`
-clause is checked purely for the unit domain. The captured closure's inherited
-generics, RustCall signature, upvars and five-block MIR are retained as finite
-source and match an independent compiler export. The actual
-`dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` type is retained structurally;
-Lean checks explicit bounds and the Fn/FnMut/FnOnce supertrait chain. Finite
-metadata declarations produce supported `dyn` and `&dyn` layouts, while Fn
-declarations produce candidate vtable slot order. Actual closure instances,
-shims, vtable allocations, HRTB signature erasure and fixed-interpreter std
-startup remain unsupported.
+For ordinary std main, the external `std::rt::lang_start`, its closure template,
+and `std::rt::lang_start_internal` are available as finite material. The latter
+calls `std::panic::catch_unwind` and `Result::unwrap_or_else`; source demand
+continues through those definitions. Generic declarations use ordered lexical
+layers, including inherited parameters. The captured closure's RustCall
+signature, upvars and five-block MIR match an independent compiler export. The
+actual `dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` type is retained
+structurally; Lean checks explicit bounds and the Fn/FnMut/FnOnce supertrait
+chain. Finite metadata declarations produce supported `dyn` and `&dyn` layouts,
+and nominal source rules derive the genuine `Result<isize, Box<dyn Any + Send>>`
+local's layout. Fn declarations produce candidate vtable slot order and
+symbolic closure shim MIR/ABI. Checked executable identities, complete ABI and
+MIR, vtable allocation identities, trait impl selection, and the fixed
+interpreter's std startup effects remain incomplete. Ordinary std main has not
+executed through the new path.
 
 ## Exported input coverage
 

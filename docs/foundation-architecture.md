@@ -69,15 +69,19 @@ For an ordinary std executable, the finite export now selects the actual
 `std::rt::lang_start` MIR template and Lean checks its `T: 'static` obligation
 from source. Its body captures the main function pointer in a closure, unsizes a
 reference to `dyn Fn() -> i32 + Sync + RefUnwindSafe`, and calls
-`std::rt::lang_start_internal`. The finite source preserves the structural
-principal, projection and auto-trait predicates. Lean checks their explicit
-source bounds and the Fn/FnMut/FnOnce supertrait chain. The selected closure
-template retains inherited generics, a RustCall signature, captured upvars and
-generic MIR. Finite metadata declarations and target material determine the
-supported `&dyn` layout; Fn-family declarations determine candidate vtable
-slots. HRTB signature erasure, closure instances and shims, vtable allocations,
-and fixed-interpreter lowering must be connected before this path can run.
-These source and layout comparisons do not establish ordinary std startup.
+`std::rt::lang_start_internal`. Its two direct calls reach
+`std::panic::catch_unwind` and `Result::unwrap_or_else`. The finite source
+preserves structural principal, projection and auto-trait predicates, ordered
+lexical generic environments, and the actual closure MIR. Lean checks explicit
+bounds and the Fn/FnMut/FnOnce supertrait chain. Source declarations and target
+material determine supported `dyn`, `&dyn`, and narrow nominal layouts, including
+the genuine `Result<isize, Box<dyn Any + Send>>` local. Source-derived symbolic
+closure shims and vtable slots have been compared with compiler output, but
+their symbolic identities, complete executable MIR/ABI, allocations and fixed
+interpreter effects still need a checked bridge. External static initializers,
+the pinned Miri constructor-section filter, and byte interner identity also
+limit startup fidelity. These source and layout comparisons do not establish
+ordinary std startup or a general Rust execution path.
 
 Lean rejects demands outside the supported source domain. In particular,
 general trait resolution, const-MIR evaluation, indirect ABI, broader calls,
