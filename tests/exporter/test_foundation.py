@@ -47,6 +47,75 @@ class FoundationExport(unittest.TestCase):
                     self.assertLess(len(doc["types"]), 10)
                     self.assertNotIn(None, doc["types"])
 
+    def test_source_signatures_preserve_generic_safety_and_abi(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-signature-") as directory:
+            source = Path(directory) / "signatures.rs"
+            source.write_text('pub fn generic<T: Copy>(x: T) -> T { x }\npub unsafe extern "C" fn c_unsafe(x: u32) -> u32 { x }\npub extern "C-unwind" fn c_unwind(x: u32) -> u32 { x }\n')
+            for root, safety, abi, unwind in (
+                ("generic", "safe", "rust", None),
+                ("c_unsafe", "unsafe", "c", False),
+                ("c_unwind", "safe", "c", True),
+            ):
+                output = Path(directory) / f"{root}.json"
+                result = subprocess.run([
+                    "bash", "tools/export-mir.sh", "--output", str(output),
+                    "--foundation", "--root", root, "--", str(source),
+                    "--crate-type=lib", "--crate-name", "signatures",
+                ], cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                doc = json.loads(output.read_text())
+                self.assertEqual(doc["compilation"], {"panic_strategy":"unwind","panic_in_drop":"unwind"})
+                body = doc["bodies"][0]
+                metadata = body["source_metadata"]
+                self.assertEqual(len(metadata["locals"]), len(body["locals"]))
+                self.assertTrue(metadata["scopes"])
+                self.assertEqual(len(metadata["blocks"]), len(body["blocks"]))
+                for source_block, block in zip(metadata["blocks"], body["blocks"]):
+                    self.assertEqual(len(source_block["statements"]), len(block["statements"]))
+                    self.assertLess(source_block["terminator"]["scope"], len(metadata["scopes"]))
+                signature = body["signature"]
+                self.assertEqual(signature["safety"], safety)
+                self.assertEqual(signature["abi"], {"kind":abi,"unwind":unwind})
+                self.assertFalse(signature["c_variadic"])
+                self.assertEqual(signature["inputs"], [signature["output"]])
+                self.assertEqual(signature["inputs"], body["locals"][1:2])
+                self.assertEqual(body["function_attributes"], {
+                    "never_unwind":False,"track_caller":False,
+                    "is_foreign":False,"is_drop_glue":False,
+                })
+                shape = doc["types"][signature["output"]]["shape"]
+                self.assertEqual(shape, {"kind":"param","index":0,"name":"T"}
+                                 if root == "generic" else {"kind":"uint","name":"u32"})
+
+    def test_variadic_frame_remains_fail_closed(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-variadic-") as directory:
+            source = Path(directory) / "variadic.rs"
+            source.write_text('pub unsafe extern "C" fn variadic(x: u32, _: ...) -> u32 { x }\n')
+            output = Path(directory) / "variadic.json"
+            result = subprocess.run([
+                "bash", "tools/export-mir.sh", "--output", str(output),
+                "--foundation", "--root", "variadic", "--", str(source),
+                "--crate-type=lib", "--crate-name", "variadic",
+            ], cwd=ROOT, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unsupported generic parameter", result.stderr)
+            self.assertIn("VaList", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_bound_signature_aborts_without_erasing_regions(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-bound-signature-") as directory:
+            source = Path(directory) / "bound.rs"
+            source.write_text("pub fn borrowed(x: &u8) -> &u8 { x }\n")
+            output = Path(directory) / "bound.json"
+            result = subprocess.run([
+                "bash", "tools/export-mir.sh", "--output", str(output),
+                "--foundation", "--root", "borrowed", "--", str(source),
+                "--crate-type=lib", "--crate-name", "bound",
+            ], cwd=ROOT, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unsupported bound function signature", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_unsupported_call_and_missing_root_abort(self):
         with tempfile.TemporaryDirectory(prefix="foundation-") as directory:
             for root, diagnostic in (("calls", "unsupported terminator"), ("missing", "missing MIR root"),

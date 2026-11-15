@@ -3,6 +3,9 @@
 //! This format deliberately has no runtime query answers or successful fallback
 //! rows. Unsupported source forms abort export. A consumer must implement their
 //! semantics from the material; this format is not executable schema12 input.
+#[path = "foundation_source.rs"]
+mod source_material;
+
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
 use rustc_middle::{mir, ty::{self, TyCtxt}};
@@ -168,6 +171,23 @@ impl<'tcx> Material<'tcx> {
         }).collect::<Result<Vec<_>>>()?;
         Ok(json!({"parameters":parameters,"clauses":clauses}))
     }
+    fn signature(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
+        // Source FnSig is finite generic material, not a normalized FnAbi answer.
+        // Pinned rustc_ty_utils::abi::FnAbiDesc performs substitution, region
+        // erasure and normalization later, when a concrete instance is demanded.
+        let signature = tcx.fn_sig(def).instantiate_identity().skip_normalization();
+        if !signature.bound_vars().is_empty() {
+            return unsupported("bound function signature", signature);
+        }
+        let signature = signature.skip_binder();
+        Ok(json!({
+            "inputs":signature.inputs().iter().map(|t|self.ty(tcx,*t)).collect::<Result<Vec<_>>>()?,
+            "output":self.ty(tcx,signature.output())?,
+            "safety":match signature.safety() {rustc_hir::Safety::Safe=>"safe",rustc_hir::Safety::Unsafe=>"unsafe"},
+            "abi":super::extern_abi_json(signature.abi()),
+            "c_variadic":signature.c_variadic(),
+        }))
+    }
     fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
@@ -191,7 +211,7 @@ impl<'tcx> Material<'tcx> {
         if b.source.promoted.is_some() || b.source.instance != ty::InstanceKind::Item(def) {
             return unsupported("non-item MIR source", b.source);
         }
-        if b.source_scopes.iter().any(|scope| scope.inlined.is_some()) {
+        if b.source_scopes.iter().any(|scope| scope.inlined.is_some() || scope.inlined_parent_scope.is_some()) {
             return unsupported("inlined frame metadata", def);
         }
         if !matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn | rustc_hir::def::DefKind::AssocFn) {
@@ -204,6 +224,15 @@ impl<'tcx> Material<'tcx> {
             return unsupported("caller location prerequisite", def);
         }
         let environment = self.environment(tcx,def)?;
+        let signature = self.signature(tcx,def)?;
+        // Inputs to pinned ty::layout::fn_can_unwind; do not cache its answer.
+        let function_attributes = json!({
+            "never_unwind":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
+            "track_caller":ty::InstanceKind::Item(def).requires_caller_location(tcx),
+            "is_foreign":tcx.is_foreign_item(def),
+            "is_drop_glue":tcx.is_lang_item(def,rustc_attr_ir::LangItem::DropGlue),
+        });
+        let source_metadata = source_material::capture(tcx, b);
         let locals = b.local_decls.iter().map(|l|self.ty(tcx,l.ty)).collect::<Result<Vec<_>>>()?;
         let blocks = b.basic_blocks.iter().map(|bb| {
             let statements = bb.statements.iter().map(|s| Ok(match &s.kind {
@@ -222,7 +251,7 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"required_consts":[],"locals":locals,"blocks":blocks}))
+        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":[],"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
     }
 }
 fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
@@ -237,5 +266,5 @@ fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
     if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(d.to_def_id()))); }
     let bodies = selected.into_iter().map(|d|m.body(tcx,d.to_def_id())).collect::<Result<Vec<_>>>()?;
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
-    Ok(json!({"schema":"lean-miri-foundation","schema_version":1,"rustc_commit":super::EXPECTED_RUSTC_COMMIT,"target":{"triple":tcx.sess.opts.target_triple.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},"definitions":m.definitions,"types":m.types,"bodies":bodies}))
+    Ok(json!({"schema":"lean-miri-foundation","schema_version":1,"rustc_commit":super::EXPECTED_RUSTC_COMMIT,"compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"}},"target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},"definitions":m.definitions,"types":m.types,"bodies":bodies}))
 }
