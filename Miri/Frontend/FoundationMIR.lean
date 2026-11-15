@@ -32,13 +32,6 @@ private def wholeLocal (count : Nat) (source : Json) : Except String MIR.Place :
   unless localId < count do throw "foundation MIR local is out of bounds"
   return ⟨localId, #[]⟩
 
-private def operand (count : Nat) (source : Json) : Except String MIR.Operand := do
-  let kind ← source.getObjValAs? String "kind"
-  unless kind == "copy" || kind == "move" do
-    throw "foundation MIR operand is unsupported"
-  let place ← wholeLocal count (← source.getObjVal? "place")
-  return if kind == "copy" then .Copy place else .Move place
-
 private def runtimePhase (source : Json) : Except String MIR.MirPhase := do
   unless (← source.getObjValAs? String "kind") == "runtime" do
     throw "foundation MIR phase is unsupported"
@@ -113,28 +106,11 @@ def lowerPreparedMIR (prepared : PreparedItem)
           let destination ← wholeLocal item.localTypes.size (← statement.getObjVal? "place")
           let value ← statement.getObjVal? "value"
           let some destinationType := item.localTypes[destination.localId]? | throw "missing destination type"
-          if (← value.getObjValAs? String "kind") != "use" then
-            let joined ← lowerJoinedRvalue prepared rvalueJoins constantOperand value
-            unless sameConcrete 1024 joined.type destinationType do
-              throw "foundation joined rvalue assignment type mismatch"
-            projectedPlaces := projectedPlaces ++ joined.places
-            pure (MIR.StatementKind.Assign destination joined.value)
-          else do
-            let sourceOperand ← value.getObjVal? "operand"
-            let (op, sourceType) ← if (← sourceOperand.getObjValAs? String "kind") == "constant" then do
-              let (constant, type) ← constantOperand sourceOperand
-              pure (MIR.Operand.Constant constant, type)
-            else do
-              let op ← operand item.localTypes.size sourceOperand
-              let sourceLocal ← match op with
-                | .Copy p | .Move p => pure p.localId
-                | _ => throw "foundation MIR operand invariant"
-              let some sourceType := item.localTypes[sourceLocal]? | throw "missing source local type"
-              pure (op, sourceType)
-            unless sameConcrete 1024 sourceType destinationType do
-              throw "foundation MIR assignment type mismatch"
-            let retag ← value.getObjValAs? Bool "retag"
-            pure (MIR.StatementKind.Assign destination (.Use op (if retag then .Yes else .No)))
+          let joined ← lowerJoinedRvalue prepared rvalueJoins constantOperand value
+          unless sameConcrete 1024 joined.type destinationType do
+            throw "foundation joined rvalue assignment type mismatch"
+          projectedPlaces := projectedPlaces ++ joined.places
+          pure (MIR.StatementKind.Assign destination joined.value)
         | _ => throw "foundation MIR statement is unsupported"
       statements := statements.push ⟨sourceInfo, kind⟩
       sourceLocations := sourceLocations.push source

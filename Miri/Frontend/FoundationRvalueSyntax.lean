@@ -25,9 +25,10 @@ structure JoinedRvalue where
   type : ConcreteType
   places : Array SourcePlaceTyping
 
-/-- Dereference-only source places. Every intermediate type is retained for
+/-- Checked dereference and tuple/closure-field places. Every intermediate type is retained for
 BodyCore's checked projected-place compiler fact join. -/
-def lowerSourcePlace (localTypes : Array ConcreteType) (source : Json) :
+def lowerSourcePlace (localTypes : Array ConcreteType) (source : Json)
+    (joins : RvalueSourceJoins := {}) :
     Except String SourcePlaceTyping := do
   let localId ← source.getObjValAs? Nat "local"
   let some initial := localTypes[localId]? | throw "rvalue source local absent"
@@ -35,21 +36,35 @@ def lowerSourcePlace (localTypes : Array ConcreteType) (source : Json) :
   let mut projection := #[]
   let mut projectionTypes := #[]
   for step in (← source.getObjValAs? (Array Json) "projection") do
-    unless (← step.getObjValAs? String "kind") == "deref" do
-      throw "rvalue source projection unsupported"
-    let .pointer kind pointee := type | throw "rvalue dereference source is not a pointer"
-    let _ ← pointerKindInfo kind
-    type := pointee
-    projection := projection.push .Deref
+    match ← step.getObjValAs? String "kind" with
+    | "deref" =>
+      let .pointer kind pointee := type | throw "rvalue dereference source is not a pointer"
+      let _ ← pointerKindInfo kind
+      type := pointee
+      projection := projection.push .Deref
+    | "field" =>
+      let fields ← match type with
+        | .tuple fields => pure fields
+        | .closure _ arguments =>
+          let some (.tuple fields) := arguments.back? | throw "closure projection upvars absent"
+          pure fields
+        | _ => throw "rvalue field projection requires checked tuple/closure shape"
+      let index ← step.getObjValAs? Nat "index"
+      let some field := fields[index]? | throw "rvalue field projection index out of bounds"
+      let sourceType ← joins.sourceType (← step.getObjValAs? Nat "type")
+      unless sameConcrete 1024 field sourceType do throw "rvalue field source type mismatch"
+      type := field
+      projection := projection.push (.Field index (← joins.physicalType field))
+    | _ => throw "rvalue source projection unsupported"
     projectionTypes := projectionTypes.push type
   return ⟨⟨localId, projection⟩, type, projectionTypes⟩
 
-private def lowerOperand (prepared : PreparedItem)
+def lowerSourceOperand (prepared : PreparedItem) (joins : RvalueSourceJoins)
     (constant : Json → Except String (MIR.ConstOperand × ConcreteType)) (source : Json) :
     Except String (MIR.Operand × ConcreteType × Array SourcePlaceTyping) := do
   match ← source.getObjValAs? String "kind" with
   | "copy" | "move" =>
-    let place ← lowerSourcePlace prepared.item.localTypes (← source.getObjVal? "place")
+    let place ← lowerSourcePlace prepared.item.localTypes (← source.getObjVal? "place") joins
     let op := if (← source.getObjValAs? String "kind") == "copy" then
         MIR.Operand.Copy place.place else .Move place.place
     return (op, place.type, #[place])
@@ -64,17 +79,21 @@ def lowerJoinedRvalue (prepared : PreparedItem) (joins : RvalueSourceJoins)
     (constant : Json → Except String (MIR.ConstOperand × ConcreteType)) (source : Json) :
     Except String JoinedRvalue := do
   match ← source.getObjValAs? String "kind" with
+  | "use" =>
+    let (operand, type, places) ← lowerSourceOperand prepared joins constant (← source.getObjVal? "operand")
+    let retag ← source.getObjValAs? Bool "retag"
+    return ⟨.Use operand (if retag then .Yes else .No), type, places⟩
   | "ref" =>
     unless (← source.getObjValAs? String "borrow_kind") == "shared" do
       throw "joined rvalue borrow kind unsupported"
     let region ← source.getObjValAs? String "region"
     unless region == "static" || region == "erased" do throw "joined rvalue borrow region unsupported"
-    let place ← lowerSourcePlace prepared.item.localTypes (← source.getObjVal? "place")
+    let place ← lowerSourcePlace prepared.item.localTypes (← source.getObjVal? "place") joins
     -- prepareItem erases regions before executable MIR construction.
     return ⟨.Ref .Erased .Shared place.place,
       .pointer "reference_erased_const" place.type, #[place]⟩
   | "cast_unsize" =>
-    let (operand, sourceType, places) ← lowerOperand prepared constant (← source.getObjVal? "operand")
+    let (operand, sourceType, places) ← lowerSourceOperand prepared joins constant (← source.getObjVal? "operand")
     let target ← joins.sourceType (← source.getObjValAs? Nat "target")
     let .pointer kind _ := sourceType | throw "unsize source is not a pointer"
     let .pointer targetKind _ := target | throw "unsize target is not a pointer"
@@ -99,7 +118,7 @@ def lowerJoinedRvalue (prepared : PreparedItem) (joins : RvalueSourceJoins)
     let mut operands := #[]
     let mut places := #[]
     for (operandSource, capture) in operandsSource.zip captures do
-      let (operand, actual, facts) ← lowerOperand prepared constant operandSource
+      let (operand, actual, facts) ← lowerSourceOperand prepared joins constant operandSource
       unless sameConcrete 1024 actual capture do throw "closure capture source type mismatch"
       operands := operands.push operand
       places := places ++ facts
