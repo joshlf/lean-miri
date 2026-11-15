@@ -72,6 +72,18 @@ closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
 [foundation-architecture](docs/foundation-architecture.md).
 
+The normal `tools/run.sh` route now decodes foundation material into a checked
+`ImportDocument` and passes it through the existing lowerer, preparation,
+runner and finalizer. A fresh custom-entry input reaches runtime construction,
+then stops before a guest step because the fixed foreign-symbol provider still
+requires exported candidates and callable instance IDs eagerly. The normal
+runner has not completed this custom entry. Finite linked declaration source
+matches independent exported-candidate order and attributes for 231 custom
+entry and 244 ordinary std candidates. The next migration is one shared pure
+source compiler World: all call, ABI, entry and panic consumers must resolve
+canonical identities from the same World when demanded. An empty candidate
+table or private foreign instance IDs would change semantics.
+
 For ordinary std main, the external `std::rt::lang_start`, its closure template,
 and `std::rt::lang_start_internal` are available as finite material. The latter
 calls `std::panic::catch_unwind` and `Result::unwrap_or_else`; source demand

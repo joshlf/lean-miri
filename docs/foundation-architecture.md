@@ -96,6 +96,18 @@ their use before constructing the limited program. General migration requires
 computing each demanded query from finite source material and expanding the
 supported interpreter domain without invented compiler answers.
 
+The normal runner now routes a foundation document through the existing input
+lowerer, preparation, evaluator and finalizer. Its custom-entry input currently
+stops in the foreign-symbol provider before a guest step: that provider demands
+all exported candidates and callable instance IDs during preparation. Ordered
+candidate declarations and linkage attributes are finite material, and their
+order and attributes have been checked against 231 custom-entry and 244 std
+candidates from an independent export. The pending provider change must select
+symbols on demand and resolve only the selected callable through one persistent
+pure compiler World shared by call, ABI, entry and panic consumers. A World
+identity may be allocated during one evaluation; no result may depend on a
+cache shared between evaluations. Missing body or ABI source remains an error.
+
 ## Proof and trust boundary
 
 rustc's MIR generation, compiler revision, target description and the exporter's
@@ -103,7 +115,7 @@ faithful encoding remain assumptions about the external Rust program. A Lean
 theorem would then need to state the exact exported document, initial state,
 external contracts and permitted choices, and cover every reachable permitted
 finite prefix of the **fixed** interpreter. A successful export, decoder check,
-restricted fixture evaluation, concrete run or finite Miri comparison establishes
+concrete run or finite Miri comparison establishes
 none of those universal claims. Missing semantics, query answers, overflow and
 unsupported forms must stop with errors rather than successful execution.
 
