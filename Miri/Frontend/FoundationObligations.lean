@@ -1,5 +1,6 @@
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationTraitClaims
+import Miri.Frontend.FoundationExistentialBounds
 import Miri.Frontend.FoundationOutlives
 
 /-! Pure checks for the small set of obligations understood by the restricted
@@ -63,11 +64,18 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
       let some row := d.definitions[definition]? | throw "unknown trait definition"
       let path ← str row "path"
       let arguments ← arr clause "arguments"
-      unless arguments.size == 1 do throw "unsupported trait argument count"
       let some arg := arguments[0]? | throw "missing trait self argument"
       unless (← str arg "kind") == "type" do throw "non-type trait self argument"
       let source ← typeExpr d (← num arg "type")
       let ty ← instantiate typeArgs constArgs source
+      if let .dynamicObject existential := ty then
+        let mut traitArguments := #[]
+        for argument in arguments.extract 1 arguments.size do
+          unless (← str argument "kind") == "type" do throw "non-type dynamic trait argument unsupported"
+          traitArguments := traitArguments.push (← instantiate typeArgs constArgs (← typeExpr d (← num argument "type")))
+        checkExplicitExistentialTrait existential definition traitArguments
+        continue
+      unless arguments.size == 1 do throw "unsupported trait argument count"
       if path == "std::marker::Copy" || path == "std::marker::Sized" ||
           path == "core::marker::Copy" || path == "core::marker::Sized" then
         unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"

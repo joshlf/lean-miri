@@ -1,4 +1,5 @@
 import Lean
+import Miri.Frontend.FoundationExistential
 import Miri.Frontend.FoundationSource
 
 /-! Finite, structural rustc material for pure, demand-time Lean queries.  This
@@ -86,6 +87,7 @@ inductive TypeExpr where
   | array (element : TypeExpr) (length : ConstExpr)
   | tuple (elements : Array TypeExpr)
   | pointer (kind : String) (pointee : TypeExpr)
+  | dynamicObject (source : ExistentialType TypeExpr)
   | functionPointer (inputs : Array TypeExpr) (output : TypeExpr) (safety abi : String) (cVariadic : Bool)
   deriving Repr
 
@@ -132,6 +134,7 @@ where
         throw "unsupported reference region"
       let tag := s!"reference_{region}_{if mutable then "mut" else "const"}"
       return .pointer tag (← go remaining seen (← nat shape "pointee"))
+    | "dynamic" => return .dynamicObject (← parseExistential d.definitions (go remaining seen) shape)
     | "function_pointer" =>
       let signature ← field shape "signature"
       unless (← array signature "bound_variables").isEmpty do
@@ -163,6 +166,7 @@ inductive ConcreteType where
   | array (element : ConcreteType) (length : Nat)
   | tuple (elements : Array ConcreteType)
   | pointer (kind : String) (pointee : ConcreteType)
+  | dynamicObject (source : ExistentialType ConcreteType)
   | functionPointer (inputs : Array ConcreteType) (output : ConcreteType) (safety abi : String) (cVariadic : Bool)
   deriving Repr
 
@@ -184,6 +188,7 @@ where
     | .tuple elements =>
       return .tuple (← elements.mapM (go remaining))
     | .pointer kind pointee => return .pointer kind (← go remaining pointee)
+    | .dynamicObject source => return .dynamicObject (← mapExistentialM (go remaining) source)
     | .functionPointer inputs output safety abi variadic =>
       return .functionPointer (← inputs.mapM (go remaining)) (← go remaining output) safety abi variadic
 
