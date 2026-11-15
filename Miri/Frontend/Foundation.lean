@@ -83,6 +83,7 @@ inductive ConstExpr where
 
 inductive TypeExpr where
   | primitive (kind name : String)
+  | closure (definition : Nat) (arguments : Array TypeExpr)
   | nominal (definition : Nat) (arguments : Array TypeExpr)
   | parameter (index : Nat)
   | array (element : TypeExpr) (length : ConstExpr)
@@ -115,6 +116,19 @@ where
     let .succ remaining := fuel | throw "foundation type resolution exhausted"
     let seen := seen.push id
     match kind with
+    | "closure" =>
+      let definition ← nat shape "definition"
+      let parentCount ← nat shape "parent_count"
+      let sourceArgs ← array shape "arguments"
+      unless sourceArgs.size == parentCount + 3 do throw "closure synthetic argument count mismatch"
+      let mut args := #[]
+      for arg in sourceArgs do
+        unless (← string arg "kind") == "type" do throw "closure non-type argument unsupported"
+        args := args.push (← go remaining seen (← nat arg "type"))
+      for (name, ordinal) in #[("kind_type", 0), ("signature_type", 1), ("tupled_upvars_type", 2)] do
+        let some arg := sourceArgs[parentCount + ordinal]? | throw "closure synthetic argument absent"
+        unless (← nat arg "type") == (← nat shape name) do throw "closure synthetic argument identity mismatch"
+      return .closure definition args
     | "adt" =>
       let mut args := #[]
       for arg in ← array shape "arguments" do
@@ -154,14 +168,15 @@ where
       let safety ← string signature "safety"
       unless safety == "safe" || safety == "unsafe" do throw "invalid function-pointer safety"
       let abi ← field signature "abi"
-      unless (← string abi "kind") == "rust" && (← field abi "unwind") == Json.null do
+      let abiKind ← string abi "kind"
+      unless (abiKind == "rust" || abiKind == "rust_call") && (← field abi "unwind") == Json.null do
         throw "function-pointer ABI unsupported"
       let variadic ← signature.getObjValAs? Bool "c_variadic"
       unless !variadic do throw "variadic function pointer unsupported"
       let mut inputs := #[]
       for input in (← array signature "inputs") do
         inputs := inputs.push (← go remaining seen (← input.getNat?))
-      return .functionPointer inputs (← go remaining seen (← nat signature "output")) safety "rust" variadic
+      return .functionPointer inputs (← go remaining seen (← nat signature "output")) safety abiKind variadic
     | "bool" | "char" | "never" | "str" => return .primitive kind ""
     | "int" | "uint" | "float" => return .primitive kind (← string shape "name")
     | other => throw s!"unsupported demand-time foundation type {other}"
@@ -175,6 +190,7 @@ def ConstExpr.instantiate (constants : Array (Option Nat)) : ConstExpr → Excep
 
 inductive ConcreteType where
   | primitive (kind name : String)
+  | closure (definition : Nat) (arguments : Array ConcreteType)
   | nominal (definition : Nat) (arguments : Array ConcreteType)
   | array (element : ConcreteType) (length : Nat)
   | tuple (elements : Array ConcreteType)
@@ -193,6 +209,7 @@ where
     let .succ remaining := fuel | throw "foundation instantiation exhausted"
     match expr with
     | .primitive kind name => return .primitive kind name
+    | .closure definition arguments => return .closure definition (← arguments.mapM (go remaining))
     | .nominal definition arguments => return .nominal definition (← arguments.mapM (go remaining))
     | .parameter i =>
       match types[i]?.bind id with

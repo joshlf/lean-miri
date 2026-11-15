@@ -9,6 +9,9 @@ namespace Miri.Frontend.Foundation
 def sameConcrete : Nat → ConcreteType → ConcreteType → Bool
   | 0, _, _ => false
   | _+1, .primitive k n, .primitive k' n' => k == k' && n == n'
+  | f+1, .closure d args, .closure d' args' =>
+    d == d' && args.size == args'.size &&
+      (args.zip args').all (fun (a,b) => sameConcrete f a b)
   | f+1, .nominal d args, .nominal d' args' =>
     d == d' && args.size == args'.size &&
       (args.zip args').all (fun (a,b) => sameConcrete f a b)

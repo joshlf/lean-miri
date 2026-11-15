@@ -46,6 +46,16 @@ where
   go (bound fuel : Nat) (ty : ConcreteType) : Except String FoundationLayout := do
     let .succ remaining := fuel | throw "foundation layout recursion exhausted"
     match ty with
+    | .closure _ arguments =>
+      let some (.tuple upvars) := arguments.back? | throw "closure upvars argument absent"
+      unless arguments.size ≥ 3 do throw "closure synthetic arguments absent"
+      let some (.primitive "int" kind) := arguments[arguments.size - 3]?
+        | throw "closure kind type absent"
+      unless #["i8", "i16", "i32"].contains kind do throw "closure kind encoding invalid"
+      let some (.functionPointer _ _ safety "rust_call" false) := arguments[arguments.size - 2]?
+        | throw "closure RustCall signature absent"
+      unless safety == "safe" || safety == "unsafe" do throw "closure signature safety invalid"
+      go bound remaining (.tuple upvars)
     | .nominal _ _ => throw "nominal component requires document physical query"
     | .patternNotNull _ => throw "general constrained-pattern layout unsupported"
     | .primitive "str" "" =>
@@ -69,10 +79,15 @@ where
       if elements.isEmpty then
         let align ← target.aggregateAlign.bytes.mapError toString
         return ⟨0, align.toNat⟩
-      throw "nonempty Rust tuple layout is unsupported"
+      unless elements.size == 1 do throw "multiple-field Rust tuple layout unsupported"
+      let some element := elements[0]? | throw "tuple element absent"
+      let layout ← go bound remaining element
+      let aggregate ← target.aggregateAlign.bytes.mapError toString
+      unless aggregate.toNat ≤ layout.align do throw "singleton tuple aggregate alignment unsupported"
+      return layout
     | .dynamicObject _ => return ⟨0, ← integerAlign target 8⟩
     | .functionPointer _ _ safety abi variadic =>
-      unless (safety == "safe" || safety == "unsafe") && abi == "rust" && !variadic do
+      unless (safety == "safe" || safety == "unsafe") && (abi == "rust" || abi == "rust_call") && !variadic do
         throw "unsupported physical function-pointer signature"
       let spec ← (target.pointerSpecIn target.instructionAddressSpace).mapError toString
       return ⟨spec.pointerSize.bytes.toNat, (← spec.pointerAlign.bytes.mapError toString).toNat⟩

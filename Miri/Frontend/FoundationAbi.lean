@@ -89,6 +89,7 @@ private def rustModeCore (target : Target) (architecture : String)
   let layout ← query ty
   if layout.size == 0 then return .ignore
   match ty with
+  | .closure _ _ => throw "closure ABI requires full physical classification"
   | .nominal _ _ => throw "nominal component requires document physical query"
   | .patternNotNull _ => throw "general constrained-pattern Rust ABI unsupported"
   | .primitive kind _ => return .direct (kind == "bool")

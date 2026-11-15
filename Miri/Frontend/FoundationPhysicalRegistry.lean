@@ -145,12 +145,33 @@ where
           fieldIds := fieldIds.push ids
         pure (next, some (definition, argIds, fieldIds))
       | _ => pure (r, none)
+    let (r, aggregateReferences) ← match ty with
+      | .closure definition args => do
+        let some row := r.registry.document.definitions[definition]? | throw "closure definition absent"
+        unless (← row.getObjValAs? String "kind") == "closure" do throw "closure definition kind mismatch"
+        unless args.size ≥ 3 do throw "closure synthetic arguments absent"
+        let mut next := r
+        let mut ids := #[]
+        for arg in args do
+          let (updated, id) ← go fuel next arg
+          next := updated
+          ids := ids.push id
+        pure (next, some ids)
+      | .tuple fields => do
+        let mut next := r
+        let mut ids := #[]
+        for field in fields do
+          let (updated, id) ← go fuel next field
+          next := updated
+          ids := ids.push id
+        pure (next, some ids)
+      | _ => pure (r, none)
     let (registry, id) ← r.registry.intern ty
     unless id == r.types.size && id == r.layouts.size do
       throw "physical registry pool identity mismatch"
     let node ← match nominalReferences with
       | some (definition, args, fields) => nominalTypeNode r.registry.document definition id id args fields
-      | none => physicalTypeNode ty id id references pointeeReference functionReferences dynamicReferences
+      | none => physicalTypeNode ty id id references pointeeReference functionReferences dynamicReferences aggregateReferences
     return ({ r with registry, types := r.types.push node, layouts := r.layouts.push layout }, id)
 
 /-- Resolve source types without changing the identity scheme. -/

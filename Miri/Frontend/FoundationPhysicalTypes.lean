@@ -72,6 +72,15 @@ where
     let .succ fuel := fuel | throw "physical layout recursion exhausted"
     let basic ← query ty
     match ty with
+    | .closure _ arguments =>
+      let some (.tuple fields) := arguments.back? | throw "closure upvars tuple absent"
+      unless arguments.size ≥ 3 do throw "closure synthetic arguments absent"
+      let layout ← go fuel (.tuple fields)
+      if fields.isEmpty then return layout
+      let some field := fields[0]? | throw "closure field absent"
+      unless fields.size == 1 do throw "multiple closure upvars unsupported"
+      let child ← go fuel field
+      return { layout with randomizationSeed := child.randomizationSeed }
     | .nominal _ _ => throw "nominal layout requires document material"
     | .patternNotNull _ => throw "general constrained-pattern physical layout unsupported"
     | .primitive "str" "" =>
@@ -91,10 +100,24 @@ where
         ⟨.array, count, none, some stride, #[], #[]⟩ (.arrayFormula stride count)
         memoryBackend (if count == 0 then none else elem.largestNiche)
     | .tuple elements =>
-      unless elements.isEmpty do throw "nonempty physical tuple unsupported"
-      let align ← target.aggregateAlign.bytes.mapError toString
-      return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
-        (.explicit #[]) memoryBackend none
+      if elements.isEmpty then
+        let align ← target.aggregateAlign.bytes.mapError toString
+        return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
+          (.explicit #[]) memoryBackend none
+      unless elements.size == 1 do throw "multiple-field physical tuple unsupported"
+      let some field := elements[0]? | throw "singleton tuple field absent"
+      let child ← go fuel field
+      let some backend := child.backendRepresentation | throw "singleton tuple backend absent"
+      unless backend.kind == .scalar && child.sizeBytes != some 0 &&
+          child.abiAlignBytes == some basic.align do
+        throw "singleton tuple requires filling scalar field"
+      -- Default repr, one field: offset0, identity memory order; scalar
+      -- newtype optimization and seed sum preserve the child's backend/niche.
+      return { child with
+        fields := some ⟨.arbitrary, 1, none, none, #[0], #[0]⟩
+        fieldOffsetsBytes := .explicit #[0]
+        -- MaybeUnsized excludes the sole tail from the field seed sum.
+        randomizationSeed := 0 }
     | .dynamicObject _ =>
       return baseLayout 0 basic.align 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
         (.explicit #[]) {memoryBackend with sized := some false} none
@@ -169,7 +192,8 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     (arrayReferences : Option (Nat × Nat) := none)
     (pointeeReference : Option Nat := none)
     (functionReferences : Option (Array Nat × Nat) := none)
-    (dynamicReferences : Option (Array Nat × Option Nat) := none) : Except String Input.TypeNode := do
+    (dynamicReferences : Option (Array Nat × Option Nat) := none)
+    (aggregateReferences : Option (Array Nat) := none) : Except String Input.TypeNode := do
   let (shape, display) ← match ty with
     | .primitive "bool" "" => pure (Input.TypeShape.bool, "bool")
     | .primitive "char" "" => pure (Input.TypeShape.char, "char")
@@ -185,17 +209,25 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
     | .array _ count =>
       let some (element, length) := arrayReferences | throw "array pool identities absent"
       pure (.array element length ⟨count, true⟩, s!"foundation-array-{id}")
+    | .closure definition arguments =>
+      let some args := aggregateReferences | throw "closure argument identities absent"
+      let some (.tuple fields) := arguments.back? | throw "closure upvars absent"
+      pure (.closure definition (args.map MIR.GenericArg.Type) fields.size, s!"foundation-closure-{id}")
     | .tuple elements =>
-      unless elements.isEmpty do throw "nonempty physical tuple unsupported"
-      pure (.tuple #[], "()")
+      let ids ← match aggregateReferences with
+        | some ids => pure ids
+        | none => if elements.isEmpty then pure #[] else throw "tuple field identities absent"
+      unless ids.size == elements.size do throw "tuple field identity count mismatch"
+      pure (.tuple ids, if elements.isEmpty then "()" else s!"foundation-tuple-{id}")
     | .functionPointer _ _ safety abi variadic =>
-      unless abi == "rust" && !variadic do throw "physical function-pointer ABI unsupported"
+      unless (abi == "rust" || abi == "rust_call") && !variadic do throw "physical function-pointer ABI unsupported"
       let safety ← match safety with
         | "safe" => pure MIR.Safety.Safe
         | "unsafe" => pure MIR.Safety.Unsafe
         | _ => throw "physical function-pointer safety unsupported"
       let some (inputs, output) := functionReferences | throw "function-pointer signature identities absent"
-      let signature : Input.FunctionSignature := ⟨inputs, output, safety, .Rust, variadic⟩
+      let convention := if abi == "rust_call" then ABI.ExternAbi.RustCall else .Rust
+      let signature : Input.FunctionSignature := ⟨inputs, output, safety, convention, variadic⟩
       pure (.functionPointer signature #[], s!"foundation-function-pointer-{id}")
     | .dynamicObject source =>
       let some (predicates, principal) := dynamicReferences | throw "dynamic predicate pool identities absent"
