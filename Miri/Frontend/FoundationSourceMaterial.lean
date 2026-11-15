@@ -80,8 +80,11 @@ def typedSourceMaterial (document : Document) : Except String Input.SourceMateri
     endian := document.target.endian
     runtimeDataLayout := some (← evidenceOfTarget document.target) }
   let linkSections ← (← sourceLinkSections document.source).mapM sectionDeclaration
-  let material : Input.SourceMaterial := {target,declarations,genericLayers := layers,
-    linkSections := some linkSections}
+  let material : Input.SourceMaterial := {
+    target := target
+    declarations := declarations
+    genericLayers := layers
+    linkSections := some linkSections }
   material.validate
   return material
 
