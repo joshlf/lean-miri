@@ -1,5 +1,6 @@
 //! Finite definition discovery from uninstantiated MIR syntax. Only requested
-//! bodies are traversed; the compiler-selected start is a declaration seed.
+//! roots and their executable operand/closure edges are traversed; structural
+//! type references contribute headers only. The selected start is a declaration seed.
 //! Calls contribute their source FnDef, never an implementation selection.
 use super::*;
 use rustc_middle::ty::{TypeSuperVisitable, TypeVisitable};
@@ -23,7 +24,16 @@ impl Graph {
     }
 }
 
-fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)> {
+fn has_source_body(tcx: TyCtxt<'_>, definition: DefId) -> bool {
+    matches!(tcx.def_kind(definition), rustc_hir::def::DefKind::Fn
+        | rustc_hir::def::DefKind::AssocFn | rustc_hir::def::DefKind::Closure)
+        && !super::super::is_required_trait_method(tcx,definition)
+        && !tcx.is_foreign_item(definition)
+        && !rustc_attr_ir::find_attr!(tcx,definition,RustcIntrinsic)
+        && tcx.is_mir_available(definition)
+}
+
+fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>,Vec<DefId>)> {
     if !tcx.is_mir_available(owner) { return unsupported("selected source MIR unavailable",owner); }
     let body = tcx.instance_mir(ty::InstanceKind::Item(owner));
     super::super::ensure_untainted_mir(body)?;
@@ -46,7 +56,8 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)
             value.super_visit_with(self);
         }
     }
-    struct BodyTypes<'a,'tcx> { functions: &'a mut FunctionTypes<'tcx> }
+    struct BodyTypes<'a,'tcx> { functions: &'a mut FunctionTypes<'tcx>,
+        bodies: &'a mut Vec<DefId>, tcx: TyCtxt<'tcx>, body: &'a mir::Body<'tcx> }
     impl<'tcx> mir::visit::Visitor<'tcx> for BodyTypes<'_,'tcx> {
         fn visit_ty(&mut self, value: ty::Ty<'tcx>, _: mir::visit::TyContext) {
             value.visit_with(self.functions);
@@ -54,9 +65,20 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)
         fn visit_ty_const(&mut self, value: ty::Const<'tcx>, _: mir::Location) {
             value.visit_with(self.functions);
         }
+        fn visit_operand(&mut self, value: &mir::Operand<'tcx>, location: mir::Location) {
+            // A function value may execute through a pointer or a generic
+            // callable parameter. Only its outer FnDef is an executable edge;
+            // FnDefs nested in generic type arguments remain header demands.
+            if let ty::FnDef(definition,_) = *value.ty(self.body,self.tcx).kind() {
+                self.bodies.push(definition);
+            }
+            self.super_operand(value,location);
+        }
     }
     let mut functions = FunctionTypes {seen:HashSet::new(),definitions:Vec::new()};
-    mir::visit::Visitor::visit_body(&mut BodyTypes {functions:&mut functions},body);
+    let mut body_edges = Vec::new();
+    mir::visit::Visitor::visit_body(&mut BodyTypes {functions:&mut functions,
+        bodies:&mut body_edges,tcx,body},body);
     let mut result = functions.definitions.clone();
     let mut calls = functions.definitions;
     for block in body.basic_blocks.iter() {
@@ -68,16 +90,23 @@ fn syntax_edges(tcx: TyCtxt<'_>, owner: DefId) -> Result<(Vec<DefId>,Vec<DefId>)
         for statement in &block.statements {
             if let mir::StatementKind::Assign(assignment) = &statement.kind {
                 if let mir::Rvalue::Aggregate(kind,_) = &assignment.1 {
-                    if let mir::AggregateKind::Closure(definition,_) = **kind { result.push(definition); }
+                    if let mir::AggregateKind::Closure(definition,_) = **kind {
+                        result.push(definition); body_edges.push(definition);
+                    }
                 }
             }
         }
     }
+    // Executable edges must also remain declaration identities, independently
+    // of whether the structural type visitor visits that operand type again.
+    result.extend(body_edges.iter().copied());
     result.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
     result.dedup();
     calls.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
     calls.dedup();
-    Ok((result,calls))
+    body_edges.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
+    body_edges.dedup();
+    Ok((result,calls,body_edges))
 }
 
 pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String]) -> Result<Graph> {
@@ -87,7 +116,7 @@ pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String])
     declarations.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
     declarations.dedup();
     let mut selected = declarations.iter().copied().filter(|definition| {
-        tcx.is_mir_available(*definition) && !super::super::is_required_trait_method(tcx,*definition)
+        has_source_body(tcx,*definition)
             && (roots.is_empty() || roots.contains(&tcx.def_path_str(*definition)))
     }).collect::<Vec<_>>();
     let mut pending = selected.clone();
@@ -102,20 +131,17 @@ pub(super) fn discover(tcx: TyCtxt<'_>, roots: &[String], signatures: &[String])
             pending.push(start);
         }
     }
-    let mut visited = Vec::new();
+    let mut visited = HashSet::new();
     let mut call_declarations = Vec::new();
     while let Some(owner) = pending.pop() {
-        if visited.contains(&owner) { continue; }
-        visited.push(owner);
-        let (edges,calls) = syntax_edges(tcx,owner)?;
+        if !visited.insert(owner) { continue; }
+        let (edges,calls,body_edges) = syntax_edges(tcx,owner)?;
         if selected.contains(&owner) { call_declarations.extend(calls); }
         for definition in edges {
             if !declarations.contains(&definition) { declarations.push(definition); }
-            if roots.contains(&tcx.def_path_str(definition)) && !selected.contains(&definition) {
-                if !matches!(tcx.def_kind(definition), rustc_hir::def::DefKind::Fn
-                    | rustc_hir::def::DefKind::AssocFn | rustc_hir::def::DefKind::Closure) {
-                    return unsupported("requested source body definition kind",definition);
-                }
+            let explicit = roots.contains(&tcx.def_path_str(definition));
+            let executable = selected.contains(&owner) && body_edges.contains(&definition);
+            if (explicit || executable) && has_source_body(tcx,definition) && !selected.contains(&definition) {
                 selected.push(definition);
                 pending.push(definition);
             }
