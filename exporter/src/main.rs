@@ -2919,12 +2919,12 @@ fn type_compiler_facts_json<'tcx>(
         is_monomorphic: closed,
         is_monomorphic_enough: !input.has_param(),
         is_like_maybe_dangling: input.is_like_maybe_dangling(),
-        is_freeze: Some(normalized.is_freeze(tcx, env)),
-        is_unpin: Some(normalized.is_unpin(tcx, env)),
-        is_unsafe_unpin: Some(normalized.is_unsafe_unpin(tcx, env)),
-        needs_drop: Some(normalized.needs_drop(tcx, env)),
+        is_freeze: normalized.is_freeze(tcx, env),
+        is_unpin: normalized.is_unpin(tcx, env),
+        is_unsafe_unpin: normalized.is_unsafe_unpin(tcx, env),
+        needs_drop: normalized.needs_drop(tcx, env),
         opsem_inhabited: normalized.is_opsem_inhabited(tcx, env),
-        is_sized: Some(normalized.is_sized(tcx, env)),
+        is_sized: normalized.is_sized(tcx, env),
     };
     let unsafe_binder_erased = match input.kind() {
         ty::UnsafeBinder(b) => Some(type_json(
@@ -2946,7 +2946,7 @@ fn type_compiler_facts_json<'tcx>(
         .map(|metadata| type_json(context, tcx, metadata))
         .transpose()?;
     let type_queries = TypeQueries {
-        normalized: Some(type_json(context, tcx, normalized)?),
+        normalized: type_json(context, tcx, normalized)?,
         unsafe_binder_erased,
         pointer_metadata_type,
         metadata_tail: type_json(context, tcx, tail)?,
@@ -3008,7 +3008,7 @@ fn type_compiler_facts_json<'tcx>(
         adt,
         capture_names,
         simd_size_and_type,
-        discriminants: Some(discriminant_facts_json(context, tcx, normalized)?.into()),
+        discriminants: discriminant_facts_json(context, tcx, normalized)?.into(),
         projection_queries: projection_queries::export(tcx, context, input)?,
         definition: match input.kind() {
             ty::Adt(def, _) => Some(def_json(context, def.did())),
@@ -3018,7 +3018,7 @@ fn type_compiler_facts_json<'tcx>(
             | ty::Coroutine(d, _) => Some(def_json(context, *d)),
             _ => None,
         },
-        type_id_hash: Some(tcx.type_id_hash(input).as_u128().to_string()),
+        type_id_hash: tcx.type_id_hash(input).as_u128().to_string(),
     })
 }
 

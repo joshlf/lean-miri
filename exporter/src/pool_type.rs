@@ -199,11 +199,10 @@ pub(super) struct CompilerFacts {
     pub adt: Option<AdtFacts>,
     pub capture_names: Option<Vec<Option<String>>>,
     pub simd_size_and_type: Option<Simd>,
-    pub discriminants: Option<Shared<Discriminants>>,
+    pub discriminants: Shared<Discriminants>,
     pub projection_queries: Option<ProjectionQueries>,
     pub definition: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub type_id_hash: Option<String>,
+    pub type_id_hash: String,
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct BooleanQueries {
@@ -216,22 +215,16 @@ pub(super) struct BooleanQueries {
     pub is_monomorphic: bool,
     pub is_monomorphic_enough: bool,
     pub is_like_maybe_dangling: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_freeze: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_unpin: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_unsafe_unpin: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub needs_drop: Option<bool>,
+    pub is_freeze: bool,
+    pub is_unpin: bool,
+    pub is_unsafe_unpin: bool,
+    pub needs_drop: bool,
     pub opsem_inhabited: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_sized: Option<bool>,
+    pub is_sized: bool,
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct TypeQueries {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub normalized: Option<u64>,
+    pub normalized: u64,
     pub unsafe_binder_erased: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pointer_metadata_type: Option<u64>,
