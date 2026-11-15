@@ -3,6 +3,7 @@ import Miri.Frontend.FoundationTraitClaims
 import Miri.Frontend.FoundationExistentialBounds
 import Miri.Frontend.FoundationFnSupertraits
 import Miri.Frontend.FoundationOutlives
+import Miri.Frontend.FoundationProjectionClauses
 
 /-! Pure checks for the small set of obligations understood by the restricted
 foundation fixture evaluator. Unknown traits and forms remain errors. -/
@@ -76,12 +77,21 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
           traitArguments := traitArguments.push (← instantiate typeArgs constArgs (← typeExpr d (← num argument "type")))
         checkSourceExistentialTrait d existential definition traitArguments
         continue
+      if let .functionPointer .. := ty then
+        if arguments.size == 2 then
+          let mut traitArguments := #[]
+          for argument in arguments.extract 1 arguments.size do
+            unless (← str argument "kind") == "type" do throw "non-type Fn trait argument unsupported"
+            traitArguments := traitArguments.push (← instantiate typeArgs constArgs (← typeExpr d (← num argument "type")))
+          checkFunctionPointerFnTrait d definition ty traitArguments
+          continue
       unless arguments.size == 1 do throw "unsupported trait argument count"
       if path == "std::marker::Copy" || path == "std::marker::Sized" ||
           path == "core::marker::Copy" || path == "core::marker::Sized" then
         unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"
       else
         unless (← localTraitClaim row ty) do throw s!"unsatisfied local trait obligation {path}"
+    | "projection" => checkProjectionClause d typeArgs constArgs clause
     | "type_outlives" =>
       let ty ← instantiate typeArgs constArgs (← typeExpr d (← num clause "type"))
       checkStaticOutlives ty (← str clause "region")
