@@ -235,6 +235,8 @@ pub(super) struct TypeQueries {
     pub unsafe_binder_erased: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pointer_metadata_type: Option<u64>,
+    pub metadata_tail: u64,
+    pub discriminant_type: u64,
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct AdtFacts {

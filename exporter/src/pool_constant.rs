@@ -50,8 +50,6 @@ pub(crate) enum Annotation {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum Constant {
     LiteralConst { value: Value },
-    TypeConstant { type_constant: u64 },
-    UnevaluatedConst { definition:u64, arguments:Vec<super::pool_values::GenericArgument>, promoted:Option<u32> },
     EvaluatedConst { value: Value },
 }
 #[derive(Clone, Debug, Serialize)]

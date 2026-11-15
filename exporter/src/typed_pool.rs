@@ -135,7 +135,7 @@ mod tests {
         assert!(!requests.insert(9));
         assert_eq!(requests.get_index(1), Some(&2));
         assert_eq!(requests.suffix(2), &[7]);
-        assert!(requests.contains(&9));
+        assert!(requests.iter().any(|key| *key == 9));
         assert_eq!(requests.into_iter().collect::<Vec<_>>(), vec![9, 2, 7]);
     }
 
@@ -227,7 +227,6 @@ impl<K: Clone + Eq + Hash> OrderedSet<K> {
         self.order.push(key);
         true
     }
-    pub(super) fn contains(&self, key: &K) -> bool { self.seen.contains_key(key) }
     pub(super) fn get_index(&self, index: usize) -> Option<&K> { self.order.get(index) }
     pub(super) fn suffix(&self, cursor: usize) -> &[K] { &self.order[cursor..] }
     pub(super) fn iter(&self) -> std::slice::Iter<'_, K> {
