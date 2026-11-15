@@ -8,7 +8,7 @@ import Miri.Input.CompilerIntrinsicSymbols
 import Miri.Input.EvalCompilerMachine
 import Miri.Input.EvalTerminatorMachine
 
-/-! A bounded two-body u8 direct call in the existing fixed interpreter. The caller
+/-! A bounded two-body scalar direct call in the existing fixed interpreter. The caller
 supplies a prepared source program; unavailable host operations fail explicitly.
 This is a finite call/return observation, not a process run or safety theorem. -/
 namespace Miri.Frontend.Foundation.FixedDirectCallRun
@@ -59,7 +59,7 @@ private def leaves (dummy : SpanRef) : CoreLeaves := {
   blockingSources := Input.EvalTerminatorMachine.ioSourcesAccess }
 
 private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
-    (rootInstance : CallInstance) (config : ExecutionMachine.Config MiriMemoryKind
+    (rootInstance : CallInstance) (input : Nat) (config : ExecutionMachine.Config MiriMemoryKind
       CoreUser
       Unit String ABI.ExternAbi Unit) (state : InnerState) : Except String (InnerState × RuntimeStackPlace Provenance) := do
   let abi ← Input.CompilerInstanceAbi.abiOfInstance p.lifecycle.instances rootInstance #[]
@@ -67,10 +67,18 @@ private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
   let returnLayout ← (p.runtime.lookup returnTy).mapError toString
   let some argumentTy := body.body.locals[1]? | throw "identity argument absent"
   let argumentLayout ← (p.runtime.lookup argumentTy).mapError toString
-  unless body.body.argumentCount == 1 && argumentLayout.layout.size.bytes == 1 &&
-      argumentTy == p.program.input.queries.primitives.u8 && returnTy == argumentTy do
-    throw "bounded runner requires exactly one byte argument"
-  let argument : FnArg Provenance := .Copy ⟨.immediate (.scalar (.fromScalarInt (.ofUInt8 42))), argumentLayout⟩
+  let primitives := p.program.input.queries.primitives
+  let expectedBytes ← if argumentTy == primitives.u8 then pure 1
+    else if argumentTy == primitives.u16 then pure 2
+    else if argumentTy == primitives.usize then pure (p.runtime.target.base.pointerWidth.bits.toNat / 8)
+    else throw "bounded call runner scalar type unsupported"
+  unless body.body.argumentCount == 1 && returnTy == argumentTy &&
+      argumentLayout.layout.size.bytes.toNat == expectedBytes do
+    throw "bounded call runner argument/return type width mismatch"
+  unless input < 2 ^ (expectedBytes * 8) && input < 2^128 do throw "bounded call input exceeds scalar width"
+  let some bits ← (ScalarInt.tryFromUInt (BitVec.ofNat 128 input) argumentLayout.layout.size).mapError reprStr
+    | throw "bounded call input was truncated"
+  let argument : FnArg Provenance := .Copy ⟨.immediate (.scalar (.fromScalarInt bits)), argumentLayout⟩
   let hooks := ExecutionMachine.callHooks config options.limits
   let action : MachineHooks.M MiriMemoryKind
       CoreUser
@@ -80,10 +88,10 @@ private def rootCall (p : Input.CompilerProviders.Prepared) (body : LoadedBody)
     pure (.memory destination)
   checkedState (MachineHooks.run action state)
 
-/-- Execute a bounded two-body u8 call under the explicit fixed-scheduling, shallow
+/-- Execute a bounded two-body scalar call under the explicit fixed-scheduling, shallow
 validation, vclock profile below. Only the observed finite call is asserted;
 startup, process exit and other permitted choices are outside this check. -/
-def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : UInt8 := 42) : Except String String := do
+def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : Nat := 42) : Except String String := do
   let dummy ← Input.CompilerContextSpan.rootSpan prepared.program
   let definition ← prepared.program.rootDefinitionId 0
   let some root := prepared.program.input.bodyRoots[0]? | throw "root absent"
@@ -141,14 +149,14 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : UInt8 
       Input.CompilerVTableMachine.attach prepared.vtables image vtableRuntime
       Input.CompilerIntrinsicSymbols.attach prepared image Input.EvalConfiguration.symbols
     let (inner, _) ← checkedState (MachineHooks.run registryAttach inner)
-    let (inner, returnPlace) ← rootCall prepared body rootInstance config inner
+    let (inner, returnPlace) ← rootCall prepared body rootInstance expected config inner
     unless returnPlace.layout.ty == returnTy do
       throw "root return place lost its compiler type identity"
     unless (match returnPlace with | .memory _ => true | _ => false) do
       throw "non-unit root return place was not backed by real memory"
     let mut current : OuterState := ExecutionStateTransport.outward inner
     let mut sawCallee := false
-    let mut observed : Option UInt8 := none
+    let mut observed : Option Nat := none
     for _ in [:32] do
       let some frame := current.stack.currentFrame? | break
       if frame.functionInstance != rootInstance then
@@ -163,7 +171,8 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : UInt8 
               (PlaceMachine.localToOp config.compiler () 0) (ExecutionStateTransport.inward current))
             let (inner, value) ← checkedState (MachineHooks.run (PlaceMachine.readImmediate config.access localOp) inner)
             let scalar ← value.imm.toScalar.mapError reprStr
-            let result ← scalar.toUInt8.mapError reprStr
+            let result ← scalar.toBits returnPlace.layout.layout.size |>.mapError reprStr
+            let result := result.toNat
             observed := some result
             current := ExecutionStateTransport.outward inner
         | _ => throw "unexpected root unwind in direct-call observation"
@@ -175,6 +184,6 @@ def runPrepared (prepared : Input.CompilerProviders.Prepared) (expected : UInt8 
       throw "direct-call observation bound exhausted before Return"
     unless sawCallee && observed == some expected do
       throw s!"fixed direct call did not enter callee and return {expected}"
-    pure "fixed interpreter calls(42_u8)=42; real callee frame entered; both Returns executed; stack empty"
+    pure s!"fixed interpreter {root.defPath}({expected})={expected}; width={returnPlace.layout.layout.size.bytes}; real callee frame entered; both Returns executed; stack empty"
 
 end Miri.Frontend.Foundation.FixedDirectCallRun

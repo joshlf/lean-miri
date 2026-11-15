@@ -4,7 +4,8 @@ import Miri.Frontend.FoundationDirectCalls
 /-! A deliberately bounded, allocation-operand-free direct-call domain. Two
 source bodies share computed physical/instance/ABI pools. Body-local rustc span
 identities are relocated explicitly; no compiler allocation identity is invented.
-Only a u8 caller with one call to a u8 identity leaf is accepted. -/
+Only an unsigned u8/u16/usize caller with one call to an identity leaf of
+the same type is accepted. -/
 namespace Miri.Frontend.Foundation
 open Lean
 
@@ -83,6 +84,20 @@ def relocateBodySource (body : Input.BodyCore) (offset : Nat) (files : Array Nat
     backtraceSpans := backtraces
     requiredConsts := body.requiredConsts.map fun c => { c with span := ⟨c.span.id + offset⟩ } }
 
+private def checkScalarIdentity (body : Input.BodyCore) (typeId : Nat) : Except String Unit := do
+  unless body.mir.argumentCount == 1 && body.mir.locals == #[typeId, typeId] &&
+      body.mir.basicBlocks.size == 1 do throw "scalar identity leaf locals/control flow mismatch"
+  let some block := body.mir.basicBlocks[0]? | throw "scalar identity entry block absent"
+  unless block.statements.size == 1 && block.terminator.kind == .Return do
+    throw "scalar identity requires assignment and Return"
+  let some statement := block.statements[0]? | throw "scalar identity assignment absent"
+  match statement.kind with
+  | .Assign destination (.Use (.Copy operand) _)
+  | .Assign destination (.Use (.Move operand) _) =>
+    unless destination == ⟨0, #[]⟩ && operand == ⟨1, #[]⟩ do
+      throw "scalar identity local effect mismatch"
+  | _ => throw "scalar identity leaf effect unsupported"
+
 /-- Build exactly two source-derived bodies and direct call evidence. Every
 nonprimitive runtime operation domain remains absent; effect checks restrict
 this constructor before those domains are assembled. No process entry is set. -/
@@ -110,9 +125,12 @@ def restrictedDirectCallProgram (document : Document) (definition : Nat) :
       pure #[ItemArgument.type entry.type]
     | _ => throw "call program requires single type-generic identity leaf"
   let callee ← prepareItem document calleeDefinition calleeTypeArgs
+  let some scalarType := root.item.localTypes[0]? | throw "call program return type absent"
+  let .primitive "uint" scalarName := scalarType | throw "call program requires unsigned scalar"
+  unless scalarName ∈ ["u8", "u16", "usize"] do throw "call program scalar width unsupported"
   for item in #[root.item, callee.item] do
-    unless item.argumentCount == 1 && item.localTypes.all (sameConcrete 1024 (.primitive "uint" "u8")) do
-      throw "call program requires only u8 locals"
+    unless item.argumentCount == 1 && item.localTypes.all (sameConcrete 1024 scalarType) do
+      throw "call program requires identical supported scalar locals"
     unless (← item.source.getObjValAs? (Array Json) "required_consts").isEmpty do
       throw "call program required const operands unsupported"
     for ty in item.localTypes do
@@ -154,8 +172,8 @@ def restrictedDirectCallProgram (document : Document) (definition : Nat) :
         let some (_, d) := demands.find? (·.1 == block) | throw "call demand site absent"
         callSyntax prepared frozen d terminal spans) evidence
     if node.id == demand.node.id then
-      let components ← buildSourceProgramComponents document calleeDefinition calleeTypeArgs
-      checkU8IdentityEffects components
+      let some returnType := body.mir.locals[0]? | throw "scalar identity return local absent"
+      checkScalarIdentity body returnType
     let mut fileIds := #[]
     for file in sourcePool.files do
       let id := (globalFiles.findIdx? (· == file)).getD globalFiles.size
@@ -180,17 +198,48 @@ def restrictedDirectCallProgram (document : Document) (definition : Nat) :
     context := rootSpanSource.context
     file := rootFile }
   let session ← sessionOfDocument document rootSpan
-  let mut queries ← restrictedLibraryQueries document calleeDefinition calleeTypeArgs
+  let foreign ← foreignSymbols document.source
+  let selectionSource ← document.source.getObjVal? "entry_selection"
+  let _ ← selectionSource.getObj?
+  let _ ← selectionSource.getObjVal? "compiler_entry"
+  let _ ← selectionSource.getObjVal? "start_lang_item"
+  let selection ← entrySelection document.source
+  unless selection.compilerEntry.isNone do throw "direct-call library domain excludes process entry"
+  let frames ← frameMetadataOfSource document
   let rootRuntime ← runtimeInstanceOfItem document root.item rootNode
   let calleeRuntime ← runtimeInstanceOfItem document callee.item demand.node
   let some strType := frozen.types.findIdx? (·.shapeKind == .str) | throw "call program str primitive absent"
-  queries := { queries with
-    globalBytes := { queries.globalBytes with strType }
-    session
-    primitives
+  let (_, globalBytes) ← globalBytesWithoutCandidates pool.registry.physical #[]
+  unless globalBytes.strType == strType do throw "call byte-interner primitive identity mismatch"
+  let queries : Input.Catalog.Queries := {
+    session := session
+    runtime := {
+      startup := none
+      types := #[]
+      virtualQueries := #[]
+      instances := #[rootRuntime, calleeRuntime]
+      foreignSymbols := foreign }
+    frameMetadata := frames
     instanceAbis := pool.instanceAbis
     functionFacts := ⟨frozen.facts, #[], #[]⟩
-    runtime := { queries.runtime with instances := #[rootRuntime, calleeRuntime] } }
+    casts := #[]
+    typeNames := #[]
+    panic := #[]
+    nativeSignatures := #[]
+    retag := #[]
+    covariance := #[]
+    globalBytes
+    callerLocations := #[]
+    main := ⟨selection.startLangItem, none, none, #[], none⟩
+    primitives := primitives
+    vtables := #[]
+    namedTypes := none
+    shimAbis := none
+    namedShimAbis := none
+    libcTypeLayouts := none
+    windowsTypeLayouts := none
+    namedConstants := none
+    namedStatics := none }
   let (producer, producerSettings) ← producerOfDocument document
   let some rootDefinition := document.definitions[definition]? | throw "root definition absent"
   let rootPath ← rootDefinition.getObjValAs? String "path"
