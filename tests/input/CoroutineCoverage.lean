@@ -176,7 +176,7 @@ def main : IO Unit := do
   let missingKindBodies := bodies.map (·.text) |>.set! 0 missingKind
   let missingKindBodies := "[" ++ String.intercalate "," missingKindBodies.toList ++ "]"
   rejected (← must (setField valid "bodies" missingKindBodies)) "body_kind"
-  rejected (← must (withoutField valid "mir_templates")) "mir_templates"
+  rejected (← must (setField valid "mir_templates" "[]")) "mir_templates"
   rejected (← must (withoutField valid "compiler_instance_abis")) "compiler_instance_abis"
   -- Fixture edits reorder root fields. Put the obsolete header first so this
   -- control tests version rejection before interpreting obsolete body fields.

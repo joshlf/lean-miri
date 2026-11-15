@@ -70,15 +70,12 @@ deriving instance DecidableEq for CoroutineLayoutEvidence
 deriving instance DecidableEq for CoroutineEvidence
 deriving instance DecidableEq for CoroutineAuxiliaryBody
 deriving instance DecidableEq for CoroutineCoverage
-deriving instance DecidableEq for MirTemplate.Template
-deriving instance DecidableEq for CopyTemplateSource
-deriving instance DecidableEq for CopyTemplateRef
 deriving instance DecidableEq for NoopDropRef
 deriving instance DecidableEq for BodySeed
 deriving instance DecidableEq for ImportDocument
 -- Density evidence contains only a proof about this exact document's type
 -- table. Proof irrelevance decides its lifted carrier; source equality above
--- still compares every declaration, template, and body seed structurally.
+-- still compares every declaration and body seed structurally.
 local instance {proposition : Prop} : DecidableEq (PLift proposition) :=
   fun _ _ => .isTrue (Subsingleton.elim _ _)
 deriving instance DecidableEq for GenericInstantiation.Context
