@@ -26,8 +26,7 @@ def main (args : List String) : IO Unit := do
       | throw (IO.userError "concrete shim has no rustc body")
     let some seed := document.bodies[bodyIndex]?
       | throw (IO.userError "concrete shim body index disappeared")
-    let .material body := seed
-      | throw (IO.userError "concrete shim body is not rustc material")
+    let body := seed
     let (loaded,world) ← must ((CallResolution.loadedBodyOfInstance prepared id).run initial)
     unless loaded.identity.index == bodyIndex && loaded.body == body.mir do
       throw (IO.userError "loaded shim differs from rustc material body")

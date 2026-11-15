@@ -469,7 +469,7 @@ private def terminalDiagnostic (prepared : Input.EvalPreparation.Prepared)
 private def prepareRun (prepared : Input.EvalPreparation.Prepared)
     (initialMemory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
     (pageSize : UInt64) (numCpus hostPid : UInt32) (diagnosticSeed : Option UInt64)
-    (profile : Lean.Options) (ui : Option UiSettings) :
+    (profile : Lean.Options) (ui : Option UiSettings) (argv0 : String) :
     Except String ((Option (Array HostStdio.Entry) → Array ExecutionChoices.Input → Except StepError
       (Input.EvalSourceRunFinalization.Result OuterState)) ×
       (Array ExecutionChoices.Input → Except String String)) := do
@@ -483,7 +483,7 @@ private def prepareRun (prepared : Input.EvalPreparation.Prepared)
       unless ui.isSome do throw "compiler did not select an rustc_main entry"
       pure (← Input.CompilerMiriEntry.miriStart compiler, MainEntryType.miriStart)
   let bytes ← (Input.CompilerGlobalBytes.prepare compiler.program compiler.runtime initialMemory).mapError toString
-  let arrays ← compiler.initialArrays
+  let arrays ← compiler.initialTypes
   let targetBits := compiler.runtime.target.base.pointerWidth.bits.toNat
   let arch ← (Input.EvalArchitectureMachine.targetArch compiler.intrinsics).mapError toString
   unless compiler.program.input.producer.targetTriple == "x86_64-unknown-linux-gnu" &&
@@ -507,7 +507,7 @@ private def prepareRun (prepared : Input.EvalPreparation.Prepared)
     validation := options.place.validation
     alignment := (ui.map (·.alignment)).getD .Int, affinity := none, muteOutput := true, hostUsizeBits := 64 }
   let bootstrap : Input.EvalBootstrap.Configuration Os := {
-    arguments := #[(ui.map (·.source)).getD "/workspace/lean-miri/scratch/main31.rs"], entry := definition, entryType
+    arguments := #[argv0], entry := definition, entryType
     communicate := false, forwarded := #[], environment := #[], overrides := #[] }
   let targetFacts ← compiler.externStatics.targetFacts.mapError id
   let startupFacts ← profileit "startup.prepare_run.facts" profile fun _ =>
@@ -669,6 +669,15 @@ private def captureLinuxProfile : IO (UInt64 × UInt32) := do
     throw (IO.userError "Linux host profile values are outside their supported range")
   pure (UInt64.ofNat page, UInt32.ofNat cpu)
 
+private def invocationSource (input : String) : Except String String := do
+  let document ← Lean.Json.parse input
+  let invocation ← document.getObjVal? "invocation"
+  let rustcArgs ← invocation.getObjVal? "rustc_args" >>= Lean.Json.getArr?
+  for argument in rustcArgs do
+    let value ← argument.getStr?
+    if !value.startsWith "-" && value.endsWith ".rs" then return value
+  throw "export invocation has no Rust source path for argv0"
+
 private def runMain (args : List String) (control : Option ControlOutput) : IO Unit := do
   if let ["--fingerprint", path] := args then
     let bytes ← IO.FS.readBinFile path
@@ -694,6 +703,9 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
       pure (some 0, some ui)
     | _ => throw (IO.userError "usage: NativeRunner <untouched-export.json|/dev/stdin> [--seed <u64> | --ui-source <source> --ui-flags <JSON-array>] [--profile] (gzip streamed externally)")
   let input ← readJson path
+  let argv0 ← match ui with
+    | some settings => pure settings.source
+    | none => must (invocationSource input)
   if let some output := control then
     let bytes := input.toUTF8
     let hash := bytes.foldl (fun (hash : UInt64) byte =>
@@ -704,7 +716,7 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
     emit control "header" (Lean.Json.mkObj [
       ("run_id", toJson output.runId), ("snapshot_fnv1a64", toJson hash.toNat),
       ("snapshot_byte_length", toJson bytes.size),
-      ("source", toJson ((ui.map (·.source)).getD "")), ("runtime_flags", flags),
+      ("source", toJson argv0), ("runtime_flags", flags),
       ("choice_mode", toJson (choiceMode diagnosticSeed))])
   let boundary := fun message => emit control "boundary" (toJson message)
   boundary s!"choice_mode={choiceMode diagnosticSeed}; generated_choices=unbounded; byte_length=uncapped; supplied_prefix=preserved"
@@ -734,7 +746,7 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
     | some ui => uiProfile ui
     | none => Lean.Json.mkObj [
       ("num_cpus", toJson numCpus.toNat), ("environment_policy", toJson ("empty" : String)),
-      ("argv0", toJson ("/workspace/lean-miri/scratch/main31.rs" : String)),
+      ("argv0", toJson argv0),
       ("float_nondeterminism", toJson options.floatNondeterministic),
       ("cmpxchg_weak_failure_rate_bits", toJson options.weakFailureRate.toNat),
       ("short_fd_operations", toJson false), ("choice_policy", toJson (choiceMode diagnosticSeed))]
@@ -742,7 +754,7 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
   let hostPid ← IO.Process.getPID
   boundary "run: start"
   let (execute, checkValidationMismatch) ← must
-    (prepareRun prepared attempt.memory pageSize numCpus hostPid diagnosticSeed profile ui)
+    (prepareRun prepared attempt.memory pageSize numCpus hostPid diagnosticSeed profile ui argv0)
   boundary "run: hooks ready"
   boundary "run: validation preflight start"
   let mismatch ← match checkValidationMismatch initialInputs with

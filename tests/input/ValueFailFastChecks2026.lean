@@ -17,7 +17,7 @@ private def context : DecodeMIR.Context := {
   typeConstantCount := 0, spanCount := 1, scalarSize := fun id => if id == 0 then some 1 else none }
 private def decode (statements : List String) (phase : String := tag "runtime" [("phase",s "optimized")]) := do
   let body := obj [
-    ("def_id","0"),("instance_id","0"),("phase",phase),("arg_count","0"),("spread_arg","null"),
+    ("source_role",s "runtime"),("def_id","0"),("instance_id","0"),("phase",phase),("arg_count","0"),("spread_arg","null"),
     ("span","0"),("preamble_def_span","0"),("backtrace_spans","[]"),("required_consts","[]"),
     ("locals",arr [obj [("local","0"),("type","0"),("source_info",info)]]),
     ("source_scopes",arr [obj [("scope","0"),("parent","null"),("span","0"),("inlined","null"),("inlined_parent_scope","null")]]),

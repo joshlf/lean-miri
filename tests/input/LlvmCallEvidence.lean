@@ -98,7 +98,7 @@ def main (args : List String) : IO Unit := do
       let body := {body with callEvidence := body.callEvidence.map fun evidence => evidence.map fun call =>
         if call.kind == .llvmIntrinsic then {call with instanceId := some item} else call}
       let material : Body := {toBodyCore := body, promotedBodies := seed.promotedBodies}
-      wrongItemBodies := wrongItemBodies.set! index (.material material)
+      wrongItemBodies := wrongItemBodies.set! index material
   let wrongItemDocument := {decoded.document with bodies := wrongItemBodies}
   let wrongItemProgram ← must (lowerProgram wrongItemDocument)
   let wrongItemCalls ← must (CallResolution.prepareWithRuntime runtime wrongItemProgram)

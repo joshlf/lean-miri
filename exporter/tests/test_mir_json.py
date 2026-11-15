@@ -20,6 +20,15 @@ def document(**fields):
 
 
 class MirJSONTests(unittest.TestCase):
+    def test_obsolete_source_wire_rejected(self):
+        for field in ("mir_templates", "ctfe_scalar_sources", "compiler_trait_program"):
+            with self.subTest(field=field), self.assertRaisesRegex(MirJSONError, field):
+                decode_mir_document(document(**{field: []}))
+        with self.assertRaisesRegex(MirJSONError, "body_kind"):
+            decode_mir_document(document(bodies=[{"body_kind": "material"}]))
+        with self.assertRaisesRegex(MirJSONError, "layout recipe"):
+            decode_mir_document(document(layout_values=[{"primitive_recipe": "u128"}]))
+
     def test_preserves_recursive_references(self):
         encoded = document(types=[{"shape": {"pointee": 0}, "layout": 0}],
                            layouts=[0], layout_values=[{"size_bytes": 8}], payload={"type": 0})
@@ -156,8 +165,6 @@ class MirJSONTests(unittest.TestCase):
             raw.pop(name, None)
         pooled = pool_document(raw)
         expected = copy.deepcopy(raw)
-        for body in expected["bodies"]:
-            body["body_kind"] = "material"
         self.assertEqual(expand_document(pooled, schema_version=8), expected)
         self.assertEqual(pooled["layouts"], [0, 0])
         self.assertEqual(len(pooled["layout_values"]), 1)

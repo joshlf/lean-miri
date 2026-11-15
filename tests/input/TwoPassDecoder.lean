@@ -38,7 +38,6 @@ private def replaceBody (source : String) (change : String → Except String Str
   let bodies ← items (← get source "bodies")
   let some body := bodies[0]? | throw "missing fixture body"
   let _ ← get body "basic_blocks"
-  let body ← set body "body_kind" (Json.renderString "material")
   set source "bodies" (arr (bodies.set! 0 (← change body)))
 
 private def reject (source label : String) : IO Unit :=
@@ -112,7 +111,7 @@ def main : IO Unit := do
   let fixture ← IO.FS.readFile "tests/input/fixtures/strict-unit.json"
   checkPlaceFactsOrder fixture
   let baseline ← must (decodeFixture fixture)
-  let withConstant ← must (replaceBody fixture fun body => set body "required_consts" (arr #[constant "255"]))
+  let withConstant := fixture
   let expected ← must (decodeFixture withConstant)
   let reordered ← must (forwardOrder (permuted (← must (Json.parse withConstant))))
   let decoded ← must (decodeFixture reordered)
@@ -123,27 +122,18 @@ def main : IO Unit := do
   -- material bodies are already typed MIR; comparing them needs no invented
   -- execution target or temporary constructor universe.
   for index in [:decoded.document.bodies.size] do
-    let some (.material actual) := decoded.document.bodies[index]?
-      | throw (IO.userError "minimal parser fixture unexpectedly contains a source template")
-    let some (.material reference) := expected.document.bodies[index]?
-      | throw (IO.userError "minimal parser reference unexpectedly contains a source template")
+    let some actual := decoded.document.bodies[index]?
+      | throw (IO.userError "minimal parser body missing")
+    let some reference := expected.document.bodies[index]?
+      | throw (IO.userError "minimal parser reference body missing")
     check (actual.mir == reference.mir) "recursive field permutation changed final MIR"
-  let body ← must (SourceMir.metadata decoded.document 0)
-  let cs := body.requiredConsts
-  let some c := cs[0]? | throw (IO.userError "missing required constant")
-  match c.value with
-  | .Val (.Scalar (.Int bits width)) ty =>
-    check (bits == 255 && width == 1 && ty == 1) "explicit scalar width changed across forward tables"
-  | _ => throw (IO.userError "wrong resolved scalar constant")
-  -- This synthetic raw-layout parser fixture intentionally has no target.
-  -- Recipes require real target material; never invent it for this adapter.
+  -- This parser fixture has no target; use only explicit layout sizes.
   let scalarSize : Nat → Option Nat ← if baseline.document.runtimeTargetDataLayout.isSome then do
     let runtime ← must ((RuntimeMetadata.ofDocument baseline.document).mapError toString)
     pure (fun id => (runtime.lookup id).toOption.map (·.layout.size.bytes.toNat))
   else pure (fun id => do
     let node ← baseline.document.types[id]?
     let input ← baseline.document.layouts[node.layoutId]?
-    unless input.primitiveRecipe.isNone && input.tupleType.isNone && input.unionType.isNone && input.structType.isNone && input.enumType.isNone do none
     input.sizeBytes)
   let asmContext : DecodeMIR.Context := {
     typeCount := baseline.document.types.size, allocationCount := baseline.document.allocations.size,

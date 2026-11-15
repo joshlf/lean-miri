@@ -86,7 +86,7 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
   let residualBlock := {block with terminator := {block.terminator with kind := .CoroutineDrop}}
   let residual := {owner with mir := {owner.mir with basicBlocks := owner.mir.basicBlocks.set! 0 residualBlock}}
   let residualBody : Body := {toBodyCore := residual.toBodyCore, promotedBodies := ownerSeed.promotedBodies}
-  invalidCoverage {document with bodies := document.bodies.set! 0 (.material residualBody)} coverage "unlowered terminator"
+  invalidCoverage {document with bodies := document.bodies.set! 0 residualBody} coverage "unlowered terminator"
   invalidCoverage document {coverage with auxiliaryBodies := #[{sync with body := {residual with mir := {residual.mir with phase := .Runtime .Initial}}}, proxy]} "unlowered terminator"
   invalidCoverage document {coverage with auxiliaryBodies := #[{sync with body := {sync.body with definitionId := none}}, proxy]} "auxiliary source kind differs from body definition"
   -- A constructed four-state physical layout: the first three states have no
@@ -172,10 +172,10 @@ def main : IO Unit := do
   let current ← must (JsonFixtures.parse valid)
   let bodies ← must ((← must (current.field "bodies")).array)
   let some first := bodies[0]? | throw (IO.userError "current fixture body missing")
-  let missingKind ← must (withoutField first.text "body_kind")
-  let missingKindBodies := bodies.map (·.text) |>.set! 0 missingKind
-  let missingKindBodies := "[" ++ String.intercalate "," missingKindBodies.toList ++ "]"
-  rejected (← must (setField valid "bodies" missingKindBodies)) "body_kind"
+  let oldKind ← must (setField first.text "body_kind" "\"material\"")
+  let oldKindBodies := bodies.map (·.text) |>.set! 0 oldKind
+  let oldKindBodies := "[" ++ String.intercalate "," oldKindBodies.toList ++ "]"
+  rejected (← must (setField valid "bodies" oldKindBodies)) "body_kind"
   rejected (← must (setField valid "mir_templates" "[]")) "mir_templates"
   rejected (← must (withoutField valid "compiler_instance_abis")) "compiler_instance_abis"
   -- Fixture edits reorder root fields. Put the obsolete header first so this

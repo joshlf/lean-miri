@@ -30,11 +30,16 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
         raise MirJSONError("document is not a lean-miri-rustc-mir export")
     if type(document.get("schema_version")) is not int or document["schema_version"] != 13:
         raise MirJSONError("MIR root schema_version must be 13")
+    for name in ("mir_templates", "ctfe_scalar_sources", "compiler_trait_program"):
+        if name in document:
+            raise MirJSONError(f"obsolete source field {name}")
     for name in sorted(POOL_NAMES):
         if not isinstance(document.get(name), list):
             raise MirJSONError(f"{name} must be a pool array")
         if any(not isinstance(row, dict) for row in document[name]):
             raise MirJSONError(f"{name} definitions must be objects")
+    if any("body_kind" in body for body in document["bodies"]):
+        raise MirJSONError("obsolete body_kind discriminator")
     layouts = document.get("layouts")
     if not isinstance(layouts, list) or any(type(index) is not int or index < 0 for index in layouts):
         raise MirJSONError("layouts must be a nonnegative reference array")
@@ -42,6 +47,11 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
         rows = document.get(name)
         if not isinstance(rows, list) or any(not isinstance(row, row_type) for row in rows):
             raise MirJSONError(f"{name} must be a pool of {row_type.__name__} values")
+    obsolete_layout_fields = {"primitive_recipe", "tuple_type", "union_type", "struct_type",
+                              "enum_type", "sequence_type", "pointer_type", "pointer_data_type",
+                              "enum_tag_type", "pattern_type"}
+    if any(obsolete_layout_fields.intersection(row) for row in document["layout_values"]):
+        raise MirJSONError("obsolete layout recipe")
     files = document.get("files")
     if not isinstance(files, list) or any(not isinstance(name, str) for name in files):
         raise MirJSONError("files must be a string array")

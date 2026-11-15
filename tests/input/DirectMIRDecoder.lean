@@ -13,7 +13,7 @@ private def literal (bits : String) :=
   "\"constant\":{\"kind\":\"evaluated_const\"," ++
   "\"value\":{\"kind\":\"scalar\",\"size_bytes\":1,\"bits_unsigned\":\"" ++ bits ++ "\"}}}}"
 private def body (bits : String) (localId : Nat := 0) :=
-  "{\"phase\":{\"kind\":\"built\"},\"instance_id\":0,\"arg_count\":0,\"spread_arg\":null," ++
+  "{\"source_role\":\"runtime\",\"phase\":{\"kind\":\"built\"},\"instance_id\":0,\"arg_count\":0,\"spread_arg\":null," ++
   "\"locals\":[{\"local\":0,\"type\":0,\"source_info\":" ++ source ++ "}]," ++
   "\"basic_blocks\":[{\"block\":0,\"is_cleanup\":false,\"statements\":[{" ++
   "\"source_info\":" ++ source ++ ",\"kind\":{\"variant\":\"Assign\",\"place\":{\"local\":" ++ toString localId ++
@@ -26,7 +26,9 @@ private def decode (text : String) := do
   DecodeMIR.resolveBody context (← JsonReader.run (DecodeMIR.parseBody "bodies[0]") text)
 
 def main : IO Unit := do
-  let .ok result := decode (body "255") | throw (IO.userError "valid scalar MIR did not decode")
+  let result ← match decode (body "255") with
+    | .ok result => pure result
+    | .error error => throw (IO.userError s!"valid scalar MIR did not decode: {error}")
   let some block := result.mir.basicBlocks[0]? | throw (IO.userError "missing block")
   let some stmt := block.statements[0]? | throw (IO.userError "missing statement")
   let .Assign _ (.Use (.Constant constant) _) := stmt.kind | throw (IO.userError "wrong MIR constructors")

@@ -38,7 +38,7 @@ private def checkInlineScopes (program : LoweredProgram) : IO Unit := do
     id, parent := none, spanId := 0, inlinedParent := none
     inlined := some ⟨callee.id, 0, track⟩ }
   let withScopes (scopes : Array SourceScope) := {
-    program with input := { program.input with bodies := #[.material {
+    program with input := { program.input with bodies := #[{
       body with sourceScopes := scopes }] } }
   let equal ← must (CompilerScopes.prepare (withScopes #[scope 0 true, scope 1 true]))
   check (CompilerVirtualFacts.inlineAttribute equal callee.id == some true)
@@ -53,8 +53,8 @@ private def checkInlineScopes (program : LoweredProgram) : IO Unit := do
       "contradictory unused inlinecallee failed for an unrelated reason"
   | .ok _ => throw (IO.userError "contradictory unused inlinecallee passed table construction")
   let acrossBodies := { program with input := { program.input with bodies := #[
-    .material { body with sourceScopes := #[scope 0 true] },
-    .material { body with sourceScopes := #[scope 0 false] }] } }
+    { body with sourceScopes := #[scope 0 true] },
+    { body with sourceScopes := #[scope 0 false] }] } }
   check (!(CompilerScopes.prepare acrossBodies).isOk)
     "contradictory inlinecallee attributes in distinct bodies passed construction"
   let erroneous ← must (CompilerScopes.prepare (withScopes #[scope 9 false, scope 1 true]))
@@ -83,7 +83,7 @@ def main (args : List String) : IO Unit := do
   check ((CompilerLifecycle.bodyEntry prepared ⟨identity,actual.body⟩ actual).isOk)
     "valid demanded body lost its lifecycle metadata"
   let invalidBody := { body with preambleDefSpanId := program.input.spans.size }
-  let invalid := { program with input := { program.input with bodies := program.input.bodies.set! index (.material invalidBody) } }
+  let invalid := { program with input := { program.input with bodies := program.input.bodies.set! index invalidBody } }
   let rejected := CompilerLifecycle.prepare invalid
   let invalidWorld := {world with metadata := {world.metadata with source := invalid.input, checkedMaterial := none, denseTypes := none}}
   let (actual,_) ← must ((invalid.resolveBodyIdentity identity).run invalidWorld)
@@ -91,7 +91,7 @@ def main (args : List String) : IO Unit := do
     "invalid demanded source span became lifecycle evidence"
   check (tables rejected.program == tables program) "lifecycle preparation changed compiler pools"
   let invalidBody := { body with instanceId := program.input.instances.size }
-  let invalid := { program with input := { program.input with bodies := program.input.bodies.set! index (.material invalidBody) } }
+  let invalid := { program with input := { program.input with bodies := program.input.bodies.set! index invalidBody } }
   let invalidWorld := {world with metadata := {world.metadata with source := invalid.input, checkedMaterial := none, denseTypes := none}}
   check (!((invalid.resolveBodyIdentity identity).run invalidWorld).isOk)
     "out of bounds demanded body instance was accepted"

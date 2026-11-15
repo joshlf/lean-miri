@@ -16,26 +16,26 @@ private def instanceRow (kind : Miri.Interpreter.CallInstanceKind)
 private def checkInstances : IO Unit := do
   let rows := #[instanceRow (.Item 7) #[.Type 3], instanceRow (.Item 7) #[.Type 4],
     instanceRow (.Virtual 8 0), instanceRow (.Shim (.DropGlue 9 none))]
-  check (CompilerInstance.item rows 7 #[.Type 3] == .ok 0 &&
-    CompilerInstance.item rows 7 #[.Type 4] == .ok 1)
+  check (CompilerInstance.Material.item rows 7 #[.Type 3] == .ok 0 &&
+    CompilerInstance.Material.item rows 7 #[.Type 4] == .ok 1)
     "instance lookup merged distinct generic arguments"
-  check (CompilerInstance.definitionOf rows 2 == .ok 8 &&
-    CompilerInstance.definitionOf rows 3 == .ok 9)
+  check (CompilerInstance.Material.definitionOf rows 2 == .ok 8 &&
+    CompilerInstance.Material.definitionOf rows 3 == .ok 9)
     "instance lookup discarded a virtual or shim definition"
   for definition in #[8,9,10] do
-    check (CompilerInstance.item rows definition #[] ==
+    check (CompilerInstance.Material.item rows definition #[] ==
       .error "exact compiler Item instance is absent")
       "item lookup accepted a non-Item or absent definition"
-  check (CompilerInstance.item (rows.push (instanceRow (.Item 7) #[.Type 3])) 7 #[.Type 3] ==
+  check (CompilerInstance.Material.item (rows.push (instanceRow (.Item 7) #[.Type 3])) 7 #[.Type 3] ==
     .error "duplicate canonical Item instance identity")
     "item lookup accepted duplicate exact identities"
   let expected := "compiler instance ID 4 out of bounds"
-  check (match CompilerInstance.source rows 4 with
+  check (match CompilerInstance.Material.source rows 4 with
     | .error message => message == expected | .ok _ => false)
     "instance source did not reject an out-of-bounds ID"
-  check (CompilerInstance.kindOf rows 4 == .error expected &&
-    CompilerInstance.argsOf rows 4 == .error expected &&
-    CompilerInstance.definitionOf rows 4 == .error expected)
+  check (CompilerInstance.Material.kindOf rows 4 == .error expected &&
+    CompilerInstance.Material.argsOf rows 4 == .error expected &&
+    CompilerInstance.Material.definitionOf rows 4 == .error expected)
     "instance projections changed the bounds error"
 
 def main (args : List String) : IO Unit := do

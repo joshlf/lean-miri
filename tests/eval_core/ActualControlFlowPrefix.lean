@@ -165,7 +165,7 @@ private def runWithConfig (prepared : Input.CompilerProviders.Prepared)
 private def runPrepared (prepared : Input.CompilerProviders.Prepared) : Except String String := do
   let dummy ← Input.CompilerContextSpan.rootSpan prepared.program
   let definition ← prepared.program.rootDefinitionId 0
-  let rootInstance ← Input.CompilerInstance.item prepared.loweringContext.instances definition #[]
+  let rootInstance ← Input.CompilerInstance.Material.item prepared.loweringContext.instances definition #[]
   let initialTypes ← prepared.initialTypes
   let (body,arrays) ← (Input.RuntimeArrayTypes.perform initialTypes
     (Input.CallResolution.loadedBodyOfInstance prepared.lifecycle.calls.calls rootInstance)).mapError reprStr

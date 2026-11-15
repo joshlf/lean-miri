@@ -31,7 +31,7 @@ def main (args : List String) : IO Unit := do
   let prepared ← must (Input.CompilerProviders.prepare program)
   let dummySpan ← must (Input.CompilerContextSpan.rootSpan prepared.program)
   let definition ← must (prepared.program.rootDefinitionId 0)
-  let rootInstance ← must (Input.CompilerInstance.item prepared.loweringContext.instances definition #[])
+  let rootInstance ← must (Input.CompilerInstance.Material.item prepared.loweringContext.instances definition #[])
   let initialTypes ← must prepared.initialTypes
   let (_,arrays) ← must ((Input.RuntimeArrayTypes.perform initialTypes
     (Input.CallResolution.loadedBodyOfInstance prepared.lifecycle.calls.calls rootInstance)).mapError reprStr)

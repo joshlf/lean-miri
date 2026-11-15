@@ -39,7 +39,7 @@ private def legacySourceNode (image : AllocationImage.Imported)
 private def legacyFunctionInstance (prepared : CompilerVTableRuntime.Prepared)
     (id : InstanceId) : Except String CallInstance := do
   let ctx := prepared.facts.context.loweringContext
-  let _ ← CompilerInstance.source ctx.instances id
+  let _ ← CompilerInstance.Material.source ctx.instances id
   pure id
 
 private def legacyGlobalFunction (prepared : CompilerVTableRuntime.Prepared)
@@ -162,7 +162,7 @@ private def functionHooks (prepared : EvalPreparation.Prepared) (salt : Fin 32) 
   putRegistry := fun user registry => {user with functions := registry}
   crossCrateInlineAlways := true
   instanceArgs := fun id =>
-    match CompilerInstance.argsOf prepared.compiler.program.input.instances id with
+    match CompilerInstance.Material.argsOf prepared.compiler.program.input.instances id with
     | .ok args => pure args
     | .error message => throw (.unsupported message)
   inlineNever := fun _ => pure false

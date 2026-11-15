@@ -24,7 +24,7 @@ class LegacyFixtureSchemaTests(unittest.TestCase):
             self.assertNotIn("can_unwind", abi)
 
     def test_current_body_schema_missing_required_catalog_is_not_adapted(self):
-        source = {"schema_version": 13, "bodies": [{"body_kind": "material"}]}
+        source = {"schema_version": 13, "bodies": [{}]}
         self.assertEqual(adapt_legacy_fixture(source), source)
         self.assertNotIn("compiler_instance_abis", adapt_legacy_fixture(source))
 

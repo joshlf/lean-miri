@@ -1,5 +1,6 @@
 import Miri.Input.Decoder
 import Miri.Input.CompilerInstanceAbi
+import Miri.Input.WorldNormalization
 
 /-! Exercise the production material layout and ABI readers against fresh
 rustc exports, then remove each demanded result from the immutable view. -/
@@ -28,6 +29,18 @@ private def inspect (path : String) : IO Unit := do
   let missingRuntime := {runtime with source := {runtime.source with layouts := #[]}}
   check (!((missingRuntime.layoutInWorld firstType.id).run world.arena).isOk)
     "layout demand accepted a missing rustc result"
+  let some normalizationNode := document.types.find? (fun node =>
+      node.layoutQueryInputTypeId.isNone &&
+      (node.compilerFacts.any fun facts => facts.typeQueries.any (·.1 == "normalized")))
+    | throw (IO.userError "export has no material normalization result")
+  let withoutFacts := normalizationNode.compilerFacts.map fun facts =>
+    {facts with typeQueries := facts.typeQueries.filter (·.1 != "normalized")}
+  let withoutNormalization := {normalizationNode with compilerFacts := withoutFacts}
+  let modifiedTypes := document.types.set! normalizationNode.id withoutNormalization
+  let modifiedRuntime ← must ((RuntimeMetadata.ofDocument {document with types := modifiedTypes}).mapError toString)
+  let modifiedWorld ← must ((RuntimeArrayTypes.create modifiedRuntime).mapError reprStr)
+  check (!((WorldNormalization.normalizeType () 10000 10000 normalizationNode.id).run modifiedWorld.arena).isOk)
+    "normalization demand accepted a missing rustc result"
 
   let program ← must (lowerProgram document)
   let prepared ← must (CompilerInstanceAbi.prepare runtime program)
@@ -47,6 +60,14 @@ private def inspect (path : String) : IO Unit := do
     "Item result differs from exact rustc instance row"
   check (!(CompilerInstance.Material.item #[] definition item.genericArgs).isOk)
     "Item lookup accepted a missing rustc instance result"
+  let some arrayNode := document.types.find? (fun node => node.shapeKind == .array)
+    | throw (IO.userError "export has no array type for constructed layout rejection")
+  let .array _ length _ := arrayNode.shape
+    | throw (IO.userError "array shape changed")
+  let (novelArray,arena) ← must ((TypeArena.World.internType (.array arrayNode.id length)).run world.arena)
+  check (novelArray >= document.types.size) "constructed array unexpectedly reused a material type"
+  check (!((runtime.layoutInWorld novelArray).run arena).isOk)
+    "constructed array acquired a layout without a rustc result"
   IO.println s!"PASS {path}: {layouts} exact material layouts, ABI and Item missing-result boundaries"
 
 def main (args : List String) : IO Unit := do

@@ -23,16 +23,13 @@ private def unpack (result : Except String α) : IO α :=
   | .error e => throw (IO.userError e)
 
 def main : IO Unit := do
-  -- Layouts are unavailable during parsing: all three catalog forms carry a
-  -- forward type reference and an explicit width for a 16-bit scalar.
+  -- Layouts are unavailable during parsing: catalog forms carry a forward
+  -- type reference and an explicit width for a 16-bit scalar.
   let named ← unpack <| JsonReader.run CatalogDecoder.namedConstant
     r#"{"query":{"evaluation":{"bits_unsigned":"65535","size_bytes":2,"kind":"scalar"},"instance_id":0,"type":42},"path":["libc","WORD"],"name":"WORD","typing_env":"fully_monomorphized"}"#
   unless named.typeId == 42 && named.name == "WORD" do
     throw (IO.userError "named constant identity changed")
   expectWord named.typeId named.value
-  let typeName ← unpack <| JsonReader.run CatalogDecoder.typeName
-    r#"{"bits_unsigned":"65535","size_bytes":2,"result_type":42,"kind":"scalar","typing_env":"fully_monomorphized","input_type":0}"#
-  expectWord typeName.resultType typeName.value
   let caller ← unpack <| JsonReader.run CatalogDecoder.callerLocation
     r#"{"bits_unsigned":"65535","size_bytes":2,"span":0,"kind":"scalar","result_type":42}"#
   let some callerType := caller.resultType | throw (IO.userError "missing caller-location result type")
@@ -54,10 +51,6 @@ def main : IO Unit := do
   let some wrongWidthType := wrongWidth.resultType | throw (IO.userError "missing width-test result type")
   if (DecodeMIR.resolveConstValue context wrongWidthType wrongWidth.value).isOk then
     throw (IO.userError "catalog width inconsistent with compiler layout accepted")
-  let dangling ← unpack <| JsonReader.run CatalogDecoder.typeName
-    r#"{"input_type":0,"result_type":43,"typing_env":"fully_monomorphized","kind":"zero_sized"}"#
-  if (DecodeMIR.resolveConstValue context dangling.resultType dangling.value).isOk then
-    throw (IO.userError "dangling catalog constant result type accepted")
   let pointer ← unpack <| JsonReader.run CatalogDecoder.callerLocation
     r#"{"result_type":42,"span":0,"kind":"pointer_scalar","allocation":1,"offset_bytes":0,"immutable":true,"shared_ref":false}"#
   let some pointerType := pointer.resultType | throw (IO.userError "missing pointer-test result type")

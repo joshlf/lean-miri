@@ -55,13 +55,9 @@ def main (args : List String) : IO Unit := do
   | .Scalar (.Initialized (value := .Int .I128 false) (validRange := range)) =>
     check (range.start.toNat == 0 && range.end.toNat == 2^128-1) "runtime u128 range changed"
   | _ => throw (IO.userError "runtime u128 scalar shape changed")
-  -- Primitive recipes fix their valid range algorithmically. Exercise decimal
-  -- wire range parsing on the independently exported NonZeroU128 ADT scalar
-  -- material, whose initialized scalar endpoints remain explicit inputs.
+  -- Exercise decimal wire ranges on rustc's NonZeroU128 ADT layout.
   let some mutableNode := decoded.document.types.find? (fun node =>
-    let material := (decoded.document.layouts[node.layoutId]?).any fun source =>
-      source.primitiveRecipe.isNone && source.tupleType.isNone && source.unionType.isNone && source.structType.isNone && source.enumType.isNone
-    material && (metadata.lookup node.id).toOption.any fun value =>
+    node.shapeKind == .adt && (metadata.lookup node.id).toOption.any fun value =>
       match value.layout.backendRepr with
       | .Scalar (.Initialized (value := .Int .I128 false)) => true
       | _ => false)

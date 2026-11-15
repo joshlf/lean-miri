@@ -72,19 +72,15 @@ def adaptLegacyFixture (source : String) : Except String String := do
   | .ok _ => pure ()
   let raw ← Json.parse source
   let version := (raw.getObjVal? "schema_version" >>= Json.getNat?).toOption
-  let oldBodyEncoding := version == some 13 &&
-    ((raw.getObjVal? "bodies" >>= Json.getArr?).toOption.any fun bodies =>
-      !bodies.isEmpty && bodies.all (fun body => !(body.getObjVal? "body_kind").isOk))
-  unless version == some 11 || version == some 12 || oldBodyEncoding do return source
+  unless version == some 11 || version == some 12 do return source
   let mut value := raw.setObjVal! "schema_version" (toJson (13 : Nat))
+  if let .ok fields := value.getObj? then
+    value := Json.mkObj (fields.toList.filter fun (key, _) =>
+      !["mir_templates", "ctfe_scalar_sources", "compiler_trait_program"].contains key)
   if let .ok producer := value.getObjVal? "producer" then
     if !(producer.getObjVal? "freeze_lang_item").isOk then
       -- Hypothetical historical component environment, not recovered lang items.
       value := value.setObjVal! "producer" (producer.setObjVal! "freeze_lang_item" .null)
-  if let .ok bodies := raw.getObjVal? "bodies" >>= Json.getArr? then
-    value := value.setObjVal! "bodies" (toJson (bodies.map fun body =>
-      if (body.getObjVal? "body_kind").isOk then body
-      else body.setObjVal! "body_kind" (toJson "material")))
   if let .ok types := raw.getObjVal? "types" >>= Json.getArr? then
     let constants := (raw.getObjVal? "type_constants" >>= Json.getArr?).toOption.getD #[]
     value := value.setObjVal! "types" (toJson (types.map fun node => Id.run do

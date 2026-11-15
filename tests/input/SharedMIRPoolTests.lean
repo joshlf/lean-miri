@@ -5,7 +5,7 @@ open Miri.Input DecodeMIR
 private def statementText := r#"{"variant":"Assign","place":{"local":1,"type":0,"projection":[]},"rvalue":{"kind":"Use","retag":{"kind":"no","performs_retag":false},"operand":{"kind":"Constant","constant":{"type":0,"span":0,"user_type_annotation":null,"constant":{"kind":"evaluated_const","value":{"kind":"scalar","size_bytes":1,"bits_unsigned":"7"}}}}}}"#
 
 private def bodyText (locals : String) :=
-  r#"{"phase":{"kind":"built"},"instance_id":0,"arg_count":0,"spread_arg":null,"locals":["# ++ locals ++
+  r#"{"source_role":"runtime","phase":{"kind":"built"},"instance_id":0,"arg_count":0,"spread_arg":null,"locals":["# ++ locals ++
   r#"],"basic_blocks":[{"block":0,"is_cleanup":false,"statements":[{"source_info":0,"kind":0},{"source_info":0,"kind":0}],"terminator":{"source_info":0,"kind":{"variant":"Return"}}}],"source_scopes":[{"scope":0,"span":0,"parent":null,"inlined":null,"inlined_parent_scope":null}],"source_def_id":0,"span":0,"preamble_def_span":0,"backtrace_spans":0,"required_consts":[]}"#
 
 private def local0 := r#"{"local":0,"type":0,"source_info":0}"#

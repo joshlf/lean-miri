@@ -28,7 +28,7 @@ def main():
     assert document["schema"] == "lean-miri-rustc-mir"
     assert "ctfe_scalar_sources" not in document
     assert "mir_templates" not in document
-    bodies = [body for body in document["bodies"] if body["body_kind"] == "material"]
+    bodies = document["bodies"]
     assert bodies, "no concrete executable body was exported"
     counts = collections.Counter(constant["kind"] for body in bodies for constant in constants(body))
     assert counts["evaluated_const"] > 0, "fixture did not exercise rustc evaluation"

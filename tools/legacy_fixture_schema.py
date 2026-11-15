@@ -51,23 +51,18 @@ def _bound_free_arguments(types, constants, arguments):
 
 
 def adapt_legacy_fixture(document):
-    bodies = document.get("bodies")
-    old_13_body_encoding = (document.get("schema_version") == 13
-                           and isinstance(bodies, list) and bool(bodies)
-                           and all(isinstance(body, dict) and "body_kind" not in body for body in bodies))
-    if document.get("schema_version") not in (11, 12) and not old_13_body_encoding:
+    if document.get("schema_version") not in (11, 12):
         return copy.deepcopy(document)
     result = copy.deepcopy(document)
     result["schema_version"] = 13
+    for field in ("mir_templates", "ctfe_scalar_sources", "compiler_trait_program"):
+        result.pop(field, None)
     producer = result.get("producer")
     if isinstance(producer, dict):
         # Hypothetical old component environment, not recovered lang-item data.
         producer.setdefault("freeze_lang_item", None)
     # Historical executable bodies remain material. No source template or trait
     # proof is reconstructed from a monomorphic execution fixture.
-    for body in result.get("bodies", []):
-        if isinstance(body, dict):
-            body.setdefault("body_kind", "material")
     for node in result.get("types", []):
         shape = node.get("shape", {}) if isinstance(node, dict) else {}
         if shape.get("kind") == "alias":

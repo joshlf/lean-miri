@@ -206,7 +206,7 @@ private def runPrepared (prepared : Input.EvalPreparation.Prepared)
   let compiler := prepared.compiler
   let dummy := prepared.dummySpan
   let definition ← compiler.program.rootDefinitionId 0
-  let rootInstance ← Input.CompilerInstance.item compiler.loweringContext.instances definition #[]
+  let rootInstance ← Input.CompilerInstance.Material.item compiler.loweringContext.instances definition #[]
   let initialTypes ← compiler.initialTypes
   let (_body,arrays) ← (Input.RuntimeArrayTypes.perform initialTypes
     (Input.CallResolution.loadedBodyOfInstance compiler.lifecycle.calls.calls rootInstance)).mapError reprStr

@@ -14,11 +14,8 @@ private def check (condition : Bool) (message : String) : IO Unit :=
 private def replaceSpans (program : LoweredProgram) (index : Nat)
     (rows : Array BacktraceSpan) : Except String LoweredProgram := do
   let some seed := program.input.bodies[index]? | throw "test body index absent"
-  match seed with
-  | .material body =>
-    let bodies := program.input.bodies.set! index (.material {body with backtraceSpans := rows})
-    pure {program with input := {program.input with bodies}}
-  | .noopDrop _ => throw "test requires ordinary body metadata"
+  let bodies := program.input.bodies.set! index {seed with backtraceSpans := rows}
+  pure {program with input := {program.input with bodies}}
 
 private def collapse (world : RuntimeArrayTypes.World) (prepared : CompilerBacktraceSource.Prepared)
     (index span : Nat) : Except String UInt32 := do

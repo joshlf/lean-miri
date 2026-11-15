@@ -70,8 +70,7 @@ deriving instance DecidableEq for CoroutineLayoutEvidence
 deriving instance DecidableEq for CoroutineEvidence
 deriving instance DecidableEq for CoroutineAuxiliaryBody
 deriving instance DecidableEq for CoroutineCoverage
-deriving instance DecidableEq for NoopDropRef
-deriving instance DecidableEq for BodySeed
+deriving instance DecidableEq for CompilerTypeConstResult
 deriving instance DecidableEq for ImportDocument
 -- Density evidence contains only a proof about this exact document's type
 -- table. Proof irrelevance decides its lifted carrier; source equality above

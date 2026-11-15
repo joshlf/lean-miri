@@ -18,9 +18,9 @@ def main (args : List String) : IO Unit := do
     throw (IO.userError "lowering changed compiler pool definitions or body IDs")
   for index in [:program.bodyCount] do
     let metadata ← must (program.bodyMetadata index)
-    let expected ← match input.document.bodies[index]? with
-      | some (.material _) | some (.noopDrop _) => pure s!"$.bodies[{index}]"
-      | none => throw (IO.userError "body path refers to an absent body seed")
+    let some _ := input.document.bodies[index]?
+      | throw (IO.userError "body path refers to an absent body")
+    let expected := s!"$.bodies[{index}]"
     unless metadata.sourcePath == expected do
       throw (IO.userError s!"body diagnostic path does not resolve to its source definition: {index}")
   IO.println s!"source body paths and compiler pool IDs preserved for {program.bodyCount} definitions"

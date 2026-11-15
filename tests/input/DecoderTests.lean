@@ -60,7 +60,6 @@ private def rewriteFirstBody (doc : String) (rewrite : String → Except String 
   let bodies ← array (← getField doc "bodies")
   let first ← getAt bodies 0
   let _ ← getField first "basic_blocks"
-  let first ← setField first "body_kind" (string "material")
   setField doc "bodies" (encodeArray (← updateAt bodies 0 (← rewrite first)))
 
 private def rewriteFirstBlock (body : String) (rewrite : String → Except String String) : Except String String := do
