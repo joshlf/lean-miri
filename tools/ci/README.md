@@ -14,7 +14,7 @@ with another runner.
 | --- | --- |
 | `regression` | Two fixture hash manifests and `check.sh`: source/fixture integrity, Python tools, source-analyzer Rust tests, Lean proofs/assertions/axioms, source-extracted component comparisons, the exporter's current Cargo test entry point, fresh input/frontend/runtime-metadata and arithmetic/call/global execution comparisons. |
 | `extended` | Build prerequisites; decoder, structural, optimization and connected-proof scripts; intrinsic float/AES/random-memory comparisons; scheduler and SC prefixes; detached join ordering; source-extracted selector; fresh primitive-range producer/Lean decoder contract; native math ABI. Then a separate reference-feature release exporter for fresh powi-zero, math capability, timezone and three vtable identity controls. |
-| `fresh` | Independent fresh query-demand mutations, runtime-type closure, cross-crate vtable metadata, and six focused guests (acquire/relaxed handoff, positive/negative fence, pthread race, backtrace). |
+| `fresh` | Independent fresh query-demand mutations, runtime-type closure, cross-crate vtable metadata, and six focused guests (acquire/relaxed handoff, positive/negative fence, pthread race, backtrace); November upstream comparisons, intrinsic/pthread/TLS/CFI controls, coroutine metadata and backtrace-pointer controls. |
 | `replay` | Build prerequisites, canonical12 (11 fixed, one freshly exported), four ordering controls, freshly exported large Tree Borrows and SC diagnostic seeds 0–11 with negative-log checks. |
 
 `check.sh` owns the common `miri_tests` runtime registry and axiom audit. Other

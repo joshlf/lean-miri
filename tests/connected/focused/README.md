@@ -60,3 +60,8 @@ python3 tests/connected/focused/check_resolved_generic.py \
   --exporter exporter/target/release/lean-miri-mir-exporter \
   --runner .lake/build/bin/native_runner
 ```
+
+The maintained `backtrace.rs` preserves the nested-frame, name, filename,
+location and function-pointer assertions of the frozen backtrace reproducer.
+It links std and uses the canonical c_void field required by the new
+`miri_resolve_frame` signature; the original reproducer remains unchanged.

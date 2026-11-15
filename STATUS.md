@@ -223,6 +223,11 @@ uses 14 as the unknown version, retains schema-11/12 controls, and separately
 rejects schema 13 without its new alignment evidence. Native stdio protocol and
 Rust unit checks use the new rustc pin. Vendor diagnostic files retain upstream's
 original trailing blank lines; local source/fixture changes pass whitespace checks.
+The fresh CI lane registers the upstream, local control, coroutine and pointer
+comparisons independently. Its maintained backtrace guest links std for the
+new canonical MiriFrame signature and preserves the frozen reproducer's nested
+frame, name, filename, location and function-pointer assertions; the original
+reproducer remains unchanged.
 
 New upstream facilities outside the existing acceptance scope remain incomplete:
 UDP socket operations, the real-host `copy_file_range` capability and direct

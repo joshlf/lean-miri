@@ -27,11 +27,11 @@ class Suite:
 def suites(lane):
     if lane == 'fresh':
         # A failing guest must not prevent the other independent checks.
-        from fresh_tests import FOCUSED
+        from fresh_tests import FOCUSED, UPSTREAM_CHECKS
         return [Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
                 Suite('fresh-prepare', ('bash', 'tools/ci/fresh.sh', 'prepare'), 7200),
                 *[Suite(name, ('python3', 'tools/ci/fresh_tests.py', name))
-                  for name in ('query-demand', 'runtime-type-closure', 'vtable-cross-crate', *FOCUSED)]]
+                  for name in ('query-demand', 'runtime-type-closure', 'vtable-cross-crate', *FOCUSED, *UPSTREAM_CHECKS)]]
     if lane == 'regression':
         # check.sh already contains quick's audit/Python/inventory checks.
         # Only the two fixture hash manifests are unique to check-quick.sh.
