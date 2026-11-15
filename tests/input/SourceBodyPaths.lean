@@ -19,11 +19,7 @@ def main (args : List String) : IO Unit := do
   for index in [:program.bodyCount] do
     let metadata ← must (program.bodyMetadata index)
     let expected ← match input.document.bodies[index]? with
-      | some (.material _) => pure s!"$.bodies[{index}]"
-      | some (.copyTemplate reference) =>
-        unless reference.templateId < input.document.mirTemplates.size do
-          throw (IO.userError "body path refers to an absent source template")
-        pure s!"$.mir_templates[{reference.templateId}]"
+      | some (.material _) | some (.noopDrop _) => pure s!"$.bodies[{index}]"
       | none => throw (IO.userError "body path refers to an absent body seed")
     unless metadata.sourcePath == expected do
       throw (IO.userError s!"body diagnostic path does not resolve to its source definition: {index}")

@@ -62,8 +62,7 @@ private def checkInlineScopes (program : LoweredProgram) : IO Unit := do
     "failed scope entry changed the valid inlinecallee evidence"
   let original ← must (worldFor program)
   let malformed := {original with
-    metadata := {original.metadata with source := erroneous.program.input, checkedMaterial := none, denseTypes := none}
-    bodies := BodyArena.Store.ofSource erroneous.program.input.bodies}
+    metadata := {original.metadata with source := erroneous.program.input, checkedMaterial := none, denseTypes := none}}
   check (!((CompilerScopes.sourceScopeIdentity erroneous (.ofCanonicalIndex 0) 0).run malformed).isOk)
     "failed scope entry lost its deferred source-scope error"
   IO.println "inline attribute indexing rejects contradictions during table construction"

@@ -19,21 +19,11 @@ private def replaceSpans (program : LoweredProgram) (index : Nat)
     let bodies := program.input.bodies.set! index (.material {body with backtraceSpans := rows})
     pure {program with input := {program.input with bodies}}
   | .noopDrop _ => throw "test requires ordinary body metadata"
-  | .copyTemplate reference =>
-    let some source := program.input.mirTemplates[reference.templateId]?
-      | throw "test template source absent"
-    -- Clone this source metadata for the selected reference only. No executable
-    -- body or execution-owned type ID is embedded into immutable input.
-    let templateId := program.input.mirTemplates.size
-    let mirTemplates := program.input.mirTemplates.push {source with backtraceSpans := rows}
-    let bodies := program.input.bodies.set! index (.copyTemplate {reference with templateId})
-    pure {program with input := {program.input with bodies, mirTemplates}}
 
 private def collapse (world : RuntimeArrayTypes.World) (prepared : CompilerBacktraceSource.Prepared)
     (index span : Nat) : Except String UInt32 := do
   let world := {world with
-    metadata := {world.metadata with source := prepared.program.input, checkedMaterial := none, denseTypes := none}
-    bodies := BodyArena.Store.ofSource prepared.program.input.bodies}
+    metadata := {world.metadata with source := prepared.program.input, checkedMaterial := none, denseTypes := none}}
   let access : RuntimeArrayQueries.Access RuntimeArrayTypes.World := ⟨id,fun _ next => next⟩
   match CompilerBacktraceSource.collapsedSpan prepared access (.ofCanonicalIndex index) ⟨span⟩ world with
   | .ok value _ => pure value

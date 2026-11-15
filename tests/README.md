@@ -23,6 +23,8 @@ execution wires. `tools/check-material-guest.py` runs a fresh exported guest
 against its same-TyCtxt Miri reference and the Lean interpreter. Historical
 fixtures used by older component tests are adapted only in test code
 (`MiriTests/Input/LegacyFixture.lean` and `tools/legacy_fixture_schema.py`).
+Run `bash tools/check-rustc-boundary.sh` after building the exporter to
+check fresh concrete constant, layout, ABI, instance and FnPtr shim rows.
 
 ## Self-contained Lean checks: MiriTests
 

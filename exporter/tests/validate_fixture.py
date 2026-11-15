@@ -21,6 +21,9 @@ assert len(doc["files"]) == len(set(doc["files"])), "duplicate filename spelling
 for span in doc["spans"]:
     assert type(span["file"]) is int and 0 <= span["file"] < len(doc["files"])
 for body in doc["bodies"]:
+    if body["body_kind"] == "noop_drop":
+        continue
+    assert body["body_kind"] == "material"
     for span in body["backtrace_spans"]:
         assert "collapsed_lo" not in span
         assert type(span["source_position"]["byte_position"]) is int
@@ -221,6 +224,7 @@ assert retags and all(
 reference_regions = [
     statement["kind"]["rvalue"]["region"]
     for body in doc["bodies"]
+    if body["body_kind"] == "material"
     for block in body["basic_blocks"]
     for statement in block["statements"]
     if statement["kind"].get("rvalue", {}).get("kind") == "Ref"
@@ -340,6 +344,8 @@ check_allocation_refs([doc["bodies"], doc["instances"], doc["allocations"]])
 
 # Every encountered operation in a successful document has typed semantics.
 for body in doc["bodies"]:
+    if body["body_kind"] == "noop_drop":
+        continue
     for block in body["basic_blocks"]:
         for statement in block["statements"]:
             assert statement["kind"].get("variant") and "status" not in statement["kind"]

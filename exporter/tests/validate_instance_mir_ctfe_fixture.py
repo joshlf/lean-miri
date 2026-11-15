@@ -35,7 +35,8 @@ def main(path):
     for def_path, (crate, index) in expected.items():
         require(def_path in rows, f"missing instance row {def_path}")
         row = rows[def_path]
-        require(pool_entry(document, "definitions", row["def_id"]) == {"crate": crate, "index": index},
+        definition = pool_entry(document, "definitions", row["def_id"])
+        require((definition["crate"], definition["index"]) == (crate, index),
                 f"{def_path} DefId changed: {row['def_id']}")
         require(row["instance_kind"] == {"def_id": row["def_id"], "kind": "item"},
                 f"{def_path} is not an Item instance: {row['instance_kind']}")
@@ -44,7 +45,8 @@ def main(path):
         body = pool_entry(document, "bodies", row["body"])
         require(body["instance_id"] == row["instance_id"],
                 f"{def_path} body belongs to another concrete instance")
-        require(pool_entry(document, "definitions", body["source_def_id"]) == {"crate": crate, "index": index},
+        source_definition = pool_entry(document, "definitions", body["source_def_id"])
+        require((source_definition["crate"], source_definition["index"]) == (crate, index),
                 f"{def_path} loaded body has a different source DefId")
         require("source_instance_kind" not in body,
                 f"{def_path} loaded body contains an unused source instance kind")

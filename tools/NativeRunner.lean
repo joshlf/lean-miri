@@ -426,8 +426,7 @@ private def terminalDiagnostic (prepared : Input.EvalPreparation.Prepared)
       let (body,retained) ← ((prepared.compiler.program.resolveBodyIdentity frame.bodyIdentity).run world).toOption
       if retained.arena.constructedTypes.size != world.arena.constructedTypes.size ||
           retained.arena.constructedConstants.size != world.arena.constructedConstants.size ||
-          retained.instances.constructed.size != world.instances.constructed.size ||
-          retained.bodies.constructed.size != world.bodies.constructed.size then none else pure ()
+          retained.instances.constructed.size != world.instances.constructed.size then none else pure ()
       if body.body != frame.body || body.input.instanceId != frame.functionInstance then none
       else do
         let records := body.input.backtraceSpans.filter (·.spanId == span.id)

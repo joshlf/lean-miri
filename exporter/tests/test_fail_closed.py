@@ -181,10 +181,10 @@ class FailClosedExportTests(unittest.TestCase):
         unsigned = next(node for node in document["types"]
                         if node["shape"].get("unsigned_kind") == "u32")
         facts = unsigned["compiler_facts"]
-        self.assertEqual(facts["boolean_queries"]["is_dynamic"],
-                         False)
-        self.assertEqual(facts["type_queries"]["boxed_type"],
-                         None)
+        self.assertIs(facts["boolean_queries"]["is_box"], False)
+        self.assertIs(facts["boolean_queries"]["is_sized"], True)
+        self.assertNotIn("is_dynamic", facts["boolean_queries"])
+        self.assertNotIn("boxed_type", facts["type_queries"])
 
     def test_no_main_binary_exports_startup_facts(self):
         result = subprocess.run(
