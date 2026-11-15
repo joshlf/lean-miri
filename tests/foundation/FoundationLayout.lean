@@ -2,8 +2,9 @@ import Miri.Frontend.FoundationLayout
 
 open Lean Miri.Frontend.Foundation
 
-private def target (dataLayout := "e-i64:64-i128:128") (pointerSizeBits := 64) : Target :=
-  { triple := "test", dataLayout, pointerSizeBits, endian := "little" }
+-- Explicit runtime fixture, never a fallback for a foundation document.
+private def target : Miri.ABI.RuntimeTargetDataLayout :=
+  { Miri.ABI.RuntimeTargetDataLayout.default with i64Align := ⟨3⟩, i128Align := ⟨4⟩ }
 
 private def expect (r : Except String FoundationLayout) (size align : Nat) : IO Unit := do
   match r with
@@ -16,23 +17,24 @@ private def fails (r : Except String FoundationLayout) : IO Unit := do
   | .ok v => throw (IO.userError s!"unexpected layout {repr v}")
 
 def main (paths : List String) : IO Unit := do
-  expect (layoutOf target (.primitive "bool" "")) 1 1
-  expect (layoutOf target (.primitive "char" "")) 4 4
-  expect (layoutOf target (.primitive "int" "i128")) 16 16
-  expect (layoutOf (target "e") (.primitive "int" "i64")) 8 4
-  expect (layoutOf (target "e-i64:64-i96:128") (.primitive "uint" "u128")) 16 16
-  expect (layoutOf (target "e-i128:128-i64:64") (.primitive "uint" "u128")) 16 16
-  expect (layoutOf (target "e-i16:32:64") (.array (.primitive "uint" "u16") 3)) 6 4
-  expect (layoutOf (target "e" 32) (.primitive "uint" "usize")) 4 4
-  expect (layoutOf target (.array (.primitive "uint" "u16") 0)) 0 2
-  expect (layoutOf target (.tuple #[])) 0 1
-  fails (layoutOf target (.array (.primitive "uint" "u8") (2 ^ 61)))
-  fails (layoutOf target (.array (.tuple #[]) (2 ^ 64)))
-  fails (layoutOf target (.tuple #[.primitive "uint" "u8"]))
-  fails (layoutOf target (.primitive "float" "f32"))
-  fails (layoutOf (target "e-i16:24") (.primitive "uint" "u16"))
-  fails (layoutOf (target "e" 128) (.primitive "uint" "u8"))
-  IO.println "foundation layout: 16 self-contained checks passed"
+  expect (layoutOfRuntime target (.primitive "bool" "")) 1 1
+  expect (layoutOfRuntime target (.primitive "char" "")) 4 4
+  expect (layoutOfRuntime target (.primitive "int" "i128")) 16 16
+  expect (layoutOfRuntime Miri.ABI.RuntimeTargetDataLayout.default (.primitive "int" "i64")) 8 4
+  expect (layoutOfRuntime { target with i8Align := ⟨1⟩ } (.primitive "bool" "")) 1 2
+  expect (layoutOfRuntime { target with i32Align := ⟨3⟩ } (.primitive "char" "")) 4 8
+  expect (layoutOfRuntime { target with i16Align := ⟨2⟩ } (.array (.primitive "uint" "u16") 3)) 6 4
+  expect (layoutOfRuntime { target with base := ⟨.big, .w32⟩, defaultAddressSpacePointerSpec := ⟨Miri.ABI.Size.ofBytes 4, ⟨2⟩, Miri.ABI.Size.ofBytes 4, false⟩ } (.primitive "uint" "usize")) 4 4
+  expect (layoutOfRuntime target (.array (.primitive "uint" "u16") 0)) 0 2
+  expect (layoutOfRuntime target (.tuple #[])) 0 1
+  fails (layoutOfRuntime target (.array (.primitive "uint" "u8") (2 ^ 61)))
+  fails (layoutOfRuntime target (.array (.tuple #[]) (2 ^ 64)))
+  fails (layoutOfRuntime target (.tuple #[.primitive "uint" "u8"]))
+  fails (layoutOfRuntime target (.primitive "float" "f32"))
+  fails (layoutOfRuntime { target with i16Align := ⟨30⟩ } (.primitive "uint" "u16"))
+  fails (layoutOfRuntime { target with base := ⟨.big, .w32⟩ } (.primitive "uint" "u8"))
+  fails (layoutOf { triple := "missing", dataLayout := "", pointerSizeBits := 64, endian := "little" } (.primitive "uint" "u8"))
+  IO.println "foundation layout: 17 self-contained checks passed"
   let fixtures ← match paths with
     | [] => pure #[]
     | [arrayPath, concretePath] => pure #[
