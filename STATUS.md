@@ -74,15 +74,20 @@ trust boundary and export-only performance comparison are in
 
 The normal `tools/run.sh` route now decodes foundation material into a checked
 `ImportDocument` and passes it through the existing lowerer, preparation,
-runner and finalizer. A fresh custom-entry input reaches runtime construction,
-then stops before a guest step because the fixed foreign-symbol provider still
-requires exported candidates and callable instance IDs eagerly. The normal
-runner has not completed this custom entry. Finite linked declaration source
+runner and finalizer. A fresh custom `#[lang=start]` entry completes this route
+and exits with its actual `argc` result. The runner now seeds one persistent,
+evaluation-local source compiler World and uses the exported Rust source path
+as `argv0`. Its normal MIR body provider reads the current World; a fresh
+three-frame and repeated-call check passes through the fixed call evaluator.
+Finite linked declaration source
 matches independent exported-candidate order and attributes for 231 custom
-entry and 244 ordinary std candidates. The next migration is one shared pure
-source compiler World: all call, ABI, entry and panic consumers must resolve
-canonical identities from the same World when demanded. An empty candidate
-table or private foreign instance IDs would change semantics.
+entry and 244 ordinary std candidates. The normal foundation decoder still
+routes every input through the restricted two-body custom-entry assembler;
+a fresh ordinary std main stops there at `unsupported primitive compiler facts`
+before evaluation. General source material must remain in the World and supply
+actual call, ABI, entry, type and panic queries on demand. Remaining call
+resolution and ABI consumers still read precomputed answers from Prepared.
+Neither source inventories nor the custom-entry run establish std execution.
 
 For ordinary std main, the external `std::rt::lang_start`, its closure template,
 and `std::rt::lang_start_internal` are available as finite material. The latter
