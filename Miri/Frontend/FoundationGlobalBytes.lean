@@ -48,7 +48,7 @@ def globalBytesWithoutCandidates (initial : PhysicalTypeRegistry)
       unless relocation.target < nodes.size do throw "global byte relocation target absent"
     if (← globalByteCandidate memory).isSome then
       throw "foundation byte-interner source key/salt identity material is missing"
-  return (registry, ⟨32, strType, nodes.map (·.id), #[]⟩)
+  return (registry, { saltCount := 32, strType, coveredAllocations := nodes.map (·.id), candidates := #[] })
 
 set_option autoImplicit false in
 /-- Import explicit memory images through the fixed checked graph importer.

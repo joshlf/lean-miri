@@ -291,6 +291,7 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
   for row in q.covariance do
     checkId b.types row.sourceType "$.compiler_covariance_queries" "type"
     checkId b.types row.targetType "$.compiler_covariance_queries" "type"
+  q.globalBytes.validateAvailability
   checkId b.types q.globalBytes.strType "$.compiler_global_byte_queries.str_type" "type"
   for id in q.globalBytes.coveredAllocations do checkId b.allocations id "$.compiler_global_byte_queries.covered_allocations" "allocation"
   for row in q.globalBytes.candidates do

@@ -58,6 +58,9 @@ def prepare (program : LoweredProgram) (runtime : RuntimeMetadata)
   if memory.byteGlobalKeysReady || !memory.byteGlobalKeys.isEmpty then
     throw "global byte keys already initialized"
   let source := program.input.queries.globalBytes
+  source.validateAvailability
+  unless source.evidenceAvailable do
+    throw "compiler-global byte interner source evidence is unavailable"
   unless source.saltCount == 32 do throw "global byte salt support differs from pinned source"
   let mut keys := #[]
   if let some world := program.input.compilerAllocIdWorld then
