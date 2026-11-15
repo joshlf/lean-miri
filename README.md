@@ -74,8 +74,9 @@ bash tools/export-mir.sh --output scratch/identity-foundation.json \
 
 This retains a generic MIR template and finite type, definition and target
 material without enumerating query answers or monomorphic substitutions. Lean
-derives a restricted program input from the material and has executed a direct
-`u8` identity frame in the fixed Miri interpreter. General Rust startup,
+derives restricted program inputs from the material and has executed `u8`
+identity, scalar const and two-function direct-call frames in the fixed Miri
+interpreter. General Rust startup,
 queries and execution are not yet migrated; the finite run is not a safety
 proof. See the
 [architecture and current boundary](docs/foundation-architecture.md) and
