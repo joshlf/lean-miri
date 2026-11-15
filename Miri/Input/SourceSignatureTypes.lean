@@ -45,8 +45,8 @@ def boundVariables (initial : SourceCompilerWorld.World) (binder : Array BoundVa
 
 /-- Construct source signature identity using the erased physical query only
 for geometry. This domain supports primitive, tuple, array, pointer and
-existential predicate trees;
-other constructors remain Unsupported rather than silently erase identity. -/
+existential predicate trees, plus instantiated nominal types under an empty
+signature binder; other constructors remain Unsupported rather than silently erase identity. -/
 def intern (initial : SourceCompilerWorld.World) (bindings : Array (Option Concrete))
     (constants : Array (Option Nat)) (binder : Array BoundVariable) (reference : TypeRef) :
     Except String (SourceCompilerWorld.World × TypeId) := go 1024 initial reference
@@ -63,6 +63,12 @@ where
     let some layout := world.canonical.layouts[erasedNode.layoutId]? | throw "Invalid erased signature layout"
     let (world,shape) ← match expr with
       | .primitive .. | .parameter .. => pure (world,erasedNode.shape)
+      | .nominal .. =>
+        -- Successful instantiation with an empty signature binder cannot
+        -- erase any bound reference: bound-region lookup would have failed.
+        -- Static and already-erased regions remain unchanged in Concrete.
+        unless binder.isEmpty do throw "Unsupported original nominal signature under a binder"
+        pure (world,erasedNode.shape)
       | .reference pointee mutable value => do
         let (world,pointee) ← go fuel world pointee
         let (updated,value) ← region material binder world value
