@@ -144,6 +144,7 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
     let some source := document.bodies.find? (fun b =>
         (b.getObjValAs? Nat "definition").toOption == some definition) | throw "demanded function source absent"
     let signature ← source.getObjVal? "signature"
+    let boundVariables ← signatureBoundVariables document signature
     let safety ← match ← signature.getObjValAs? String "safety" with
       | "safe" => pure MIR.Safety.Safe
       | "unsafe" => pure MIR.Safety.Unsafe
@@ -162,7 +163,7 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
     types := types.push {
       id := typeId
       layoutId
-      shape := .functionDefinition definition node.genericArgs sig #[]
+      shape := .functionDefinition definition node.genericArgs sig boundVariables
       display }
     facts := facts.push ⟨typeId, some id, ⟨inputs, output, safety, .Rust, false⟩⟩
     typeIds := typeIds.push typeId
