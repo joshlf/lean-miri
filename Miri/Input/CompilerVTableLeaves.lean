@@ -99,5 +99,5 @@ def make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
     entries := fun _ principal ty => if sourceMode then
       throw (.unsupported "source vtable method/contents materialization unavailable")
       else lift (CompilerVTableRuntime.entries p.lifecycle.calls.symbols principal ty)
-    assertVirtualInstanceMatches := VirtualCalls.assertConcrete (CompilerVirtualLeaves.make p.lifecycle.calls) }
+    assertVirtualInstanceMatches := VirtualCalls.assertConcrete (CompilerVirtualLeaves.make p.lifecycle.calls access) }
 end Miri.Input.CompilerVTableLeaves

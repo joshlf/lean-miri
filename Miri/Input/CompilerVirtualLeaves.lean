@@ -1,4 +1,5 @@
 import Miri.Input.CompilerCallPipeline
+import Miri.Input.SourceCallerLocation
 
 /-! Complete compiler dictionary for source virtual/drop/caller-location
 drivers. All identities refer to the pipeline's final shared tables. -/
@@ -9,9 +10,15 @@ private def lift (value : Except String A) : EStateM StepError S A :=
   | .ok value => pure value
   | .error reason => throw (.unsupported s!"compiler virtual query: {reason}")
 
-def make (p : CompilerCallPipeline.Prepared) : VirtualCalls.CompilerHooks S C :=
+private def source (access : SourceCompilerWorld.Access S) (operation : SourceCompilerWorld.World → Except String A) :
+    EStateM StepError S A := do
+  let some world := access.get (← get) | throw (.unsupported "compiler virtual World unavailable")
+  lift (operation world)
+
+def make (p : CompilerCallPipeline.Prepared) (access : SourceCompilerWorld.Access S) : VirtualCalls.CompilerHooks S C :=
   let facts := p.symbols.facts
-  CompilerVirtualFacts.scopeHooks p.scopes {
+  let sourceMode := p.calls.program.input.sourceMaterial.isSome
+  let hooks : VirtualCalls.CompilerHooks S C := {
     instanceArgs := fun inst => lift (CompilerInstance.argsOf facts.context.loweringContext.instances inst)
     classifyReceiver := fun ty => lift (CompilerVirtualFacts.receiverKind facts.context ty)
     fieldLayout := fun layout index => lift ((facts.context.runtime.field layout index).mapError toString)
@@ -25,11 +32,15 @@ def make (p : CompilerCallPipeline.Prepared) : VirtualCalls.CompilerHooks S C :=
     rebaseVirtualArgs := fun args parent concrete => lift (CompilerRuntimeQueries.rebaseVirtualArgs p.runtime args parent concrete)
     expectResolveForVTable := fun _ method args => lift (CompilerRuntimeQueries.expectResolveForVTable p.runtime method args)
     resolveDropGlue := fun ty => lift (CompilerRuntimeQueries.resolveDropGlue p.runtime ty)
-    requiresCallerLocation := fun callee => lift (CompilerRuntimeQueries.requiresCallerLocation p.runtime callee)
-    sourceScope := fun identity _ body index => do
+    requiresCallerLocation := fun callee => if sourceMode then
+      source access (SourceCallerLocation.requiresCallerLocation · callee)
+      else lift (CompilerRuntimeQueries.requiresCallerLocation p.runtime callee)
+    sourceScope := fun identity callee body index => do
+      if sourceMode then return ← source access (SourceCallerLocation.sourceScope · identity callee body index)
       let some actual := p.scopes.program.bundle.bodies[identity.index]?
         | throw (.unsupported "canonical frame body identity is absent")
       unless actual.body == body do throw (.invalidProgram "frame body identity/content mismatch")
       lift (CompilerScopes.sourceScope p.scopes identity.index index)
     unitLayout := lift (CompilerFacts.unitLayout facts.context) }
+  if sourceMode then hooks else CompilerVirtualFacts.scopeHooks p.scopes hooks
 end Miri.Input.CompilerVirtualLeaves

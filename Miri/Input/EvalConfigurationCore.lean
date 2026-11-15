@@ -664,7 +664,7 @@ def makeWithForeignContext {Assembly : Type}
         variantCount := intrinsicQueries.variantCount
         callerLocationConstant := EvalCallerLocationConstruction.hook p functions
           (VirtualCalls.callerLocation (ExecutionCalls.virtualHooks
-            (CompilerCallConstruction.virtual p table PointerPlaceMachine.controlledAlignment)
+            (CompilerCallConstruction.virtual p EvalCoreMachine.sourceCompilerAccess table PointerPlaceMachine.controlledAlignment)
             access operands options.place.debugAssertions)
             options.limits.callDispatch)
           (fun ty => CompilerFacts.builtinDeref context ty true)
@@ -689,7 +689,7 @@ def makeWithForeignContext {Assembly : Type}
       validationRecursive := fun _ _ => ValidityMachine.enforceValidityRecursively
       calls := CompilerCallConstruction.leaves p EvalCoreMachine.sourceCompilerAccess options.compatibilityBudget
         (foreignOverride.orElse fun _ => leaves.foreign.map pure) callBackend leaves.dynSymName llvm
-      virtual := CompilerCallConstruction.virtual p table PointerPlaceMachine.controlledAlignment
+      virtual := CompilerCallConstruction.virtual p EvalCoreMachine.sourceCompilerAccess table PointerPlaceMachine.controlledAlignment
       helpers := helpers
       control := ⟨CompilerBodySpan.get p⟩
       panic := EvalCallRuntime.panic p

@@ -58,9 +58,10 @@ def leaves (p : CompilerProviders.Prepared)
 /-- Shared canonical vtable queries plus the exact compiler virtual leaves;
 receiver reads, projections and pointer construction are not caller callbacks. -/
 def virtual (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U))
     (vtable : VTableHooks Provenance (MachineHooks.State K U) C CallInstance (FnAbi MIR.TyId))
     (alignment : PointerPlaceMachine.AlignmentContext U) : ExecutionCallLeaves.Virtual K U C :=
-  ⟨CompilerVirtualLeaves.make p.lifecycle.calls,vtable,alignment⟩
+  ⟨CompilerVirtualLeaves.make p.lifecycle.calls world,vtable,alignment⟩
 
 /-- Source frame metadata, preamble/checks and after-pop unwind processing.
 Storage is the actual shared machine allocation context; no raw-push or
