@@ -5,6 +5,38 @@ import Miri.Frontend.FoundationClosure
 is not a LoweredProgram: executable closure/shim/vtable/static demands remain. -/
 namespace Miri.Frontend.Foundation
 open Lean
+structure StdInternalCallDemand where
+  definition : Nat
+  arguments : Array Json
+
+/-- The two explicit declaration demands in this pinned startup template.
+Arguments remain source templates, not resolved executable instances. -/
+def stdInternalCallDemands (document : Document) (body : Json) : Except String (Array StdInternalCallDemand) := do
+  let mut demands := #[]
+  let mut paths := #[]
+  for block in (← body.getObjValAs? (Array Json) "blocks") do
+    let terminal ← block.getObjVal? "terminator"
+    if (← terminal.getObjValAs? String "kind") == "call" then
+      let operand ← terminal.getObjVal? "function"
+      unless (← operand.getObjValAs? String "kind") == "constant" do throw "std internal indirect call unsupported"
+      unless (← (← operand.getObjVal? "value").getObjValAs? String "kind") == "zero_sized" do
+        throw "std internal callee not FnDef ZST"
+      let type ← operand.getObjValAs? Nat "type"
+      let some row := document.types[type]? | throw "std internal callee type absent"
+      let shape ← row.getObjVal? "shape"
+      unless (← shape.getObjValAs? String "kind") == "function_definition" do throw "std internal callee not FnDef"
+      let definition ← shape.getObjValAs? Nat "definition"
+      let some row := document.definitions[definition]? | throw "std internal callee definition absent"
+      unless (← row.getObjValAs? Nat "definition_id") == definition do throw "std internal callee identity mismatch"
+      let path ← row.getObjValAs? String "path"
+      unless path == "std::panic::catch_unwind" || path == "std::result::Result::<T, E>::unwrap_or_else" do
+        throw "std internal callee outside explicit frontier"
+      unless !paths.contains path do throw "std internal duplicate callee demand"
+      paths := paths.push path
+      demands := demands.push { definition, arguments := ← shape.getObjValAs? (Array Json) "arguments" }
+  unless demands.size == 2 do throw "std internal callee demand missing or extra"
+  return demands
+
 structure StdStartupSource where
   main : Nat
   start : Nat
@@ -12,6 +44,7 @@ structure StdStartupSource where
   mainBody : Json
   startBody : Json
   internalBody : Json
+  internalCalls : Array StdInternalCallDemand
   closure : SelectedClosureTemplate
 
 private def uniqueBody (document : Document) (definition : Nat) : Except String Json := do
@@ -57,8 +90,9 @@ def stdStartupSource (document : Document) : Except String StdStartupSource := d
   unless (← definition.getObjValAs? String "path") == "std::rt::lang_start_internal" &&
       (← definition.getObjValAs? String "kind") == "fn" do throw "std internal source edge mismatch"
   let internalBody ← uniqueBody document internal
+  let internalCalls ← stdInternalCallDemands document internalBody
   let [closureDefinition] := closureDefinitions.toList | throw "std start Closure demand missing or duplicated"
   let closure ← selectClosureTemplate document closureDefinition #[.type returnType]
   unless closure.parentDefinition == start do throw "std start closure parent mismatch"
-  return { main := entry.definition, start, internal, mainBody, startBody, internalBody, closure }
+  return { main := entry.definition, start, internal, mainBody, startBody, internalBody, internalCalls, closure }
 end Miri.Frontend.Foundation

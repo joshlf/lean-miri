@@ -22,6 +22,13 @@ def main (paths : List String) : IO Unit := do
       failure (lowerSourceControlTerminator terminal blocks.size false)
       resumes := resumes + 1
   unless resumes == 1 do throw (IO.userError "genuine std cleanup resume absent")
+  unless spine.internalCalls.size == 2 do throw (IO.userError "actual internal call demands absent")
+  let calls ← checked (blocks.filterM fun block => do
+    let terminal ← block.getObjVal? "terminator"
+    return (← terminal.getObjValAs? String "kind") == "call")
+  let some firstCall := calls[0]? | throw (IO.userError "first internal Call missing")
+  failure (stdInternalCallDemands document (spine.internalBody.setObjVal! "blocks" (toJson #[firstCall])))
+  failure (stdInternalCallDemands document (spine.internalBody.setObjVal! "blocks" (toJson (blocks.push firstCall))))
   for definition in #[spine.main,spine.start,spine.internal] do
     let bodies ← checked (document.bodies.filterM fun body => return (← body.getObjValAs? Nat "definition") != definition)
     failure (stdStartupSource { document with bodies })
