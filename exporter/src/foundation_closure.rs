@@ -100,7 +100,11 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":block.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"track_caller":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),"source_type":self.ty(tcx,source_ty)?,
+        Ok(json!({"definition":self.definition(tcx,def),"function_attributes":{
+            "never_unwind":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
+            "track_caller":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),
+            "is_foreign":tcx.is_foreign_item(def),"is_drop_glue":tcx.is_lang_item(def,rustc_attr_ir::LangItem::DropGlue)
+        },"track_caller":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),"source_type":self.ty(tcx,source_ty)?,
             "parent_definition":self.definition(tcx,parent),"parent_count":generics.parent_count,
             "parent_environment":parent_environment,"own_parameters":parameters,"own_clauses":[],
             "kind_type":self.ty(tcx,closure.kind_ty())?,"signature_type":self.ty(tcx,closure.sig_as_fn_ptr_ty())?,

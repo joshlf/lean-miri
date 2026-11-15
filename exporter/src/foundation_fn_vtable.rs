@@ -9,14 +9,14 @@ impl<'tcx> Material<'tcx> {
         Ok(match *value.kind() {
             ty::Param(p) => json!({"kind":"param","index":p.index}),
             ty::Tuple(elements) => json!({"kind":"tuple","elements":elements.iter().map(|t|self.fn_vtable_type(tcx,t)).collect::<Result<Vec<_>>>()?}),
-            ty::Ref(region,pointee,mutable) => {
-                let region = match region.kind() {
+            ty::Ref(source_region,pointee,mutable) => {
+                let region = match source_region.kind() {
                     ty::ReBound(ty::BoundVarIndexKind::Bound(index), variable) => json!({"kind":"bound","binder":index.as_u32(),"variable":variable.var.as_u32(),"source_kind":format!("{:?}",variable.kind)}),
                     ty::ReErased => json!({"kind":"erased"}),
                     ty::ReStatic => json!({"kind":"static"}),
                     other => return unsupported("Fn declaration reference region",other),
                 };
-                json!({"kind":"reference","mutable":mutable.is_mut(),"region":region,"pointee":self.fn_vtable_type(tcx,pointee)?})
+                json!({"kind":"reference","mutable":mutable.is_mut(),"region":region,"source_region":self.signature_region(tcx,source_region)?,"pointee":self.fn_vtable_type(tcx,pointee)?})
             },
             ty::Alias(rigid, alias) => match alias.kind {
                 ty::AliasTyKind::Projection {def_id} => json!({"kind":"projection","rigid":format!("{rigid:?}"),"definition":self.definition(tcx,def_id),"arguments":self.fn_vtable_arguments(tcx,alias.args)?}),
@@ -114,7 +114,7 @@ impl<'tcx> Material<'tcx> {
                     record["method"] = json!({"source_span":{"file":format!("{:?}",start.file.name),"start":{"line":start.line,"column":start.col.to_usize()},"end":{"line":end.line,"column":end.col.to_usize()}},"source_span_key":{"lo":span.lo().0,"hi":span.hi().0,"ctxt":format!("{:?}",span.ctxt()),"parent_local_definition":span.parent().map(|d|d.local_def_index.as_u32())},"clause_source":self.fn_method_clause_source(tcx,item.def_id)?,"never_unwind":tcx.codegen_fn_attrs(item.def_id).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),"is_foreign":tcx.is_foreign_item(item.def_id),"is_method":item.is_method(),"final":item.defaultness(tcx).is_final(),
                         "parent_count":params.parent_count,"own_parameters":params.own_params.iter().map(|p|format!("{:?}",p.kind)).collect::<Vec<_>>(),
                         "own_clauses":own_clauses.clauses.iter().map(|(c,_)|format!("{c:?}")).collect::<Vec<_>>(),
-                        "bound_variables":signature.bound_vars().iter().map(|v|format!("{v:?}")).collect::<Vec<_>>(),
+                        "signature_bound_variables":self.signature_binders(tcx,signature.bound_vars())?,"bound_variables":signature.bound_vars().iter().map(|v|format!("{v:?}")).collect::<Vec<_>>(),
                         "safety":format!("{:?}",raw.safety()),"abi":format!("{:?}",raw.abi()),"variadic":raw.c_variadic(),
                         "inputs":raw.inputs().iter().map(|t|self.fn_vtable_type(tcx,*t)).collect::<Result<Vec<_>>>()?,
                         "output":self.fn_vtable_type(tcx,raw.output())?});
