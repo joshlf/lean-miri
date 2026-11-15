@@ -6,7 +6,8 @@ needs_drop_components_with_async,struct_tail_raw}; ty/sty.rs::{builtin_deref,
 discriminant_ty,ptr_metadata_ty_or_tail,is_like_maybe_dangling};
 ty/inhabitedness/mod.rs::OpSemInhabitedness::is_inhabited_ty.
 All supported leaves are inhabited, Sized, Freeze and both Unpin traits;
-arrays recurse and the only supported tuple is empty. No trait solver fallback
+arrays and pointer signatures recurse; references/str remain unsupported and
+the only supported tuple is empty. No trait solver fallback
 is taken. Region/parameter/inference flags are absent by construction.
 Hashing, nominal definitions and projection catalogs are intentionally absent. -/
 namespace Miri.Frontend.Foundation
@@ -25,15 +26,30 @@ where
       unless #["u8", "u16", "u32", "u64", "u128", "usize"].contains name do
         throw "unsupported unsigned compiler facts"
     | .array element _ => go fuel element
+    | .pointer kind pointee =>
+      unless kind == "raw_pointer_const" || kind == "raw_pointer_mut" do
+        throw "reference compiler facts unsupported"
+      go fuel pointee
+    | .functionPointer inputs output safety abi variadic =>
+      unless (safety == "safe" || safety == "unsafe") && abi == "rust" && !variadic do
+        throw "function-pointer compiler signature unsupported"
+      for input in inputs do go fuel input
+      go fuel output
     | .tuple fields =>
       unless fields.isEmpty do throw "nonempty tuple compiler facts unsupported"
     | _ => throw "unsupported primitive compiler facts"
 
 /-- IDs must be provided by the physical registry: self, unit metadata, and u8
 (the pinned discriminant type for every supported non-enum shape). -/
-def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat) :
+def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
+    (rawPointee : Option Nat := none) :
     Except String Input.TypeCompilerFacts := do
   primitiveFactsDomain ty
+  let explicitDeref ← match ty with
+    | .pointer .. => do
+      let some pointee := rawPointee | throw "raw pointer compiler fact lacks physical pointee"
+      pure (some pointee)
+    | _ => pure none
   return {
     typingEnvironment := "fully_monomorphized"
     booleanQueries := #[
@@ -47,7 +63,7 @@ def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat) :
     typeQueries := #[
       ("normalized", some self), ("metadata_tail", some self),
       ("pointer_metadata_type", some unit), ("discriminant_type", some u8),
-      ("builtin_deref_explicit", none), ("builtin_deref_implicit", none),
+      ("builtin_deref_explicit", explicitDeref), ("builtin_deref_implicit", none),
       ("boxed_type", none), ("unsafe_binder_erased", none)]
     discriminants := some ⟨false, none, #[]⟩ }
 
@@ -63,7 +79,10 @@ def withPrimitiveFacts (r : PhysicalTypeRegistry) : Except String PhysicalTypeRe
   for i in [:r.types.size] do
     let some entry := r.registry.entries[i]? | throw "compiler fact type identity absent"
     let (node, _) ← r.lookup i
-    let facts ← primitiveCompilerFacts entry.type i unit u8
+    let rawPointee := match node.shape with
+      | .rawPointer pointee _ => some pointee
+      | _ => none
+    let facts ← primitiveCompilerFacts entry.type i unit u8 rawPointee
     if h : i < nodes.size then
       nodes := nodes.set i { node with compilerFacts := some facts }
     else
