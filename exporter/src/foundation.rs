@@ -27,6 +27,8 @@ mod pattern_material;
 mod fn_vtable_material;
 #[path = "foundation_closure.rs"]
 mod closure_material;
+#[path = "foundation_closure_callees.rs"]
+mod closure_callee_material;
 #[path = "foundation_allocations.rs"]
 mod allocation_material;
 #[path = "foundation_const_def.rs"]
@@ -220,6 +222,7 @@ impl<'tcx> Material<'tcx> {
             },
             mir::Rvalue::Aggregate(kind,operands) => match &**kind {
                 mir::AggregateKind::Closure(def,args) => json!({"kind":"aggregate_closure","definition":self.definition(tcx,*def),"arguments":self.args(tcx,args)?,"operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
+                mir::AggregateKind::Tuple => json!({"kind":"aggregate_tuple","operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
                 other => return unsupported("aggregate rvalue",other),
             },
             mir::Rvalue::Cast(mir::CastKind::PointerCoercion(ty::adjustment::PointerCoercion::Unsize,source),operand,target) =>
@@ -250,7 +253,7 @@ impl<'tcx> Material<'tcx> {
             "c_variadic":signature.c_variadic(),
         }))
     }
-    fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId) -> Result<Value> {
+    fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId, roots: &[String]) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
         // Pinned queries.rs: retain the complete promoted table, including
@@ -263,15 +266,17 @@ impl<'tcx> Material<'tcx> {
             && matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn)
             && !tcx.is_const_fn(def)
             && tcx.is_mir_available(def);
-        // The only additional external owner is validated against the exact
-        // FnDef operand of the actual generic std lang_start body.
+        // Other external owners require a checked source Call FnDef edge.
         let external_start_internal = !def.is_local()
             && tcx.def_path_str(def) == "std::rt::lang_start_internal"
             && start_edge_material::start_internal(tcx)? == Some(def);
         let external_internal_callee = !def.is_local()
             && start_edge_material::internal_callees(tcx)?.contains(&def);
+        let external_closure_callee = !def.is_local()
+            && closure_callee_material::is_source_callee(tcx,roots,def)?
+            && !tcx.is_const_fn(def) && tcx.is_mir_available(def);
         if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal
-            && !external_internal_callee {
+            && !external_internal_callee && !external_closure_callee {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -321,8 +326,13 @@ impl<'tcx> Material<'tcx> {
             let terminator = match &bb.terminator().kind {
                 mir::TerminatorKind::Return => json!({"kind":"return"}),
                 mir::TerminatorKind::UnwindResume => json!({"kind":"unwind_resume"}),
+                mir::TerminatorKind::UnwindTerminate(reason) => json!({"kind":"unwind_terminate","reason":super::unwind_terminate_reason_json(*reason)}),
                 mir::TerminatorKind::Goto {target,..} => json!({"kind":"goto","target":target.as_u32()}),
                 mir::TerminatorKind::Unreachable => json!({"kind":"unreachable"}),
+                mir::TerminatorKind::Drop {place,target,unwind,replace,drop} => json!({
+                    "kind":"drop","place":self.place(tcx,*place)?,"target":target.as_u32(),
+                    "unwind":super::unwind_json(*unwind),"replace":replace,
+                    "async_drop":drop.map(|block|block.as_u32())}),
                 mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int","operand":self.operand(tcx,discr)?,"targets":targets.iter().map(|(v,b)|json!({"value":v.to_string(),"target":b.as_u32()})).collect::<Vec<_>>(),"otherwise":targets.otherwise().as_u32()}),
                 mir::TerminatorKind::Call {func,args,destination,target,unwind,call_source,..} => json!({
                     "kind":"call",
@@ -355,6 +365,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     }
     selected.extend(start_edge_material::selected(tcx,roots)?);
     selected.extend(closure_material::selected(tcx,roots)?);
+    selected.extend(closure_callee_material::selected(tcx,roots)?);
     selected.sort_by_key(|d|tcx.def_path_str(*d));
     selected.dedup();
     for root in roots {
@@ -367,7 +378,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
         if tcx.def_kind(def) == rustc_hir::def::DefKind::Closure {
             closure_templates.push(m.closure_template(tcx,def)?);
         } else {
-            bodies.push(m.body(tcx,def)?);
+            bodies.push(m.body(tcx,def,roots)?);
         }
     }
     let startup_material = super::foundation_startup::capture(tcx, |def|m.definition(tcx,def))?;
@@ -381,7 +392,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
     let mut session = super::foundation_session::export(tcx);
     session["root_span"] = source_material::root_span(tcx);
-    let source_function_signatures = function_header_material::capture(tcx,&mut m,signature_roots)?;
+    let source_function_signatures = function_header_material::capture_for_roots(tcx,&mut m,signature_roots,roots)?;
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
     let has_fn_pointer = m.types.iter().any(|row| row["shape"]["kind"] == "function_pointer");
     let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
