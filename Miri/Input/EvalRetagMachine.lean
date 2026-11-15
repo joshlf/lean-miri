@@ -33,7 +33,7 @@ def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
   let dynamic := PlaceDynamic.withVTable projection.dynamic vtable
   let size := fun (place : MPlaceTy Provenance) =>
     DynamicLayout.sizeAndAlignFromMeta dynamic choice projection.dynamicFuel place.mplace.metadata place.layout
-  {
+  CompilerRetagWorld.hooks prepared world {
     instanceDefinition := fun inst => lift (CompilerInstance.definitionOf context.loweringContext.instances inst)
     typeShape := fun ty => lift (CompilerFacts.retagTypeShape context ty)
     builtinDeref := fun ty => lift (CompilerFacts.requiredType context ty "builtin_deref_explicit")
@@ -77,8 +77,7 @@ def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
           ⟨.memory place.mplace,place.layout⟩
         pure (← memory pointer,← memory allocator)
       unpackDynTrait := fun place => do
-        let .dynamic expected ← lift (CompilerFactAdapters.validityKind prepared place.layout.ty)
-          | throw (.invalidProgram "freeze dyn unpack on non-dynamic compiler type")
+        let expected ← CompilerRetagWorld.dynamicPredicates prepared world place.layout.ty
         let inner ← VTable.unpackDynTrait vtable choice ⟨.indirect place.mplace,place.layout⟩ expected
         let .indirect memory := inner.op | throw (.invalidProgram "dynamic unpack returned immediate")
         pure ⟨memory,inner.layout⟩ } }

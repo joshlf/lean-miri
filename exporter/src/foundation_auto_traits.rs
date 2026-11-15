@@ -9,6 +9,8 @@ fn outer_constructor(ty: ty::Ty<'_>) -> Value {
     // Rigid constructors cannot change under substitution. Alias/param/unknown
     // roots are deliberately not certified disjoint from a requested Self.
     match *ty.kind() {
+        ty::Pat(base,pattern) => json!({"kind":"pattern","base":outer_constructor(base),
+            "pattern_kind":if matches!(*pattern,ty::PatternKind::NotNull) {"not_null".to_string()} else {format!("{pattern:?}")}}),
         ty::Adt(def,_) => json!({"kind":"adt","definition":raw_definition(def.did())}),
         ty::FnDef(def,_) => json!({"kind":"fn_def","definition":raw_definition(def)}),
         ty::Closure(def,_) => json!({"kind":"closure","definition":raw_definition(def)}),
@@ -38,13 +40,16 @@ impl<'tcx> Material<'tcx> {
                 }
             }
         }
+        let unpin = tcx.lang_items().unpin_trait();
+        let unsafe_unpin = tcx.lang_items().unsafe_unpin_trait();
+        let freeze = tcx.lang_items().freeze_trait();
+        if self.type_ids.keys().any(|ty| matches!(ty.kind(),ty::Closure(..))) {
+            requested.extend([unpin,unsafe_unpin,freeze].into_iter().flatten());
+        }
         requested.sort_by_key(|definition|(definition.krate.as_u32(),definition.index.as_u32()));
         requested.dedup();
         let mut declarations = Vec::new();
         for definition in requested {
-            if definition.is_local() || tcx.crate_name(definition.krate).as_str() != "core" {
-                return unsupported("non-core closure auto trait declaration",definition);
-            }
             let generics = tcx.generics_of(definition);
             let clauses = tcx.explicit_clauses_of(definition);
             if generics.parent.is_some() || clauses.parent.is_some() {
@@ -87,7 +92,10 @@ impl<'tcx> Material<'tcx> {
                 }
                 json!({"kind":"unsupported","source":format!("{clause:?}")})
             }).collect::<Vec<_>>();
-            declarations.push(json!({"definition":self.definition(tcx,definition),
+            let lang_item = if Some(definition) == unpin {Some("unpin")}
+                else if Some(definition) == unsafe_unpin {Some("unsafe_unpin")}
+                else if Some(definition) == freeze {Some("freeze")} else {None};
+            declarations.push(json!({"definition":self.definition(tcx,definition),"lang_item":lang_item,
                 "is_auto":tcx.trait_is_auto(definition),"safety":format!("{:?}",tcx.trait_def(definition).safety),
                 "has_self":generics.has_self,"parameters":generics.own_params.iter().map(|p|match p.kind {
                     ty::GenericParamDefKind::Type {has_default,..} => json!({"index":p.index,"kind":"type","has_default":has_default}),
@@ -96,6 +104,9 @@ impl<'tcx> Material<'tcx> {
                 "associated_item_count":tcx.associated_items(definition).in_definition_order().count(),
                 "clauses":source_clauses,"complete_manual_headers":true,"manual_impl_headers":headers}));
         }
-        Ok(json!({"declarations":declarations}))
+        Ok(json!({"declarations":declarations,"lang_items":{
+            "unpin":unpin.map(|d|self.definition(tcx,d)),
+            "unsafe_unpin":unsafe_unpin.map(|d|self.definition(tcx,d)),
+            "freeze":freeze.map(|d|self.definition(tcx,d))}}))
     }
 }

@@ -164,6 +164,69 @@ private def callableDeclarations (document : Document) : Except String (Array Ca
 
 /-- Preserve every captured source header and lexical clause owner exactly once.
 No concrete substitutions, ABI results or selected implementations are produced. -/
+private def autoTraits (document : Document) : Except String (Option AutoTraits) := do
+  let source ← document.source.getObjVal? "closure_auto_source"
+  let langs ← match source.getObjVal? "lang_items" with
+    | .ok value => pure value
+    | .error _ => return none
+  let mut langItems := #[]
+  for (name,role) in #[("unpin",AutoTraitRole.unpin),("unsafe_unpin",.unsafeUnpin),("freeze",.freeze)] do
+    let value ← langs.getObjVal? name
+    let id : Option Nat ← fromJson? value
+    langItems := langItems.push (role,← id.mapM (raw document))
+  let rawId (source : Json) : Except String Input.DefinitionId := do
+    let crate ← source.getObjValAs? Nat "crate_index"
+    let index ← source.getObjValAs? Nat "index"
+    unless crate < 2^32 && index < 2^32 do throw "auto trait raw definition exceeds rustc width"
+    return ⟨crate,index⟩
+  let identities := langItems.filterMap (·.2)
+  unless identities.toList.eraseDups.length == identities.size do throw "auto trait language identities duplicated"
+  let mut declarations := #[]
+  for row in (← source.getObjValAs? (Array Json) "declarations") do
+    let definition ← raw document (← row.getObjValAs? Nat "definition")
+    unless !(declarations.any (fun (entry : AutoDeclaration) => entry.definition == definition)) do
+      throw "auto trait declaration duplicated"
+    let langSource ← row.getObjVal? "lang_item"
+    let langTag : Option String ← fromJson? langSource
+    let langItem ← langTag.mapM fun tag => match tag with
+      | "unpin" => pure AutoTraitRole.unpin
+      | "unsafe_unpin" => pure .unsafeUnpin
+      | "freeze" => pure .freeze
+      | _ => throw "auto trait language role unknown"
+    let safety ← row.getObjValAs? String "safety"
+    unless safety == "Safe" || safety == "Unsafe" do throw "auto trait safety source unknown"
+    let parameters ← (← row.getObjValAs? (Array Json) "parameters").mapM fun parameter => do
+      unless (← parameter.getObjValAs? String "kind") == "type" do throw "auto trait parameter source unsupported"
+      return (← parameter.getObjValAs? Nat "index",← parameter.getObjValAs? Bool "has_default")
+    let clauses ← (← row.getObjValAs? (Array Json) "clauses").mapM fun clause => do
+      if (← clause.getObjValAs? String "kind") == "meta_sized_self" then
+        return Except.ok (← raw document (← clause.getObjValAs? Nat "definition"))
+      pure (Except.error "auto trait super-clause unsupported")
+    let implementations ← (← row.getObjValAs? (Array Json) "manual_impl_headers").mapM fun header => do
+      let head ← header.getObjVal? "self_constructor"
+      let rec parseHead (fuel : Nat) (head : Json) : Except String AutoSelfHead := do
+        let .succ fuel := fuel | throw "auto impl outer pattern nesting unsupported"
+        match ← head.getObjValAs? String "kind" with
+        | "pattern" => return .pattern (← parseHead fuel (← head.getObjVal? "base")) (← head.getObjValAs? String "pattern_kind")
+        | "adt" => AutoSelfHead.adt <$> (rawId (← head.getObjVal? "definition"))
+        | "fn_def" => AutoSelfHead.functionDefinition <$> (rawId (← head.getObjVal? "definition"))
+        | "closure" => AutoSelfHead.closure <$> (rawId (← head.getObjVal? "definition"))
+        | "coroutine_closure" => AutoSelfHead.coroutineClosure <$> (rawId (← head.getObjVal? "definition"))
+        | "tuple" => AutoSelfHead.tuple <$> head.getObjValAs? Nat "arity"
+        | "unknown" => pure AutoSelfHead.unknown
+        | tag =>
+          if #["fn_pointer","raw_pointer","reference","array","slice","str","bool","char","int","uint","float","never"].contains tag
+          then pure (.rigid tag) else throw "auto impl outer constructor unknown"
+      let selfHead ← parseHead 256 head
+      let polarity ← header.getObjValAs? String "polarity"
+      unless #["Positive","Negative","Reservation"].contains polarity do throw "auto impl polarity unknown"
+      return AutoImplHeader.mk (← rawId (← header.getObjVal? "definition")) selfHead polarity
+    declarations := declarations.push (AutoDeclaration.mk definition langItem (← row.getObjValAs? Bool "is_auto")
+      (safety == "Unsafe") (← row.getObjValAs? Bool "has_self") parameters
+      (← row.getObjValAs? Nat "associated_item_count") clauses
+      (← row.getObjValAs? Bool "complete_manual_headers") implementations)
+  return some ⟨langItems,declarations⟩
+
 def material (document : Document) : Except String Material := do
   let compilation ← document.source.getObjVal? "compilation"
   let panic ← compilation.getObjValAs? String "panic_strategy"
@@ -219,5 +282,5 @@ def material (document : Document) : Except String Material := do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,(← compilation.getObjValAs? String "opt_level") == "No"⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No"⟩
 end Miri.Frontend.Foundation.SourceAbiParser

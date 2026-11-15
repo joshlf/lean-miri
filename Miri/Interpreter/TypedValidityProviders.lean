@@ -1,3 +1,4 @@
+import Miri.Input.CompilerRetagWorld
 import Miri.Interpreter.CompilerExecutionProviders
 import Miri.Input.CompilerValidityWorld
 
@@ -58,8 +59,7 @@ def retagHooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
       let (pointer,allocator) ← CompilerExecutionProviders.projectBox prepared.context runtime projection choice ⟨.memory place.mplace,place.layout⟩
       pure (← toMemory pointer,← toMemory allocator)
     unpackDynTrait := fun place => do
-      let .dynamic expected ← liftResult (CompilerFactAdapters.validityKind prepared place.layout.ty)
-        | throw (.invalidProgram "freeze dyn unpack on non-dynamic compiler type")
+      let expected ← CompilerRetagWorld.dynamicPredicates prepared world place.layout.ty
       let inner ← VTable.unpackDynTrait vtable choice ⟨.indirect place.mplace,place.layout⟩ expected
       let .indirect memory := inner.op | throw (.invalidProgram "dynamic unpack returned immediate")
       pure ⟨memory,inner.layout⟩}
@@ -70,6 +70,7 @@ def retagHooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
     checkPtrAccess := ValidityMachine.checkPointerAccess access
     resolveAllocation := resolveAllocation pointers
     ensureTreeExtra := pointers.ensureTreeExtra }
+  let base := CompilerRetagWorld.hooks prepared world base
   let base := TypedMachineBindings.retagHooks access base
   {base with writeUninit := fun place => do
     let access ← ValidityMachine.scopedAccess access

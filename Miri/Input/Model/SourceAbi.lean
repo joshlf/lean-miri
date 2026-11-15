@@ -105,6 +105,41 @@ structure CallableDeclaration where
   output : Option DefinitionId
   deriving Repr, DecidableEq
 
+inductive AutoTraitRole where
+  | unpin | unsafeUnpin | freeze
+  deriving Repr, DecidableEq
+inductive AutoSelfHead where
+  | pattern (base : AutoSelfHead) (kind : String)
+  | adt (definition : DefinitionId)
+  | functionDefinition (definition : DefinitionId)
+  | closure (definition : DefinitionId)
+  | coroutineClosure (definition : DefinitionId)
+  | tuple (arity : Nat)
+  | rigid (kind : String)
+  | unknown
+  deriving Repr, DecidableEq
+structure AutoImplHeader where
+  definition : DefinitionId
+  selfHead : AutoSelfHead
+  polarity : String
+  deriving Repr, DecidableEq
+structure AutoDeclaration where
+  definition : DefinitionId
+  langItem : Option AutoTraitRole
+  isAuto : Bool
+  isUnsafe : Bool
+  hasSelf : Bool
+  parameters : Array (Nat × Bool)
+  associatedItems : Nat
+  clauses : Array (Except String DefinitionId)
+  complete : Bool
+  implementations : Array AutoImplHeader
+  deriving Repr, DecidableEq
+structure AutoTraits where
+  langItems : Array (AutoTraitRole × Option DefinitionId)
+  declarations : Array AutoDeclaration
+  deriving Repr, DecidableEq
+
 structure Material where
   functions : Array Function
   owners : Array OwnerClauses
@@ -113,6 +148,7 @@ structure Material where
   panicInDropUnwinds : Bool
   traits : Array TraitDeclaration := #[]
   callables : Array CallableDeclaration := #[]
+  autoTraits : Option AutoTraits := none
   optimizationDisabled : Bool := false
   deriving Repr, DecidableEq
 
