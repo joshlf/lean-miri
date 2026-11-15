@@ -7,7 +7,11 @@ private def checked {α : Type} (value : Except String α) : IO α :=
 def main (paths : List String) : IO Unit := do
   let [path] := paths | throw (IO.userError "expected actual catch_unwind source")
   let document ← checked (Json.parse (← IO.FS.readFile path) >>= decode)
-  let [body] := document.bodies.toList | throw (IO.userError "expected one explicit catch template")
+  let candidates ← checked <| document.bodies.filterM fun body => do
+    let definition ← body.getObjValAs? Nat "definition"
+    let some row := document.definitions[definition]? | throw "source body definition missing"
+    return (← row.getObjValAs? String "path") == "std::panic::catch_unwind"
+  let [body] := candidates.toList | throw (IO.userError "expected one explicit catch template")
   let definition ← checked (body.getObjValAs? Nat "definition")
   let some row := document.definitions[definition]? | throw (IO.userError "catch definition missing")
   unless (← checked (row.getObjValAs? String "path")) == "std::panic::catch_unwind" do

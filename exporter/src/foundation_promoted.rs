@@ -1,5 +1,5 @@
 //! Complete promoted-MIR source tables, not evaluated/promoted allocation data.
-//! Nonlocal queries are limited to the source-validated actual start edge.
+//! Nonlocal queries require source-definition graph evidence.
 use super::*;
 
 impl<'tcx> Material<'tcx> {
@@ -15,11 +15,10 @@ impl<'tcx> Material<'tcx> {
         }
     }
 
-    pub(super) fn promoted_table(&mut self, tcx: TyCtxt<'tcx>, owner: DefId) -> Result<Value> {
+    pub(super) fn promoted_table(&mut self, tcx: TyCtxt<'tcx>, owner: DefId, selected_source: bool) -> Result<Value> {
         if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during promoted source capture".into()); }
         let local_owner = super::super::has_local_hir_body(tcx,owner);
-        let external_owner = !owner.is_local() &&
-            (tcx.lang_items().start_fn() == Some(owner) || start_edge_material::start_internal(tcx)? == Some(owner));
+        let external_owner = !owner.is_local() && selected_source;
         if (!local_owner && !external_owner) || tcx.def_kind(owner) != rustc_hir::def::DefKind::Fn
             || tcx.is_const_fn(owner) || !tcx.is_mir_available(owner) {
             return unsupported("promoted source table owner",owner);
@@ -94,16 +93,11 @@ impl<'tcx> Material<'tcx> {
 
 #[cfg(test)]
 fn source_document(tcx: TyCtxt<'_>, owner_path: &str) -> Result<Value> {
-    let mut candidates = tcx.hir_crate_items(()).definitions().map(|d|d.to_def_id())
-        .filter(|d|tcx.def_path_str(*d)==owner_path).collect::<Vec<_>>();
-    if candidates.is_empty() {
-        if let Some(def) = start_edge_material::start_internal(tcx)? {
-            if tcx.def_path_str(def)==owner_path {candidates.push(def);}
-        }
-    }
-    if candidates.len()!=1 {return unsupported("missing/ambiguous promoted source owner",owner_path);}
+    let roots = vec![owner_path.to_owned()];
+    let graph = source_graph_material::discover(tcx,&roots,&[])?;
+    let owner = graph.declaration(tcx,owner_path)?;
     let mut material = Material::default();
-    let table = material.promoted_table(tcx,candidates[0])?;
+    let table = material.promoted_table(tcx,owner,graph.contains_body(owner))?;
     Ok(json!({"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::super::EXPECTED_RUSTC_COMMIT,
         "target":{"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),

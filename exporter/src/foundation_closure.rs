@@ -2,29 +2,6 @@
 //! trait-call resolution answer is computed or serialized here.
 use super::*;
 
-pub(super) fn selected(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Vec<DefId>> {
-    let mut closures = Vec::new();
-    if let Some(start) = tcx.lang_items().start_fn() {
-        let prefix = format!("{}::{{closure#", tcx.def_path_str(start));
-        if !roots.iter().any(|root|root.starts_with(&prefix)) { return Ok(closures); }
-        if tcx.is_mir_available(start) {
-            let body = tcx.instance_mir(ty::InstanceKind::Item(start));
-            // These are finite source types in one explicitly named parent,
-            // not a transitive or monomorphic demand walk.
-            for local in &body.local_decls {
-                if let ty::Closure(def, _) = *local.ty.kind() {
-                    if roots.iter().any(|name| *name == tcx.def_path_str(def)) {
-                        closures.push(def);
-                    }
-                }
-            }
-        }
-    }
-    closures.sort_by_key(|def| tcx.def_path_str(*def));
-    closures.dedup();
-    Ok(closures)
-}
-
 impl<'tcx> Material<'tcx> {
     pub(super) fn closure_type(&mut self, tcx: TyCtxt<'tcx>, def: DefId,
         args: ty::GenericArgsRef<'tcx>) -> Result<Value> {

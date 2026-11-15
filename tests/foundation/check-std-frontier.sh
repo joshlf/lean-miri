@@ -5,8 +5,10 @@ cd "$ROOT"
 mkdir -p scratch
 # Catch's full generic source now exports; no executable catch instance is claimed.
 bash tools/export-mir.sh --output scratch/foundation-std-frontier-catch.json --foundation \
+  --root std::rt::lang_start --root std::rt::lang_start_internal \
   --root std::panic::catch_unwind -- tests/foundation/fixtures/std-main.rs --crate-name=foundation_std_main
 if bash tools/export-mir.sh --output scratch/foundation-std-frontier-unwrap.json --foundation \
+    --root std::rt::lang_start --root std::rt::lang_start_internal \
     --root 'std::result::Result::<T, E>::unwrap_or_else' -- tests/foundation/fixtures/std-main.rs \
     --crate-name=foundation_std_main > scratch/foundation-std-frontier-unwrap.log 2>&1; then
   printf 'Expected PlaceMention source boundary for unwrap_or_else\n' >&2

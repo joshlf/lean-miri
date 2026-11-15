@@ -75,7 +75,7 @@ class FoundationSignatureHeaders(unittest.TestCase):
     def test_unsupported_or_wrong_mode_signature_demand_rejects(self):
         with tempfile.TemporaryDirectory(prefix="signature-reject-") as directory:
             for foundation, requested, expected in [(False, "std::rt::lang_start_internal", "requires --foundation"),
-                (True, "unknown::function", "unsupported function signature source demand")]:
+                (True, "unknown::function", "missing source definition")]:
                 output = Path(directory) / f"{foundation}.json"
                 result = self.export(output, "exporter/fixtures/foundation_signature_main.rs", "main",
                     ["--foundation-signature-root", requested], foundation)

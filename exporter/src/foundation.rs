@@ -5,8 +5,8 @@
 //! semantics from the material; this format is not executable schema12 input.
 #[path = "foundation_signature_binder.rs"]
 mod signature_binder_material;
-#[path = "foundation_start_edge.rs"]
-mod start_edge_material;
+#[path = "foundation_source_graph.rs"]
+mod source_graph_material;
 #[path = "foundation_promoted.rs"]
 mod promoted_material;
 #[path = "foundation_termination.rs"]
@@ -27,8 +27,6 @@ mod pattern_material;
 mod fn_vtable_material;
 #[path = "foundation_closure.rs"]
 mod closure_material;
-#[path = "foundation_closure_callees.rs"]
-mod closure_callee_material;
 #[path = "foundation_allocation_identity.rs"]
 mod allocation_identity_material;
 #[path = "foundation_allocations.rs"]
@@ -255,30 +253,16 @@ impl<'tcx> Material<'tcx> {
             "c_variadic":signature.c_variadic(),
         }))
     }
-    fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId, roots: &[String]) -> Result<Value> {
+    fn body(&mut self, tcx: TyCtxt<'tcx>, def: DefId, selected_source: bool) -> Result<Value> {
         let b = tcx.instance_mir(ty::InstanceKind::Item(def));
         super::ensure_untainted_mir(b)?;
         // Pinned queries.rs: retain the complete promoted table, including
         // unused promoteds. metadata/encoder.rs::encode_mir records this table
         // alongside available optimized MIR for ordinary non-const functions.
-        // Permit only the explicitly selected actual external start Fn here;
-        // do not infer an empty table from a lack of body references.
-        let external_start = !def.is_local()
-            && tcx.lang_items().start_fn() == Some(def)
-            && matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn)
-            && !tcx.is_const_fn(def)
-            && tcx.is_mir_available(def);
-        // Other external owners require a checked source Call FnDef edge.
-        let external_start_internal = !def.is_local()
-            && tcx.def_path_str(def) == "std::rt::lang_start_internal"
-            && start_edge_material::start_internal(tcx)? == Some(def);
-        let external_internal_callee = !def.is_local()
-            && start_edge_material::internal_callees(tcx)?.contains(&def);
-        let external_closure_callee = !def.is_local()
-            && closure_callee_material::is_source_callee(tcx,roots,def)?
-            && !tcx.is_const_fn(def) && tcx.is_mir_available(def);
-        if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal
-            && !external_internal_callee && !external_closure_callee && !termination_material::unit_methods(tcx).contains(&def) {
+        // External templates require an actual selected source edge (or the
+        // compiler language-item seed), not a path-specific startup allowlist.
+        if !super::has_local_hir_body(tcx, def) && !selected_source
+            && !termination_material::unit_methods(tcx).contains(&def) {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -354,33 +338,14 @@ impl<'tcx> Material<'tcx> {
 }
 fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_version: &str, rustc_args: &[String]) -> Result<Value> {
     let mut m = Material::default();
-    let items = tcx.hir_crate_items(());
-    let mut selected = items.definitions().chain(items.nested_bodies()).map(|d|d.to_def_id()).filter(|d| tcx.is_mir_available(*d) && !super::is_required_trait_method(tcx,*d)).collect::<Vec<_>>();
-    // An explicitly named actual start language item can reside in an encoded
-    // dependency. Select only that finite generic template; do not enumerate
-    // monomorphic instances, callees or compiler query-answer closure.
-    if let Some(start) = tcx.lang_items().start_fn() {
-        if roots.iter().any(|root| *root == tcx.def_path_str(start)) {
-            if !tcx.is_mir_available(start) { return unsupported("selected start MIR unavailable", start); }
-            selected.push(start);
-        }
-    }
-    selected.extend(start_edge_material::selected(tcx,roots)?);
-    selected.extend(closure_material::selected(tcx,roots)?);
-    selected.extend(closure_callee_material::selected(tcx,roots)?);
-    selected.sort_by_key(|d|tcx.def_path_str(*d));
-    selected.dedup();
-    for root in roots {
-        if !selected.iter().any(|d|tcx.def_path_str(*d) == *root) { return Err(format!("foundation: missing MIR root {root:?}")); }
-    }
-    if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(*d))); }
+    let source_graph = source_graph_material::discover(tcx,roots,signature_roots)?;
     let mut bodies = Vec::new();
     let mut closure_templates = Vec::new();
-    for def in selected {
+    for &def in &source_graph.selected {
         if tcx.def_kind(def) == rustc_hir::def::DefKind::Closure {
             closure_templates.push(m.closure_template(tcx,def)?);
         } else {
-            bodies.push(m.body(tcx,def,roots)?);
+            bodies.push(m.body(tcx,def,source_graph.contains_body(def))?);
         }
     }
     let startup_material = super::foundation_startup::capture(tcx, |def|m.definition(tcx,def))?;
@@ -394,7 +359,7 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], signature_roots: &[String], rustc_v
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
     let mut session = super::foundation_session::export(tcx);
     session["root_span"] = source_material::root_span(tcx);
-    let source_function_signatures = function_header_material::capture_for_roots(tcx,&mut m,signature_roots,roots)?;
+    let source_function_signatures = function_header_material::capture_for_roots(tcx,&mut m,signature_roots,&source_graph)?;
     let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
     let has_fn_pointer = m.types.iter().any(|row| row["shape"]["kind"] == "function_pointer");
     let has_callable_declaration = [tcx.lang_items().fn_trait(),tcx.lang_items().fn_mut_trait(),tcx.lang_items().fn_once_trait()]

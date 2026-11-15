@@ -77,12 +77,12 @@ pub(super) fn unit_methods(tcx: TyCtxt<'_>) -> Vec<DefId> {
         .filter(|item|matches!(item.kind,ty::AssocKind::Fn {..})).map(|item|item.def_id).collect::<Vec<_>>()).collect()
 }
 impl<'tcx> Material<'tcx> {
-    pub(super) fn termination_templates(&mut self, tcx: TyCtxt<'tcx>, roots: &[String]) -> Result<Vec<Value>> {
+    pub(super) fn termination_templates(&mut self, tcx: TyCtxt<'tcx>, _roots: &[String]) -> Result<Vec<Value>> {
         let Some(trait_def)=tcx.lang_items().termination() else {return Ok(Vec::new())};
         if !self.def_ids.contains_key(&trait_def) {return Ok(Vec::new())}
         unit_methods(tcx).into_iter().map(|definition| {
             if !tcx.is_mir_available(definition) {return unsupported("unit trait method MIR unavailable",definition)}
-            self.body(tcx,definition,roots)
+            self.body(tcx,definition,false)
         }).collect()
     }
 }
