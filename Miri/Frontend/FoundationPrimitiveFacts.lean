@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationPhysicalRegistry
+import Miri.Frontend.FoundationRegionErasure
 
 /-! Compiler leaves for the closed physical subset, computed from structure.
 Pinned rustc sources: ty/util.rs::{is_trivially_freeze,is_trivially_unpin,
@@ -6,9 +7,10 @@ needs_drop_components_with_async,struct_tail_raw}; ty/sty.rs::{builtin_deref,
 discriminant_ty,ptr_metadata_ty_or_tail,is_like_maybe_dangling};
 ty/inhabitedness/mod.rs::OpSemInhabitedness::is_inhabited_ty.
 All supported leaves are inhabited, Sized, Freeze and both Unpin traits;
-arrays and pointer signatures recurse; references/str remain unsupported and
+arrays, shared thin references and pointer signatures recurse; str remains unsupported and
 the only supported tuple is empty. No trait solver fallback
-is taken. Region/parameter/inference flags are absent by construction.
+is taken. Static/Erased region flags and erasure are computed structurally; parameter and
+inference flags are absent by construction.
 Hashing, nominal definitions and projection catalogs are intentionally absent. -/
 namespace Miri.Frontend.Foundation
 
@@ -27,8 +29,9 @@ where
         throw "unsupported unsigned compiler facts"
     | .array element _ => go fuel element
     | .pointer kind pointee =>
-      unless kind == "raw_pointer_const" || kind == "raw_pointer_mut" do
-        throw "reference compiler facts unsupported"
+      let info ← pointerKindInfo kind
+      if info.region.isSome && info.mutability != .Not then
+        throw "mutable-reference compiler facts unsupported"
       go fuel pointee
     | .functionPointer inputs output safety abi variadic =>
       unless (safety == "safe" || safety == "unsafe") && abi == "rust" && !variadic do
@@ -42,18 +45,28 @@ where
 /-- IDs must be provided by the physical registry: self, unit metadata, and u8
 (the pinned discriminant type for every supported non-enum shape). -/
 def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
-    (rawPointee : Option Nat := none) :
+    (rawPointee : Option Nat := none) (normalized : Option Nat := none) :
     Except String Input.TypeCompilerFacts := do
   primitiveFactsDomain ty
+  let erasable ← hasErasableRegions ty
+  let normalized ← if erasable then do
+      let some id := normalized | throw "reference compiler fact lacks erased type identity"
+      pure id
+    else pure self
   let explicitDeref ← match ty with
     | .pointer .. => do
-      let some pointee := rawPointee | throw "raw pointer compiler fact lacks physical pointee"
+      let some pointee := rawPointee | throw "pointer compiler fact lacks physical pointee"
       pure (some pointee)
+    | _ => pure none
+  let implicitDeref ← match ty with
+    | .pointer kind _ => do
+      let info ← pointerKindInfo kind
+      pure (if info.region.isSome then explicitDeref else none)
     | _ => pure none
   return {
     typingEnvironment := "fully_monomorphized"
     booleanQueries := #[
-      ("is_unsafe_cell", false), ("has_erasable_regions", false),
+      ("is_unsafe_cell", false), ("has_erasable_regions", erasable),
       ("is_c_void", false), ("is_simd", false), ("is_box", false),
       ("is_global_box", false), ("is_dynamic", false), ("is_too_generic", false),
       ("is_monomorphic", true), ("is_monomorphic_enough", true),
@@ -61,9 +74,9 @@ def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
       ("is_unpin", true), ("is_unsafe_unpin", true), ("needs_drop", false),
       ("opsem_inhabited", true), ("is_sized", true)]
     typeQueries := #[
-      ("normalized", some self), ("metadata_tail", some self),
+      ("normalized", some normalized), ("metadata_tail", some normalized),
       ("pointer_metadata_type", some unit), ("discriminant_type", some u8),
-      ("builtin_deref_explicit", explicitDeref), ("builtin_deref_implicit", none),
+      ("builtin_deref_explicit", explicitDeref), ("builtin_deref_implicit", implicitDeref),
       ("boxed_type", none), ("unsafe_binder_erased", none)]
     discriminants := some ⟨false, none, #[]⟩ }
 
@@ -76,14 +89,26 @@ only additional demands are the exact unit and u8 query result types. -/
 def withPrimitiveFactsFor (r : PhysicalTypeRegistry) (typeIds : Array Nat) : Except String PhysicalTypeRegistry := do
   let (r, unit) ← r.intern (.tuple #[])
   let (r, u8) ← r.intern (.primitive "uint" "u8")
-  let mut nodes := r.types
+  let originalCount := r.types.size
+  let mut registry := r
+  let mut normalization := #[]
   for i in typeIds ++ #[unit, u8] do
+    let some entry := registry.registry.entries[i]? | throw "compiler fact source identity absent"
+    primitiveFactsDomain entry.type
+    let (next, normalized) ← registry.intern (← eraseRegions entry.type)
+    registry := next
+    normalization := normalization.push (i, normalized)
+  let r := registry
+  let additional := (List.range (r.types.size - originalCount)).toArray.map (· + originalCount)
+  let mut nodes := r.types
+  for i in typeIds ++ additional ++ #[unit, u8] do
     let some entry := r.registry.entries[i]? | throw "compiler fact type identity absent"
     let (node, _) ← r.lookup i
     let rawPointee := match node.shape with
-      | .rawPointer pointee _ => some pointee
+      | .rawPointer pointee _ | .reference pointee _ _ => some pointee
       | _ => none
-    let facts ← primitiveCompilerFacts entry.type i unit u8 rawPointee
+    let normalized := (normalization.find? (·.1 == i)).map (·.2)
+    let facts ← primitiveCompilerFacts entry.type i unit u8 rawPointee normalized
     if h : i < nodes.size then
       nodes := nodes.set i { node with compilerFacts := some facts }
     else

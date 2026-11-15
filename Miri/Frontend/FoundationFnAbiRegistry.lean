@@ -51,7 +51,16 @@ def rustFunctionAbiInRegistry (initial : PhysicalTypeRegistry) (definition : Nat
     let (next, binding) ← internAbiType registry ty
     registry := next
     bindings := bindings.push binding
-  let result ← rustFunctionAbiComponent document.target document.target.architecture unwind bindings result
+  let hasReference (ty : ConcreteType) := match ty with
+    | .pointer kind _ => match pointerKindInfo kind with
+      | .ok info => info.region.isSome
+      | .error _ => false
+    | _ => false
+  let referenceOptLevel ← if hasReference result.type || bindings.any (fun b => hasReference b.type) then do
+      let compilation ← document.source.getObjVal? "compilation"
+      pure (some (← compilation.getObjValAs? String "opt_level"))
+    else pure none
+  let result ← rustFunctionAbiComponent document.target document.target.architecture unwind bindings result referenceOptLevel
   for arg in result.arguments.push result.returnValue do
     if arg.mode.kind == .indirect || arg.mode.kind == .indirectUnsized then
       throw "foundation indirect FnAbi requires unported MIR attribute deduction"

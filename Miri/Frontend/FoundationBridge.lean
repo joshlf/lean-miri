@@ -1,6 +1,8 @@
 import Miri.Frontend.FoundationInstance
 import Miri.Frontend.FoundationTarget
 import Miri.Frontend.FoundationSource
+import Miri.Frontend.FoundationRegionErasure
+import Miri.Frontend.FoundationTypeRegistry
 
 /-! Preparation at the finite-material/fixed-interpreter boundary. This module
 constructs genuine target data and substituted item templates, checking retained
@@ -17,24 +19,32 @@ structure PreparedItem where
   signature : Json
 
 /-- Prepare one explicitly selected template. Signature/local joins currently
-require identical source type IDs. This conservative check rejects any distinct
-but equivalent source representation instead of inventing normalization results.
+compare structural types after exact supported region erasure. Original source
+signature/local IDs remain retained; no other normalization is inferred.
 The template's supported environment and every local type are instantiated by
 `instantiateItem`; this function is not trait-method or shim resolution. -/
 def prepareItem (d : Document) (definition : Nat)
     (arguments : Array ItemArgument) : Except String PreparedItem := do
   let target ← runtimeTargetOfTarget d.target
-  let item ← instantiateItem d definition arguments
+  let sourceItem ← instantiateItem d definition arguments
+  let item := {sourceItem with localTypes := ← sourceItem.localTypes.mapM eraseRegions}
   validateSourceMetadata item.source
   let signature ← item.source.getObjVal? "signature"
   let inputs ← signature.getObjValAs? (Array Nat) "inputs"
   let output ← signature.getObjValAs? Nat "output"
   let locals ← item.source.getObjValAs? (Array Nat) "locals"
   unless inputs.size == item.argumentCount do throw "signature argument count disagrees with MIR"
-  unless locals[0]? == some output do throw "signature output disagrees with MIR return local"
+  let types := arguments.map fun arg => match arg with | .type ty => some ty | _ => none
+  let constants := arguments.map fun arg => match arg with | .constant n => some n | _ => none
+  let resolved (id : Nat) : Except String ConcreteType := do
+    eraseRegions (← instantiate types constants (← typeExpr d id))
+  let some returnSource := locals[0]? | throw "MIR return local source type absent"
+  unless sameConcrete 1024 (← resolved output) (← resolved returnSource) do
+    throw "signature output disagrees with MIR return local after region erasure"
   for h : i in [:inputs.size] do
-    unless locals[i+1]? == some inputs[i] do
-      throw "signature input disagrees with MIR argument local"
+    let some localSource := locals[i+1]? | throw "MIR argument source type absent"
+    unless sameConcrete 1024 (← resolved inputs[i]) (← resolved localSource) do
+      throw "signature input disagrees with MIR argument local after region erasure"
   let safety ← signature.getObjValAs? String "safety"
   unless safety == "safe" || safety == "unsafe" do throw "unsupported function safety"
   let _abi ← signature.getObjVal? "abi"

@@ -18,7 +18,7 @@ private def attributes (bits : Nat) (extension : Input.ArgumentExtensionKind := 
 /-- Every accepted scalar is initialized; accepted arrays have neither padding
 nor unions. Thus the exact-sized integer aggregate cast preserves NoUndef. -/
 def rustPassMode (target : Target) (architecture : String) (isReturn : Bool)
-    (ty : ConcreteType) : Except String Input.AbiPassMode := do
+    (ty : ConcreteType) (referenceOptLevel : Option String := none) : Except String Input.AbiPassMode := do
   let shape ← rustModeShape target architecture isReturn ty
   let empty : Input.AbiPassMode := ⟨.ignore, #[], none, none, none, none⟩
   match shape with
@@ -26,6 +26,16 @@ def rustPassMode (target : Target) (architecture : String) (isReturn : Bool)
   | .direct extendBool =>
     -- Raw pointers have no dereferenceable pointee and retain the full valid
     -- range. FnPtr excludes null in its scalar layout: NoUndef | NonNull.
+    if let .pointer kind pointee := ty then
+      let info ← pointerKindInfo kind
+      if info.region.isSome then
+        unless isReturn && info.mutability == .Not && referenceOptLevel == some "No" do
+          throw "shared thin reference ABI requires return position and explicit OptLevel::No"
+        let pointeeLayout ← layoutOf target pointee
+        -- pointee_info_at skips Freeze at optNo, yielding size0; return
+        -- position adds neither NoAlias, NoFree, ReadOnly nor capture flags.
+        return {empty with kind := .direct, attributes := #[attributes 144 .none 0
+          (if pointeeLayout.align > 1 then some pointeeLayout.align else none)]}
     let bits := match ty with | .functionPointer .. => 144 | _ => 128
     return { empty with kind := .direct, attributes := #[attributes bits
       (if extendBool then .zeroExtend else .none)] }
@@ -51,9 +61,9 @@ structure AbiTypeBinding where
   layoutId : Input.LayoutId
 
 private def rustArgument (target : Target) (architecture : String) (isReturn : Bool)
-    (binding : AbiTypeBinding) : Except String Input.AbiArgument := do
+    (binding : AbiTypeBinding) (referenceOptLevel : Option String) : Except String Input.AbiArgument := do
   return ⟨binding.typeId, binding.layoutId,
-    ← rustPassMode target architecture isReturn binding.type⟩
+    ← rustPassMode target architecture isReturn binding.type referenceOptLevel⟩
 
 /-- Parametric construction for a nonvariadic ordinary Rust item, without
 track_caller, virtual receiver adjustment, extra arguments or deduced pointer
@@ -61,9 +71,9 @@ attributes. The caller must establish those signature facts and the binding
 associations above; this API is not sufficient evidence for interpreter import. -/
 def rustFunctionAbiComponent (target : Target) (architecture : String)
     (unwind : RustUnwindFacts) (arguments : Array AbiTypeBinding)
-    (result : AbiTypeBinding) : Except String Input.FunctionAbi := do
-  let ret ← rustArgument target architecture true result
-  let args ← arguments.mapM (rustArgument target architecture false)
+    (result : AbiTypeBinding) (referenceOptLevel : Option String := none) : Except String Input.FunctionAbi := do
+  let ret ← rustArgument target architecture true result referenceOptLevel
+  let args ← arguments.mapM (fun binding => rustArgument target architecture false binding referenceOptLevel)
   return {
     arguments := args
     returnValue := ret

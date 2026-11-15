@@ -90,8 +90,9 @@ def rustModeShape (target : Target) (architecture : String)
     return .indirect
   | .tuple _ => throw "nonzero tuple Rust ABI mode shape is unsupported"
   | .pointer kind pointee =>
-    unless kind == "raw_pointer_const" || kind == "raw_pointer_mut" do
-      throw "reference Rust ABI attributes require unsupported pointee/optimization facts"
+    let info ← pointerKindInfo kind
+    if info.region.isSome && info.mutability != .Not then
+      throw "mutable-reference Rust ABI attributes are unsupported"
     if let .primitive "str" "" := pointee then
       throw "wide raw-pointer Rust ABI mode shape is unsupported"
     return .direct false
