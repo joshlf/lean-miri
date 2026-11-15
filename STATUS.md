@@ -66,6 +66,12 @@ closure proves correctness for arbitrary programs. The precise architecture,
 trust boundary and export-only performance comparison are in
 [foundation-architecture](docs/foundation-architecture.md).
 
+For ordinary std main, the selected external `std::rt::lang_start` generic MIR
+and its actual promoted table are available as finite material. A `T: 'static`
+clause is checked purely for the unit domain. The next real source boundary is
+the `dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` existential type in that
+body; dynamic trait/projection/vtable computation is still missing.
+
 ## Exported input coverage
 
 Each concrete instance and promoted index has one executable MIR body. The
