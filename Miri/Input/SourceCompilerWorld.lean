@@ -12,18 +12,8 @@ namespace Miri.Input.SourceCompilerWorld
 open Miri.Interpreter
 
 abbrev ParameterKind := SourceSymbols.ParameterKind
-inductive ItemKind where
-  | function | associatedFunction
-  deriving Repr, DecidableEq
-
-/-- Structural declaration material, supplied after checking the source's full
-lexical generic layers. It carries no instance, body or ABI query answers. -/
-structure ItemDeclaration where
-  definition : DefinitionId
-  path : String
-  kind : ItemKind
-  parameters : Array ParameterKind
-  deriving Repr, DecidableEq
+abbrev ItemKind := SourceMaterial.ItemKind
+abbrev ItemDeclaration := SourceMaterial.ItemDeclaration
 
 /-- Raw source DefId and complete canonical generic arguments. Raw definitions
 remain usable for symbolic foreign candidates before any local IDs exist. -/
@@ -35,6 +25,9 @@ structure InstanceKey where
 structure World where
   canonical : ImportDocument
   private keys : Array (InstanceKey × CallInstance) := #[]
+  /-- Evaluation-local ABI answers derived from typed source demands. Imported
+  canonical rows alone never establish this capability in source mode. -/
+  derivedInstanceAbis : Array Catalog.InstanceAbi := #[]
 
 structure Access (S : Type) where
   get : S → Option World
@@ -58,6 +51,16 @@ def keyOf (world : World) (id : CallInstance) : Except String InstanceKey := do
 
 /-- Seed existing canonical handles without enumerating any new substitution. -/
 def create (canonical : ImportDocument) : Except String World := do
+  if let some source := canonical.sourceMaterial then
+    source.validate
+    unless source.target.triple == canonical.producer.targetTriple do
+      throw "source material target differs from canonical compilation"
+    if let some sourceLayout := source.target.runtimeDataLayout then
+      if let some canonicalLayout := canonical.runtimeTargetDataLayout then
+        unless sourceLayout.pointerWidthBits == canonicalLayout.pointerWidthBits &&
+            sourceLayout.endian == canonicalLayout.endian &&
+            sourceLayout.llvmDataLayout == canonicalLayout.llvmDataLayout do
+          throw "source material physical target differs from canonical layout pools"
   let mut seen := #[]
   for definition in canonical.definitions do
     checkDefinition definition
@@ -90,12 +93,23 @@ private def checkArguments (world : World) (parameters : Array ParameterKind)
       unless id < world.canonical.typeConstants.size do throw "source Item const argument absent"
     | _,_ => throw "source Item generic argument kind mismatch"
 
+/-- A retained typed source universe is authoritative. Headers from another
+catalog cannot assign a contradictory canonical identity in this World. -/
+def validateItemSource (declarations : Array ItemDeclaration) (world : World) (key : InstanceKey) :
+    Except String Unit := do
+  if let some source := world.canonical.sourceMaterial then
+    let supplied := declarations.filter (·.definition == key.definition)
+    let retained := source.declarations.filter (·.definition == key.definition)
+    unless supplied.size == 1 && retained.size == 1 && supplied[0]? == retained[0]? do
+      throw "Item declaration differs from retained typed source material"
+
 /-- Construct `Instance::new_raw(Item, args)` on demand. This is not trait
 resolution and does not establish MIR, ABI, promoted, inline or symbol facts.
 A successful identity has the explicit identityOnly capability until a checked
 source producer supplies the demanded additional material. -/
 def internItem (declarations : Array ItemDeclaration) (world : World) (key : InstanceKey) :
     Except String (World × CallInstance) := do
+  validateItemSource declarations world key
   if let some id := findItem world key then
     let actual ← keyOf world id
     unless actual == key do throw "source instance interner key contradiction"
@@ -119,7 +133,7 @@ def internItem (declarations : Array ItemDeclaration) (world : World) (key : Ins
     kind := .identityOnly, defPath := some declaration.path, definitionId := some definition,
     bodyId := none, promotedBodies := #[] }
   LocalValidation.validateInstance value
-  return ({
+  return ({world with
     canonical := {canonical with instances := canonical.instances.push value}
     keys := world.keys.push (key,id)},id)
 
@@ -136,9 +150,10 @@ def bodyId (world : World) (id : CallInstance) : Except String BodyId := do
 source declaration frontier. It cannot reserve another handle or a body slot. -/
 theorem internItem_existing (declarations : Array ItemDeclaration) (world : World)
     (key : InstanceKey) (id : CallInstance)
+    (sourceValid : validateItemSource declarations world key = .ok ())
     (found : findItem world key = some id) (identity : keyOf world id = .ok key) :
     internItem declarations world key = .ok (world,id) := by
-  simp [internItem, found, identity]
+  simp [internItem, sourceValid, found, identity]
   change (if key = key then Except.ok (world,id) else _) = _
   simp
 end Miri.Input.SourceCompilerWorld
