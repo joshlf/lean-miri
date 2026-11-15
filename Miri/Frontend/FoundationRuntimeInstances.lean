@@ -1,5 +1,6 @@
 import Miri.Frontend.FoundationInstanceRegistry
 import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationMethodRuntime
 
 /-! Source attributes to fixed-interpreter runtime metadata for ordinary root
 items. `Instance::print` and `FmtPrinter::print_path_with_generic_args` supply the
@@ -58,35 +59,42 @@ where
         String.intercalate ", " inputs.toList ++ ")" ++ (if output == "()" then "" else " -> " ++ output))
     | _ => throw "unsupported runtime instance argument display"
 
-/-- Runtime facts for a generated ordinary Item identity. Generic display is
-restricted to one supported type argument, and definition paths to local root
-functions with unambiguous ordinary names. Symbol mangling is not implemented:
+/-- Runtime facts for a source-backed Item identity. The source definition path
+and explicit concrete type arguments determine its name. External free functions
+use the same source/attribute checks and preserved frame crate table as local
+functions. Declaration-selected associated methods use their checked resolver.
+Symbol mangling is not implemented:
 `symbolName = none` retains the genuine absent-query boundary for later demands. -/
 def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
     (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
   let some definition := document.definitions[item.definition]? | throw "runtime source definition absent"
   unless node.instanceKind == .Item item.definition &&
       node.definitionId == some item.definition do throw "runtime source instance identity mismatch"
-  unless (← definition.getObjValAs? String "kind") == "fn" do
-    throw "runtime instance requires ordinary function source kind"
-  let facts ← item.source.getObjVal? "runtime_source"
-  unless (← facts.getObjValAs? Bool "is_local_root") do
-    throw "runtime instance requires local root function source"
   let frame ← frameMetadataOfSource document
-  unless (← definition.getObjValAs? Nat "crate_index") == frame.localCrate do
-    throw "runtime instance local crate mismatch"
+  let crateIndex ← definition.getObjValAs? Nat "crate_index"
+  unless frame.crates.any (·.1 == crateIndex) do throw "runtime source frame crate absent"
+  let kind ← definition.getObjValAs? String "kind"
+  if kind == "assoc_fn" then return ← runtimeUnitMethodOfItem document item node
+  unless kind == "fn" do throw "runtime instance requires free function or checked associated method source"
+  let facts ← item.source.getObjVal? "runtime_source"
+  let root ← facts.getObjValAs? Bool "is_local_root"
   let some name ← facts.getObjValAs? (Option String) "item_name"
     | throw "runtime instance item name absent"
-  unless (← definition.getObjValAs? String "path") == name do
-    throw "runtime instance nontrivial definition path display unsupported"
-  let display ← match item.arguments.toList with
-    | [] => pure name
-    | [.type ty] => do pure (name ++ "::<" ++ (← concreteRuntimeDisplay ty) ++ ">")
-    | _ => throw "runtime instance generic display unsupported"
+  let path ← definition.getObjValAs? String "path"
+  unless path == name || path.endsWith ("::" ++ name) do
+    throw "runtime instance definition path/item-name mismatch"
+  unless root == (crateIndex == frame.localCrate && path == name) do
+    throw "runtime instance local-root source identity mismatch"
+  let arguments ← item.arguments.mapM fun argument => do
+    match argument with
+    | .type ty => concreteRuntimeDisplay ty
+    | .constant _ => throw "runtime const argument display unsupported"
+  let display := path ++ (if arguments.isEmpty then "" else "::<" ++ String.intercalate ", " arguments.toList ++ ">")
   let attrs ← item.source.getObjVal? "function_attributes"
   let track ← attrs.getObjValAs? Bool "track_caller"
   let foreign ← attrs.getObjValAs? Bool "is_foreign"
-  unless !track && !foreign do throw "runtime instance requires ordinary nonforeign item"
+  unless !track && !foreign && !(← attrs.getObjValAs? Bool "is_drop_glue") do
+    throw "runtime instance requires unadjusted nonforeign item"
   unless !(← facts.getObjValAs? Bool "rustc_intrinsic") do
     throw "runtime instance intrinsic definition unsupported"
   let inlineAttribute ← facts.getObjValAs? String "inline"
