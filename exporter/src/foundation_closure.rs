@@ -77,7 +77,8 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":block.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"function_attributes":{
+        Ok(json!({"definition":self.definition(tcx,def),
+            "runtime_source":super::super::foundation_runtime_instances::item(tcx,def),"function_attributes":{
             "never_unwind":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::NEVER_UNWIND),
             "track_caller":tcx.codegen_fn_attrs(def).flags.contains(rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags::TRACK_CALLER),
             "is_foreign":tcx.is_foreign_item(def),"is_drop_glue":tcx.is_lang_item(def,rustc_attr_ir::LangItem::DropGlue)

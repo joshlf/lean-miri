@@ -26,7 +26,6 @@ impl<'tcx> Material<'tcx> {
             _ => return unsupported("function header owner",definition),
         };
         let attrs = tcx.codegen_fn_attrs(definition);
-        if !attrs.target_features.is_empty() { return unsupported("signature target features",definition); }
         Ok(json!({"definition":self.definition(tcx,definition),"owner_declaration":owner,
             "runtime_source":super::super::foundation_runtime_instances::item(tcx,definition),
             "environment":self.environment(tcx,definition)?,"signature":self.signature(tcx,definition)?,

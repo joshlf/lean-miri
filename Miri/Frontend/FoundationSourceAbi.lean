@@ -184,6 +184,17 @@ private def objectTraitDeclarations (document : Document) : Except String (Array
     result := result.push ⟨definition,superTraits,unsupported⟩
   return result
 
+private def targetFeatures (row : Json) : Except String (Array TargetFeature) := do
+  (← (← row.getObjVal? "runtime_source").getObjValAs? (Array Json) "target_features").mapM fun feature => do
+    let name ← feature.getObjValAs? String "name"
+    unless !name.isEmpty do throw "empty source target-feature name"
+    let kind ← match ← feature.getObjValAs? String "kind" with
+      | "Enabled" => pure TargetFeatureKind.enabled
+      | "Forced" => pure .forced
+      | "Implied" => pure .implied
+      | tag => pure (.unsupported tag)
+    return TargetFeature.mk name kind
+
 /-- Preserve every captured source header and lexical clause owner exactly once.
 No concrete substitutions, ABI results or selected implementations are produced. -/
 private def autoTraits (document : Document) : Except String (Option AutoTraits) := do
@@ -264,7 +275,11 @@ def material (document : Document) : Except String Material := do
       unless matching.size == 1 do throw "duplicate ABI source body owner"
       for field in #["environment","signature","function_attributes"] do
         unless (← body.getObjVal? field) == (← header.getObjVal? field) do throw "conflicting ABI source signature/header"
+      unless (← (← body.getObjVal? "runtime_source").getObjVal? "target_features") ==
+          (← (← header.getObjVal? "runtime_source").getObjVal? "target_features") do
+        throw "conflicting declaration target-feature source"
     else rows := rows.push header
+  let mut targetFeatureDeclarations : Array TargetFeatureDeclaration := #[]
   let mut functions : Array Function := #[]
   let mut owners : Array OwnerClauses := #[]
   let mut builtins : Array BuiltinDeclaration := #[]
@@ -274,6 +289,7 @@ def material (document : Document) : Except String Material := do
     let signature ← SourceTypesParser.signature (← row.getObjVal? "signature")
     unless signature.output < document.types.size && signature.inputs.all (· < document.types.size) do throw "ABI signature source type reference absent"
     let attrs ← row.getObjVal? "function_attributes"
+    targetFeatureDeclarations := targetFeatureDeclarations.push ⟨definition,← targetFeatures row⟩
     let attributes : Attributes := ⟨← attrs.getObjValAs? Bool "never_unwind",← attrs.getObjValAs? Bool "track_caller",
       ← attrs.getObjValAs? Bool "is_foreign",← attrs.getObjValAs? Bool "is_drop_glue"⟩
     let environment ← row.getObjVal? "environment"
@@ -299,10 +315,19 @@ def material (document : Document) : Except String Material := do
           parameters := parameters.push (ConstParameterType.mk (← raw document (← parameter.getObjValAs? Nat "definition"))
             (← parameter.getObjValAs? Nat "type"))
     functions := functions.push (Function.mk definition signature attributes parameters)
+  for row in (← document.source.getObjValAs? (Array Json) "closure_templates") do
+    -- A closure declaration is not an ordinary function signature. Missing
+    -- attribute material supplies no row and remains unavailable at demand.
+    if (row.getObjVal? "runtime_source").isOk then
+      let definition ← raw document (← row.getObjValAs? Nat "definition")
+      let features ← targetFeatures row
+      if let some old := targetFeatureDeclarations.find? (·.definition == definition) then
+        unless old.features == features do throw "conflicting closure target-feature source"
+      else targetFeatureDeclarations := targetFeatureDeclarations.push ⟨definition,features⟩
   let (traits,extraBuiltins) ← ordinaryTraits document
   for declaration in extraBuiltins do
     if let some existing := builtins.find? (·.definition == declaration.definition) then
       unless existing == declaration do throw "conflicting ordinary trait builtin declaration"
     else builtins := builtins.push declaration
-  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No",← objectTraitDeclarations document,← SourceSymbolNamesParser.material document⟩
+  return ⟨functions,owners,builtins,panic == "unwind",drop == "unwind",traits,← callableDeclarations document,← autoTraits document,(← compilation.getObjValAs? String "opt_level") == "No",← objectTraitDeclarations document,← SourceSymbolNamesParser.material document,targetFeatureDeclarations⟩
 end Miri.Frontend.Foundation.SourceAbiParser

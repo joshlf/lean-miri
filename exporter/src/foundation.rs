@@ -296,9 +296,6 @@ impl<'tcx> Material<'tcx> {
         if !matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn | rustc_hir::def::DefKind::AssocFn) {
             return unsupported("non-function entry", def);
         }
-        if !tcx.codegen_fn_attrs(def).target_features.is_empty() {
-            return unsupported("function target features", def);
-        }
         let environment = self.environment(tcx,def)?;
         let signature = self.signature(tcx,def)?;
         // Inputs to pinned ty::layout::fn_can_unwind; do not cache its answer.

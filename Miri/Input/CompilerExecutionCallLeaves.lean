@@ -47,7 +47,7 @@ def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
   checkArgumentCompat := fun _ caller callee =>
     LayoutCompat.checkArgumentCompat (CompilerFacts.compatibilityQueries p.lifecycle.calls.symbols.facts.context)
       compatibilityBudget caller callee
-  targetFeatures := CompilerTargetFeatures.dictionary p.intrinsics
+  targetFeatures := CompilerTargetFeatures.dictionary p.intrinsics world
   tupleFields := fun ty => lift (tupleFields p ty)
   isClosureLike := fun callee => lift (CompilerCallFacts.isClosureLike p.intrinsics callee)
   closureUpvarCount := fun ty => lift (closureUpvarCount p ty)

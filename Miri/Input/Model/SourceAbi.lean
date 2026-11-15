@@ -36,6 +36,19 @@ structure ConstParameterType where
   type : SourceTypes.TypeRef
   deriving Repr, DecidableEq
 
+inductive TargetFeatureKind where
+  | enabled | forced | implied | unsupported (kind : String)
+  deriving Repr, DecidableEq
+structure TargetFeature where
+  name : String
+  kind : TargetFeatureKind
+  deriving Repr, DecidableEq
+
+structure TargetFeatureDeclaration where
+  definition : DefinitionId
+  features : Array TargetFeature
+  deriving Repr, DecidableEq
+
 structure Attributes where
   neverUnwind : Bool
   trackCaller : Bool
@@ -162,6 +175,7 @@ structure Material where
   optimizationDisabled : Bool := false
   objectTraits : Array ObjectTraitDeclaration := #[]
   symbolNames : Option SourceSymbolNames.Material := none
+  targetFeatureDeclarations : Array TargetFeatureDeclaration := #[]
   deriving Repr, DecidableEq
 
 end Miri.Input.SourceAbi
