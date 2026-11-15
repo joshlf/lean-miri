@@ -61,6 +61,25 @@ with status zero even when the guest does not complete, so its process exit code
 alone is insufficient. Proving safety requires a Lean theorem covering all
 permitted executions.
 
+### Finite generic material
+
+The migration toward demand-time compiler queries has an experimental
+`--foundation` export mode. For example:
+
+```bash
+bash tools/export-mir.sh --output scratch/identity-foundation.json \
+  --foundation --root identity -- exporter/fixtures/foundation.rs \
+  --crate-type=lib --crate-name=foundation
+```
+
+This retains a generic MIR template and finite type, definition and target
+material without enumerating query answers or monomorphic substitutions. Lean
+can resolve requested types and generic arguments from it. The fixed Miri
+interpreter does not yet consume this format; its restricted fixture evaluator
+does not provide a safety proof. See the
+[architecture and current boundary](docs/foundation-architecture.md) and
+[remaining work](STATUS.md).
+
 ### Work with the input in Lean
 
 To inspect a single function, export the included `add_one` example with `--root`.

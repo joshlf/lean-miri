@@ -21,7 +21,9 @@ private def sizedAndCopy : Nat → ConcreteType → Bool
   | f+1, ty => if scalarType ty then true else match ty with
     | .array element _ => sizedAndCopy f element
     | .tuple elements => elements.all (sizedAndCopy f)
-    | .pointer _ _ => true
+    -- The source graph currently drops pointer mutability at substitution.
+    -- In particular, &mut T is not Copy, so pointer obligations stay unknown.
+    | .pointer _ _ => false
     | _ => false
 
 private def ensureParam (typeArgs : Array (Option ConcreteType))
