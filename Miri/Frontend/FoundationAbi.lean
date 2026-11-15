@@ -63,13 +63,16 @@ replacement for genuine interpreter `FnAbi` evidence. -/
 inductive RustModeShape where
   | ignore
   | direct (zeroExtendBool : Bool)
+  | pair
   | integerCast (sizeBytes : Nat)
   | indirect
   deriving Repr, DecidableEq
 
-/-- Scalar/array Rust ABI mode-shape classification for the x86_64 architecture.
-The architecture-specific pre-adjustment is empty on this architecture. Floats,
-pointers, nonempty tuples, foreign ABIs and other architectures fail closed.
+/-- Supported scalar, array and pointer Rust ABI mode shapes on x86_64.
+The architecture-specific pre-adjustment is empty on this architecture. Shared
+str references have scalar-pair shape; their attributes remain separately guarded
+by source optimization/position facts. Floats, mutable references, nonempty
+tuples, foreign ABIs and other architectures fail closed.
 `layoutOf` supplies the supported scalar/array size checks before classification.
 No complete FnAbi or attribute equivalence is claimed. -/
 def rustModeShape (target : Target) (architecture : String)
@@ -82,10 +85,10 @@ def rustModeShape (target : Target) (architecture : String)
     throw "unsized str Rust ABI mode shape is unsupported"
   let layout ← layoutOf target ty
   if layout.size == 0 then return .ignore
-  if isReturn && layout.size > 2 * (target.pointerSizeBits / 8) then return .indirect
   match ty with
   | .primitive kind _ => return .direct (kind == "bool")
   | .array _ _ =>
+    if isReturn && layout.size > 2 * (target.pointerSizeBits / 8) then return .indirect
     if layout.size <= target.pointerSizeBits / 8 then return .integerCast layout.size
     return .indirect
   | .tuple _ => throw "nonzero tuple Rust ABI mode shape is unsupported"
@@ -94,7 +97,8 @@ def rustModeShape (target : Target) (architecture : String)
     if info.region.isSome && info.mutability != .Not then
       throw "mutable-reference Rust ABI attributes are unsupported"
     if let .primitive "str" "" := pointee then
-      throw "wide raw-pointer Rust ABI mode shape is unsupported"
+      unless info.region.isSome do throw "wide raw-pointer Rust ABI mode shape is unsupported"
+      return .pair
     return .direct false
   | .functionPointer .. => return .direct false
 

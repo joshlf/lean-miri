@@ -39,6 +39,18 @@ def rustPassMode (target : Target) (architecture : String) (isReturn : Bool)
     let bits := match ty with | .functionPointer .. => 144 | _ => 128
     return { empty with kind := .direct, attributes := #[attributes bits
       (if extendBool then .zeroExtend else .none)] }
+  | .pair =>
+    let .pointer kind (.primitive "str" "") := ty
+      | throw "unsupported Rust ABI scalar-pair type"
+    let info ← pointerKindInfo kind
+    unless isReturn && info.region.isSome && info.mutability == .Not && referenceOptLevel == some "No" do
+      throw "shared str pair ABI requires return position and explicit OptLevel::No"
+    let pointee ← layoutOf target (.primitive "str" "")
+    -- arg_attrs_for_rust_scalar at data offset: NoUndef|NonNull, optNo
+    -- pointee size0. Metadata is a full-range initialized usize: NoUndef.
+    return {empty with kind := .pair, attributes := #[
+      attributes 144 .none 0 (if pointee.align > 1 then some pointee.align else none),
+      attributes 128]}
   | .integerCast size =>
     let register : Input.AbiRegister := ⟨.integer, size * 8, none⟩
     let cast : Input.AbiCastTarget := ⟨#[], none, register, size, false, attributes 128⟩

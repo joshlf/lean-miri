@@ -6,11 +6,11 @@ Pinned rustc sources: ty/util.rs::{is_trivially_freeze,is_trivially_unpin,
 needs_drop_components_with_async,struct_tail_raw}; ty/sty.rs::{builtin_deref,
 discriminant_ty,ptr_metadata_ty_or_tail,is_like_maybe_dangling};
 ty/inhabitedness/mod.rs::OpSemInhabitedness::is_inhabited_ty.
-All supported leaves are inhabited, Sized, Freeze and both Unpin traits;
-arrays, shared thin references and pointer signatures recurse; str remains unsupported and
-the only supported tuple is empty. No trait solver fallback
-is taken. Static/Erased region flags and erasure are computed structurally; parameter and
-inference flags are absent by construction.
+All supported leaves are inhabited, Freeze and both Unpin traits. str is
+unsized with canonical usize metadata; the other supported shapes are Sized.
+Arrays, shared references and pointer signatures recurse; the only supported
+tuple is empty. No trait solver fallback is taken. Static/Erased region flags
+and erasure are computed structurally; parameter/inference flags are absent.
 Hashing, nominal definitions and projection catalogs are intentionally absent. -/
 namespace Miri.Frontend.Foundation
 
@@ -20,13 +20,14 @@ where
   go (fuel : Nat) (ty : ConcreteType) : Except String Unit := do
     let .succ fuel := fuel | throw "primitive compiler facts recursion exhausted"
     match ty with
-    | .primitive "bool" "" | .primitive "char" "" => pure ()
+    | .primitive "bool" "" | .primitive "char" "" | .primitive "str" "" => pure ()
     | .primitive "int" name =>
       unless #["i8", "i16", "i32", "i64", "i128", "isize"].contains name do
         throw "unsupported signed compiler facts"
     | .primitive "uint" name =>
       unless #["u8", "u16", "u32", "u64", "u128", "usize"].contains name do
         throw "unsupported unsigned compiler facts"
+    | .array (.primitive "str" "") _ => throw "unsized str array compiler facts unsupported"
     | .array element _ => go fuel element
     | .pointer kind pointee =>
       let info ← pointerKindInfo kind
@@ -45,9 +46,15 @@ where
 /-- IDs must be provided by the physical registry: self, unit metadata, and u8
 (the pinned discriminant type for every supported non-enum shape). -/
 def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
-    (rawPointee : Option Nat := none) (normalized : Option Nat := none) :
+    (rawPointee : Option Nat := none) (normalized : Option Nat := none)
+    (usize : Option Nat := none) :
     Except String Input.TypeCompilerFacts := do
   primitiveFactsDomain ty
+  let isStr := match ty with | .primitive "str" "" => true | _ => false
+  let metadata ← if isStr then do
+      let some id := usize | throw "str compiler fact lacks canonical usize identity"
+      pure id
+    else pure unit
   let erasable ← hasErasableRegions ty
   let normalized ← if erasable then do
       let some id := normalized | throw "reference compiler fact lacks erased type identity"
@@ -72,10 +79,10 @@ def primitiveCompilerFacts (ty : ConcreteType) (self unit u8 : Nat)
       ("is_monomorphic", true), ("is_monomorphic_enough", true),
       ("is_like_maybe_dangling", false), ("is_freeze", true),
       ("is_unpin", true), ("is_unsafe_unpin", true), ("needs_drop", false),
-      ("opsem_inhabited", true), ("is_sized", true)]
+      ("opsem_inhabited", true), ("is_sized", !isStr)]
     typeQueries := #[
       ("normalized", some normalized), ("metadata_tail", some normalized),
-      ("pointer_metadata_type", some unit), ("discriminant_type", some u8),
+      ("pointer_metadata_type", some metadata), ("discriminant_type", some u8),
       ("builtin_deref_explicit", explicitDeref), ("builtin_deref_implicit", implicitDeref),
       ("boxed_type", none), ("unsafe_binder_erased", none)]
     discriminants := some ⟨false, none, #[]⟩ }
@@ -84,15 +91,24 @@ namespace PhysicalTypeRegistry
 
 /-- Attach derived leaves to explicitly demanded supported rows. Other rows
 retain their existing evidence, including absent facts for unsupported auxiliary
-str/reference material. Each selected row must pass primitiveFactsDomain. The
-only additional demands are the exact unit and u8 query result types. -/
+material. Each selected row must pass primitiveFactsDomain. The
+additional demands are exact unit/u8 result types, usize when str is selected,
+and supported region-erased identities. -/
 def withPrimitiveFactsFor (r : PhysicalTypeRegistry) (typeIds : Array Nat) : Except String PhysicalTypeRegistry := do
   let (r, unit) ← r.intern (.tuple #[])
   let (r, u8) ← r.intern (.primitive "uint" "u8")
+  let needsUsize := typeIds.any fun id => match r.registry.entries[id]? with
+    | some entry => match entry.type with | .primitive "str" "" => true | _ => false
+    | none => false
+  let (r, usize) ← if needsUsize then do
+      let (r, id) ← r.intern (.primitive "uint" "usize")
+      pure (r, some id)
+    else pure (r, none)
+  let roots := typeIds ++ #[unit, u8] ++ (match usize with | some id => #[id] | none => #[])
   let originalCount := r.types.size
   let mut registry := r
   let mut normalization := #[]
-  for i in typeIds ++ #[unit, u8] do
+  for i in roots do
     let some entry := registry.registry.entries[i]? | throw "compiler fact source identity absent"
     primitiveFactsDomain entry.type
     let (next, normalized) ← registry.intern (← eraseRegions entry.type)
@@ -101,14 +117,14 @@ def withPrimitiveFactsFor (r : PhysicalTypeRegistry) (typeIds : Array Nat) : Exc
   let r := registry
   let additional := (List.range (r.types.size - originalCount)).toArray.map (· + originalCount)
   let mut nodes := r.types
-  for i in typeIds ++ additional ++ #[unit, u8] do
+  for i in roots ++ additional do
     let some entry := r.registry.entries[i]? | throw "compiler fact type identity absent"
     let (node, _) ← r.lookup i
     let rawPointee := match node.shape with
       | .rawPointer pointee _ | .reference pointee _ _ => some pointee
       | _ => none
     let normalized := (normalization.find? (·.1 == i)).map (·.2)
-    let facts ← primitiveCompilerFacts entry.type i unit u8 rawPointee normalized
+    let facts ← primitiveCompilerFacts entry.type i unit u8 rawPointee normalized usize
     if h : i < nodes.size then
       nodes := nodes.set i { node with compilerFacts := some facts }
     else
