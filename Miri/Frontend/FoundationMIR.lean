@@ -41,6 +41,41 @@ private def runtimePhase (source : Json) : Except String MIR.MirPhase := do
   | "optimized" => return .Runtime .Optimized
   | _ => throw "foundation MIR runtime phase is unsupported"
 
+private def sourceUnwindReason (source : Json) : Except String MIR.UnwindTerminateReason := do
+  match ← source.getObjValAs? String "kind" with
+  | "abi" => pure .Abi
+  | "in_cleanup" => pure .InCleanup
+  | _ => throw "foundation unwind terminate reason unsupported"
+
+/-- Preserve the complete synchronous unwind action; cleanup targets must name
+actual cleanup blocks. This performs no drop-glue or exception query. -/
+def lowerSourceUnwind (source : Json) (blocks : Array Json) : Except String MIR.UnwindAction := do
+  match ← source.getObjValAs? String "kind" with
+  | "Continue" => pure .Continue
+  | "Unreachable" => pure .Unreachable
+  | "Terminate" => return .Terminate (← sourceUnwindReason (← source.getObjVal? "reason"))
+  | "Cleanup" =>
+    let target ← source.getObjValAs? Nat "target"
+    let some block := blocks[target]? | throw "foundation unwind cleanup target absent"
+    unless (← block.getObjValAs? Bool "cleanup") do throw "foundation unwind target is not cleanup"
+    return .Cleanup target
+  | _ => throw "foundation unwind action unsupported"
+
+/-- Synchronous source Drop is retained even for a no-drop type. The fixed
+interpreter still needs its genuine drop-glue query. Async drop requires source
+expansion and remains Unsupported rather than becoming a goto. -/
+def lowerSourceDrop (prepared : PreparedItem) (joins : RvalueSourceJoins) (source : Json) :
+    Except String (MIR.TerminatorKind × SourcePlaceTyping) := do
+  let _ ← source.getObjVal? "async_drop"
+  unless (← source.getObjValAs? (Option Nat) "async_drop").isNone do throw "foundation async drop expansion unsupported"
+  let blocks ← prepared.item.source.getObjValAs? (Array Json) "blocks"
+  let target ← source.getObjValAs? Nat "target"
+  unless target < blocks.size do throw "foundation drop return target out of bounds"
+  let place ← lowerSourcePlace prepared.item.localTypes (← source.getObjVal? "place") joins
+  let unwind ← lowerSourceUnwind (← source.getObjVal? "unwind") blocks
+  let replace ← source.getObjValAs? Bool "replace"
+  return (.Drop place.place target unwind replace none,place)
+
 /-- Exact non-call control syntax. A resume is admitted only in a cleanup
 block; it does not turn an unwinding frame into a normal return. -/
 def lowerSourceControlTerminator (source : Json) (blockCount : Nat) (cleanup : Bool) :
@@ -56,6 +91,11 @@ def lowerSourceControlTerminator (source : Json) (blockCount : Nat) (cleanup : B
   | "unwind_resume" =>
     unless cleanup do throw "foundation unwind resume outside cleanup"
     pure .UnwindResume
+  | "unwind_terminate" =>
+    let reason ← sourceUnwindReason (← source.getObjVal? "reason")
+    if reason == .InCleanup && !cleanup then throw "foundation terminate in cleanup outside cleanup block"
+    return .UnwindTerminate reason
+  | "unreachable" => pure .Unreachable
   | _ => throw "foundation MIR control terminator is unsupported"
 
 /-- Lower every supported block of one template after substitution.
@@ -119,6 +159,10 @@ def lowerPreparedMIR (prepared : PreparedItem)
     let kind ← if (← terminal.getObjValAs? String "kind") == "call" then do
         let some spans := callSpans[blockIndex]? | throw "foundation call spans absent"
         callTerminator blockIndex terminal spans
+      else if (← terminal.getObjValAs? String "kind") == "drop" then do
+        let (kind,place) ← lowerSourceDrop prepared rvalueJoins terminal
+        projectedPlaces := projectedPlaces.push place
+        pure kind
       else lowerSourceControlTerminator terminal blocks.size cleanup
     let terminator : MIR.Terminator := {
       sourceInfo := ⟨⟨sourceLocations.size⟩, ← terminalSource.getObjValAs? Nat "scope"⟩

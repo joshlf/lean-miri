@@ -26,6 +26,9 @@ private def scalarType : ConcreteType → Bool
 private def sizedAndCopy : Nat → ConcreteType → Bool
   | 0, _ => false
   | f+1, ty => if scalarType ty then true else match ty with
+    -- Pinned candidate_assembly.rs gives FnPtr unconditional builtin
+    -- Copy/Clone and Sized candidates (select/mod.rs has no constituents).
+    | .functionPointer .. => true
     | .array element _ => sizedAndCopy f element
     | .tuple elements => elements.all (sizedAndCopy f)
     -- The source graph currently drops pointer mutability at substitution.

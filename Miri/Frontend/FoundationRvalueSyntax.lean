@@ -103,6 +103,16 @@ def lowerJoinedRvalue (prepared : PreparedItem) (joins : RvalueSourceJoins)
       | "as_cast" => pure .AsCast
       | _ => throw "unsize coercion source unsupported"
     return ⟨.Cast (.PointerCoercion .Unsize coercionSource) operand (← joins.physicalType target), target, places⟩
+  | "aggregate_tuple" =>
+    let mut operands := #[]
+    let mut types := #[]
+    let mut places := #[]
+    for operandSource in (← source.getObjValAs? (Array Json) "operands") do
+      let (operand, type, facts) ← lowerSourceOperand prepared joins constant operandSource
+      operands := operands.push operand
+      types := types.push type
+      places := places ++ facts
+    return ⟨.Aggregate .Tuple operands, .tuple types, places⟩
   | "aggregate_closure" =>
     let definition ← source.getObjValAs? Nat "definition"
     let argumentsSource ← source.getObjValAs? (Array Json) "arguments"
