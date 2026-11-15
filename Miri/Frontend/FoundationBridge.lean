@@ -1,6 +1,7 @@
 import Miri.Frontend.FoundationInstance
 import Miri.Frontend.FoundationTarget
 import Miri.Frontend.FoundationSource
+import Miri.Frontend.FoundationSignatureBinder
 import Miri.Frontend.FoundationRegionErasure
 import Miri.Frontend.FoundationTypeRegistry
 
@@ -15,11 +16,12 @@ open Lean
 structure PreparedItem where
   target : ABI.RuntimeTargetDataLayout
   item : ItemTemplate
-  /-- Original compiler signature, including ABI, safety and variadic status. -/
+  /-- Original compiler signature, including binder, ABI, safety and variadic status. -/
   signature : Json
 
 /-- Prepare one explicitly selected template. Signature/local joins currently
-compare structural types after exact supported region erasure. Original source
+compare structural types after validated FnSig lifetime-binder and supported
+region erasure. Original source
 signature/local IDs remain retained; no other normalization is inferred.
 The template's supported environment and every local type are instantiated by
 `instantiateItem`; this function is not trait-method or shim resolution. -/
@@ -30,6 +32,7 @@ def prepareItem (d : Document) (definition : Nat)
   let item := {sourceItem with localTypes := ← sourceItem.localTypes.mapM eraseRegions}
   validateSourceMetadata item.source
   let signature ← item.source.getObjVal? "signature"
+  let signatureDocument ← eraseSignatureBinder d signature
   let inputs ← signature.getObjValAs? (Array Nat) "inputs"
   let output ← signature.getObjValAs? Nat "output"
   let locals ← item.source.getObjValAs? (Array Nat) "locals"
@@ -37,7 +40,7 @@ def prepareItem (d : Document) (definition : Nat)
   let types := arguments.map fun arg => match arg with | .type ty => some ty | _ => none
   let constants := arguments.map fun arg => match arg with | .constant n => some n | _ => none
   let resolved (id : Nat) : Except String ConcreteType := do
-    eraseRegions (← instantiate types constants (← typeExpr d id))
+    eraseRegions (← instantiate types constants (← typeExpr signatureDocument id))
   let some returnSource := locals[0]? | throw "MIR return local source type absent"
   unless sameConcrete 1024 (← resolved output) (← resolved returnSource) do
     throw "signature output disagrees with MIR return local after region erasure"

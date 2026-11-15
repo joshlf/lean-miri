@@ -3,7 +3,7 @@ use super::*;
 impl<'tcx> Material<'tcx> {
     pub(super) fn dynamic_type(&mut self, tcx: TyCtxt<'tcx>, predicates: &'tcx ty::List<ty::PolyExistentialPredicate<'tcx>>,
         region: ty::Region<'tcx>) -> Result<Value> {
-        if !matches!(region.kind(),ty::ReErased | ty::ReStatic) { return unsupported("dynamic region",region); }
+        let region = self.signature_region(tcx,region)?;
         let predicates = predicates.iter().map(|bound| {
             if !bound.bound_vars().is_empty() { return unsupported("bound existential predicate",bound); }
             Ok(match bound.skip_binder() {
@@ -26,6 +26,6 @@ impl<'tcx> Material<'tcx> {
                 },
             })
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"kind":"dynamic","region":if matches!(region.kind(),ty::ReStatic){"static"}else{"erased"},"predicates":predicates}))
+        Ok(json!({"kind":"dynamic","region":region,"predicates":predicates}))
     }
 }
