@@ -19,7 +19,6 @@ mod shared_json;
 mod pool_type;
 mod generic_material;
 mod definition_path;
-mod noop_drop;
 mod adt_material;
 mod pool_layout;
 mod pool_instance;
@@ -203,7 +202,7 @@ struct ExportDocument {
     #[serde(flatten)]
     runtime_catalogs: RuntimeCatalogs,
     body_roots: Vec<BodyRoot>,
-    bodies: Vec<pool_body::BodySeed<u64, Vec<u64>>>,
+    bodies: Vec<pool_body::Body<u64, Vec<u64>>>,
     compiler_coroutine_coverage: coroutine_coverage::Catalog<pool_body::Body<u64, Vec<u64>>>,
     definitions: Vec<pool_values::Definition>,
     type_constants: Vec<pool_values::TypeConstant>,
@@ -300,7 +299,7 @@ struct ExportContext<'tcx> {
     vtable_state: incremental::Vtables,
     virtual_state: incremental::Virtuals<'tcx>,
     vtable_diagnostics: vtable_diagnostics::Trace<'tcx>,
-    bodies: Pool<BodyKey<'tcx>, pool_body::BodySeed>,
+    bodies: Pool<BodyKey<'tcx>, pool_body::Body>,
     coroutine_coverage: coroutine_coverage::Catalog,
     constant_eval_role: Option<MirBodyRole>,
     definitions: Pool<rustc_hir::def_id::DefId, pool_values::Definition>,
@@ -1838,7 +1837,7 @@ impl ExportCallbacks {
         let mut document = ExportDocument {
             schema: "lean-miri-rustc-mir",
             schema_version: ROOT_SCHEMA_VERSION,
-            mir_query: "TyCtxt::instance_mir(InstanceKind::Item(def_id)); ordinary runtime function bodies use optimized_mir",
+            mir_query: "TyCtxt::instance_mir(instance.def); ordinary runtime function bodies use optimized_mir",
             compiler_abi_layout_schema: "physical_ty_and_layout_v1",
             producer,
             runtime_target_data_layout: target_data_layout,
@@ -2485,17 +2484,6 @@ fn export_reachable_instances<'tcx>(
             )?);
             continue;
         }
-        if noop_drop::eligible(tcx,instance) {
-            context.runtime_mir_frame_instances.insert(instance);
-            let body=source_noop_drop_json(tcx,instance,context)?;
-            let instance_kind=instance_kind_json(context,tcx,instance.def)?;
-            let definition=def_json(context,def_id);
-            let def_path=tcx.def_path_str(def_id);
-            let generic_args=generic_args_json(context,tcx,instance.args)?;
-            records.push(InstanceFact {instance_id,instance_kind,def_id:definition,def_path,generic_args,
-                data:pool_instance::InstanceData::InstanceMir {body,promoted_bodies:Vec::new()}});
-            continue;
-        }
         let template = checked_instance_mir(tcx, instance.def)?;
         if callable_runtime_instance(tcx, instance) {
             context.runtime_mir_frame_instances.insert(instance);
@@ -2599,28 +2587,6 @@ fn checked_instance_mir<'tcx>(
     Ok(body)
 }
 
-// Signature/location material only: never construct a no-op shim body here.
-fn source_noop_drop_json<'tcx>(tcx:TyCtxt<'tcx>,instance:ty::Instance<'tcx>,
-    context:&mut ExportContext<'tcx>)->Result<u64,String> {
-    if !noop_drop::eligible(tcx,instance) {
-        return export_failure("no-op drop source","outside selected shim category");
-    }
-    let (id,fresh)=context.bodies.reserve(BodyKey {instance,promoted:None});
-    if !fresh {return Ok(id as u64)}
-    // These exact source-generated shim families cannot own coroutine state.
-    // Record the raw body's marker even when it is the final body in the pool.
-    if context.coroutine_coverage.body_coroutines.len() <= id {
-        context.coroutine_coverage.body_coroutines.resize(id + 1,false);
-    }
-    let definition=instance.def.def_id();
-    def_json(context,definition); // raw generic signature declaration demand
-    let span=tcx.def_span(definition);
-    let source_span=backtrace_span_json(context,tcx,span,span);
-    let instance_id=context.register_metadata_instance(instance);
-    context.bodies.define(id,pool_body::BodySeed::NoopDrop{instance_id,source_span});
-    Ok(id as u64)
-}
-
 // Each concrete instance owns one executable body. Normalize only its template:
 // rebinding a substituted body can capture caller parameters incorrectly.
 fn resolved_mir_body_json<'tcx>(
@@ -2662,7 +2628,7 @@ fn resolved_mir_body_json<'tcx>(
                 format!("{:?}", body.source.instance).chars().take(1200).collect::<String>(), body.phase)
         } else { error }
     })?;
-    context.bodies.define(id, pool_body::BodySeed::Material {body:definition});
+    context.bodies.define(id, definition);
     Ok(id as u64)
 }
 
@@ -4673,18 +4639,15 @@ fn register_call_transfer_for_target<'tcx>(
     // Use the same substituted body that the source interpreter enters. ABI
     // argument types are validation metadata; the actual copy destination is
     // the instantiated MIR local (or spread tuple field).
-    let (callee_arg_count,callee_spread_arg,callee_argument_types,callee_return_type) =
-        if noop_drop::eligible(tcx,instance) {
-            let interface=noop_drop::interface(tcx,instance)?;
-            (interface.argument_count,interface.spread_argument,interface.arguments,interface.return_type)
-        } else {
-        let template = checked_instance_mir(tcx, instance.def)?;
-            let body=instance.try_instantiate_mir_and_normalize_erasing_regions(
-                tcx,template.typing_env(tcx),ty::EarlyBinder::bind(tcx,template.clone()))
-                .map_err(|error|format!("callee MIR instantiation failed: {error:?}"))?;
-            let arguments=body.args_iter().map(|local|(local,body.local_decls[local].ty)).collect();
-            (body.arg_count,body.spread_arg,arguments,body.local_decls[rustc_middle::mir::RETURN_PLACE].ty)
-        };
+    let template = checked_instance_mir(tcx, instance.def)?;
+    let body = instance.try_instantiate_mir_and_normalize_erasing_regions(
+        tcx, template.typing_env(tcx), ty::EarlyBinder::bind(tcx, template.clone()))
+        .map_err(|error| format!("callee MIR instantiation failed: {error:?}"))?;
+    let callee_arg_count = body.arg_count;
+    let callee_spread_arg = body.spread_arg;
+    let callee_argument_types: Vec<(rustc_middle::mir::Local, ty::Ty<'tcx>)> = body.args_iter()
+        .map(|local| (local, body.local_decls[local].ty)).collect();
+    let callee_return_type = body.local_decls[rustc_middle::mir::RETURN_PLACE].ty;
     let caller_args = if caller_location {
         caller_abi
             .args

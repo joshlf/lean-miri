@@ -780,21 +780,6 @@ pub(super) struct Body<Q = VtableQueryKey, C = crate::resolution_values::Pending
     pub required_consts: Vec<crate::pool_constant::Operand>,
 }
 
-#[derive(Serialize)]
-#[serde(tag = "body_kind", rename_all = "snake_case")]
-pub(super) enum BodySeed<Q = VtableQueryKey, C = crate::resolution_values::PendingCandidates> {
-    Material { #[serde(flatten)] body: Body<Q,C> },
-    NoopDrop {instance_id:u64, source_span:BacktraceSpan},
-}
-impl BodySeed<VtableQueryKey,crate::resolution_values::PendingCandidates> {
-    pub fn finish(self, ids:&std::collections::HashMap<(u64,Vec<u64>),u64>,
-        candidates:&std::collections::HashMap<u64,Vec<u64>>) -> Result<BodySeed<u64,Vec<u64>>,String> {
-        Ok(match self {
-            Self::Material{body}=>BodySeed::Material{body:body.finish(ids,candidates)?},
-            Self::NoopDrop{instance_id,source_span}=>BodySeed::NoopDrop{instance_id,source_span},
-        })
-    }
-}
 
 #[cfg(test)]
 mod tests {
