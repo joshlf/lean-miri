@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Frontend.FoundationPrimitiveFacts
 import Miri.Input.Decoder
 
@@ -23,7 +23,7 @@ def main (paths : List String) : IO Unit := do
   let d ← expect (Json.parse (← IO.FS.readFile sourcePath) >>= decode)
   let some body := d.bodies[0]? | throw (IO.userError "literal source missing")
   let definition ← expect (body.getObjValAs? Nat "definition")
-  let (r, abi) ← expect (rustFunctionAbiOfItem d definition #[])
+  let (r, abi) ← expect (rustFunctionAbiOfSourceSignature d definition #[])
   let r ← expect r.withPrimitiveFacts
   check (abi.returnValue.mode.kind == .pair && abi.returnValue.mode.attributes.size == 2) "str scalar pair ABI"
   let reference ← expect (Input.decodeJson (← IO.FS.readFile referencePath))

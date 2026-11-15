@@ -16,5 +16,5 @@ done
 bash tools/export-mir.sh --foundation --output "$RUN/closure-source.json" --foundation-signature-root std::process::ExitCode::to_i32 --root 'std::rt::lang_start::{closure#0}' -- \
   exporter/fixtures/foundation_signature_main.rs --crate-name=foundation_signature_main
 python3 tests/foundation/project_std_physical_oracle.py "$RUN/reference.json" "$RUN/oracle.json"
-flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build Miri.Frontend.FoundationFnAbiRegistry Miri.Frontend.FoundationBridge Miri.Frontend.FoundationSignatureFnAbi
+flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build Miri.Frontend.FoundationSignatureFnAbi
 "$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationStdPhysical.lean "$RUN/source.json" "$RUN/oracle.json" "$RUN/closure-source.json"

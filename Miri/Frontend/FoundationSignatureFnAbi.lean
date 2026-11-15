@@ -1,4 +1,9 @@
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationFnAbi
+import Miri.Frontend.FoundationPhysicalRegistry
+import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationObligations
+import Miri.Frontend.FoundationSignatureBinder
+import Miri.Frontend.FoundationRegionErasure
 import Miri.Frontend.FoundationGenericEnvironment
 import Miri.Frontend.FoundationItemResolution
 

@@ -1,6 +1,5 @@
-import Miri.Frontend.FoundationInstanceRegistry
-import Miri.Frontend.FoundationFnAbiRegistry
-import Miri.Frontend.FoundationMethodRuntime
+import Miri.Frontend.FoundationInstance
+import Miri.Input.Model.Catalogs
 
 /-! Source attributes to fixed-interpreter runtime metadata for ordinary root
 items. `Instance::print` and `FmtPrinter::print_path_with_generic_args` supply the
@@ -118,36 +117,5 @@ def runtimeInstanceOfHeader (document : Document) (definitionId : Nat)
     codegenSymbolName := some symbol
     symbolName := none
   }
-
-/-- The ordinary body wrapper and header-only seed share the same declaration
-attribute path. Associated methods retain their independently checked resolver. -/
-def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
-    (node : Input.InstanceNode) : Except String Input.Catalog.RuntimeInstance := do
-  let some definition := document.definitions[item.definition]? | throw "runtime source definition absent"
-  if (← definition.getObjValAs? String "kind") == "assoc_fn" then
-    let _ ← frameMetadataOfSource document
-    return ← runtimeUnitMethodOfItem document item node
-  runtimeInstanceOfHeader document item.definition item.arguments item.source node
-
-structure RuntimeItemComponents where
-  registry : InstanceRegistry
-  abi : Input.FunctionAbi
-  runtime : Input.Catalog.RuntimeInstance
-  frames : Input.Catalog.FrameMetadata
-  instanceAbi : Input.Catalog.InstanceAbi
-
-/-- Fresh single-item ABI/instance/runtime component construction. ABI index zero
-is the index of this returned single ABI pool, with no extra variadic arguments.
-This introduces no allocation IDs and does not construct a process entry. -/
-def buildRuntimeItem (document : Document) (definition : Nat)
-    (arguments : Array ItemArgument) : Except String RuntimeItemComponents := do
-  let item ← instantiateItem document definition arguments
-  let (physical, abi) ← rustFunctionAbiOfItem document definition arguments
-  let registry ← InstanceRegistry.start physical
-  let (registry, node) ← registry.intern definition arguments
-  let runtime ← runtimeInstanceOfItem document item node
-  let frames ← frameMetadataOfSource document
-  let instanceAbi : Input.Catalog.InstanceAbi := ⟨node.id, #[], 0⟩
-  return ⟨registry, abi, runtime, frames, instanceAbi⟩
 
 end Miri.Frontend.Foundation

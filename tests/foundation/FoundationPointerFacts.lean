@@ -1,5 +1,5 @@
 import Miri.Frontend.FoundationPrimitiveFacts
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Input.Decoder
 
 open Lean Miri Miri.Frontend.Foundation
@@ -17,7 +17,7 @@ def main (paths : List String) : IO Unit := do
   let document ← checked (Json.parse (← IO.FS.readFile foundationPath) >>= decode)
   let some body := document.bodies[0]? | throw (IO.userError "source body absent")
   let definition ← checked (body.getObjValAs? Nat "definition")
-  let (initial, abi) ← checked (rustFunctionAbiOfItem document definition #[])
+  let (initial, abi) ← checked (rustFunctionAbiOfSourceSignature document definition #[])
   let physical ← checked initial.withPrimitiveFacts
   let (node, _) ← checked (physical.lookup abi.returnValue.typeId)
   let some computed := node.compilerFacts | throw (IO.userError "computed pointer facts absent")

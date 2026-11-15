@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationObligations
 import Miri.Frontend.FoundationTraitClaims
 
 open Lean Miri.Frontend.Foundation
@@ -14,15 +14,13 @@ def main (paths : List String) : IO Unit := do
     | .ok d => pure d
     | .error e => throw (IO.userError e)
   let some body := document.bodies[0]? | throw (IO.userError "missing trait fixture body")
-  let definition ← match body.getObjValAs? Nat "definition" with
-    | .ok n => pure n
-    | .error e => throw (IO.userError e)
+  let environment ← IO.ofExcept (body.getObjVal? "environment")
   for name in #["u8", "u32"] do
-    match instantiateItem document definition #[.type (.primitive "uint" name)] with
+    match checkEnvironment document #[some (.primitive "uint" name)] #[none] environment with
     | .ok _ => pure ()
     | .error e => throw (IO.userError e)
-  rejected (instantiateItem document definition #[.type (.primitive "uint" "u16")])
-  rejected (instantiateItem document definition #[.type (.array (.primitive "uint" "u8") 3)])
+  rejected (checkEnvironment document #[some (.primitive "uint" "u16")] #[none] environment)
+  rejected (checkEnvironment document #[some (.array (.primitive "uint" "u8") 3)] #[none] environment)
   let some row := document.definitions.find? (fun d => (d.getObjVal? "local_trait").isOk)
     | throw (IO.userError "missing local trait source")
   let source ← match row.getObjVal? "local_trait" with

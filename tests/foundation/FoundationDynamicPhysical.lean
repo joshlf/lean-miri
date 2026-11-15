@@ -1,6 +1,5 @@
 import Miri.Frontend.FoundationPrimitiveFacts
-import Miri.Frontend.FoundationBridge
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Input.Decoder
 
 open Lean Miri Miri.Frontend.Foundation
@@ -21,8 +20,9 @@ def main (paths : List String) : IO Unit := do
   let d ← expect (Json.parse (← IO.FS.readFile sourcePath) >>= decode)
   let some sourceBody := d.bodies[0]? | throw (IO.userError "dyn source body absent")
   let definition ← expect (sourceBody.getObjValAs? Nat "definition")
-  let prepared ← expect (prepareItem d definition #[])
-  let some ty := prepared.item.localTypes[1]? | throw (IO.userError "dyn argument absent")
+  let localTypes ← expect ((← expect (sourceBody.getObjValAs? (Array Nat) "locals")).mapM fun id => do
+    eraseRegions (← instantiate #[] #[] (← typeExpr d id)))
+  let some ty := localTypes[1]? | throw (IO.userError "dyn argument absent")
   let (r, id) ← expect ((PhysicalTypeRegistry.start d).intern ty)
   let r ← expect (r.withPrimitiveFactsFor (List.range r.types.size).toArray)
   let (node, _) ← expect (r.lookup id)
@@ -106,12 +106,12 @@ def main (paths : List String) : IO Unit := do
   let absent := Json.mkObj [("mode",toJson "metadata_lang_item_absent"),("metadata_type",Json.null)]
   rejects ((PhysicalTypeRegistry.start {d with source := d.source.setObjVal! "dyn_metadata_source" absent}).intern ty)
   let some entry := r.registry.entries[dynId]? | throw (IO.userError "dyn concrete type absent")
-  rejects (layoutOfRuntime prepared.target ty)
+  rejects (layoutOfRuntime (← expect (runtimeTargetOfTarget d.target)) ty)
   rejects (layoutOfDocument d (.array entry.type 0))
   rejects (rustPassMode d.target "x86_64" true entry.type (some "No"))
   if node.shapeKind == .reference then
-    let (_, abi) ← expect (rustFunctionAbiOfItem d definition #[])
+    let (_, abi) ← expect (rustFunctionAbiOfSourceSignature d definition #[])
     let some argument := abi.arguments[0]? | throw (IO.userError "dyn ABI argument absent")
     check (argument.mode.kind == .pair) "shared dyn argument ABI must be pair"
-  else rejects (rustFunctionAbiOfItem d definition #[])
+  else rejects (rustFunctionAbiOfSourceSignature d definition #[])
   IO.println "dynamic physical types: full compiler layouts, predicate joins and structural leaves match; unknown metadata/solver facts reject"

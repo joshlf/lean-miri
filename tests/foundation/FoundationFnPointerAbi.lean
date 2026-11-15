@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Input.Decoder
 
 open Lean Miri Miri.Frontend.Foundation
@@ -16,7 +16,7 @@ def main (paths : List String) : IO Unit := do
   let document ← checked (Json.parse (← IO.FS.readFile foundationPath) >>= decode)
   let some body := document.bodies[0]? | throw (IO.userError "source body absent")
   let definition ← checked (body.getObjValAs? Nat "definition")
-  let (physical, computed) ← checked (rustFunctionAbiOfItem document definition #[])
+  let (physical, computed) ← checked (rustFunctionAbiOfSourceSignature document definition #[])
   let compiler ← checked (Input.decodeJson (← IO.FS.readFile compilerPath))
   let doc := compiler.document
   let some root := doc.bodyRoots[0]? | throw (IO.userError "compiler root absent")

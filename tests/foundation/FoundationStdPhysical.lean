@@ -1,5 +1,4 @@
-import Miri.Frontend.FoundationBridge
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Input.TableTail
 open Lean Miri Miri.Frontend.Foundation
@@ -17,11 +16,12 @@ def main (paths : List String) : IO Unit := do
   let expected ← expect (oracle.getObjValAs? (Array Json) "local_layouts")
   let some body := d.bodies[0]? | throw (IO.userError "std body absent")
   let definition ← expect (body.getObjValAs? Nat "definition")
-  let prepared ← expect (prepareItem d definition #[])
-  check (prepared.item.localTypes.size == expected.size && expected.size == 7) "std local coverage"
+  let localTypes ← expect ((← expect (body.getObjValAs? (Array Nat) "locals")).mapM fun id => do
+    eraseRegions (← instantiate #[] #[] (← typeExpr d id)))
+  check (localTypes.size == expected.size && expected.size == 7) "std local coverage"
   let target ← expect (runtimeTargetOfTarget d.target)
   let mut registry := PhysicalTypeRegistry.start d
-  for (ty,i) in prepared.item.localTypes.zipIdx do
+  for (ty,i) in localTypes.zipIdx do
     let (r,id) ← expect (registry.intern ty)
     registry := r
     let actual ← expect (r.runtimeLayout id)
@@ -29,11 +29,11 @@ def main (paths : List String) : IO Unit := do
     let layout ← expect (Input.JsonReader.run Input.DecoderValues.decodeCompilerLayout row.compress)
     let compiler ← expect ((Input.RuntimeMetadata.layout target layout).mapError toString)
     check (actual.layout == compiler) s!"complete real std local{i} layout differs"
-  let _ ← expect (rustFunctionAbiOfItem d definition #[])
+  let _ ← expect (rustFunctionAbiOfSourceSignature d definition #[])
   -- The same tuple's MaybeUnsized tail must not use the closure's AlwaysSized
   -- ordering or seed. Inspect its exact independently emitted compiler row in
   -- the closure source test separately; here check the pinned distinction.
-  let some (ConcreteType.closure closureDefinition args) := prepared.item.localTypes[6]? | throw (IO.userError "std capture closure absent")
+  let some (ConcreteType.closure closureDefinition args) := localTypes[6]? | throw (IO.userError "std capture closure absent")
   let some (ConcreteType.tuple fields) := args.back? | throw (IO.userError "capture tuple absent")
   let tuple ← expect (physicalLayoutOfDocument d (.tuple fields))
   let closure ← expect (physicalLayoutOfDocument d (.closure closureDefinition args))
@@ -77,7 +77,7 @@ def main (paths : List String) : IO Unit := do
   rejects (rustPassMode closureSource.target closureSource.target.architecture false (.nominal defId #[]))
   rejects (rustPassModeOfDocument { closureSource with target := { closureSource.target with architecture := "aarch64" } }
     false (.nominal defId #[]))
-  let some result := prepared.item.localTypes[5]? | throw (IO.userError "Result source absent")
+  let some result := localTypes[5]? | throw (IO.userError "Result source absent")
   rejects (rustPassModeOfDocument d false result)
   let methodDefinition ← expect (oracle.getObjVal? "method_definition")
   let methodCrate ← expect (methodDefinition.getObjValAs? Nat "crate")
@@ -110,4 +110,4 @@ def main (paths : List String) : IO Unit := do
     returnValue := rebase fullAbi.returnValue expectedAbi.returnValue }
   check (rebased == expectedAbi) "complete inherent method FnAbi differs"
   rejects (rustFunctionAbiOfSourceSignature { closureSource with source := (closureSource.source.setObjVal! "source_function_signatures" (.arr #[])) } methodId #[])
-  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers/full inherent FnAbi; unsupported aggregate controls"
+  IO.println "PASS actual std source locals, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers/full inherent FnAbi; unsupported aggregate controls"

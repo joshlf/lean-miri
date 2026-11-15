@@ -69,8 +69,7 @@ def main (paths : List String) : IO Unit := do
       let some root := reference.bodyRoots[0]? | throw (IO.userError "compiler root absent")
       pure (definition, root.entryInstance)
     else throw (IO.userError "unknown comparison mode")
-  let (r, abi) ← expect (if mode == "header" then rustFunctionAbiOfSourceSignature d definition #[]
-    else rustFunctionAbiOfItem d definition #[])
+  let (r, abi) ← expect (rustFunctionAbiOfSourceSignature d definition #[])
   let queries := reference.queries.instanceAbis.filter (fun q => q.instanceId == compilerInstance && q.extraArgumentTypes.isEmpty)
   check (queries.size == 1) "compiler ABI key missing or ambiguous"
   let some query := queries[0]? | throw (IO.userError "compiler ABI key absent")
@@ -100,14 +99,10 @@ def main (paths : List String) : IO Unit := do
   rejects (rustFunctionAbiOfSourceSignature absentOpt definition #[])
   if mode == "header" then
     check (!(d.bodies.any fun body => (body.getObjValAs? Nat "definition").toOption == some definition)) "std header masquerades as executable body"
-    rejects (rustFunctionAbiOfItem d definition #[])
     rejects (rustFunctionAbiOfSourceSignature {d with source := d.source.setObjVal! "source_function_signatures" (.arr #[])} definition #[])
     rejects (rustFunctionAbiOfSourceSignature {d with source := d.source.setObjVal! "dyn_metadata_source" Json.null} definition #[])
   else
-    let (signatureRegistry, signatureAbi) ← expect (rustFunctionAbiOfSourceSignature d definition #[])
-    check (signatureAbi == abi && signatureRegistry.types.size == r.types.size) "body/header ABI queries disagree"
     let some body := d.bodies[0]? | throw (IO.userError "body source missing")
     let broken := {d with bodies := #[body.setObjVal! "locals" Json.null]}
     let _ ← expect (rustFunctionAbiOfSourceSignature broken definition #[])
-    rejects (rustFunctionAbiOfItem broken definition #[])
   IO.println s!"{mode}: complete compiler FnAbi/type/layout comparison passed; unavailable/optimized source rejects"

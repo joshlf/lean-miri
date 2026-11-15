@@ -1,5 +1,5 @@
 import Miri.Frontend.FoundationGenericEnvironment
-import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationObligations
 import Miri.Frontend.FoundationOutlives
 import Miri.Input.Decoder
 
@@ -25,8 +25,10 @@ def main (paths : List String) : IO Unit := do
       (clause.getObjValAs? String "kind").toOption == some "type_outlives" &&
       (clause.getObjValAs? String "region").toOption == some "static") do
     throw (IO.userError "source static outlives predicate absent")
-  let item ← checked (instantiateItem document definition #[.type (.tuple #[])])
-  unless item.localTypes.all (fun ty => match ty with | .tuple fields => fields.isEmpty | _ => false) do
+  checked (checkEnvironment document #[some (.tuple #[])] #[none] environment)
+  let locals ← checked ((← checked (body.getObjValAs? (Array Nat) "locals")).mapM fun id => do
+    instantiate #[some (.tuple #[])] #[none] (← typeExpr document id))
+  unless locals.all (fun ty => match ty with | .tuple fields => fields.isEmpty | _ => false) do
     throw (IO.userError "unit type-outlives substitution changed")
   let some sourceDefinition := document.definitions[definition]? | throw (IO.userError "source definition absent")
   let crateIndex ← checked (sourceDefinition.getObjValAs? Nat "crate_index")

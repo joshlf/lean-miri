@@ -15,7 +15,6 @@ import Miri.Frontend.FoundationSpanRegistry
 import Miri.Frontend.FoundationGlobalBytes
 import Miri.Frontend.FoundationAllocations
 import Miri.Frontend.FoundationLinkSections
-import Miri.Frontend.FoundationDirectCalls
 
 /-! Normal compiler-entry seed. Only compiler-selected startup header demands
 are materialized here. Source instances have identityOnly capability; no MIR
@@ -72,7 +71,8 @@ def compilerEntrySeed (document : Document) : Except String Input.SourceCompiler
     if (primitiveFactsDomain ty).isOk then some id else none
   let physical ← physical.withPrimitiveFactsFor knownFacts
   let helper ← helperAbi physical startAbi
-  let registry ← InstanceRegistry.start physical
+  let some sourceTypes := material.physical | throw "typed source definitions unavailable"
+  let definitions := sourceTypes.definitions.map (·.raw)
   let initialSpans : SpanRegistry := ⟨#[],#[],#[],#[]⟩
   let (spans, rootSpan) ← appendSessionRootSpan initialSpans document.source
   let some sourceMemory := material.allocations | throw "typed source memory graph unavailable"
@@ -106,13 +106,13 @@ def compilerEntrySeed (document : Document) : Except String Input.SourceCompiler
     producer, producerSettings, sourceMaterial := some material
     runtimeTargetDataLayout := some (← evidenceOfTarget document.target)
     compilerAbiLayoutSchema := some "physical_ty_and_layout_v1"
-    definitions := registry.definitions, typeConstants := physical.typeConstants, predicates := physical.predicates
+    definitions := definitions, typeConstants := physical.typeConstants, predicates := physical.predicates
     layouts := physical.layouts, types := physical.types, files := spans.files, spans := spans.spans
     allocations := memory, compilerAllocIdWorld := none, instances := #[], selectedScope := none
     functionAbis := #[mainAbi,startAbi,helper], bodyRoots := #[], bodies := #[], queries }
   let world ← Input.SourceCompilerWorld.create initial
-  let some mainRaw := registry.definitions[entry.definition]? | throw "source main definition absent"
-  let some startRaw := registry.definitions[start]? | throw "source start definition absent"
+  let some mainRaw := definitions[entry.definition]? | throw "source main definition absent"
+  let some startRaw := definitions[start]? | throw "source start definition absent"
   let (world,mainId) ← Input.SourceCompilerWorld.internItem material.declarations world ⟨mainRaw,#[]⟩
   let (world,startId) ← Input.SourceCompilerWorld.internItem material.declarations world
     ⟨startRaw,#[.Type mainAbi.returnValue.typeId]⟩
@@ -137,6 +137,29 @@ def compilerEntrySeed (document : Document) : Except String Input.SourceCompiler
     " {" ++ startRuntime.display ++ "}"
   let functionType := world.canonical.types.size
   let functionLayout := world.canonical.layouts.size
+  -- Pinned FnDef LayoutData::unit(cx,true): i8 alignment, not tuple aggregate alignment.
+  let target ← runtimeTargetOfTarget document.target
+  let alignment ← target.i8Align.bytes.mapError toString
+  let functionItemLayout : Input.Layout := {
+    maxReprAlignBytes := none
+    reprC := false
+    uninhabited := false
+    largestNiche := none
+    randomizationSeed := 0
+    kind := .layout
+    sizeBytes := some 0
+    abiAlignBytes := some alignment.toNat
+    unadjustedAbiAlignBytes := some alignment.toNat
+    fieldOffsetsBytes := .explicit #[]
+    fields := some ⟨.arbitrary, 0, none, none, #[], #[]⟩
+    variantsLayout := some ⟨.single, some 0, none, none, none, #[]⟩
+    backendRepresentation := some ⟨.memory, some true, none, none, none, none, none, none, none⟩
+    variantsKind := some .single
+    backendReprKind := some .memory
+    variants := none
+    backendRepr := none
+  }
+
   let type : Input.TypeNode := {
     id := functionType, layoutId := functionLayout
     shape := .functionDefinition start #[.Type mainAbi.returnValue.typeId] sig variables, display }
@@ -148,7 +171,7 @@ def compilerEntrySeed (document : Document) : Except String Input.SourceCompiler
     signature := ⟨true,false,false,mainAbi.returnValue.typeId,mainPointer,some ⟨startId,functionType⟩⟩ }
   let canonical := { world.canonical with
     types := world.canonical.types.push type
-    layouts := world.canonical.layouts.push (← DirectCallPool.fnDefinitionLayout (← runtimeTargetOfTarget document.target))
+    layouts := world.canonical.layouts.push functionItemLayout
     queries := { queries with
       runtime := { queries.runtime with instances := #[mainRuntime,startRuntime] }
       instanceAbis := #[⟨mainId,#[],mainAbiId⟩,⟨startId,#[],startAbiId⟩]

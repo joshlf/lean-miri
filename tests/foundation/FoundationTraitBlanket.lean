@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationInstance
+import Miri.Frontend.FoundationObligations
 import Miri.Frontend.FoundationTraitClaims
 
 open Lean Miri.Frontend.Foundation
@@ -17,11 +17,11 @@ def main (paths : List String) : IO Unit := do
   let [path] := paths | throw (IO.userError "expected fresh array blanket source JSON")
   let document ← unwrap (Json.parse (← IO.FS.readFile path) >>= decode)
   let some body := document.bodies[0]? | throw (IO.userError "missing marked template")
-  let definition ← unwrap (body.getObjValAs? Nat "definition")
+  let environment ← unwrap (body.getObjVal? "environment")
   let some row := document.definitions.find? (fun row => (row.getObjVal? "local_trait").isOk)
     | throw (IO.userError "missing local blanket source")
   for name in #["u8", "u32"] do
-    let _ ← unwrap (instantiateItem document definition #[.type (.array (.primitive "uint" name) 3)])
+    let _ ← unwrap (checkEnvironment document #[some (.array (.primitive "uint" name) 3)] #[none] environment)
   unless !(← unwrap (localTraitClaim row (.array (.primitive "uint" "u8") 4))) do
     throw (IO.userError "nonmatching array length satisfied local trait")
   let shared := ConcreteType.array (.pointer "reference_static_const" (.primitive "uint" "u8")) 3

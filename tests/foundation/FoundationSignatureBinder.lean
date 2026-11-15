@@ -1,4 +1,5 @@
-import Miri.Frontend.FoundationBridge
+import Miri.Frontend.FoundationRegionErasure
+import Miri.Frontend.FoundationTypeRegistry
 import Miri.Frontend.FoundationSignatureBinder
 import Miri.Input.Decoder
 
@@ -16,7 +17,6 @@ def main (paths : List String) : IO Unit := do
   let [finitePath, compilerPath] := paths | throw (IO.userError "expected finite and ordinary binder exports")
   let document ← checked (Json.parse (← IO.FS.readFile finitePath) >>= decode)
   let some body := document.bodies[0]? | throw (IO.userError "source body absent")
-  let definition ← checked (body.getObjValAs? Nat "definition")
   let signature ← checked (body.getObjVal? "signature")
   let variables ← checked (signatureBoundVariables document signature)
   let [MIR.BoundVariableKind.Region (.Named sourceNamed)] := variables.toList
@@ -32,8 +32,9 @@ def main (paths : List String) : IO Unit := do
   let ty ← checked (instantiate #[] #[] (← checked (typeExpr erased input)))
   unless sameConcrete 1024 ty (.pointer "reference_erased_const" (.primitive "uint" "u8")) do
     throw (IO.userError "known bound reference did not erase exactly")
-  let prepared ← checked (prepareItem document definition #[])
-  unless prepared.item.localTypes.all (sameConcrete 1024 ty) do
+  let locals ← checked ((← checked (body.getObjValAs? (Array Nat) "locals")).mapM fun id => do
+    eraseRegions (← instantiate #[] #[] (← typeExpr document id)))
+  unless locals.all (sameConcrete 1024 ty) do
     throw (IO.userError "signature/body erasure join changed")
   let compiler ← checked (Input.decodeJson (← IO.FS.readFile compilerPath))
   let doc := compiler.document

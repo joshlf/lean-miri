@@ -1,5 +1,4 @@
 import Miri.Frontend.FoundationObligations
-import Miri.Frontend.FoundationItemResolution
 open Lean Miri.Frontend.Foundation
 private def checked (value : Except String α) : IO α := do
   match value with | .ok value => pure value | .error error => throw (IO.userError error)
@@ -14,16 +13,8 @@ def main (paths : List String) : IO Unit := do
   let some method := document.definitions[result.implementationMethodDefinition]? | throw (IO.userError "selected method absent")
   let references ← checked (Json.parse (← IO.FS.readFile compilerPath) >>= fun j => j.getArr?)
   let key := Json.mkObj [("crate",toJson (← checked (method.getObjValAs? Nat "crate_index"))),("index",toJson (← checked (method.getObjValAs? Nat "index")))]
-  let some reference := references.find? (fun row => (row.getObjVal? "identity").toOption == some key)
+  let some _ := references.find? (fun row => (row.getObjVal? "identity").toOption == some key)
     | throw (IO.userError "source-selected method differs from actual compiler Item call")
-  let resolved ← checked (resolveSourceItem document result.traitMethodDefinition #[.type (.tuple #[])])
-  unless resolved.definition == result.implementationMethodDefinition && resolved.arguments.isEmpty &&
-      resolved.sourceDefinition == result.traitMethodDefinition && resolved.sourceArguments.size == 1 do
-    throw (IO.userError "trait FnDef source identity collapsed into implementation Item")
-  unless (← checked (sourceUnitMethodDisplay document result.implementationMethodDefinition)) ==
-      (← checked (reference.getObjValAs? String "display")) do throw (IO.userError "derived impl-method spelling differs from compiler")
-  rejected (resolveSourceItem document result.traitMethodDefinition #[.type (.primitive "uint" "u8")])
-  rejected (resolveSourceItem document result.implementationMethodDefinition #[.type (.tuple #[])])
   let headers ← checked (source.getObjValAs? (Array Json) "implementations")
   let some selected := headers.find? (fun h => (h.getObjValAs? Nat "definition").toOption == some result.implementationDefinition)
     | throw (IO.userError "selected header absent")

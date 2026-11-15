@@ -15,8 +15,8 @@ for fixture in foundation_dynamic foundation_dynamic_raw; do
   done
 done
 flock /tmp/lean-miri-lake-build.lock "$ELAN_HOME/bin/lake" build \
-  Miri.Frontend.FoundationPhysicalRegistry Miri.Frontend.FoundationPrimitiveFacts Miri.Frontend.FoundationBridge \
-  Miri.Frontend.FoundationFnAbiRegistry
+  Miri.Frontend.FoundationPhysicalRegistry Miri.Frontend.FoundationPrimitiveFacts \
+  Miri.Frontend.FoundationSignatureFnAbi
 for fixture in foundation_dynamic foundation_dynamic_raw; do
   "$ELAN_HOME/bin/lake" env lean --run tests/foundation/FoundationDynamicPhysical.lean \
     "$RUN/$fixture-foundation.json" "$RUN/$fixture-reference.json"

@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationBridge
+import Miri.Frontend.FoundationSignatureBinder
 open Lean Miri.Frontend.Foundation
 private def checked {α : Type} (value : Except String α) : IO α :=
   match value with | .ok value => pure value | .error error => throw (IO.userError error)
@@ -13,7 +13,6 @@ def main (paths : List String) : IO Unit := do
   let .functionPointer #[.primitive "uint" "u8"] (.primitive "uint" "u8") "safe" "rust" false ←
       checked (instantiate #[] #[] (← checked (typeExpr erased callback)))
     | throw (IO.userError "noncapturing inner callback changed")
-  let _ ← checked (prepareItem document (← checked (body.getObjValAs? Nat "definition")) #[])
   let some row := document.types[callback]? | throw (IO.userError "callback source row absent")
   let shape ← checked (row.getObjVal? "shape")
   let inner ← checked (shape.getObjVal? "signature")

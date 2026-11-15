@@ -1,4 +1,4 @@
-import Miri.Frontend.FoundationFnAbiRegistry
+import Miri.Frontend.FoundationSignatureFnAbi
 import Miri.Frontend.FoundationPrimitiveFacts
 
 open Lean Miri Miri.Frontend.Foundation
@@ -15,17 +15,19 @@ def main (paths : List String) : IO Unit := do
   let d ← expect (Json.parse text >>= decode)
   let some sourceBody := d.bodies[0]? | throw (IO.userError "source body missing")
   let definition ← expect (sourceBody.getObjValAs? Nat "definition")
-  let prepared ← expect (prepareItem d definition #[])
-  let output ← expect (prepared.signature.getObjValAs? Nat "output")
+  let localTypes ← expect ((← expect (sourceBody.getObjValAs? (Array Nat) "locals")).mapM fun id => do
+    eraseRegions (← instantiate #[] #[] (← typeExpr d id)))
+  let signature ← expect (functionHeaderSource d definition >>= fun header => header.getObjVal? "signature")
+  let output ← expect (signature.getObjValAs? Nat "output")
   let sourceType ← expect (typeExpr d output >>= instantiate #[] #[])
   let array := ConcreteType.array (.primitive "uint" "u8") 4
   let static := ConcreteType.pointer "reference_static_const" array
   let erased := ConcreteType.pointer "reference_erased_const" array
   check (sameConcrete 64 sourceType static) "source static region lost"
   check (sameConcrete 64 (← expect (eraseRegions sourceType)) erased) "pure source erasure"
-  let some localType := prepared.item.localTypes[0]? | throw (IO.userError "return local missing")
+  let some localType := localTypes[0]? | throw (IO.userError "return local missing")
   check (sameConcrete 64 localType erased) "executable local not canonical erased"
-  let (r, abi) ← expect (rustFunctionAbiOfItem d definition #[])
+  let (r, abi) ← expect (rustFunctionAbiOfSourceSignature d definition #[])
   check (abi.arguments.isEmpty && abi.returnValue.mode.kind == .direct) "thin return mode"
   let some attrs := abi.returnValue.mode.attributes[0]? | throw (IO.userError "return attributes missing")
   check (attrs.regularBits == 144 && attrs.pointeeSizeBytes == 0 && attrs.pointeeAlignBytes.isNone)
@@ -57,5 +59,5 @@ def main (paths : List String) : IO Unit := do
   let some sourceRow := d.types[output]? | throw (IO.userError "source reference row absent")
   let shape ← expect (sourceRow.getObjVal? "shape")
   let mutated := sourceRow.setObjVal! "shape" (shape.setObjVal! "mutable" (toJson true))
-  rejects (prepareItem {d with types := d.types.set! output mutated} definition #[])
+  rejects (rustFunctionAbiOfSourceSignature {d with types := d.types.set! output mutated} definition #[])
   IO.println "thin shared references: pure erasure, exact optNo return ABI and compiler leaves passed"
