@@ -4,13 +4,19 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 OUT="${1:-$ROOT/scratch/rustc-boundary}"
 mkdir -p "$OUT"
-bash tools/export-mir.sh --output "$OUT/fnptr.json" --root roundtrip -- \
+if [[ -n "${EXPORTER_BIN:-}" ]]; then
+  source exporter/tests/fixture-env.sh
+  export_document() { "$EXPORTER_BIN" "$@"; }
+else
+  export_document() { bash tools/export-mir.sh "$@"; }
+fi
+export_document --output "$OUT/fnptr.json" --root roundtrip -- \
   tests/compiler_queries/fn-pointer-shims.rs --crate-type=lib \
   --crate-name=fnptr_shim_boundary -Zmir-opt-level=0
-bash tools/export-mir.sh --output "$OUT/constants.json" --root miri_start -- \
+export_document --output "$OUT/constants.json" --root miri_start -- \
   tests/compiler_queries/concrete-constants.rs --crate-name=concrete_constants \
   --edition=2024 -Cpanic=abort -Zmir-opt-level=0
-bash tools/export-mir.sh --output "$OUT/guest.json" --root miri_start -- \
+export_document --output "$OUT/guest.json" --root miri_start -- \
   tests/compiler_queries/material-guest.rs --crate-name=material_guest \
   --edition=2024 -Cpanic=abort -Zmir-opt-level=0 --cfg=miri
 flock /tmp/lean-miri-lake-build.lock lake build Miri.Input.Decoder Miri.Input.CompilerInstanceAbi Miri.Input.CompilerMirConstants
