@@ -69,9 +69,11 @@ For an ordinary std executable, the finite export now selects the actual
 `std::rt::lang_start` MIR template and Lean checks its `T: 'static` obligation
 from source. Its body captures the main function pointer in a closure, unsizes a
 reference to `dyn Fn() -> i32 + Sync + RefUnwindSafe`, and calls
-`std::rt::lang_start_internal`. Structural dynamic bounds, closure source,
-wide-reference metadata, vtable construction and their MIR lowering must be
-connected before this path can run. Exporting the selected template does not
+`std::rt::lang_start_internal`. The finite source preserves the structural
+principal, projection and auto-trait predicates, and Lean checks explicit
+bound matches. Closure source, wide-reference metadata, vtable construction,
+supertrait resolution and their MIR lowering must be connected before this
+path can run. Exporting the selected template does not
 establish an ordinary std startup execution.
 
 Lean rejects demands outside the supported source domain. In particular,

@@ -76,8 +76,11 @@ trust boundary and export-only performance comparison are in
 For ordinary std main, the selected external `std::rt::lang_start` generic MIR
 and its actual promoted table are available as finite material. A `T: 'static`
 clause is checked purely for the unit domain. The next real source boundary is
-the `dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` existential type in that
-body; dynamic trait/projection/vtable computation is still missing.
+the closure captured by that body. The actual
+`dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` type is retained structurally;
+Lean parses its principal, projection and auto-trait bounds and checks explicit
+source-bound matches. Supertrait resolution, closure layout/calls, vtable
+construction and allocation remain unsupported.
 
 ## Exported input coverage
 
