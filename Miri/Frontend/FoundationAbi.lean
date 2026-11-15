@@ -75,8 +75,9 @@ by source optimization/position facts. Floats, mutable references, nonempty
 tuples, foreign ABIs and other architectures fail closed.
 `layoutOf` supplies the supported scalar/array size checks before classification.
 No complete FnAbi or attribute equivalence is claimed. -/
-def rustModeShape (target : Target) (architecture : String)
-    (isReturn : Bool) (ty : ConcreteType) : Except String RustModeShape := do
+private def rustModeCore (target : Target) (architecture : String)
+    (isReturn : Bool) (ty : ConcreteType)
+    (query : ConcreteType → Except String FoundationLayout) : Except String RustModeShape := do
   unless architecture == "x86_64" do
     throw "foundation Rust ABI mode shape requires explicit x86_64 architecture"
   unless target.pointerSizeBits == 64 do
@@ -85,9 +86,10 @@ def rustModeShape (target : Target) (architecture : String)
     throw "unsized str Rust ABI mode shape is unsupported"
   if let .dynamicObject _ := ty then
     throw "unsized dynamic object Rust ABI mode shape is unsupported"
-  let layout ← layoutOf target ty
+  let layout ← query ty
   if layout.size == 0 then return .ignore
   match ty with
+  | .patternNotNull _ => throw "general constrained-pattern Rust ABI unsupported"
   | .primitive kind _ => return .direct (kind == "bool")
   | .array _ _ =>
     if isReturn && layout.size > 2 * (target.pointerSizeBits / 8) then return .indirect
@@ -98,12 +100,23 @@ def rustModeShape (target : Target) (architecture : String)
     let info ← pointerKindInfo kind
     if info.region.isSome && info.mutability != .Not then
       throw "mutable-reference Rust ABI attributes are unsupported"
-    if let .primitive "str" "" := pointee then
+    match pointee with
+    | .primitive "str" "" | .dynamicObject _ =>
       unless info.region.isSome do throw "wide raw-pointer Rust ABI mode shape is unsupported"
       return .pair
+    | _ => pure ()
     return .direct false
   | .dynamicObject _ => throw "dynamic object ABI mode unsupported"
   | .functionPointer .. => return .direct false
+
+/-- Target-only mode queries cannot assert unavailable dyn declaration evidence. -/
+def rustModeShape (target : Target) (architecture : String) (isReturn : Bool)
+    (ty : ConcreteType) : Except String RustModeShape :=
+  rustModeCore target architecture isReturn ty (layoutOf target)
+
+/-- Use finite declaration material when a dyn pointer needs its metadata layout. -/
+def rustModeShapeOfDocument (d : Document) (isReturn : Bool) (ty : ConcreteType) : Except String RustModeShape :=
+  rustModeCore d.target d.target.architecture isReturn ty (layoutOfDocument d)
 
 /-- Instantiate the requested finite type before computing its mode projection. -/
 def rustModeShapeOfType (d : Document) (architecture : String) (isReturn : Bool)

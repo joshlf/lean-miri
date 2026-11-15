@@ -46,6 +46,7 @@ where
   go (bound fuel : Nat) (ty : ConcreteType) : Except String FoundationLayout := do
     let .succ remaining := fuel | throw "foundation layout recursion exhausted"
     match ty with
+    | .patternNotNull _ => throw "general constrained-pattern layout unsupported"
     | .primitive "str" "" =>
       return ⟨0, ← integerAlign target 8⟩
     | .primitive kind name =>

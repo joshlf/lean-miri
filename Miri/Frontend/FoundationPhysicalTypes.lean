@@ -71,6 +71,7 @@ where
     let .succ fuel := fuel | throw "physical layout recursion exhausted"
     let basic ← query ty
     match ty with
+    | .patternNotNull _ => throw "general constrained-pattern physical layout unsupported"
     | .primitive "str" "" =>
       return baseLayout 0 basic.align 0xc1325f37d127be22
         ⟨.array, 0, none, some 1, #[], #[]⟩ (.arrayFormula 1 0)

@@ -91,7 +91,9 @@ def main (paths : List String) : IO Unit := do
   let ty := ConcreteType.pointer "reference_erased_const" (.primitive "str" "")
   rejects (rustPassMode d.target "x86_64" true ty)
   rejects (rustPassMode d.target "x86_64" true ty (some "Aggressive"))
-  rejects (rustPassMode d.target "x86_64" false ty (some "No"))
+  let argument ← expect (rustPassMode d.target "x86_64" false ty (some "No"))
+  check (argument.kind == .pair && argument.attributes == abi.returnValue.mode.attributes) "optNo str argument attributes"
+  rejects (rustPassMode d.target "x86_64" false ty (some "Aggressive"))
   rejects (rustPassMode d.target "x86_64" true (.pointer "reference_erased_mut" (.primitive "str" "")) (some "No"))
   rejects (rustPassMode d.target "x86_64" true (.pointer "raw_pointer_const" (.primitive "str" "")) (some "No"))
   rejects (primitiveCompilerFacts (.primitive "str" "") 0 1 2)

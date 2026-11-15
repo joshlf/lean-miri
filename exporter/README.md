@@ -322,6 +322,14 @@ bash tools/export-mir.sh --output scratch/foundation.json --foundation \
   --crate-type=lib --crate-name foundation
 ```
 
+Use `--foundation-signature-root std::rt::lang_start_internal` alongside the
+selected local MIR root to retain that actual standard helper's generic source
+signature, lifetime binder, environment and attributes. This explicit demand
+produces declaration material under `source_function_signatures`; it does not
+supply a MIR body, a compiler FnAbi answer or execution readiness. Ordinary
+exports leave this header collection empty and do not add its dyn types.
+
+
 This path captures generic source MIR templates, structural type/definition graphs
 and target data. It does not run the schema12 runtime-query discovery fixpoint,
 instantiate every generic argument combination, evaluate compiler query answers,

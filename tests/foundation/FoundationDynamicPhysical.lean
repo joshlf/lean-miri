@@ -109,5 +109,9 @@ def main (paths : List String) : IO Unit := do
   rejects (layoutOfRuntime prepared.target ty)
   rejects (layoutOfDocument d (.array entry.type 0))
   rejects (rustPassMode d.target "x86_64" true entry.type (some "No"))
-  rejects (rustFunctionAbiOfItem d definition #[])
+  if node.shapeKind == .reference then
+    let (_, abi) ← expect (rustFunctionAbiOfItem d definition #[])
+    let some argument := abi.arguments[0]? | throw (IO.userError "dyn ABI argument absent")
+    check (argument.mode.kind == .pair) "shared dyn argument ABI must be pair"
+  else rejects (rustFunctionAbiOfItem d definition #[])
   IO.println "dynamic physical types: full compiler layouts, predicate joins and structural leaves match; unknown metadata/solver facts reject"

@@ -50,7 +50,9 @@ def main (paths : List String) : IO Unit := do
   check (sameConcrete 64 normalizedEntry.type erased) "normalization failed to erase regions"
   rejects (rustPassMode d.target "x86_64" true erased)
   rejects (rustPassMode d.target "x86_64" true erased (some "Aggressive"))
-  rejects (rustPassMode d.target "x86_64" false erased (some "No"))
+  let argument ← expect (rustPassMode d.target "x86_64" false erased (some "No"))
+  check (argument.kind == .direct && argument.attributes == abi.returnValue.mode.attributes) "optNo shared argument attributes"
+  rejects (rustPassMode d.target "x86_64" false erased (some "Aggressive"))
   rejects (rustPassMode d.target "x86_64" true (.pointer "reference_erased_mut" array) (some "No"))
   let some sourceRow := d.types[output]? | throw (IO.userError "source reference row absent")
   let shape ← expect (sourceRow.getObjVal? "shape")
