@@ -42,10 +42,66 @@ where
     | .uint (.known kind) => return .primitive "uint" (← integerName kind false)
     | .tuple fields => return .tuple (← fields.mapM child)
     | .rawPointer pointee mutable => return .pointer (if mutable == .Mut then "raw_pointer_mut" else "raw_pointer_const") (← child pointee)
+    | .reference pointee mutable region =>
+      let lifetime ← match region with
+        | .Static => pure "static"
+        | .Erased => pure "erased"
+        | _ => throw "typed ABI reference bound/free region unsupported"
+      return .pointer ("reference_" ++ lifetime ++ (if mutable == .Mut then "_mut" else "_const")) (← child pointee)
+    | .dynamicTraitObject predicates principal region =>
+      unless region == .Static || region == .Erased do throw "typed ABI dynamic region unsupported"
+      let some material := world.canonical.sourceMaterial | throw "typed dynamic source absent"
+      let some physical := material.physical | throw "typed dynamic physical source absent"
+      let sourceDefinition (definition : Nat) : Except String Nat := do
+        let some raw := world.canonical.definitions[definition]? | throw "typed dynamic raw definition absent"
+        let rows := physical.definitions.toList.zipIdx |>.filter (fun (row,_) => row.raw == raw)
+        let [(_,index)] := rows | throw "typed dynamic source definition absent/ambiguous"
+        pure index
+      let mut object : SourceTypes.Existential SourceTypes.Concrete := ⟨region,none,#[],#[],#[]⟩
+      for id in predicates do
+        let some predicate := world.canonical.predicates[id]? | throw "typed dynamic predicate absent"
+        unless predicate.boundVariables.isEmpty do throw "typed dynamic bound predicate unsupported"
+        let definition ← sourceDefinition predicate.definitionId
+        let args : Array SourceTypes.Concrete ← predicate.genericArgs.mapM fun arg => do
+          let .Type type := arg | throw "typed dynamic non-type argument unsupported"
+          child type
+        match predicate.kind with
+        | .trait =>
+          unless principal == some id && object.principal.isNone && predicate.projectionTerm.isNone do
+            throw "typed dynamic principal identity mismatch"
+          object := {object with principal := some definition, arguments := args}
+        | .autoTrait =>
+          unless args.isEmpty && predicate.projectionTerm.isNone do throw "typed dynamic auto trait arguments unsupported"
+          object := {object with autoTraits := object.autoTraits.push definition}
+        | .projection =>
+          let some term := predicate.projectionTerm | throw "typed dynamic projection term absent"
+          let mut parents : Array Nat := #[]
+          for expression in physical.types do
+            if let .dynamicObject _ sourcePredicates := expression then
+              for sourcePredicate in sourcePredicates do
+                if let .projection assoc parent _ _ _ := sourcePredicate then
+                  if assoc == definition && !parents.contains parent then parents := parents.push parent
+          let [parent] := parents.toList | throw "typed dynamic projection parent source absent/ambiguous"
+          object := {object with projections := object.projections.push ⟨definition,parent,args,← child term⟩}
+      unless principal.isSome == object.principal.isSome do throw "typed dynamic principal absent"
+      return .dynamicObject object
     | .array element length constructor =>
       let (_,bits,_) ← scalarConstant world width length
       unless constructor.canonicalValueConstructor && constructor.count == bits do throw "typed ABI array count identity mismatch"
       return .array (← child element) bits
+    | .closure definition arguments count =>
+      let some raw := world.canonical.definitions[definition]? | throw "typed closure raw definition absent"
+      let some material := world.canonical.sourceMaterial | throw "typed closure source material absent"
+      let some physical := material.physical | throw "typed closure physical source absent"
+      let declarations := physical.definitions.toList.zipIdx |>.filter (fun (row,_) => row.raw == raw)
+      let [(declared,sourceDefinition)] := declarations | throw "typed closure source definition absent/ambiguous"
+      unless declared.kind == "closure" do throw "typed closure source definition kind mismatch"
+      let args : Array SourceTypes.Concrete ← arguments.mapM fun argument => do
+        let .Type type := argument | throw "typed closure non-type generic argument unsupported"
+        child type
+      let some (.tuple captures) := args.back? | throw "typed closure upvar tuple absent"
+      unless captures.size == count do throw "typed closure capture count mismatch"
+      return .closure sourceDefinition args
     | .functionPointer signature binders =>
       unless binders.isEmpty && !signature.cVariadic do throw "typed ABI argument function binder/variadic unsupported"
       return .functionPointer (← signature.inputs.mapM child) (← child signature.output) signature.safety signature.abi false
