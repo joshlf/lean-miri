@@ -150,4 +150,31 @@ def hooks (prepared : CompilerFactAdapters.Prepared) (access : SourceCompilerWor
     isFreeze := fun _ id => query prepared access (isFreeze · id) (fun _ => CompilerFacts.boolean prepared.context id "is_freeze")
     fieldPath := fun _ layout index child => query prepared access (fieldPath · layout index child)
       (fun _ => CompilerPaths.fieldPath prepared.context layout index child)}
+/-- An actual empty tuple row determines unit validity queries in source mode.
+The statement uses canonical row/shape evidence, not a layout-based type guess
+or a premise asserting success of a machine callback. -/
+theorem hooks_unit_at (prepared : CompilerFactAdapters.Prepared)
+    (access : SourceCompilerWorld.Access S)
+    (base : ValidityVisitor.Hooks P S C E Fn Abi Pad) (choice : C)
+    (before : S) (world : World) (id : TypeId) (value : TypeNode)
+    (present : access.get before = some world)
+    (source : world.canonical.sourceMaterial.isSome = true)
+    (row : world.canonical.types[id]? = some value)
+    (shape : value.shape = .tuple #[]) :
+    (hooks prepared access base).classify choice id before =
+      .ok (.aggregate false false false) before ∧
+    (hooks prepared access base).typeName choice id before = .ok value.display before ∧
+    (hooks prepared access base).opsemInhabited choice id before = .ok true before := by
+  constructor
+  · simp [hooks, query, classify, node, present, source, row, shape,
+      get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind,
+      pure, EStateM.pure, Except.bind, Except.pure] <;> rfl
+  constructor
+  · simp [hooks, query, typeName, node, present, source, row,
+      get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind,
+      pure, EStateM.pure, Except.bind, Except.pure] <;> rfl
+  · simp [hooks, query, opsemInhabited, opsemInhabited.go, node, present, source, row, shape,
+      get, getThe, MonadStateOf.get, EStateM.get, bind, EStateM.bind,
+      pure, EStateM.pure, Except.bind, Except.pure] <;> rfl
+
 end Miri.Input.CompilerValidityWorld
