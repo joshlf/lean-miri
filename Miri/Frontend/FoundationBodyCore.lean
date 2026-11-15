@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationMIR
+import Miri.Frontend.FoundationSpanRegistry
 import Miri.Input.LowerMIR
 
 /-! Explicit joins at the fixed-interpreter boundary. This does not create
@@ -19,6 +20,7 @@ structure BodyBindings where
   types : Array PhysicalTypeBinding
   physicalTypeIds : Array Input.TypeId
   spans : Array Input.SourceSpanData
+  compilerSpans : Array SourceSpan
   files : Array String
   definitionId : Input.DefinitionRef
   instanceNode : Input.InstanceNode
@@ -28,6 +30,11 @@ structure BodyBindings where
   requiredConsts : Array MIR.ConstOperand
 
 private def joinSpan (bindings : BodyBindings) (j : Json) : Except String Nat := do
+  let identity ← j.getObjValAs? Nat "span_id"
+  let compiler ← sourceSpan j
+  let some source := bindings.compilerSpans[identity]?
+    | throw "foundation compiler span identity is not interned"
+  unless compiler == source do throw "foundation compiler span identity mismatch"
   let start ← j.getObjVal? "start"
   let finish ← j.getObjVal? "end"
   let filename ← j.getObjValAs? String "file"
@@ -40,9 +47,10 @@ private def joinSpan (bindings : BodyBindings) (j : Json) : Except String Nat :=
     «end» := ⟨← finish.getObjValAs? Nat "line", ← finish.getObjValAs? Nat "column"⟩
     context := ← j.getObjValAs? String "ctxt", file }
   unless expected.lo ≤ expected.hi do throw "foundation body reversed span"
-  let some index := bindings.spans.findIdx? (· == expected)
+  let some row := bindings.spans[identity]?
     | throw "foundation body source span is not interned"
-  return index
+  unless row == expected do throw "foundation body source span identity mismatch"
+  return identity
 
 private def joinInfo (bindings : BodyBindings) (scopeCount : Nat) (j : Json) :
     Except String Input.SourceInfo := do

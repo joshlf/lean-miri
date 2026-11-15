@@ -2,6 +2,9 @@
 
 mod foundation;
 mod foundation_target;
+mod foundation_session;
+mod foundation_producer;
+mod foundation_runtime_instances;
 mod incremental;
 mod cast_queries;
 mod allocator_world;
@@ -1915,7 +1918,8 @@ fn run_direct(args: Vec<String>) -> Result<(), String> {
     };
     if options.foundation {
         let mut callbacks = foundation::FoundationCallbacks {
-            roots: options.root_paths, document: None, error: None,
+            roots: options.root_paths, rustc_version,
+            rustc_args: rustc_args[1..].to_vec(), document: None, error: None,
         };
         let status = rustc_driver::catch_with_exit_code(|| {
             rustc_driver::compiler_entrypoint(&rustc_args, &mut callbacks)

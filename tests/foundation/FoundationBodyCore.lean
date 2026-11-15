@@ -13,7 +13,7 @@ def main (paths : List String) : IO Unit := do
     let definition ← source.getObjValAs? Nat "definition"
     let prepared ← prepareItem d definition #[.type (.primitive "uint" "u8")]
     let bindings : BodyBindings := {
-      types := #[], physicalTypeIds := #[], spans := #[], files := #[]
+      types := #[], physicalTypeIds := #[], spans := #[], compilerSpans := #[], files := #[]
       definitionId := 0
       instanceNode := {
         instanceKind := .Item 0, genericArgs := #[], id := 0

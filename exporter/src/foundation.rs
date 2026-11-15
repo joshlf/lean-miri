@@ -7,6 +7,8 @@
 mod const_material;
 #[path = "foundation_source.rs"]
 mod source_material;
+#[path = "foundation_foreign_symbols.rs"]
+mod foreign_symbol_material;
 
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
@@ -18,12 +20,14 @@ type Result<T> = std::result::Result<T, String>;
 
 pub(super) struct FoundationCallbacks {
     pub roots: Vec<String>,
+    pub rustc_version: String,
+    pub rustc_args: Vec<String>,
     pub document: Option<Value>,
     pub error: Option<String>,
 }
 impl Callbacks for FoundationCallbacks {
     fn after_analysis<'tcx>(&mut self, _: &rustc_interface::interface::Compiler, tcx: TyCtxt<'tcx>) -> Compilation {
-        match export(tcx, &self.roots) {
+        match export(tcx, &self.roots, &self.rustc_version, &self.rustc_args) {
             Ok(document) => self.document = Some(document),
             Err(error) => self.error = Some(error),
         }
@@ -255,10 +259,10 @@ impl<'tcx> Material<'tcx> {
             };
             Ok(json!({"cleanup":bb.is_cleanup,"statements":statements,"terminator":terminator}))
         }).collect::<Result<Vec<_>>>()?;
-        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"promoted_count":promoted_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
+        Ok(json!({"definition":self.definition(tcx,def),"argument_count":b.arg_count,"promoted_count":promoted_count,"environment":environment,"signature":signature,"function_attributes":function_attributes,"runtime_source":super::foundation_runtime_instances::item(tcx,def),"required_consts":required_consts,"source_metadata":source_metadata,"locals":locals,"blocks":blocks}))
     }
 }
-fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
+fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[String]) -> Result<Value> {
     let mut m = Material::default();
     let items = tcx.hir_crate_items(());
     let mut selected = items.definitions().chain(items.nested_bodies()).filter(|d| tcx.is_mir_available(d.to_def_id()) && !super::is_required_trait_method(tcx,d.to_def_id())).collect::<Vec<_>>();
@@ -269,6 +273,26 @@ fn export(tcx: TyCtxt<'_>, roots: &[String]) -> Result<Value> {
     }
     if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(d.to_def_id()))); }
     let bodies = selected.into_iter().map(|d|m.body(tcx,d.to_def_id())).collect::<Result<Vec<_>>>()?;
+    // Finite source selection/configuration only. No lang_start instance or
+    // function allocation is resolved or enumerated here.
+    let compiler_entry = tcx.entry_fn(()).map(|(definition, kind)| match kind {
+        rustc_session::config::EntryFnType::Main { sigpipe } => json!({
+            "definition":m.definition(tcx,definition),"kind":"rustc_main","sigpipe":sigpipe}),
+    });
+    let start_lang_item = tcx.lang_items().start_fn().map(|d|m.definition(tcx,d));
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
-    Ok(json!({"schema":"lean-miri-foundation","schema_version":1,"rustc_commit":super::EXPECTED_RUSTC_COMMIT,"session":{"root_span":source_material::root_span(tcx)},"compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"}},"target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},"definitions":m.definitions,"types":m.types,"bodies":bodies}))
+    let mut session = super::foundation_session::export(tcx);
+    session["root_span"] = source_material::root_span(tcx);
+    Ok(json!({
+        "schema":"lean-miri-foundation","schema_version":1,
+        "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
+        "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
+        "frame_metadata":super::foundation_runtime_instances::frames(tcx),
+        "foreign_symbol_material":foreign_symbol_material::export(tcx)?,
+        "entry_selection":{"compiler_entry":compiler_entry,"start_lang_item":start_lang_item},
+        "session":session,
+        "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"}},
+        "target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
+        "definitions":m.definitions,"types":m.types,"bodies":bodies
+    }))
 }
