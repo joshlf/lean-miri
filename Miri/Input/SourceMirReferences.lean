@@ -37,7 +37,7 @@ private def rvalue : SourceMir.Rvalue → Needed
   | .use op _ | .unary _ op => operand op
   | .binary _ a b => append (operand a) (operand b)
   | .reference _ _ value | .discriminant value => ⟨place value,#[],#[]⟩
-  | .unsize op target _ => append (operand op) ⟨#[target],#[],#[]⟩
+  | .pointerCoercion _ op target _ => append (operand op) ⟨#[target],#[],#[]⟩
   | .aggregateTuple values => operands values
   | .aggregateClosure definition args values =>
     append (operands values) ⟨(args.map argument).flatten,#[definition],#[]⟩

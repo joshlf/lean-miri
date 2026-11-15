@@ -245,8 +245,17 @@ impl<'tcx> Material<'tcx> {
                 mir::AggregateKind::Tuple => json!({"kind":"aggregate_tuple","operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
                 other => return unsupported("aggregate rvalue",other),
             },
-            mir::Rvalue::Cast(mir::CastKind::PointerCoercion(ty::adjustment::PointerCoercion::Unsize,source),operand,target) =>
-                json!({"kind":"cast_unsize","source":match source {mir::CoercionSource::AsCast=>"as_cast",mir::CoercionSource::Implicit=>"implicit"},"operand":self.operand(tcx,operand)?,"target":self.ty(tcx,*target)?}),
+            mir::Rvalue::Cast(mir::CastKind::PointerCoercion(coercion,source),operand,target) => {
+                let coercion = match coercion {
+                    ty::adjustment::PointerCoercion::Unsize => json!({"kind":"unsize"}),
+                    ty::adjustment::PointerCoercion::ReifyFnPointer(safety) => json!({"kind":"reify_fn_pointer", "safety": match safety {
+                        rustc_hir::Safety::Safe => "safe",rustc_hir::Safety::Unsafe => "unsafe"}}),
+                    other => return unsupported("pointer coercion",other),
+                };
+                json!({"kind":"pointer_coercion","coercion":coercion,
+                    "source":match source {mir::CoercionSource::AsCast=>"as_cast",mir::CoercionSource::Implicit=>"implicit"},
+                    "operand":self.operand(tcx,operand)?,"target":self.ty(tcx,*target)?})
+            },
             mir::Rvalue::BinaryOp(op,p) => json!({"kind":"binary","operator":super::binop_name(*op),"left":self.operand(tcx,&p.0)?,"right":self.operand(tcx,&p.1)?}),
             mir::Rvalue::UnaryOp(op,o) => json!({"kind":"unary","operator":super::unop_name(*op),"operand":self.operand(tcx,o)?}),
             mir::Rvalue::Repeat(o,n) => json!({"kind":"repeat","operand":self.operand(tcx,o)?,"length":self.constant(tcx,*n)?}),

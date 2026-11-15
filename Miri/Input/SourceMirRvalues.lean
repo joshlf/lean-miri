@@ -110,16 +110,32 @@ def lower (c : Context) (expected : Nat) (value : SourceMir.Rvalue) : Except Str
       unless selected.fields.map (·.typeId) == types do
         throw "Invalid source ADT aggregate field types"
     return (.Aggregate (.Adt definition variant args none activeField) values,facts)
-  | .unsize value target source =>
+  | .pointerCoercion coercion value target source =>
     let (value,sourceType,facts) ← operand c value
-    let some target := c.types[target]?.join | throw "Invalid source unsize target not prepared"
-    unless target == expected do throw "Invalid source unsize target/destination type mismatch"
-    match ← shape c sourceType,← shape c target with
-    | .reference _ sourceMut _,.reference _ targetMut _
-    | .rawPointer _ sourceMut,.rawPointer _ targetMut =>
-      unless sourceMut == targetMut do throw "Unsupported source unsize mutability adjustment"
-    | _,_ => throw "Unsupported source unsize pointer forms"
-    return (.Cast (.PointerCoercion .Unsize (← known source)) value target,facts)
+    let some target := c.types[target]?.join | throw "Invalid source coercion target not prepared"
+    unless target == expected do throw "Invalid source coercion target/destination type mismatch"
+    let coercion ← known coercion
+    match coercion with
+    | .Unsize =>
+      match ← shape c sourceType,← shape c target with
+      | .reference _ sourceMut _,.reference _ targetMut _
+      | .rawPointer _ sourceMut,.rawPointer _ targetMut =>
+        unless sourceMut == targetMut do throw "Unsupported source unsize mutability adjustment"
+      | _,_ => throw "Unsupported source unsize pointer forms"
+    | .ReifyFnPointer safety =>
+      let .functionDefinition _ _ signature bound ← shape c sourceType
+        | throw "Invalid source reification operand is not a function definition"
+      let .functionPointer pointer pointerBound ← shape c target
+        | throw "Invalid source reification target is not a function pointer"
+      unless bound.isEmpty && pointerBound.isEmpty do
+        throw "Unsupported source reification higher-ranked signature"
+      unless pointer.safety == safety && (signature.safety == .Safe || safety == .Unsafe) do
+        throw "Invalid source reification safety adjustment"
+      unless signature.inputs == pointer.inputs && signature.output == pointer.output &&
+          signature.abi == pointer.abi && signature.cVariadic == pointer.cVariadic do
+        throw "Unsupported source reification signature normalization"
+    | _ => throw "Unsupported source pointer coercion"
+    return (.Cast (.PointerCoercion coercion (← known source)) value target,facts)
   | .discriminant p =>
     let (p,fact) ← place c p
     return (.Discriminant p,#[fact])

@@ -162,13 +162,22 @@ private def rvalue (c : Context) (j : Json) : Except String Rvalue := do
       unless activeField.isNone && values.size == selected.fields.size do throw "source ADT aggregate field/operand mismatch"
     return .aggregateAdt definition variant args userType activeField values
   | "aggregate_tuple" => return .aggregateTuple (← (← j.getObjValAs? (Array Json) "operands").mapM (operand c))
-  | "cast_unsize" =>
+  | "pointer_coercion" =>
+    let coercion ← j.getObjVal? "coercion"
+    let kind : Operator MIR.PointerCoercion ← match ← coercion.getObjValAs? String "kind" with
+      | "unsize" => pure (.known .Unsize)
+      | "reify_fn_pointer" =>
+        match ← coercion.getObjValAs? String "safety" with
+        | "safe" => pure (.known (.ReifyFnPointer .Safe))
+        | "unsafe" => pure (.known (.ReifyFnPointer .Unsafe))
+        | tag => pure (.unsupported ("reify_fn_pointer safety:" ++ tag))
+      | tag => pure (.unsupported tag)
     let tag ← j.getObjValAs? String "source"
     let source : Operator MIR.CoercionSource := match tag with
       | "as_cast" => .known .AsCast
       | "implicit" => .known .Implicit
       | _ => .unsupported tag
-    return .unsize (← operand c (← j.getObjVal? "operand")) (← typeRef c (← j.getObjValAs? Nat "target")) source
+    return .pointerCoercion kind (← operand c (← j.getObjVal? "operand")) (← typeRef c (← j.getObjValAs? Nat "target")) source
   | tag => pure (.unsupported tag)
 private def reason (j : Json) : Except String (Operator MIR.UnwindTerminateReason) := do
   match ← j.getObjValAs? String "kind" with
