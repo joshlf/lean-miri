@@ -1,4 +1,5 @@
 import Miri.Input.CompilerVirtualLeaves
+import Miri.Input.SourceCallFacts
 import Miri.Input.CompilerProviders
 import Miri.Input.CompilerCallFacts
 import Miri.Input.CompilerExecutionCallLeaves
@@ -10,6 +11,11 @@ namespace Miri.Input.CompilerCallConstruction
 open Lean Miri.ABI Miri.Memory Miri.Interpreter
 private def lift (query : Except String A) : MachineHooks.M K U A :=
   match query with | .ok value => pure value | .error error => throw (.unsupported error)
+
+private def sourceQuery (access : SourceCompilerWorld.Access (MachineHooks.State K U))
+    (operation : SourceCompilerWorld.World → Except String A) : MachineHooks.M K U A := do
+  let some world := access.get (← get) | throw (.unsupported "call dispatch World unavailable")
+  lift (operation world)
 
 /-- Canonical full compiler dictionary, including target-feature policy. -/
 def compiler (p : CompilerProviders.Prepared) (budget : Nat)
@@ -42,8 +48,12 @@ def dispatch (p : CompilerProviders.Prepared)
   backend := backend
   dynSymName := dynSymName
   foreignScope := fun action => action
-  isForeignItem := fun callee => lift (CompilerCallFacts.isForeignItem p.intrinsics callee)
-  symbolName := fun callee => lift (CompilerCallFacts.symbolName p.intrinsics callee)
+  isForeignItem := fun callee => if p.runtime.source.sourceMaterial.isSome then
+    sourceQuery world (SourceCallFacts.isForeignItem · callee)
+    else lift (CompilerCallFacts.isForeignItem p.intrinsics callee)
+  symbolName := fun callee => if p.runtime.source.sourceMaterial.isSome then
+    sourceQuery world (SourceCallFacts.symbolName · callee)
+    else lift (CompilerCallFacts.symbolName p.intrinsics callee)
   loadMir := fun _ callee => CompilerCallPipeline.loadMir world callee
 
 def leaves (p : CompilerProviders.Prepared)
