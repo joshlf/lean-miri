@@ -35,13 +35,14 @@ ELAN_HOME="$ROOT/.elan" "$ROOT/.elan/bin/lake" env lean --run \
 ELAN_HOME="$ROOT/.elan" "$ROOT/.elan/bin/lake" env lean --run \
   tests/foundation/FoundationConstBodyCore.lean "$TASK_DIR/foundation.json"
 cat > "$TASK_DIR/unsupported.rs" <<'RS'
-const VALUE: u8 = 18 + 19;
+const fn helper(value: u8) -> u8 { value }
+const VALUE: u8 = helper(37);
 pub fn scalar() -> u8 { VALUE }
 RS
 if bash tools/export-mir.sh --output "$TASK_DIR/unsupported.json" --foundation --root scalar \
     -- "$TASK_DIR/unsupported.rs" --crate-type=lib --crate-name unsupported_const \
     >"$TASK_DIR/unsupported.log" 2>&1; then
-  echo 'unsupported const MIR arithmetic was accepted' >&2
+  echo 'unsupported const MIR call was accepted' >&2
   exit 1
 fi
 rg -q 'foundation: unsupported .*const' "$TASK_DIR/unsupported.log"

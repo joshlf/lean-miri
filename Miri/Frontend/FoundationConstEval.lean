@@ -1,10 +1,12 @@
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationConst
+import Miri.Frontend.FoundationConstMir
 
 /-! Demand evaluation of finite scalar const-item expressions. No rustc query,
 allocation, process, mutable state or answer cache participates. The source
-subset is a scalar literal or a reference to another free scalar const item;
-cycles, generic/promoted constants and other expressions fail closed. -/
+subset includes scalar literals, free const references and acyclic unsigned
+arithmetic/branch CTFE MIR. Cycles, overflow, generic/promoted constants and
+other expressions fail closed. -/
 namespace Miri.Frontend.Foundation
 open Lean
 
@@ -29,6 +31,13 @@ where
       let some row := document.definitions[definition]? | throw "const definition out of bounds"
       unless (← row.getObjValAs? String "kind") == "const" do throw "source definition is not a free const"
       let expression ← row.getObjVal? "const_expression"
+      if (expression.getObjValAs? String "kind").toOption == some "mir" then
+        unless (← expression.getObjValAs? Nat "type") == typeId do
+          throw "const definition output type mismatch"
+        let result ← evaluateConstMir document (← expression.getObjVal? "mir")
+          (go fuel (seen.push definition))
+        unless result.typeId == typeId do throw "const MIR output type mismatch"
+        return result
       -- WithRetag has no pointer provenance to transform for validated scalar integers.
       let _ ← expression.getObjValAs? Bool "retag"
       unless (← expression.getObjValAs? Nat "type") == typeId do

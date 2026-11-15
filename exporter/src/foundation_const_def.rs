@@ -14,17 +14,22 @@ impl<'tcx> Material<'tcx> {
             self.definitions[definition]["const_expression"] = json!({"pending":true});
             let body = tcx.mir_for_ctfe(value.def);
             crate::ensure_untainted_mir(body)?;
-            if body.basic_blocks.len() != 1 || body.arg_count != 0 || body.local_decls.len() != 1 {
-                return unsupported("non-expression const body", value.def);
+            if body.arg_count != 0 || body.coroutine.is_some() || body.spread_arg.is_some()
+                || body.source.promoted.is_some() || body.source.instance != ty::InstanceKind::Item(value.def) {
+                return unsupported("non-item const body", value.def);
             }
-            if !self.required_constants(tcx,body)?.is_empty() {
-                return unsupported("nested required constants in const expression", value.def);
+            let required = self.required_constants(tcx,body)?;
+            let simple = body.basic_blocks.len() == 1 && body.local_decls.len() == 1
+                && required.is_empty() && !body.basic_blocks[mir::START_BLOCK].is_cleanup
+                && body.basic_blocks[mir::START_BLOCK].statements.len() == 1
+                && matches!(body.basic_blocks[mir::START_BLOCK].terminator().kind,mir::TerminatorKind::Return);
+            if !simple {
+                let material = self.constant_mir_body(tcx,body,required)?;
+                self.definitions[definition]["const_expression"] = json!({
+                    "kind":"mir","type":self.ty(tcx,body.return_ty())?,"mir":material});
+                return Ok(json!({"kind":"unevaluated","definition":definition,"arguments":[]}));
             }
             let block = &body.basic_blocks[mir::START_BLOCK];
-            if block.is_cleanup || block.statements.len() != 1 ||
-                !matches!(block.terminator().kind, mir::TerminatorKind::Return) {
-                return unsupported("const expression control flow", value.def);
-            }
             let mir::StatementKind::Assign(assignment) = &block.statements[0].kind else {
                 return unsupported("const expression statement", value.def);
             };
@@ -40,4 +45,37 @@ impl<'tcx> Material<'tcx> {
         }
         Ok(json!({"kind":"unevaluated","definition":definition,"arguments":[]}))
     }
+    fn constant_mir_body(&mut self, tcx: TyCtxt<'tcx>, body: &mir::Body<'tcx>, required: Vec<Value>) -> Result<Value> {
+        let locals = body.local_decls.iter().map(|local|self.ty(tcx,local.ty)).collect::<Result<Vec<_>>>()?;
+        let blocks = body.basic_blocks.iter().map(|block| {
+            if block.is_cleanup { return unsupported("const cleanup block", block); }
+            let statements = block.statements.iter().map(|statement| Ok(match &statement.kind {
+                mir::StatementKind::Assign(assignment) => json!({"kind":"assign",
+                    "place":self.place(tcx,assignment.0)?,"value":self.rvalue(tcx,&assignment.1)?}),
+                mir::StatementKind::StorageLive(local) => json!({"kind":"storage_live","local":local.as_u32()}),
+                mir::StatementKind::StorageDead(local) => json!({"kind":"storage_dead","local":local.as_u32()}),
+                mir::StatementKind::Nop => json!({"kind":"nop"}),
+                other => return unsupported("const MIR statement",other),
+            })).collect::<Result<Vec<_>>>()?;
+            let terminator = match &block.terminator().kind {
+                mir::TerminatorKind::Return => json!({"kind":"return"}),
+                mir::TerminatorKind::Goto {target,..} => json!({"kind":"goto","target":target.as_u32()}),
+                mir::TerminatorKind::SwitchInt {discr,targets} => json!({"kind":"switch_int",
+                    "operand":self.operand(tcx,discr)?,"targets":targets.iter().map(|(value,target)|json!({"value":value.to_string(),"target":target.as_u32()})).collect::<Vec<_>>(),
+                    "otherwise":targets.otherwise().as_u32()}),
+                mir::TerminatorKind::Assert {cond,expected,msg,target,unwind} => {
+                    if !matches!(unwind,mir::UnwindAction::Continue) { return unsupported("const assert unwind",unwind); }
+                    let mir::AssertKind::Overflow(operator,left,right) = &**msg
+                        else { return unsupported("const assert message",msg); };
+                    json!({"kind":"assert","condition":self.operand(tcx,cond)?,"expected":expected,
+                        "target":target.as_u32(),"unwind":"continue","message":{"kind":"overflow",
+                            "operator":crate::binop_name(*operator),"left":self.operand(tcx,left)?,"right":self.operand(tcx,right)?}})
+                },
+                other => return unsupported("const MIR terminator",other),
+            };
+            Ok(json!({"statements":statements,"terminator":terminator}))
+        }).collect::<Result<Vec<_>>>()?;
+        Ok(json!({"locals":locals,"required_consts":required,"blocks":blocks}))
+    }
+
 }
