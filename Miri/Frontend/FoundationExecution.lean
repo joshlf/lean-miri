@@ -110,7 +110,9 @@ def evaluateRestrictedBody (d : Document) (definition : Nat)
   for h : i in [:arguments.size] do
     let some ty := types[i+1]? | throw "missing argument type"
     validate d ty arguments[i]
-    locals := locals.set! (i+1) (some arguments[i])
+    if hLocal : i+1 < locals.size then
+      locals := locals.set (i+1) (some arguments[i]) hLocal
+    else throw "argument local out of bounds"
   let blocks ← arr body "blocks"
   unless blocks.size == 1 do throw "unsupported foundation control flow"
   let some block := blocks[0]? | throw "missing entry block"
@@ -130,7 +132,9 @@ def evaluateRestrictedBody (d : Document) (definition : Nat)
     unless sameType 1024 sourceTy destTy do throw "assignment type mismatch"
     let some value := (locals[source]?.bind id) | throw "uninitialized local read"
     validate d sourceTy value
-    locals := locals.set! dest (some value)
+    if hLocal : dest < locals.size then
+      locals := locals.set dest (some value) hLocal
+    else throw "destination local out of bounds"
   unless (← str (← get block "terminator") "kind") == "return" do
     throw "unsupported foundation terminator"
   let some result := (locals[0]?.bind id) | throw "uninitialized return local"
