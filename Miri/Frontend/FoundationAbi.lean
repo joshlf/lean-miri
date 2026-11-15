@@ -78,6 +78,8 @@ def rustModeShape (target : Target) (architecture : String)
     throw "foundation Rust ABI mode shape requires explicit x86_64 architecture"
   unless target.pointerSizeBits == 64 do
     throw "foundation x86_64 Rust ABI requires 64-bit pointers"
+  if let .primitive "str" "" := ty then
+    throw "unsized str Rust ABI mode shape is unsupported"
   let layout ← layoutOf target ty
   if layout.size == 0 then return .ignore
   if isReturn && layout.size > 2 * (target.pointerSizeBits / 8) then return .indirect

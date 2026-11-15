@@ -34,8 +34,9 @@ private def integerWidth (target : ABI.RuntimeTargetDataLayout) (kind name : Str
 
 /-- Compute only requested layouts. Nonempty Rust tuples can reorder fields;
 without the complete pinned aggregate algorithm they remain explicit errors.
-Thin pointers to supported Sized structural types are supported; floats,
-unsized types and nominal types remain unsupported. -/
+Pointers to supported Sized types and str are supported. str has its unsized
+zero-size layout lower bound; floats, other unsized types and nominal types
+remain unsupported. Arrays require a supported Sized element. -/
 def layoutOfRuntime (target : ABI.RuntimeTargetDataLayout) (ty : ConcreteType) : Except String FoundationLayout := do
   target.validate.mapError toString
   let bound := target.base.objSizeBound.toNat
@@ -44,6 +45,8 @@ where
   go (bound fuel : Nat) (ty : ConcreteType) : Except String FoundationLayout := do
     let .succ remaining := fuel | throw "foundation layout recursion exhausted"
     match ty with
+    | .primitive "str" "" =>
+      return ⟨0, ← integerAlign target 8⟩
     | .primitive kind name =>
       let width ← if kind == "bool" && name == "" then pure 8
         else if kind == "char" && name == "" then pure 32
@@ -52,6 +55,7 @@ where
       return ⟨width / 8, align⟩
     | .array element length =>
       unless length < 2 ^ target.base.pointerWidth.bits.toNat do throw "array length exceeds target usize"
+      if let .primitive "str" "" := element then throw "array element is unsized"
       let elem ← go bound remaining element
       let size := elem.size * length
       unless size < bound do throw "foundation array layout size overflow"
@@ -67,6 +71,14 @@ where
       let _ ← go bound remaining pointee
       let spec ← (target.pointerSpecIn ABI.AddressSpace.ZERO).mapError toString
       let align ← spec.pointerAlign.bytes.mapError toString
+      if let .primitive "str" "" := pointee then
+        let bits := target.pointerOffset.bytes.toNat * 8
+        let metadataAlign ← integerAlign target bits
+        let metadataSize := bits / 8
+        let offset := (spec.pointerSize.bytes.toNat + metadataAlign - 1) / metadataAlign * metadataAlign
+        let aggregate ← target.aggregateAlign.bytes.mapError toString
+        let pairAlign := max align.toNat (max metadataAlign aggregate.toNat)
+        return ⟨(offset + metadataSize + pairAlign - 1) / pairAlign * pairAlign, pairAlign⟩
       return ⟨spec.pointerSize.bytes.toNat, align.toNat⟩
 
 /-- Foundation queries require complete finite target evidence; missing or

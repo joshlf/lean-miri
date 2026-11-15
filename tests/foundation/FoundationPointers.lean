@@ -41,9 +41,9 @@ def main (paths : List String) : IO Unit := do
     match physicalLayoutOfRuntime target (.pointer kind byte) with
     | .error _ => pure ()
     | .ok _ => throw (IO.userError "ambiguous pointer accepted")
-  match physicalLayoutOfRuntime target (.pointer "raw_pointer_const" (.primitive "str" "")) with
+  match physicalLayoutOfRuntime target (.pointer "raw_pointer_const" (.tuple #[byte])) with
   | .error _ => pure ()
-  | .ok _ => throw (IO.userError "unsupported unsized pointer accepted")
+  | .ok _ => throw (IO.userError "unsupported pointee accepted")
   let [path] := paths | throw (IO.userError "usage: FoundationPointers FOUNDATION_JSON")
   let json ← IO.FS.readFile path
   let document ← expect (Json.parse json >>= decode)

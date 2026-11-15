@@ -67,6 +67,10 @@ where
     let .succ fuel := fuel | throw "physical layout recursion exhausted"
     let basic ← layoutOfRuntime target ty
     match ty with
+    | .primitive "str" "" =>
+      return baseLayout 0 basic.align 0xc1325f37d127be22
+        ⟨.array, 0, none, some 1, #[], #[]⟩ (.arrayFormula 1 0)
+        { memoryBackend with sized := some false } none
     | .primitive kind _name =>
       let signed := kind == "int"
       let last := if kind == "bool" then 1 else if kind == "char" then 0x10ffff
@@ -84,7 +88,7 @@ where
       let align ← target.aggregateAlign.bytes.mapError toString
       return baseLayout 0 align.toNat 0 ⟨.arbitrary, 0, none, none, #[], #[]⟩
         (.explicit #[]) memoryBackend none
-    | .pointer kind _ =>
+    | .pointer kind pointee =>
       let info ← pointerKindInfo kind
       let first := if info.region.isSome then 1 else 0
       let last := 2 ^ (basic.size * 8) - 1
@@ -94,6 +98,25 @@ where
       let niche := if first == 0 then none else some (Input.NicheLayout.mk 0 primitive (first, last))
       let rotate (n : Nat) := UInt64.ofNat ((n % 2^64) / 2^16 + (n % 2^16) * 2^48)
       let seed := (UInt64.ofNat basic.size + UInt64.ofNat (4 * 2^32) + rotate first + rotate last).toNat
+      if let .primitive "str" "" := pointee then
+        -- Unsized str metadata is the target pointer-offset-sized unsigned integer.
+        let metadataSize := target.pointerOffset.bytes.toNat
+        let metadata ← scalarLayout metadataSize
+          (← layoutOfRuntime target (.primitive "uint" s!"u{metadataSize * 8}")).align
+          false (2 ^ (metadataSize * 8) - 1)
+        let some metadataScalar := metadata.backendRepresentation >>= (·.scalar)
+          | throw "str metadata scalar absent"
+        let some metadataAlign := metadata.abiAlignBytes | throw "str metadata alignment absent"
+        let pointerSize := (← (target.pointerSizeIn ABI.AddressSpace.ZERO).mapError toString).bytes.toNat
+        let offset := (pointerSize + metadataAlign - 1) / metadataAlign * metadataAlign
+        -- Reconstruct the data scalar with its own width, not the pair width.
+        let last := 2 ^ (pointerSize * 8) - 1
+        let primitive := { primitive with sizeBytes := pointerSize }
+        let scalar := { scalar with primitive, validRange := some (first, last) }
+        let niche := if first == 0 then none else some (Input.NicheLayout.mk 0 primitive (first, last))
+        return baseLayout basic.size basic.align (pointerSize + metadataSize)
+          ⟨.arbitrary, 2, none, none, #[0, offset], #[0, 1]⟩ (.explicit #[0, offset])
+          ⟨.scalarPair, none, none, some scalar, some metadataScalar, some offset, none, none, none⟩ niche
       return baseLayout basic.size basic.align seed ⟨.primitive, 0, none, none, #[], #[]⟩
         (.explicit #[]) ⟨.scalar, none, some scalar, none, none, none, none, none, none⟩ niche
 
@@ -108,6 +131,7 @@ def physicalTypeNode (ty : ConcreteType) (id layoutId : Nat)
   let (shape, display) ← match ty with
     | .primitive "bool" "" => pure (Input.TypeShape.bool, "bool")
     | .primitive "char" "" => pure (Input.TypeShape.char, "char")
+    | .primitive "str" "" => pure (Input.TypeShape.str, "str")
     | .primitive "int" name =>
       unless #["i8", "i16", "i32", "i64", "i128", "isize"].contains name do
         throw "invalid signed primitive name"
