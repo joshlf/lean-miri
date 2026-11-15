@@ -52,6 +52,28 @@ class FoundationExport(unittest.TestCase):
                     self.assertLess(len(doc["types"]), 10)
                     self.assertNotIn(None, doc["types"])
 
+    def test_source_entry_selection_preserves_library_absence_and_rustc_main(self):
+        with tempfile.TemporaryDirectory(prefix="foundation-entry-") as directory:
+            output = Path(directory) / "library.json"
+            result = self.export("identity", output)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            library = json.loads(output.read_text())
+            self.assertIsNone(library["entry_selection"]["compiler_entry"])
+            source = Path(directory) / "main.rs"
+            source.write_text("fn main() {}\n")
+            output = Path(directory) / "binary.json"
+            result = subprocess.run([
+                "bash", "tools/export-mir.sh", "--output", str(output),
+                "--foundation", "--root", "main", "--", str(source),
+                "--crate-name", "entry_source",
+            ], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            binary = json.loads(output.read_text())
+            entry = binary["entry_selection"]["compiler_entry"]
+            self.assertEqual(entry, {"definition":binary["bodies"][0]["definition"],"kind":"rustc_main","sigpipe":0})
+            self.assertIsNotNone(binary["entry_selection"]["start_lang_item"])
+            self.assertNotIn("allocations", binary)
+
     def test_backtraces_match_schema12_body_hygiene_collapse(self):
         with tempfile.TemporaryDirectory(prefix="foundation-backtrace-") as directory:
             source = Path(directory) / "macro.rs"
