@@ -1,5 +1,4 @@
 import Miri.Input.Model.SourceDeclarations
-import Miri.Input.Model.SourceAbi
 
 /-! Evaluation-local typed source carrier. This first slice retains declaration
 identity, target and lexical generic slots. No JSON value is retained. Generic
@@ -25,7 +24,6 @@ structure SourceMaterial where
   target : SourceMaterial.Target
   declarations : Array SourceMaterial.ItemDeclaration
   genericLayers : Array SourceMaterial.GenericLayer
-  abi : Option SourceAbi.Material := none
   genericMir : SourceMaterial.Unavailable := .unsupported
   typeExpressions : SourceMaterial.Unavailable := .unsupported
   constraints : SourceMaterial.Unavailable := .unsupported
