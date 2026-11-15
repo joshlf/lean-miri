@@ -23,22 +23,18 @@ def unitPointerLayout (prepared : CompilerCallPipeline.Prepared) : Result LocalL
 returns None; unavailable type/repr metadata is an error, not a non-ADT default. -/
 def adtReprC (prepared : CompilerCallPipeline.Prepared) (ty : MIR.TyId) : Result (Option Bool) := do
   let node ← prepared.symbols.facts.context.runtime.node ty |>.mapError toString
-  unless node.shapeStatus == .supported do throw "return type compiler shape unresolved"
   if node.shapeKind == .adt then
     return some (← CompilerFacts.adtInfo prepared.symbols.facts.context ty).reprC
-  match node.shapeKind with
-  | .unknown tag => throw s!"unknown return type compiler shape {tag}"
-  | _ => return none
+  return none
 
 def hooks (prepared : CompilerCallPipeline.Prepared) (shim : CompilerShimAbi.Prepared)
     (image : AllocationImage.Imported) (memory : S → MemoryState P Extra K)
-    (base : Backtrace.Hooks P S D MD B I E Loc) : Backtrace.Hooks P S D MD B I E Loc := Id.run do
-  let lookup := CompilerVTableRuntime.GlobalLookup.prepare prepared.symbols
+    (base : Backtrace.Hooks P S D MD B I E Loc) : Backtrace.Hooks P S D MD B I E Loc :=
   { base with
     foreign := CompilerShimAbi.hooks shim base.foreign
     unitPointerLayout := lift (unitPointerLayout prepared)
     globalFunction := fun id => do
-      lift (CompilerVTableRuntime.globalFunctionUsing prepared.symbols lookup image (memory (← get)) id) }
+      lift (CompilerVTableRuntime.globalFunction prepared.symbols image (memory (← get)) id) }
 
 def reprCHook (prepared : CompilerCallPipeline.Prepared) (ty : MIR.TyId) : EStateM StepError S (Option Bool) :=
   lift (adtReprC prepared ty)

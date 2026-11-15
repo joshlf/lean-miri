@@ -5,7 +5,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))
-from mir_json import load_mir_document
+from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 
 def require(condition, message):
@@ -35,40 +35,36 @@ def main(path):
     for def_path, (crate, index) in expected.items():
         require(def_path in rows, f"missing instance row {def_path}")
         row = rows[def_path]
-        require(row["def_id"] == {"crate": crate, "index": index},
+        require(pool_entry(document, "definitions", row["def_id"]) == {"crate": crate, "index": index},
                 f"{def_path} DefId changed: {row['def_id']}")
-        require(row["instance_kind"] == {"def_id": {"crate": crate, "index": index}, "kind": "item"},
+        require(row["instance_kind"] == {"def_id": row["def_id"], "kind": "item"},
                 f"{def_path} is not an Item instance: {row['instance_kind']}")
-        require(row["kind"] == "instance_mir" and row["status"] == "supported",
-                f"{def_path} is not supported instance MIR: {row['kind']} / {row['status']}")
-        require(row["body_instantiation"] == {"kind": "substituted_and_normalized", "status": "supported"},
-                f"{def_path} body was not normalized: {row.get('body_instantiation')}")
-        require(row["instance_args_are_monomorphic"] is True,
-                f"{def_path} arguments are not monomorphic")
-        require(row["body_template_is_polymorphic"] is False,
-                f"{def_path} body template is polymorphic")
-        body = row["body"]
-        require(body["source_def_id"] == {"crate": crate, "index": index},
+        require(row["kind"] == "instance_mir" and "status" not in row,
+                f"{def_path} is not supported instance MIR: {row['kind']}")
+        body = pool_entry(document, "bodies", row["body"])
+        require(body["instance_id"] == row["instance_id"],
+                f"{def_path} body belongs to another concrete instance")
+        require(pool_entry(document, "definitions", body["source_def_id"]) == {"crate": crate, "index": index},
                 f"{def_path} loaded body has a different source DefId")
-        require(body["source_instance_kind"] == row["instance_kind"],
-                f"{def_path} loaded body has a different source instance kind")
+        require("source_instance_kind" not in body,
+                f"{def_path} loaded body contains an unused source instance kind")
         require(body["basic_blocks"], f"{def_path} loaded body has no basic blocks")
         for node in walk(body["basic_blocks"]):
             require(node.get("status") != "unsupported",
                     f"{def_path} body contains unsupported node {node}")
 
-    pair = rows["ctfe_producer_types::Pair"]["body"]["basic_blocks"]
+    pair = pool_entry(document, "bodies", rows["ctfe_producer_types::Pair"]["body"])["basic_blocks"]
     pair_aggregate = [n for n in walk(pair) if n.get("kind") == "Aggregate"]
     require(any(n.get("aggregate_kind", {}).get("def_path") == "ctfe_producer_types::Pair"
                 for n in pair_aggregate), "tuple constructor body lacks its Pair ADT aggregate")
-    variant_aggregate = [n for n in walk(rows["ctfe_producer_types::Token::Number"]["body"]["basic_blocks"])
+    variant_aggregate = [n for n in walk(pool_entry(document, "bodies", rows["ctfe_producer_types::Token::Number"]["body"])["basic_blocks"])
                          if n.get("kind") == "Aggregate"]
     require(any(n.get("aggregate_kind", {}).get("def_path") == "ctfe_producer_types::Token"
                 and n.get("aggregate_kind", {}).get("variant_index") == 1
                 for n in variant_aggregate), "enum constructor body lacks Token::Number variant 1")
 
-    add_body = rows["ctfe_producer_types::compile_time_add"]["body"]["basic_blocks"]
-    xor_body = rows["ctfe_producer_types::Opcode::compile_time_xor"]["body"]["basic_blocks"]
+    add_body = pool_entry(document, "bodies", rows["ctfe_producer_types::compile_time_add"]["body"])["basic_blocks"]
+    xor_body = pool_entry(document, "bodies", rows["ctfe_producer_types::Opcode::compile_time_xor"]["body"])["basic_blocks"]
     require(any(n.get("kind") == "BinaryOp" and n.get("operator", {}).get("kind") == "add_with_overflow"
                 for n in walk(add_body)), "compile_time_add body lacks supported addition")
     require(any(n.get("kind") == "BinaryOp" and n.get("operator", {}).get("kind") == "bit_xor"
@@ -77,7 +73,7 @@ def main(path):
     calls = []
     for caller in ("make_pair", "make_token"):
         caller_row = rows[caller]
-        for block in caller_row["body"]["basic_blocks"]:
+        for block in pool_entry(document, "bodies", caller_row["body"])["basic_blocks"]:
             terminator = block.get("terminator", {}).get("kind", {})
             if terminator.get("variant") == "Call":
                 calls.append(terminator)
@@ -87,7 +83,7 @@ def main(path):
         require(call.get("call_source", {}).get("kind") == "normal_call",
                 f"constructor call is not a normal call: {call.get('call_source')}")
         require(resolution.get("kind") == "indirect_function_pointer"
-                and resolution.get("status") == "supported",
+                and "status" not in resolution,
                 f"constructor call resolution changed: {resolution}")
     print("validated four supported normalized external instance_mir bodies and two indirect constructor call sites")
 

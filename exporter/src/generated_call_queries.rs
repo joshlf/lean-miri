@@ -38,45 +38,48 @@ pub(super) fn register_target_call<'tcx>(
     args: Vec<ty::Ty<'tcx>>,
     destination: ty::Ty<'tcx>,
     caller_abi: rustc_abi::ExternAbi,
-    caller_env: ty::TypingEnv<'tcx>,
-) {
-    if !closed(destination) || args.iter().any(|arg| !closed(*arg)) {
-        return;
-    }
-    context.register_instance(target);
-    let signature = tcx.mk_fn_sig(
-        args.iter().copied(),
-        destination,
-        ty::FnSigKind::default()
-            .set_abi(caller_abi)
-            .set_safety(rustc_hir::Safety::Safe),
-    );
-    let function_ty = ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(signature));
-    let _ = type_json(context, tcx, function_ty);
-    if target.def.requires_caller_location(tcx) {
-        let tracked_signature = tcx.mk_fn_sig(
-            args.iter()
-                .copied()
-                .chain(std::iter::once(tcx.caller_location_ty())),
+    runtime_abi_env: ty::TypingEnv<'tcx>,
+) -> Result<(), String> {
+    Ok::<_, String>({
+        if !closed(destination) || args.iter().any(|arg| !closed(*arg)) {
+            return Ok(());
+        }
+        context.register_instance(target);
+        let signature = tcx.mk_fn_sig(
+            args.iter().copied(),
             destination,
             ty::FnSigKind::default()
                 .set_abi(caller_abi)
                 .set_safety(rustc_hir::Safety::Safe),
         );
-        let tracked_function_ty =
-            ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(tracked_signature));
-        let _ = type_json(context, tcx, tracked_function_ty);
-    }
-    let request = CallTransferRequest {
-        function_ty,
-        caller_env,
-        caller_instance: None,
-        caller_args: args,
-        extra_types: ty::List::empty(),
-        return_destination: destination,
-        generated_caller_abi: Some(caller_abi),
-    };
-    register_call_transfer_for_target(context, tcx, &request, target, None, false);
+        context.helper_signature_requests.insert(signature);
+        let function_ty = ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(signature));
+        let _ = type_json(context, tcx, function_ty)?;
+        if target.def.requires_caller_location(tcx) {
+            let tracked_signature = tcx.mk_fn_sig(
+                args.iter()
+                    .copied()
+                    .chain(std::iter::once(tcx.caller_location_ty())),
+                destination,
+                ty::FnSigKind::default()
+                    .set_abi(caller_abi)
+                    .set_safety(rustc_hir::Safety::Safe),
+            );
+            context.helper_signature_requests.insert(tracked_signature);
+            let tracked_function_ty = ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(tracked_signature));
+            let _ = type_json(context, tcx, tracked_function_ty)?;
+        }
+        let request = CallTransferRequest {
+            function_ty,
+            runtime_abi_env,
+            caller_instance: None,
+            caller_args: args,
+            extra_types: ty::List::empty(),
+            return_destination: destination,
+            generated_caller_abi: Some(caller_abi),
+        };
+        register_call_transfer_for_target(context, tcx, &request, target, None, false)?;
+    })
 }
 
 /// Retain a catch_unwind intrinsic's exact callback/data operand types.
@@ -87,22 +90,24 @@ pub(super) fn register_catch_unwind_site<'tcx>(
     tcx: TyCtxt<'tcx>,
     body: &rustc_middle::mir::Body<'tcx>,
     args: &[rustc_span::Spanned<rustc_middle::mir::Operand<'tcx>>],
-) {
-    if args.len() != 3 {
-        return;
-    }
-    let try_ty = args[0].node.ty(body, tcx);
-    let data_ty = args[1].node.ty(body, tcx);
-    let catch_ty = args[2].node.ty(body, tcx);
-    if !closed(try_ty) || !closed(data_ty) || !closed(catch_ty) {
-        return;
-    }
-    let _ = type_json(context, tcx, try_ty);
-    let _ = type_json(context, tcx, data_ty);
-    let _ = type_json(context, tcx, catch_ty);
-    context
-        .runtime_catch_unwind_sites
-        .insert((try_ty, data_ty, catch_ty));
+) -> Result<(), String> {
+    Ok::<_, String>({
+        if args.len() != 3 {
+            return Ok(());
+        }
+        let try_ty = args[0].node.ty(body, tcx);
+        let data_ty = args[1].node.ty(body, tcx);
+        let catch_ty = args[2].node.ty(body, tcx);
+        if !closed(try_ty) || !closed(data_ty) || !closed(catch_ty) {
+            return Ok(());
+        }
+        let _ = type_json(context, tcx, try_ty)?;
+        let _ = type_json(context, tcx, data_ty)?;
+        let _ = type_json(context, tcx, catch_ty)?;
+        context
+            .runtime_catch_unwind_sites
+            .insert((try_ty, data_ty, catch_ty));
+    })
 }
 
 /// Materialize exact callback calls after each body-discovery wave. Payload
@@ -111,42 +116,28 @@ pub(super) fn register_catch_unwind_site<'tcx>(
 pub(super) fn register_catch_unwind_transfers<'tcx>(
     context: &mut ExportContext<'tcx>,
     tcx: TyCtxt<'tcx>,
-) {
-    let sites = context
-        .runtime_catch_unwind_sites
-        .iter()
-        .copied()
-        .collect::<Vec<_>>();
-    for (try_ty, data_ty, catch_ty) in sites {
-        // A normal return from the try callback writes into the Miri helper's
-        // fake unit destination. This is the exact destination type used by
-        // helpers.rs::call_function with `dest: None`.
-        register_runtime_callback_call_types(
-            context,
-            tcx,
-            "miri_catch_unwind_try".to_owned(),
-            try_ty,
-            vec![data_ty],
-            tcx.types.unit,
-            rustc_abi::ExternAbi::Rust,
-        );
-        let payload_types = context
-            .runtime_unwind_payload_types
-            .iter()
-            .copied()
-            .collect::<Vec<_>>();
-        for payload_ty in payload_types {
+) -> Result<(), String> {
+    let frontier = context.catch_unwind_frontier;
+    let sites = context.runtime_catch_unwind_sites.len();
+    let payloads = context.runtime_unwind_payload_types.len();
+    for site in frontier.site_start(payloads)..sites {
+        let (try_ty, data_ty, catch_ty) = *context.runtime_catch_unwind_sites.get_index(site).unwrap();
+        if site >= frontier.sites {
             register_runtime_callback_call_types(
-                context,
-                tcx,
-                "miri_catch_unwind_catch".to_owned(),
-                catch_ty,
-                vec![data_ty, payload_ty],
-                tcx.types.unit,
-                rustc_abi::ExternAbi::Rust,
-            );
+                context, tcx, "miri_catch_unwind_try".to_owned(), try_ty,
+                vec![data_ty], tcx.types.unit, rustc_abi::ExternAbi::Rust,
+            )?;
+        }
+        for payload_index in frontier.target_start(site)..payloads {
+            let payload_ty = *context.runtime_unwind_payload_types.get_index(payload_index).unwrap();
+            register_runtime_callback_call_types(
+                context, tcx, "miri_catch_unwind_catch".to_owned(), catch_ty,
+                vec![data_ty, payload_ty], tcx.types.unit, rustc_abi::ExternAbi::Rust,
+            )?;
         }
     }
+    context.catch_unwind_frontier.complete(sites, payloads);
+    Ok(())
 }
 
 /// Shared request constructor for callbacks whose exact target identities are
@@ -160,45 +151,48 @@ pub(super) fn register_runtime_callback_call_types<'tcx>(
     caller_args: Vec<ty::Ty<'tcx>>,
     return_destination: ty::Ty<'tcx>,
     caller_abi: rustc_abi::ExternAbi,
-) {
-    if !closed(callback_operand_type)
-        || caller_args.iter().any(|input| !closed(*input))
-        || !closed(return_destination)
-    {
-        return;
-    }
-    let key = (
-        source_symbol.clone(),
-        callback_operand_type,
-        caller_args.clone(),
-        return_destination,
-    );
-    if !context.runtime_callback_transfer_keys.insert(key) {
-        return;
-    }
-    let signature = tcx.mk_fn_sig(
-        caller_args.iter().copied(),
-        return_destination,
-        ty::FnSigKind::default()
-            .set_abi(caller_abi)
-            .set_safety(rustc_hir::Safety::Safe),
-    );
-    let function_ty = ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(signature));
-    let _ = type_json(context, tcx, callback_operand_type);
-    let _ = type_json(context, tcx, function_ty);
-    context
-        .runtime_callback_transfers
-        .push(RuntimeCallbackTransferRequest {
-            source_symbol,
+) -> Result<(), String> {
+    Ok::<_, String>({
+        if !closed(callback_operand_type)
+            || caller_args.iter().any(|input| !closed(*input))
+            || !closed(return_destination)
+        {
+            return Ok(());
+        }
+        let key = (
+            source_symbol.clone(),
             callback_operand_type,
-            request: CallTransferRequest {
-                function_ty,
-                caller_env: ty::TypingEnv::fully_monomorphized(),
-                caller_instance: None,
-                caller_args,
-                extra_types: ty::List::empty(),
-                return_destination,
-                generated_caller_abi: Some(caller_abi),
-            },
-        });
+            caller_args.clone(),
+            return_destination,
+        );
+        if !context.runtime_callback_transfer_keys.insert(key) {
+            return Ok(());
+        }
+        let signature = tcx.mk_fn_sig(
+            caller_args.iter().copied(),
+            return_destination,
+            ty::FnSigKind::default()
+                .set_abi(caller_abi)
+                .set_safety(rustc_hir::Safety::Safe),
+        );
+        context.helper_signature_requests.insert(signature);
+        let function_ty = ty::Ty::new_fn_ptr(tcx, ty::Binder::dummy(signature));
+        let _ = type_json(context, tcx, callback_operand_type)?;
+        let _ = type_json(context, tcx, function_ty)?;
+        context
+            .runtime_callback_transfers
+            .push(RuntimeCallbackTransferRequest {
+                source_symbol,
+                callback_operand_type,
+                request: CallTransferRequest {
+                    function_ty,
+                    runtime_abi_env: ty::TypingEnv::fully_monomorphized(),
+                    caller_instance: None,
+                    caller_args,
+                    extra_types: ty::List::empty(),
+                    return_destination,
+                    generated_caller_abi: Some(caller_abi),
+                },
+            });
+    })
 }

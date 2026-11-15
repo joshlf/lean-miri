@@ -1,110 +1,104 @@
-"""Strict reader for the current shared-payload MIR JSON wire format.
-
-Active MIR consumers must use this module instead of ``json.load``.  The
-on-disk document keeps ordinary root metadata inline and stores shared payload
-nodes in a bottom-up graph.  This reader validates that graph before exposing
-the familiar expanded JSON view to existing validators.
-
-Historical evidence archives are intentionally not accepted here: callers
-which compare historical documents should read those as historical JSON and
-use this decoder only for current exporter output.
-"""
+"""Read MIR documents without replacing typed pool references with payloads."""
 
 from __future__ import annotations
 
-import json
 import gzip
+import json
 from pathlib import Path
 from typing import Any
 import zlib
 
-SHARED_PAYLOADS_FIELD = "shared_payloads"
-SHARED_REF_FIELD = "$lean_miri_shared_ref"
-SHARED_PAYLOADS_SCHEMA_VERSION = 2
+try:  # Support package imports and direct scripts under tools/.
+    from .shared_json_pools import SHARED_POOLS, expand_document
+    from .coroutine_json import validate_catalog
+except ImportError:
+    from shared_json_pools import SHARED_POOLS, expand_document
+    from coroutine_json import validate_catalog
+
+POOL_NAMES = frozenset({"types", "allocations", "instances", "fn_abis", "spans",
+                        "definitions", "type_constants", "bodies", "predicates"})
 
 
 class MirJSONError(ValueError):
-    """Malformed or unsupported current MIR JSON document."""
+    """Malformed or unsupported MIR document."""
 
 
 def decode_mir_document(document: Any) -> dict[str, Any]:
-    """Validate and expand one current MIR shared-payload graph document."""
     if not isinstance(document, dict):
         raise MirJSONError("MIR document root must be an object")
-    if SHARED_REF_FIELD in document:
-        raise MirJSONError(f"reserved {SHARED_REF_FIELD!r} marker is not valid at the document root")
     if document.get("schema") != "lean-miri-rustc-mir":
         raise MirJSONError("document is not a lean-miri-rustc-mir export")
-    if document.get("schema_version") != 3:
-        raise MirJSONError("current MIR root schema_version must be 3")
+    if type(document.get("schema_version")) is not int or document["schema_version"] not in (11, 12):
+        raise MirJSONError("MIR root schema_version must be 11 or 12")
+    for name in sorted(POOL_NAMES):
+        if not isinstance(document.get(name), list):
+            raise MirJSONError(f"{name} must be a pool array")
+        if any(not isinstance(row, dict) for row in document[name]):
+            raise MirJSONError(f"{name} definitions must be objects")
+    layouts = document.get("layouts")
+    if not isinstance(layouts, list) or any(type(index) is not int or index < 0 for index in layouts):
+        raise MirJSONError("layouts must be a nonnegative reference array")
+    for name, row_type in SHARED_POOLS.items():
+        rows = document.get(name)
+        if not isinstance(rows, list) or any(not isinstance(row, row_type) for row in rows):
+            raise MirJSONError(f"{name} must be a pool of {row_type.__name__} values")
+    files = document.get("files")
+    if not isinstance(files, list) or any(not isinstance(name, str) for name in files):
+        raise MirJSONError("files must be a string array")
+    images = document.get("byte_images")
+    if not isinstance(images, list) or any(not isinstance(image, str) for image in images):
+        raise MirJSONError("byte_images must be a string array")
+    if document["schema_version"] == 11:
+        if "compiler_coroutine_coverage" in document:
+            raise MirJSONError("schema 11 forbids compiler_coroutine_coverage")
+    else:
+        try:
+            validate_catalog(document)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise MirJSONError(f"invalid compiler_coroutine_coverage: {exc}") from exc
+    return document
 
-    catalog = document.get(SHARED_PAYLOADS_FIELD)
-    if not isinstance(catalog, dict):
-        raise MirJSONError("current MIR document must contain a shared_payloads graph")
-    if set(catalog) != {"schema_version", "nodes"}:
-        raise MirJSONError("shared_payloads must contain only schema_version and nodes")
-    if catalog.get("schema_version") != SHARED_PAYLOADS_SCHEMA_VERSION:
-        raise MirJSONError(
-            f"shared_payloads schema_version must be {SHARED_PAYLOADS_SCHEMA_VERSION}"
-        )
-    nodes = catalog.get("nodes")
-    if not isinstance(nodes, list):
-        raise MirJSONError("shared_payloads.nodes must be an array")
 
-    cache: dict[int, Any] = {}
-
-    def expand(value: Any, *, parent_node: int | None, active: set[int]) -> Any:
-        if isinstance(value, list):
-            return [expand(child, parent_node=parent_node, active=active) for child in value]
-        if not isinstance(value, dict):
-            return value
-
-        if SHARED_REF_FIELD in value:
-            if set(value) != {SHARED_REF_FIELD}:
-                raise MirJSONError(f"reserved {SHARED_REF_FIELD!r} marker must be a one-key reference object")
-            index = value[SHARED_REF_FIELD]
-            if isinstance(index, bool) or not isinstance(index, int) or index < 0:
-                raise MirJSONError(f"{SHARED_REF_FIELD} must contain a non-negative integer")
-            if index in active:
-                raise MirJSONError(f"cycle in shared_payloads graph at node {index}")
-            if index >= len(nodes):
-                raise MirJSONError(f"shared_payloads reference {index} is out of range")
-            if parent_node is not None and index >= parent_node:
-                raise MirJSONError(
-                    f"shared_payloads node {parent_node} has a forward reference to node {index}"
-                )
-            if index not in cache:
-                active.add(index)
-                try:
-                    cache[index] = expand(nodes[index], parent_node=index, active=active)
-                finally:
-                    active.remove(index)
-            # Preserve graph sharing in memory. Decoded documents are read-only
-            # views; callers that need to mutate one occurrence should deepcopy
-            # the document root first.
-            return cache[index]
-
-        return {
-            key: expand(child, parent_node=parent_node, active=active)
-            for key, child in value.items()
-        }
-
-    # Decode every node, including nodes that happen not to be referenced by
-    # the root, so malformed/reserved content cannot hide in unused payloads.
-    for index in range(len(nodes)):
-        if index not in cache:
-            cache[index] = expand(nodes[index], parent_node=index, active={index})
-
-    result = {
-        key: expand(value, parent_node=None, active=set())
-        for key, value in document.items()
-        if key != SHARED_PAYLOADS_FIELD
-    }
-    return result
+def pool_entry(document: dict[str, Any], pool: str, index: Any) -> Any:
+    if pool == "layouts":
+        references = document.get("layouts", [])
+        if type(index) is not int or index < 0 or index >= len(references):
+            raise MirJSONError(f"layouts reference {index!r} is out of range")
+        if isinstance(references[index], dict):
+            return references[index]  # Explicit semantic inspection view.
+        return pool_entry(document, "layout_values", references[index])
+    if pool not in POOL_NAMES and pool not in SHARED_POOLS:
+        raise MirJSONError(f"unknown MIR pool {pool!r}")
+    rows = document.get(pool)
+    if not isinstance(rows, list):
+        raise MirJSONError(f"{pool} must be a pool array")
+    if pool == "allocations":
+        if type(index) is not int or index < 0:
+            raise MirJSONError(f"{pool} reference {index!r} is out of range")
+        matches = []
+        for row in rows:
+            if not isinstance(row, dict):
+                raise MirJSONError("allocations definitions must be objects")
+            if row.get("kind") == "function":
+                for identity in row.get("identities", []):
+                    if identity[0] == index:
+                        matches.append({"kind": "function", "instance_id": row["instance_id"],
+                                        "allocation_id": identity[0], "source_alloc_id": identity[1]})
+            elif row.get("allocation_id") == index:
+                matches.append(row)
+        if len(matches) != 1:
+            raise MirJSONError(f"allocations reference {index!r} does not identify one graph node")
+        return matches[0]
+    if type(index) is not int or index < 0 or index >= len(rows):
+        raise MirJSONError(f"{pool} reference {index!r} is out of range")
+    row = rows[index]
+    row_type = SHARED_POOLS.get(pool, dict)
+    if not isinstance(row, row_type):
+        raise MirJSONError(f"{pool}[{index}] must be an object")
+    return row
 
 
 def load_mir_document(path: str | Path) -> dict[str, Any]:
-    """Read, validate, and expand one current MIR shared-payload JSON file."""
     try:
         source = Path(path)
         if source.suffix == ".gz":
@@ -115,3 +109,16 @@ def load_mir_document(path: str | Path) -> dict[str, Any]:
     except (OSError, EOFError, UnicodeError, json.JSONDecodeError, zlib.error) as exc:
         raise MirJSONError(f"cannot read MIR JSON {path}: {exc}") from exc
     return decode_mir_document(document)
+
+
+def inspection_document(document: dict[str, Any]) -> dict[str, Any]:
+    """Resolve payloads for analysis while retaining graph/type/layout identity IDs."""
+    try:
+        return expand_document(document)
+    except ValueError as exc:
+        raise MirJSONError(str(exc)) from exc
+
+
+def load_mir_inspection_document(path: str | Path) -> dict[str, Any]:
+    """Load a schema-11/12 document and explicitly resolve shared inspection payloads."""
+    return inspection_document(load_mir_document(path))

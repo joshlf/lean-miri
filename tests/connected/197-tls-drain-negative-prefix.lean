@@ -301,8 +301,10 @@ private def checkFailurePrefix (compiler : Input.CompilerProviders.Prepared)
   | other => throw s!"destructor_a UB source location is not a call terminator: {reprStr other}"
   let some callbackSpan := compiler.program.bundle.spans[callbackBlock.terminator.sourceInfo.span.id]?
     | throw "destructor_a UB call span is absent from the compiler span table"
+  let some callbackFile := compiler.program.input.files[callbackSpan.file]?
+    | throw "destructor_a UB call filename is absent from the compiler file table"
   unless callbackSpan.start.line == 41 && callbackSpan.«end».line == 41 &&
-      callbackSpan.file.splitOn "negative-001/source.rs" != [callbackSpan.file] do
+      callbackFile.splitOn "tests/connected/fixtures/197-tls-drain-negative-prefix.rs" != [callbackFile] do
     throw s!"destructor_a callsite is not the source null-read at line 41: {reprStr callbackSpan}"
   let manager := state.machine.threads
   unless manager.threads.length == 2 do
@@ -356,17 +358,14 @@ private def checkFailurePrefix (compiler : Input.CompilerProviders.Prepared)
 
 private def runTlsDrainPure (contents : String) (pageSize : UInt64)
     (numCpus hostPid : UInt32) : Except String String := do
-  let decoded ← must (Input.decodeRuntimeJson contents)
-  unless decoded.executionInput.isSome && decoded.blockingObligations.isEmpty do
-    throw s!"strict readiness gate failed: obligations={decoded.blockingObligations.size}; sample={reprStr (decoded.blockingObligations.toList.take 30)}"
-  let program ← must (Input.lowerCoreProgram decoded.document)
+  let decoded ← must (Input.decodeJson contents)
+  let program ← must (Input.lowerProgram decoded.document)
   let attempt := Input.EvalPreparation.prepare program
   let prepared ← must attempt.outcome
   let compiler := prepared.compiler
   let image := prepared.image
   let memory := attempt.memory
-  let bytes ← must (Input.CompilerGlobalBytes.prepare compiler.program compiler.runtime memory
-    (some compiler.sourceEquality))
+  let bytes ← must (Input.CompilerGlobalBytes.prepare compiler.program compiler.runtime memory)
   let targetBits := compiler.runtime.target.base.pointerWidth.bits.toNat
   let arch ← must (Input.EvalArchitectureMachine.targetArch compiler.intrinsics)
   unless compiler.program.input.producer.targetTriple == "x86_64-unknown-linux-gnu" &&

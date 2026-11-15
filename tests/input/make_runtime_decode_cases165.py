@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive focused decoder edge inputs from an archived genuine export."""
+"""Derive focused decoder edge inputs from a fresh export."""
 import copy
 import json
 import pathlib
@@ -12,10 +12,8 @@ from mir_json import load_mir_document
 def replace_first_span(value):
     if isinstance(value, dict):
         for key, child in value.items():
-            if key == "span" and "scope" in value and isinstance(child, dict) and all(
-                item in child for item in ("lo", "hi", "start", "end", "ctxt", "file")
-            ):
-                value[key] = {"$lean_miri_shared_ref": 0}
+            if key == "span" and "scope" in value and type(child) is int:
+                value[key] = 999999999
                 return True
             if replace_first_span(child):
                 return True
@@ -29,8 +27,8 @@ def replace_first_span(value):
 def replace_first_debug(value):
     if isinstance(value, dict):
         for key, child in value.items():
-            if key == "file" and isinstance(child, dict) and child.get("status") == "debug_payload":
-                value[key] = {"status": "unsupported", "rustc_debug": "malformed diagnostic"}
+            if key == "ctxt" and isinstance(child, str):
+                value[key] = {"kind": "invalid_source_context"}
                 return True
             if replace_first_debug(child):
                 return True
@@ -42,10 +40,7 @@ def replace_first_debug(value):
 
 
 def main(source: str, output: str) -> None:
-    # Derive semantic mutations from the validated expanded document. An empty
-    # valid catalog lets every case reach its intended semantic decoder check.
     base = load_mir_document(source)
-    base["shared_payloads"] = {"schema_version": 2, "nodes": []}
     out = pathlib.Path(output)
     out.mkdir(parents=True, exist_ok=True)
     cases = {}
@@ -55,7 +50,7 @@ def main(source: str, output: str) -> None:
     cases["bad-schema-version"] = value
 
     value = copy.deepcopy(base)
-    value["bodies"][0]["phase"] = {"kind": 17, "phase": "optimized", "status": "supported"}
+    value["bodies"][0]["phase"] = {"kind": 17, "phase": "optimized"}
     cases["bad-mir-phase-tag"] = value
 
     value = copy.deepcopy(base)
@@ -81,7 +76,7 @@ def main(source: str, output: str) -> None:
 
     value = copy.deepcopy(base)
     if not replace_first_debug(value):
-        raise SystemExit("base input has no debug payload")
+        raise SystemExit("base input has no source context string")
     cases["bad-debug-payload"] = value
 
     value = copy.deepcopy(base)
@@ -95,14 +90,14 @@ def main(source: str, output: str) -> None:
     value = copy.deepcopy(base)
     statement = first_statement(value)
     statement["variant"] = "Coverage"
-    statement["coverage"] = {"kind": "future_coverage", "status": "supported"}
+    statement["coverage"] = {"kind": "future_coverage"}
     cases["coverage-tag-wrapper"] = value
 
     value = copy.deepcopy(base)
     statement = first_statement(value)
     statement["variant"] = "AscribeUserType"
-    statement["user_type_projection"] = {"status": "supported"}
-    statement["variance"] = {"kind": "future_variance", "status": "supported"}
+    statement["user_type_projection"] = {}
+    statement["variance"] = {"kind": "future_variance"}
     cases["user-projection-wrapper"] = value
 
     for name, document in cases.items():

@@ -41,8 +41,6 @@ inductive Error where
   | missingRuntimeType (id : TypeId)
   | fieldOutOfBounds (index count : Nat)
   deriving DecidableEq, Repr
-private def convert (result : Except String A) : Except Error A :=
-  result.mapError Error.metadata
 private def metadata (result : Except RuntimeMetadataError A) : Except Error A :=
   result.mapError (Error.metadata ∘ toString)
 
@@ -63,11 +61,10 @@ def calculate (target : RuntimeTargetDataLayout) (element : LayoutData)
     unadjustedAbiAlign := element.align.abi
     reprC := element.reprC
     randomizationSeed := element.randomizationSeed + count }
-private def primitive (runtime : RuntimeMetadata) (refs : Json) (key : String)
+private def primitive (runtime : RuntimeMetadata) (id : TypeId) (key : String)
     (kind : Miri.MIR.IntegerKind) : Except Error (TyAndLayout TypeId) := do
-  let id ← convert ((refs.getObjVal? key).bind fun value => (value.getObjVal? "type_id").bind Json.getNat?)
   let source ← metadata (runtime.node id)
-  unless source.shapeStatus == .supported && source.shapeMetadata.unsignedKind == some (.known kind) do
+  unless source.shapeMetadata.unsignedKind == some (.known kind) do
     throw (.metadata s!"runtime primitive {key} is not the exact compiler unsigned type")
   metadata (runtime.lookup id)
 private def elementOfId (world : World) (id : TypeId) : Element :=
@@ -88,9 +85,9 @@ private def elementLayout (world : World) : Element → Except Error (TyAndLayou
 in unrelated compiler catalog entries do not turn World creation into execution
 of those types; requesting their constructors still fails explicitly. -/
 def create (runtime : RuntimeMetadata) : Except Error World := do
-  let refs ← convert (runtime.source.raw.getObjVal? "compiler_runtime_primitives")
-  let byte ← primitive runtime refs "u8" .u8
-  let wide ← primitive runtime refs "u16" .u16
+  let refs := runtime.source.queries.primitives
+  let byte ← primitive runtime refs.u8 "u8" .u8
+  let wide ← primitive runtime refs.u16 "u16" .u16
   let next := runtime.source.types.foldl (fun next node => max next (node.id + 1)) 0
   let mut world : World := {
     metadata := runtime
@@ -100,18 +97,12 @@ def create (runtime : RuntimeMetadata) : Except Error World := do
     nextId := next
     obligations := #[] }
   for node in runtime.source.types do
-    if node.shapeKind == .array then
-      let shape ← convert (node.payload.getObjVal? "shape")
-      let element ← convert ((shape.getObjVal? "element").bind fun value => (value.getObjVal? "type_id").bind Json.getNat?)
-      let evidence := do
-        let evidence ← shape.getObjVal? "constructor_identity"
-        unless (← (← evidence.getObjVal? "status").getStr?) == "supported" do
-          throw "unresolved compiler array constructor identity"
-        unless (← (← evidence.getObjVal? "canonical_value_constructor").getBool?) do
+    if let .array element _ constructor := node.shape then
+      let evidence : Except String UInt64 := do
+        unless constructor.canonicalValueConstructor do
           throw "source array is not the canonical value-length constructor"
-        let count ← (← evidence.getObjVal? "count").getNat?
-        unless count < 2^64 do throw "compiler array count exceeds u64"
-        pure (UInt64.ofNat count)
+        unless constructor.count < 2^64 do throw "compiler array count exceeds u64"
+        pure (UInt64.ofNat constructor.count)
       match evidence with
       | .error reason => world := {world with obligations := world.obligations.push s!"type {node.id}: {reason}"}
       | .ok count =>

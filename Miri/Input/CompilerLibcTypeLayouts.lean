@@ -6,24 +6,12 @@ target-name fallback or layout-equality search. -/
 namespace Miri.Input.CompilerLibcTypeLayouts
 open Lean Miri.ABI
 
-private def supportedTypeRef (entry : Json) : Except String TypeId := do
-  unless (← (← entry.getObjVal? "status").getStr?) == "supported" do
-    throw s!"compiler libc type/layout query unavailable: {((entry.getObjVal? "reason").bind Json.getStr?).toOption}"
-  let value ← entry.getObjVal? "value"
-  (← value.getObjVal? "type_id").getNat?
-
-/-- Resolve one exact source libc type and require its imported compiler
-layout. Query errors stay demand-time errors with their producer reason. -/
 def layout (runtime : RuntimeMetadata) (name : String) : Except String (TyAndLayout TypeId) := do
-  let catalog ← runtime.source.raw.getObjVal? "compiler_libc_type_layouts"
-  unless (← (← catalog.getObjVal? "crate_path").getArr?) == #[toJson ("libc" : String)] do
+  let some catalog := runtime.source.queries.libcTypeLayouts | throw "compiler libc type catalog absent"
+  unless catalog.cratePath == #["libc"] do
     throw "compiler libc type query has wrong canonical crate path"
-  unless (← (← catalog.getObjVal? "namespace").getStr?) == "TypeNS" do
+  unless catalog.namespaceName == "TypeNS" do
     throw "compiler libc type query has wrong namespace"
-  unless (← (← catalog.getObjVal? "typing_env").getStr?) == "fully_monomorphized" do
-    throw "compiler libc type query has wrong typing environment"
-  let entries ← catalog.getObjVal? "entries"
-  let entry ← entries.getObjVal? name
-  let id ← supportedTypeRef entry
+  let some (_, id) := catalog.entries.find? (·.1 == name) | throw s!"compiler libc type absent: {name}"
   runtime.lookup id |>.mapError toString
 end Miri.Input.CompilerLibcTypeLayouts

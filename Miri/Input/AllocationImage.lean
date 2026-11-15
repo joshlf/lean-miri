@@ -38,7 +38,6 @@ private def bytes (hex : String) : Result (Array UInt8) := do
 private def mutability : MemoryMutability → Result Memory.Mutability
   | .mutable => pure .Mut
   | .immutable => pure .Not
-  | .unknown tag => throw s!"unknown allocation mutability {tag}"
 
 /-- Resolve source graph identity; never use the decoder's reversible +1
 embedding of export IDs as runtime allocation identity. -/
@@ -58,7 +57,7 @@ flags. Arbitrary initialization and pointer provenance are imported independentl
 no pointer-containing byte range is silently cleared or normalized. -/
 def decode (target : RuntimeTargetDataLayout) (memory : MemoryState P E K)
     (source : AllocationMemory) : Result (Allocation CtfeProvenance Unit) := do
-  let raw ← bytes source.bytesHex
+  let raw ← source.bytesHex.checkedBytes
   unless raw.size == source.sizeBytes do throw "allocation byte size mismatch"
   let alignment ← checked (RuntimeMetadata.alignment source.alignBytes) toString
   let finalMutability ← mutability source.mutability
@@ -171,7 +170,6 @@ structure ImportResult (P E K : Type) where
 
 private def metadata (target : RuntimeTargetDataLayout) (queries : Queries)
     (node : AllocationNode) : Result (GlobalAllocationKind × Size × Align × Memory.Mutability) := do
-  unless node.status == .supported do throw s!"compiler allocation {node.id} has unresolved status {repr node.status}"
   let consistent := match node.kind, node.data with
     | .memory, some (.memory _) | .function, some (.function _) | .static, some (.static _)
     | .vtable, some (.vtable _) | .typeId, some (.typeId _) => true
@@ -216,7 +214,8 @@ def importGraph [DecidableEq K] (target : RuntimeTargetDataLayout)
         | some (.memory source) => return (GlobalAllocationPayload.memory (← decode target memory source), none)
         | some (.static source) =>
           let info ← queries.staticInfo source
-          let definition ← lookupDefinitionId definitions source.definitionId
+          let definition := source.definitionId
+          unless definition < definitions.size do throw "static compiler definition ID out of bounds"
           if source.globalInfo.map (·.foreignItem) |>.getD false then
             -- rustc represents an extern static as GlobalAlloc::Static, but
             -- Miri resolves its pointer through extern_static_pointer rather

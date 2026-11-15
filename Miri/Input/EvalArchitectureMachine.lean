@@ -17,8 +17,7 @@ private def liftQuery (query : Except String A) : EStateM StepError S A :=
 
 /-- Exact compiler session target.arch, added independently of target triple. -/
 def targetArch (prepared : CompilerIntrinsicFacts.Prepared) : Except String String := do
-  let session ← prepared.program.input.raw.getObjVal? "compiler_session_queries"
-  (← session.getObjVal? "target_arch").getStr?
+  pure prepared.program.input.queries.session.targetArch
 
 /-- helpers.rs:940–952: absent enabled ISA feature is UB, whereas absent
 compiler evidence is an unresolved input obligation. -/
@@ -87,8 +86,6 @@ def compilerDispatcher
     (simdBase : IntrinsicSimdHooks Provenance (EvalCoreMachine.State Os R P H D O Aff B Host) C (RuntimePlace Provenance))
     (unsupportedForeignItem : String → String → StepError) :
     Except String (IntrinsicArchitecture.DispatchHooks Provenance (EvalCoreMachine.State Os R P H D O Aff B Host) C (RuntimePlace Provenance)) := do
-  unless context.runtime.source.raw == prepared.program.input.raw do
-    throw "architecture runtime/compiler facts are from different documents"
   let boolLayout ← context.primitiveLayout "bool"
   let u8Layout ← context.primitiveLayout "u8"
   match context.primitiveLayout "u128", targetArch prepared,

@@ -33,6 +33,7 @@ def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
   let size := fun (place : MPlaceTy Provenance) =>
     DynamicLayout.sizeAndAlignFromMeta dynamic choice projection.dynamicFuel place.mplace.metadata place.layout
   {
+    instanceDefinition := fun inst => lift (CompilerInstance.definitionOf context.loweringContext.instances inst)
     typeShape := fun ty => lift (CompilerFacts.retagTypeShape context ty)
     builtinDeref := fun ty => lift (CompilerFacts.requiredType context ty "builtin_deref_explicit")
     referencePointee := fun ty => lift (CompilerFacts.referencePointee context ty)
@@ -55,7 +56,7 @@ def hooks [DecidableEq K] (prepared : CompilerFactAdapters.Prepared)
       pure ⟨immediate,value.layout⟩
     writeUninit := fun place => do
       let access ← ValidityMachine.scopedAccess access
-      PlaceMachine.writeMemory access (fun _ => false) .uninit place
+      PlaceMachine.writeUninitMemory access place
     freeze := {
       target := pointers.arithmetic
       debugAssertions := projection.place.debugAssertions

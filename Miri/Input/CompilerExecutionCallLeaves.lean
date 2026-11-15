@@ -14,19 +14,18 @@ private def lift (query : Except String A) : MachineHooks.M K U A :=
 
 def tupleFields (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except String (Array MIR.TyId) := do
   let node ← p.runtime.node ty |>.mapError toString
-  unless node.shapeStatus == .supported && node.shapeKind == .tuple do
+  unless node.shapeKind == .tuple do
     throw "source RustCall spreading requires the exact tuple type"
-  let elements ← (← (← node.payload.getObjVal? "shape").getObjVal? "elements").getArr?
-  elements.mapM fun value => do
-    let id ← (← value.getObjVal? "type_id").getNat?
+  let .tuple elements := node.shape | throw "tuple field query on non-tuple"
+  for id in elements do
     let _ ← p.runtime.node id |>.mapError toString
-    pure id
+  pure elements
 
 def closureUpvarCount (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except String (Option Nat) := do
   let node ← p.runtime.node ty |>.mapError toString
-  unless node.shapeStatus == .supported do throw "closure-kind compiler evidence is unavailable"
-  if node.shapeKind != .closure then return none
-  return some (← (← (← node.payload.getObjVal? "shape").getObjVal? "upvar_count").getNat?)
+  match node.shape with
+  | .closure _ _ count => pure (some count)
+  | _ => pure none
 
 /-- Exact source ExternAbi identity, canonical FnAbi records, shared DefIds/
 TypeConstIds and actual current BodyIdentity all belong to this same program. -/
@@ -34,7 +33,10 @@ def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat) :
     ExecutionCallLeaves.Compiler (MachineHooks.State K U) C ABI.ExternAbi := {
   functionSignature := fun _ layout => lift do
     let (count,sourceAbi) ← CompilerFunctionFacts.signature p.functions layout.ty
-    pure (count,← CompilerExternAbi.decode sourceAbi)
+    pure (count, sourceAbi)
+  instanceKind := fun inst => lift (CompilerInstance.kindOf p.loweringContext.instances inst)
+  instanceArgs := fun inst => lift (CompilerInstance.argsOf p.loweringContext.instances inst)
+  itemInstance := fun definition args => lift (CompilerInstance.item p.loweringContext.instances definition args)
   functionKind := fun ty => lift (CompilerFunctionFacts.kind p.functions ty)
   resolve := fun _ definition args => CompilerProviders.resolveCurrent p definition args
   fnAbiOfFnPtr := fun _ layout extra => lift (CompilerFunctionFacts.pointerAbi p.functions layout.ty extra)

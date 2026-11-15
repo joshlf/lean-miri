@@ -11,21 +11,32 @@ for test in tests/regression/*.lean MiriTests/Regression/*.lean; do
   printf 'Checking %s\n' "$test"
   lake env lean "$test" || status=1
 done
-# Consume the pinned schema3 unit inputs prepared above. These are adapted unit
-# fixtures, not fresh producer/Miri comparisons.
+# Consume pinned schema-11 unit inputs copied byte for byte above. These are
+# retained unit inputs, not fresh producer/Miri comparisons.
 lake env lean --run tests/regression/LowerContext.lean \
-  scratch/regression-inputs/u32.schema3.json || status=1
+  scratch/regression-inputs/u32.checked.json || status=1
 for test in ProviderContext PrimitiveRebinding; do
   lake env lean --run "tests/regression/$test.lean" \
-    scratch/regression-inputs/u32.schema3.json \
-    scratch/regression-inputs/control-flow.schema3.json || status=1
+    scratch/regression-inputs/u32.checked.json \
+    scratch/regression-inputs/control-flow.checked.json || status=1
 done
 # These mains need no external input; their runtime assertions are part of the check.
 for test in DeadlineMachine MapValues ZeroWidth; do
   lake env lean --run "MiriTests/Regression/$test.lean" || status=1
 done
 lake env lean --run MiriTests/DataRace/ThreadClockReuseReachability.lean || status=1
+lake env lean --run tests/input/AllocationBacktrace.lean || status=1
+lake env lean --run tests/memory_operand/WriteUninit.lean || status=1
+lake env lean --run tests/input/CompactArrayOffsets.lean || status=1
+lake env lean --run tests/input/CoroutineCoverage.lean || status=1
 for test in KeyedArray166QA MemoryState166QA; do
   lake env lean --run "MiriTests/Connected/Focused/$test.lean" || status=1
 done
+lake env lean --run tests/input/LlvmSymbolRegistry.lean || status=1
+lake env lean --run tests/resource_destruction/SourceDrops.lean || status=1
+lake env lean --run tests/run_loop/HostStdioReplay.lean || status=1
+flock --no-fork /tmp/lean-miri-lake-build.lock lake build NativeRunner native_stdio_host_qa || status=1
+lake env lean --run tests/run_loop/NativeStdioProtocol.lean || status=1
+lake env lean tests/resource_destruction/KindOnlyHostError.lean || status=1
+python3 native/stdio_host_tests.py || status=1
 exit "$status"

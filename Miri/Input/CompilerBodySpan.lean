@@ -13,9 +13,7 @@ def get (p : CompilerProviders.Prepared) (frame : Frame P L E) :
     | throw (.invalidProgram "unwind body identity absent from canonical compilation")
   unless body.body == frame.body do
     throw (.invalidProgram "unwind body identity/content mismatch")
-  let source ← ((body.input.payload.getObjVal? "span").bind p.loweringContext.decodeCompilerValue).mapError StepError.unsupported
-  let (span,tables) ← lowerCompilerSpan p.program.compilerTables source |>.mapError StepError.unsupported
-  unless tables.spans == p.program.compilerTables.spans do
+  unless body.input.spanId < p.program.compilerTables.spans.size do
     throw (.unsupported "compiler body span absent from final shared span table")
-  pure span
+  pure ⟨body.input.spanId⟩
 end Miri.Input.CompilerBodySpan

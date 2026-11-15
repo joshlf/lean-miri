@@ -5,6 +5,10 @@ For current validation gaps, use [STATUS](../../../STATUS.md).
 The no-input collection tests moved to `MiriTests/Connected/Focused/` and are
 registered in `lake exe miri_tests`. They are executable independently of guest exports.
 
+The fresh CI lane now exports and checks all six guest rows below independently.
+It retains reference diagnostics, verifies expected reference exits/DataRace UB,
+and invokes these existing harnesses without rewriting their assertions.
+
 | Harness | Rust reproduction | Extra harness argument |
 | --- | --- | --- |
 | AtomicHandoff.lean | [Acquire](../../repro/atomic-handoff/acquire.rs), [Relaxed](../../repro/atomic-handoff/relaxed.rs) | `expect-zero`, `expect-race` respectively |
@@ -45,3 +49,14 @@ The pthread-only race reproduction shares `AtomicHandoff.lean`'s canonical
 scheduler/Unix setup. Its `expect-race` mode checks two thread records and the
 exact typed `DataRace` error, and rejects exit, Unsupported, failure and pending
 outcomes. A separate copy of that runner is unnecessary.
+
+The resolved generic regression exercises an associated unsized type, a fat raw
+pointer round trip, and an associated constant through a concrete instantiation.
+It requires successful native guest completion and rejects duplicate executable
+bodies for an instance/promoted pair:
+
+```bash
+python3 tests/connected/focused/check_resolved_generic.py \
+  --exporter exporter/target/release/lean-miri-mir-exporter \
+  --runner .lake/build/bin/native_runner
+```

@@ -189,7 +189,7 @@ private def runPrepared (prepared : Input.EvalPreparation.Prepared)
   let compiler := prepared.compiler
   let dummy := prepared.dummySpan
   let definition ← compiler.program.rootDefinitionId 0
-  let rootInstance : CallInstance := ⟨.Item definition, #[]⟩
+  let rootInstance ← Input.CompilerInstance.item compiler.loweringContext.instances definition #[]
   let _body ← Input.CallResolution.loadedBodyOfInstance compiler.lifecycle.calls.calls rootInstance
   let image := prepared.image
   let arrays ← compiler.initialArrays
@@ -235,8 +235,6 @@ private def runPrepared (prepared : Input.EvalPreparation.Prepared)
 def main (args : List String) : IO Unit := do
   let some path := args.head? | throw (IO.userError "untouched pinned-export JSON required")
   let decoded ← must (Input.decodeJson (← IO.FS.readFile path))
-  unless decoded.executionInput.isSome do
-    throw (IO.userError "export has unresolved source execution-input readiness")
   let program ← must (Input.lowerProgram decoded.document)
   let attempt := Input.EvalPreparation.prepare program
   let prepared ← must attempt.outcome

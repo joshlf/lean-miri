@@ -1,3 +1,4 @@
+import MiriTests.FunctionPointers.AllocationDiagnostics
 import MiriTests.ABI.ABIPrimitives
 import MiriTests.ABI.RuntimeLayout
 import MiriTests.Cast.Typed
@@ -17,11 +18,9 @@ import MiriTests.Connected.Proofs.MachineStateExact207
 import MiriTests.Connected.Proofs.RuntimeDocumentExact207
 import MiriTests.Connected.Proofs.ScEventProof202
 import MiriTests.Connected.Proofs.SelectorProof195
-import MiriTests.Connected.Proofs.TypedValueDecidableEq207
-import MiriTests.Constant.PreparedBindingMismatch
-import MiriTests.Constant.RuntimeArrayEqualityAxioms
 import MiriTests.ControlFlow.Transitions
 import MiriTests.FloatOps.Typed
+import MiriTests.Input.JsonFixtures
 import MiriTests.Input.CompilerForeignSymbolTables
 import MiriTests.Input.DecoderProfile2026
 import MiriTests.Input.DefinitionLookup2026

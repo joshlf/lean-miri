@@ -107,8 +107,7 @@ private def operandBase (h : Config K U C O X Host) : OperandMachine.Hooks K U C
   dereference := h.operands.dereference
   runtimeChecks := h.operands.runtimeChecks
   boolLayout := h.operands.boolLayout
-  constant := fun _ _ _ => throw (.unsupported "constant operand requires an exact structural source site")
-  constantAt := h.operands.constantAt
+  constant := h.operands.constant
 
 def projectionHooks [DecidableEq K] (h : Config K U C O X Host) :
     PlaceProjectionHooks Provenance (State K U) C FrameExtra :=
@@ -175,7 +174,6 @@ def rvalueHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     target := h.access.runtime.base
     placeLayout := RuntimePlace.layout
     evalOperand := eval
-    evalOperandAt := OperandMachine.evalOperandAt operands
     readPointer := fun _ op => do lift ((← scalar (← PlaceMachine.readImmediate h.access op)).toPointer h.access.runtime.base |>.mapError ScalarOps.scalarError)
     readScalar := fun _ op => do scalar (← PlaceMachine.readImmediate h.access op)
     projectDowncast := PlaceDynamic.downcast (projectionHooks h)
@@ -206,7 +204,6 @@ def rvalueHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
         fun error => .invalidProgram s!"pointer immediate: {reprStr error}")
       writePlaceImmediate place c (.scalar value) dest
     threadLocalPointer := h.rvalues.threadLocalPointer
-    normalize := h.rvalues.normalize
     withRetagMode := fun _ mode body => MachineHooks.withRetagMode mode body
     copyOp := fun c source dest => copyRuntimePlace place h.copy c source dest false
     copyOpAllowTransmute := fun c source dest => copyRuntimePlace place h.copy c source dest true
@@ -223,7 +220,6 @@ def rvalueHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
         h.isRawPointer c ty
       else pure false
     evalOperand := eval
-    evalOperandAt := OperandMachine.evalOperandAt operands
     evalPlaceToOp := OperandMachine.evalPlaceToOp operands
     binaryOp := ScalarOps.binary (scalarHooks h)
     unaryOp := ScalarOps.unary (scalarHooks h)
@@ -263,7 +259,6 @@ private def intrinsicHooks [DecidableEq K] (h : Config K U C O X Host) (limits :
     readBytesStripProvenance := fun _ pointer size => do
       return (← RawMemoryMachine.readBytes h.access h.arithmetic pointer size.bytes).data
     evalOperand := fun c op => eval c op none
-    evalOperandAt := fun c path op => OperandMachine.evalOperandAt (operandHooks h) c path op none
     scalarOps := scalarHooks h
     readImmediate := fun _ => PlaceMachine.readImmediate h.access
     writeImmediate := writePlaceImmediate place
@@ -286,12 +281,14 @@ def callHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) : Ca
   let intrinsic : C → CallInstance → Array (OpTy Provenance) → RuntimeStackPlace Provenance →
       Option BasicBlockId → UnwindAction → M K U (Option CallInstance) := fun c callee args dest ret _ => do
     let name ← h.intrinsicName callee
-    let types := callee.args.filterMap fun arg => match arg with | .Type ty => some ty | _ => none
+    let genericArgs ← h.calls.compiler.instanceArgs callee
+    let types := genericArgs.filterMap fun arg => match arg with | .Type ty => some ty | _ => none
     let context := h.intrinsics callee
     if ← IntrinsicBackend.eval h.backend (intrinsicHooks h limits context) c name types args dest.toRuntimePlace ret then return none
     if ← h.intrinsicMustOverride callee then throw (.unsupported s!"unimplemented intrinsic: {name}")
     unless ← h.intrinsicFallbackIsSpec callee do throw (.unsupported s!"intrinsic fallback is not a specification: {name}")
-    return some ⟨.Item callee.defId,callee.args⟩
+    let kind ← h.calls.compiler.instanceKind callee
+    return some (← h.calls.compiler.itemInstance kind.defId genericArgs)
   let virtual := ExecutionCalls.virtualHooks h.virtual h.access operands h.compiler.debugAssertions
   ExecutionCalls.make h.calls h.lifecycle h.access h.allocation h.compiler h.copy h.retag
     limits.retag limits.callDispatch operands (projectionHooks h) h.functions virtual
@@ -303,13 +300,12 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
   let h := withValidation h limits
   let operands := operandHooks h
   let eval := fun c op => OperandMachine.evalOperand operands c op none
-  let read := fun c path op => do
-    PlaceMachine.readImmediate h.access (← OperandMachine.evalOperandAt operands c path op none)
+  let read := fun c op => do
+    PlaceMachine.readImmediate h.access (← OperandMachine.evalOperand operands c op none)
   let calls := callHooks h limits
   let helpers := ExecutionCalls.helpers h.helpers calls
   let panic := {h.panic with
     evalOperand := eval
-    evalOperandAt := fun c path op => OperandMachine.evalOperandAt operands c path op none
     driver := FunctionCalls.bindUnwind h.panic.driver helpers}
   let control := ExecutionControl.hooks h.control.bodySpan h.lifecycle h.access
     (projectionHooks h).place h.copy h.retag helpers h.unwindTerminateFunction
@@ -317,7 +313,7 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
   let terminators : TerminatorHooks Provenance LocalLayout FrameExtra (MachineHooks.MachineState K U)
       C (OpTy Provenance) (RvalueImmTy Provenance) := {
     toControlHooks := control
-    evalDiscriminant := fun c op => MachineHooks.run (read c (OperandPath.instruction "discriminant") op)
+    evalDiscriminant := fun c op => MachineHooks.run (read c op)
     compareSwitchCase := fun c value bits => MachineHooks.run do
       let caseScalar ← lift (Scalar.fromUInt (BitVec.ofNat 128 bits) value.layout.layout.size |>.mapError ScalarOps.scalarError)
       let result ← ScalarOps.binary (scalarHooks h) c .Eq value ⟨.scalar caseScalar,value.layout⟩
@@ -327,7 +323,7 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     drop := fun c mirPlace target unwind => MachineHooks.run do
       let dest ← PlaceDynamic.evalPlace (projectionHooks h) c mirPlace false
       let callee ← calls.resolveDropGlue c dest.layout.ty
-      match callee.kind with
+      match ← calls.instanceKind callee with
       | .Shim (.DropGlue _ none) =>
         let state ← get
         let (state,outcome) := ControlFlow.goToBlock target state
@@ -335,7 +331,7 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
         lift outcome
       | _ => Call.initDropInPlaceCall calls c limits.callDispatch dest.stackView callee target unwind
     ignoreOptionalOverflowChecks := fun _ => h.ignoreOptionalOverflowChecks
-    readAssertCondition := fun c op => MachineHooks.run do lift ((← scalar (← read c (OperandPath.instruction "condition") op)).toBool.mapError ScalarOps.scalarError)
+    readAssertCondition := fun c op => MachineHooks.run do lift ((← scalar (← read c op)).toBool.mapError ScalarOps.scalarError)
     assertPanic := fun c message unwind => MachineHooks.run (Panic.assertPanic panic c message unwind) }
   {
     assign := fun c dest value => MachineHooks.run (evalRvalueIntoPlace (rvalueHooks h limits) c value dest)
@@ -355,7 +351,7 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
       checkAlign := h.atomics.checkPointerAlign
       memCopy := fun _ source dest size nonoverlap =>
         GlobalMemoryCopyMachine.genericCopy h.access h.addresses h.arithmetic source dest size 1 nonoverlap}
-      (fun c path op => OperandMachine.evalOperandAt operands c path op none) c intrinsic)
+      (fun c op => OperandMachine.evalOperand operands c op none) c intrinsic)
     -- Pinned Miri inherits rustc's empty counter hook.
     incrementConstEvalCounter := fun _ state => (state,.ok ())
     returnFromCurrentFrame := ControlFlow.returnFromCurrentFrame control

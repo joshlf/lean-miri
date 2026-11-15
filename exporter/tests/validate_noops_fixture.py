@@ -6,17 +6,18 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
-from mir_json import load_mir_document
+from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 doc = load_mir_document(sys.argv[1])
 assert doc["producer"]["rustc_commit"] == "8144389c895da997dbdecaa635e41d6a50be6ffd"
-assert doc["completeness"]["status"] == "incomplete"
+assert "completeness" not in doc
 assert doc["selected_scope"]["semantics"] == "structural_export_closure_only"
-assert doc["selected_scope"]["status"] == "complete"
+assert "status" not in doc["selected_scope"]
 assert doc["invocation"]["kind"] == "direct_rustc_driver"
 assert "-Cinstrument-coverage" in doc["invocation"]["rustc_args"]
 assert doc["invocation"]["rustc_args_fingerprint_fnv1a64"]
-body = next(body for body in doc["bodies"] if body["def_path"] == "covered")
+root = next(root for root in doc["body_roots"] if root["def_path"] == "covered")
+body = pool_entry(doc, "bodies", root["body"])
 coverage = [
     statement["kind"]
     for block in body["basic_blocks"]
@@ -25,9 +26,9 @@ coverage = [
 ]
 assert coverage, "-Cinstrument-coverage did not produce a Coverage statement"
 assert all(
-    item["status"] == "supported"
+    "status" not in item
     and item["execution"] == "no_op"
-    and item["coverage"]["status"] == "supported"
+    and "status" not in item["coverage"]
     and item["coverage"]["kind"] in ("point", "block_marker", "virtual_counter")
     for item in coverage
 )

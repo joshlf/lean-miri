@@ -13,29 +13,20 @@ abbrev Result := Except String
 
 def receiverKind (context : CompilerFacts.Context) (id : TypeId) : Result VirtualCalls.ReceiverKind := do
   let node ← context.runtime.node id |>.mapError toString
-  unless node.shapeStatus == .supported do throw "virtual receiver compiler shape unresolved"
   match node.shapeKind with
   | .reference => pure .reference
   | .rawPointer => pure .rawPointer
   | .dynamicTraitObject => pure .dynamic
-  | .unknown _ => throw "virtual receiver compiler shape unknown"
   | _ => pure .other
 
-/-- The compiler exports predicates.principal() through the same bound
-existential-predicate interner as trait checking. Missing legacy fields fail. -/
+/-- Dynamic metadata owns its predicate sequence; each element names the
+canonical predicate pool and the principal retains its exact compiler ID. -/
 def dynamicData (prepared : CompilerFactAdapters.Prepared) (id : TypeId) :
     Result (Option VirtualCalls.DynamicData) := do
   let node ← prepared.context.runtime.node id |>.mapError toString
-  unless node.shapeStatus == .supported do throw "dynamic type compiler shape unresolved"
-  if node.shapeKind != .dynamicTraitObject then return none
-  let token ← match ← CompilerFactAdapters.validityKind prepared id with
-    | .dynamic token => pure token
-    | _ => throw "dynamic predicate-array identity mismatch"
-  let shape ← node.payload.getObjVal? "shape"
-  let principal ← shape.getObjVal? "principal_predicate"
-  let principal : Option Nat ← if principal == Lean.Json.null then pure none else do
-    pure (some (← (← principal.getObjVal? "predicate_id").getNat?))
-  return some ⟨token,principal⟩
+  match node.shape with
+  | .dynamicTraitObject predicates principal _ => pure (some ⟨predicates,principal⟩)
+  | _ => pure none
 
 private def lift (value : Result A) : EStateM StepError S A :=
   match value with
@@ -56,21 +47,10 @@ def compilerHooks (prepared : CompilerFactAdapters.Prepared)
     layoutOf := fun ty => lift (CompilerFacts.layoutOf prepared.context ty)
     unitLayout := lift (CompilerFacts.unitLayout prepared.context) }
 
-/-- Source inlinecallee attribute evidence is optional only when that full
-instance does not occur in any inline scope. Conflicts/unresolved entries are
-errors; they must not be hidden by a fallback query. -/
-def inlineAttribute (prepared : CompilerScopes.Prepared) (fnInstance : CallInstance) : Result (Option Bool) := do
-  let mut found := none
-  for scopes in prepared.scopes do
-    for outcome in scopes do
-      if let .ok entry := outcome then
-        if let some (callee,_) := entry.scope.inlined then
-          if callee == fnInstance then
-            let some value := entry.trackCaller | throw "inlinecallee attribute evidence missing"
-            if let some previous := found then
-              unless previous == value do throw "conflicting full-instance inlinecallee attributes"
-            found := some value
-  return found
+/-- Construction validates all inlinecallee evidence, including unused instances.
+An absent full instance delegates to the mandatory base query. -/
+def inlineAttribute (prepared : CompilerScopes.Prepared) (fnInstance : CallInstance) : Option Bool :=
+  prepared.inlineAttributes[fnInstance]?
 
 /-- The canonical body key comes directly from the saved frame. Body equality
 is only a consistency assertion after indexing, never a body lookup strategy.
@@ -85,7 +65,7 @@ def scopeHooks (prepared : CompilerScopes.Prepared) (base : VirtualCalls.Compile
       unless actual.body == body do throw (.invalidProgram "frame body identity/content mismatch")
       lift (CompilerScopes.sourceScope prepared identity.index scope)
     requiresCallerLocation := fun fnInstance => do
-      match ← lift (inlineAttribute prepared fnInstance) with
+      match inlineAttribute prepared fnInstance with
       | some value => pure value
       | none => base.requiresCallerLocation fnInstance }
 

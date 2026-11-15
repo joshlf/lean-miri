@@ -12,25 +12,21 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from mir_json import pool_entry, decode_mir_document, inspection_document
 
 
-def require_external_constant(document, name):
+def require_external_constant(document, name, compiler_mir):
     """Require a root constant whose allocation refers to a decoded vtable.
 
-    Inspect the original exported graph, not one of the salt probes created by
-    prepared allocation closure. The Lean checks still consume the original bytes.
+    Resolved MIR no longer retains unevaluated constant definition IDs. Check
+    the pinned compiler's pre-evaluation MIR independently, then inspect the
+    exported root's original allocation graph (never a prepared salt probe).
+    This is a fixture-specific provenance control, not a general translation proof.
     """
-    def expand(value):
-        if isinstance(value, dict):
-            if set(value) == {'$lean_miri_shared_ref'}:
-                return expand(document['shared_payloads']['nodes'][value['$lean_miri_shared_ref']])
-            return {key: expand(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [expand(item) for item in value]
-        return value
-
     def walk(value):
         if isinstance(value, dict):
             yield value
@@ -40,22 +36,32 @@ def require_external_constant(document, name):
             for item in value:
                 yield from walk(item)
 
-    allocations = {row['allocation_id']: row for row in expand(document['allocations'])}
-    for body in expand(document['bodies']):
-        if body.get('def_path') != 'miri_start':
+    root_mir = compiler_mir.split('fn miri_start(', 1)
+    if len(root_mir) != 2:
+        raise SystemExit('compiler MIR lacks miri_start')
+    root_mir = root_mir[1].split('\n}')[0]
+    if not re.search(r'\bconst ' + re.escape(name) + r'\s*;', root_mir):
+        raise SystemExit(f'compiler root MIR lacks external constant: {name}')
+    external_names = set(re.findall(r'\bconst ([A-Za-z_]\w*::[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)', root_mir))
+    external_names = {item for item in external_names if not item.startswith('miri_start::')}
+    if external_names != {name}:
+        raise SystemExit(f'ambiguous external constant origins: {sorted(external_names)}')
+    if 'PointerCoercion(Unsize' in root_mir:
+        raise SystemExit('cross-crate control unexpectedly constructs a local vtable')
+    for root in document['body_roots']:
+        if root['def_path'] != 'miri_start':
             continue
+        body = pool_entry(document, 'bodies', root['body'])
         for constant in walk(body['basic_blocks']):
-            source = constant.get('source', {})
-            if (constant.get('kind') != 'evaluated_const' or source.get('def_path') != name or
-                    source.get('def_id', {}).get('crate', 0) == 0):
+            if constant.get('kind') != 'evaluated_const':
                 continue
             value = constant.get('value', {})
             if value.get('kind') != 'indirect_allocation':
                 continue
-            allocation = allocations[value['allocation']['allocation_id']]
-            for reference in walk(allocation):
-                target = reference.get('target', {}).get('allocation_id')
-                if allocations.get(target, {}).get('kind') == 'vtable':
+            allocation = pool_entry(document, 'allocations', value['allocation'])
+            for reference in allocation.get('relocations', []):
+                target = pool_entry(document, 'allocations', reference['target'])
+                if target.get('kind') == 'vtable':
                     print(f'vtable-erasure: external constant {name} -> symbolic vtable PASS')
                     return
     raise SystemExit(f'missing external constant with symbolic-vtable relocation: {name}')
@@ -70,15 +76,6 @@ def fingerprint(raw):
 
 def summarize_queries(raw, provenance, query_log, runtime_log):
     """Join producer rows to actual lookups; catalog presence is not consumption."""
-    def expand(value):
-        if isinstance(value, dict):
-            if set(value) == {'$lean_miri_shared_ref'}:
-                return expand(document['shared_payloads']['nodes'][value['$lean_miri_shared_ref']])
-            return {key: expand(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [expand(item) for item in value]
-        return value
-
     def events(log, prefix):
         for line in log.splitlines():
             if line.startswith(prefix + ' '):
@@ -92,9 +89,9 @@ def summarize_queries(raw, provenance, query_log, runtime_log):
     document = json.loads(raw)
     if (provenance['snapshot_fnv1a64'] != fingerprint(raw) or
             provenance['snapshot_byte_length'] != len(raw) or
-            provenance['rustc_commit'] != expand(document['producer'])['rustc_commit']):
+            provenance['rustc_commit'] != document['producer']['rustc_commit']):
         raise ValueError('producer provenance belongs to different input bytes/compiler')
-    rows = expand(document['compiler_vtable_queries'])
+    rows = document['compiler_vtable_queries']
     catalog = {row['query_id']: row for row in rows}
     origins = {row['query_id']: row for row in provenance['queries']}
     if len(catalog) != len(rows) or len(origins) != len(provenance['queries']) or catalog.keys() != origins.keys():
@@ -110,8 +107,8 @@ def summarize_queries(raw, provenance, query_log, runtime_log):
     result = []
     for query_id, row in sorted(catalog.items()):
         origin = origins[query_id]
-        before = (row['input_type']['type_id'], [p['predicate_id'] for p in row['input_predicates']])
-        after = (row['output_type']['type_id'], [p['predicate_id'] for p in row['output_predicates']])
+        before = (row['input_type'], row['input_predicates'])
+        after = (row['output_type'], row['output_predicates'])
         if (origin['input_type_id'], origin['input_predicate_ids']) != before or not origin['origins']:
             raise ValueError('producer provenance differs from complete query key')
         if any(o.get('parent_query_id') is not None and o['parent_query_id'] not in catalog
@@ -145,6 +142,8 @@ def main():
     parser.add_argument('--expect', choices=['identity', 'nonidentity'], default='nonidentity')
     parser.add_argument('--require-predicate-contrast', action='store_true',
                         help='require same-type query pairs with distinct input and output predicates')
+    parser.add_argument('--require-lockstep', action='store_true',
+                        help='require direct upcast answers and reject obsolete lockstep envelopes')
     parser.add_argument('--require-trait-vptr', action='store_true',
                         help='require the shared-memory TraitVPtr control and its alias negative checks')
     parser.add_argument('--extern', action='append', default=[], metavar='NAME=RLIB',
@@ -197,12 +196,22 @@ def main():
             reference.get('snapshot_fnv1a64') != digest):
         raise SystemExit('reference did not establish same-TyCtxt exit_zero for these exact bytes')
     if args.require_external_constant:
-        require_external_constant(json.loads(raw), args.require_external_constant)
+        # Reuse every rustc flag and dependency from this exact export. Only the
+        # output mode changes; no MIR evaluation or exporter data is fabricated.
+        mir_path = output.with_suffix('.compiler.mir')
+        rustc_cmd = [str(toolchain / 'bin/rustc'), *cmd[cmd.index('--') + 1:],
+                     '--emit=mir', '-o', str(mir_path)]
+        subprocess.run(rustc_cmd, cwd=ROOT, env=env, check=True, timeout=args.timeout)
+        require_external_constant(inspection_document(decode_mir_document(json.loads(raw))), args.require_external_constant, mir_path.read_text())
     query_args = [args.expect] + (['predicate-contrast'] if args.require_predicate_contrast else [])
     if args.require_trait_vptr:
         query_args.append('trait-vptr')
     if args.trace_queries:
         query_args.append('trace-map')
+    subprocess.run([str(elan / 'bin/lake'), 'env', 'lean', '--run',
+                    'tests/input/DecoderDirectLockstep2026.lean', str(output),
+                    *([] if args.require_lockstep else ['no-upcast'])],
+                   cwd=ROOT, env=env, check=True, timeout=args.timeout)
     logs = []
     for harness, extra in [('tests/input/VTableErasureQuery.lean', query_args),
                            ('tests/connected/203-upcast-a-prefix.lean', ['--trace-vtable-queries'] if args.trace_queries else [])]:

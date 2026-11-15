@@ -37,10 +37,9 @@ private def legacySourceNode (image : AllocationImage.Imported)
 
 private def legacyFunctionInstance (prepared : CompilerVTableRuntime.Prepared)
     (id : InstanceId) : Except String CallInstance := do
-  let candidates := prepared.instances.filter (·.id == id)
-  unless candidates.size == 1 do throw "missing or ambiguous complete compiler function instance"
-  let some value := candidates[0]? | throw "compiler function instance missing"
-  value.outcome
+  let ctx := prepared.facts.context.loweringContext
+  let _ ← CompilerInstance.source ctx.instances id
+  pure id
 
 private def legacyGlobalFunction (prepared : CompilerVTableRuntime.Prepared)
     (image : AllocationImage.Imported)
@@ -56,20 +55,12 @@ private def legacyGlobalFunction (prepared : CompilerVTableRuntime.Prepared)
     | return none
   let some (.function source) := node.data | return none
   let fnInstance ← legacyFunctionInstance prepared source.instanceId
-  let tables := prepared.facts.context.program.compilerTables
-  let definition ← lookupDefinitionId tables.definitions source.definitionId
-  unless fnInstance.defId == definition do throw "global function/full-instance definition mismatch"
-  let (args,next) ← lowerCompilerGenericArgs prepared.facts.context.loweringContext
-    tables source.genericArgs
-  unless next.definitions == tables.definitions && next.typeConstants == tables.typeConstants do
-    throw "global function arguments require unprepared compiler identities"
-  unless args == fnInstance.args do throw "global function/full-instance generic arguments mismatch"
   pure (some fnInstance)
 
 private def legacyGlobalVTable (prepared : CompilerVTableRuntime.Prepared)
     (image : AllocationImage.Imported)
     (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
-    (id : AllocId) : Except String (Option (Nat × Nat)) := do
+    (id : AllocId) : Except String (Option (Nat × PredicateList)) := do
   let some node ← if memory.hasImportedRuntimeId id then
       some <$> legacySourceNode image memory id
     else
@@ -80,9 +71,7 @@ private def legacyGlobalVTable (prepared : CompilerVTableRuntime.Prepared)
     | return none
   let some (.vtable source) := node.data | return none
   let _ ← prepared.facts.context.runtime.node source.typeId |>.mapError toString
-  let predicates ← source.payload.getObjVal? "predicates"
-  let token ← CompilerVTableFacts.exportedArrayToken prepared.facts predicates
-  pure (some (source.typeId, token))
+  pure (some (source.typeId, source.predicates))
 
 private def legacySeedFunctions (prepared : CompilerFunctionPointers.Prepared)
     (image : AllocationImage.Imported)
@@ -93,9 +82,9 @@ private def legacySeedFunctions (prepared : CompilerFunctionPointers.Prepared)
   let input := prepared.calls.calls.program.input
   let some world := input.compilerAllocIdWorld | throw "fixture lacks prepared allocation world"
   unless memory.sourceAllocIdWorldActive do throw "prepared function catalog requires the active source AllocId world"
-  unless image.source == input.allocations.filter (·.status == .supported) do
+  unless image.source == input.allocations do
     throw "prepared function catalog allocation image differs from its owning program"
-  validateCompilerAllocIdWorldRaw input.raw input.allocations (some world)
+  validateCompilerAllocIdWorld input.allocations world
     |>.mapError fun error => s!"prepared AllocId world: {error}"
   for row in world.dedupCatalog do
     if row.keyKind == .function then
@@ -130,9 +119,9 @@ private def legacySeedVTables (prepared : CompilerVTableMachine.Prepared)
   let input := prepared.calls.calls.program.input
   let some world := input.compilerAllocIdWorld | throw "fixture lacks prepared allocation world"
   unless memory.sourceAllocIdWorldActive do throw "prepared vtable catalog requires the active source AllocId world"
-  unless image.source == input.allocations.filter (·.status == .supported) do
+  unless image.source == input.allocations do
     throw "prepared vtable catalog allocation image differs from its owning program"
-  validateCompilerAllocIdWorldRaw input.raw input.allocations (some world)
+  validateCompilerAllocIdWorld input.allocations world
     |>.mapError fun error => s!"prepared AllocId world: {error}"
   for row in world.dedupCatalog do
     if row.keyKind == .vtable then
@@ -166,11 +155,15 @@ private def stateWith (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTr
     raceAllocations := #[], allocationSpans := #[], user
   }⟩
 
-private def functionHooks (salt : Fin 32) :
+private def functionHooks (prepared : EvalPreparation.Prepared) (salt : Fin 32) :
     FunctionPointers.Hooks MiriMemoryKind RuntimeUser Unit := {
   registry := RuntimeUser.functions
   putRegistry := fun user registry => {user with functions := registry}
   crossCrateInlineAlways := true
+  instanceArgs := fun id =>
+    match CompilerInstance.argsOf prepared.compiler.program.input.instances id with
+    | .ok args => pure args
+    | .error message => throw (.unsupported message)
   inlineNever := fun _ => pure false
   chooseSalt := pure salt
   ptrGetAlloc := fun _ => pure none
@@ -307,7 +300,7 @@ private def runSelected (path : String) : IO Unit := do
   let initial := stateWith memory user
   let some functionEntry := functionRegistry.functions[0]? |
     throw (IO.userError "seeded function registry is empty")
-  let fHooks := functionHooks functionEntry.salt
+  let fHooks := functionHooks prepared functionEntry.salt
   let (afterFnHit, fnHit) := MachineHooks.run
     (FunctionPointers.functionPointer fHooks (.Instance functionEntry.callee)) initial
   match fnHit with
@@ -317,7 +310,9 @@ private def runSelected (path : String) : IO Unit := do
     "function hit consumed a fresh source AllocId"
   check (afterFnHit.machine.user.functions.functions.size == functionRegistry.functions.size)
     "function hit changed the seeded registry size"
-  let missingFn : CallInstance := ⟨.Item 18446744073709551615, #[]⟩
+  let some missingFn := (Array.range prepared.compiler.program.input.instances.size).find? (fun id =>
+      !(functionRegistry.functions.any (fun entry => entry.callee == id)))
+    | throw (IO.userError "fixture has no valid uncaptured function key")
   let (afterFnMiss, fnMiss) := MachineHooks.run
     (FunctionPointers.functionPointer fHooks (.Instance missingFn)) initial
   match fnMiss with
@@ -329,6 +324,18 @@ private def runSelected (path : String) : IO Unit := do
     "function miss consumed a fresh source AllocId"
   check (afterFnMiss.machine.user.functions.functions.size == functionRegistry.functions.size)
     "function miss mutated the function registry size"
+
+  let invalidFn := prepared.compiler.program.input.instances.size
+  let (afterInvalidFn, invalidFnResult) := MachineHooks.run
+    (FunctionPointers.functionPointer fHooks (.Instance invalidFn)) initial
+  match invalidFnResult with
+  | .error (.unsupported message) =>
+    check (message == s!"compiler instance ID {invalidFn} out of bounds")
+      "out-of-bounds function ID returned an unrelated error"
+  | _ => throw (IO.userError "out-of-bounds function ID was not rejected")
+  check (afterInvalidFn.machine.memory.sourceAllocIdNext == memory.sourceAllocIdNext &&
+      afterInvalidFn.machine.user.functions.functions.size == functionRegistry.functions.size)
+    "out-of-bounds function ID changed allocator state"
 
   let some vtableEntry := vtableRegistry.entries[0]? |
     throw (IO.userError "seeded vtable registry is empty")
@@ -416,6 +423,30 @@ private def runSelected (path : String) : IO Unit := do
   check (afterFreshLookup.machine.memory.sourceAllocIdNext == afterFresh.machine.memory.sourceAllocIdNext &&
       afterFreshReverse.machine.memory.sourceAllocIdNext == afterFresh.machine.memory.sourceAllocIdNext)
     "source identity lookups mutated the fresh allocation frontier"
+
+  let mut checkedByteWitness := false
+  for (row, index) in world.dedupCatalog.toList.zipIdx do
+    if row.keyKind == .bytes && !checkedByteWitness then
+      checkedByteWitness := true
+      let some originalHex := row.byteImageHex | throw (IO.userError "valid byte witness image absent")
+      for (hex, expectedError) in #[(none, "prepared byte-key catalog row lacks its exact image"),
+          (some "zz", "prepared byte-key catalog image differs from its key allocation"),
+          (some (originalHex ++ "00"), "prepared byte-key catalog image differs from its key allocation")] do
+        let changedWorld := {world with dedupCatalog := world.dedupCatalog.set! index {row with byteImageHex := hex}}
+        let changedProgram := {prepared.compiler.program with input :=
+          {prepared.compiler.program.input with compilerAllocIdWorld := some changedWorld}}
+        match CompilerGlobalBytes.prepare changedProgram prepared.compiler.runtime memory with
+        | .error message => check (message == expectedError) "byte witness mutation returned an unrelated error"
+        | .ok _ => throw (IO.userError "manually constructed invalid byte witness was accepted")
+      let changedRow := {row with keyAllocationId := prepared.compiler.program.input.allocations.size + 1}
+      let changedWorld := {world with dedupCatalog := world.dedupCatalog.set! index changedRow}
+      let changedProgram := {prepared.compiler.program with input :=
+        {prepared.compiler.program.input with compilerAllocIdWorld := some changedWorld}}
+      match CompilerGlobalBytes.prepare changedProgram prepared.compiler.runtime memory with
+      | .error message =>
+          check (message == "prepared byte-key catalog key allocation is absent") "wrong byte-key identity returned an unrelated error"
+      | .ok _ => throw (IO.userError "manually constructed missing byte-key identity was accepted")
+  check checkedByteWitness "selected fixture has no byte witness to validate"
 
   let (byteState, byteAttach) := MachineHooks.run
     (CompilerGlobalBytes.attach prepared.compiler.program prepared.compiler.runtime) initial

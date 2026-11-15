@@ -358,15 +358,7 @@ inductive TypeConst where
   | Expr (kind : ConstExpressionKind) (arguments : Array GenericArg)
   deriving Repr, DecidableEq
 
-structure UnevaluatedConst where
-  definition : DefId
-  arguments : Array GenericArg
-  promoted : Option Nat
-  deriving Repr, DecidableEq
-
 inductive MirConst where
-  | Ty (ty : TyId) (value : TypeConst)
-  | Unevaluated (constant : UnevaluatedConst) (ty : TyId)
   | Val (value : ConstValue) (ty : TyId)
   deriving Repr, DecidableEq
 
@@ -424,7 +416,7 @@ inductive AggregateKind where
 
 inductive Rvalue where
   | Use (operand : Operand) (retag : WithRetag)
-  | Repeat (operand : Operand) (count : TypeConst)
+  | Repeat (operand : Operand) (count : TypeConstId)
   | Ref (region : Region) (borrow : BorrowKind) (place : Place)
   | ThreadLocalRef (definition : DefId)
   | RawPtr (kind : RawPtrKind) (place : Place)

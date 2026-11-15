@@ -1,10 +1,8 @@
 import Miri.Input.CompilerProviders
-import Miri.Input.NormalizationBody
 import Miri.Interpreter.AllocationDriver
 
 /-! Canonical stack.rs frame/local/instruction queries. The body index is the
-identity key; body contents only check consistency. Local layouts consume exact
-full-instance body-normalization evidence, never template type substitution. -/
+identity key; body contents only check consistency. Local layouts consume the concrete executable body’s resolved types. -/
 namespace Miri.Input.CompilerFrameContext
 open Lean Miri.ABI Miri.Memory Miri.Interpreter
 abbrev ActualFrame := Frame Provenance LocalLayout MachineHooks.FrameExtra
@@ -27,68 +25,22 @@ def bodyOfFrame (p : CompilerProviders.Prepared) (frame : ActualFrame) :
 def currentBody (p : CompilerProviders.Prepared) : MachineHooks.M K User LoweredBody := do
   lift (bodyOfFrame p (← MachineHooks.currentFrame))
 
-def normalizedBody (p : CompilerProviders.Prepared) (frame : ActualFrame) :
-    Except String Json := do
-  let body ← bodyOfFrame p frame
-  let some lifecycle := p.lifecycle.lifecycle.entries[frame.bodyIdentity.index]?
-    | throw "canonical body compiler context is absent"
-  unless (← lifecycle.callee) == frame.functionInstance do
-    throw "body normalization belongs to another full instance"
-  let context ← body.input.payload.getObjVal? "constant_query_context"
-  let normalized ← context.getObjVal? "normalization"
-  NormalizationBody.resolve normalized body.input.payload
-
-/-- The recorded normalization ran rustc's instantiate-MIR-and-normalize query
-with this exact full instance and body's typing environment. -/
-def normalizedLocalType (p : CompilerProviders.Prepared) (frame : ActualFrame)
+/-- Local types already belong to the concrete executable body. -/
+def localType (p : CompilerProviders.Prepared) (frame : ActualFrame)
     (id : MIR.LocalId) : Except String MIR.TyId := do
   let body ← bodyOfFrame p frame
-  let some source := body.input.locals[id]? | throw "source local is absent"
-  unless source.id == id do throw "source local index mismatch"
-  let locals ← (← (← normalizedBody p frame).getObjVal? "locals").getArr?
-  unless locals.size == body.input.locals.size do throw "body normalization changed local count"
-  let some decl := locals[id]? | throw "normalized local is absent"
-  unless (← decl.getObjValAs? Nat "local") == id do throw "normalized local index mismatch"
-  (← decl.getObjVal? "type").getObjValAs? Nat "type_id"
-
-/-- Source step.rs Cast target normalization at the exact current statement.
-The requested original type must be the actual Cast target. No type-ID-only
-substitution table is shared across distinct full instantiations. -/
-def normalizeCastTarget (p : CompilerProviders.Prepared) (requested : MIR.TyId) :
-    MachineHooks.M K User MIR.TyId := do
-  let frame ← MachineHooks.currentFrame
-  let .mir location := frame.location | throw .expectedMirLocation
-  let body ← lift (bodyOfFrame p frame)
-  let some block := body.body.basicBlocks[location.block]?
-    | throw (.stack (.invalidLocation location))
-  let some statement := block.statements[location.statementIndex]?
-    | throw (.invalidProgram "cast normalization outside a source statement")
-  let .Assign _ (.Cast _ _ original) := statement.kind
-    | throw (.invalidProgram "cast normalization outside the source Cast rvalue")
-  unless requested == original do throw (.invalidProgram "cast normalization requested another source type")
-  lift do
-    let normalized ← normalizedBody p frame
-    let blocks ← (← normalized.getObjVal? "basic_blocks").getArr?
-    let some normalizedBlock := blocks[location.block]? | throw "normalized source block absent"
-    unless (← normalizedBlock.getObjValAs? Nat "block") == location.block do
-      throw "normalized source block index mismatch"
-    let statements ← (← normalizedBlock.getObjVal? "statements").getArr?
-    let some statement := statements[location.statementIndex]? | throw "normalized source statement absent"
-    let kind ← statement.getObjVal? "kind"
-    unless (← kind.getObjValAs? String "variant") == "Assign" do throw "normalization changed statement kind"
-    let rvalue ← kind.getObjVal? "rvalue"
-    unless (← rvalue.getObjValAs? String "kind") == "Cast" do throw "normalization changed Cast rvalue"
-    (← rvalue.getObjVal? "target_type").getObjValAs? Nat "type_id"
+  let some ty := body.body.locals[id]? | throw "local is absent"
+  pure ty
 
 /-- The uncached compiler leaf used by the canonical local-layout cache. -/
 def computeLocalLayout (p : CompilerProviders.Prepared) (id : MIR.LocalId) :
     MachineHooks.M K User LocalLayout := do
   let frame ← MachineHooks.currentFrame
-  let ty ← lift (normalizedLocalType p frame id)
+  let ty ← lift (localType p frame id)
   lift ((p.runtime.lookup ty).mapError toString)
 
 /-- Complete source layout_of_local for the actual current frame: a cached
-layout bypasses normalization; debug compatibility runs before cache mutation. -/
+layout bypasses lookup; debug compatibility runs before cache mutation. -/
 def layoutOfLocal (p : CompilerProviders.Prepared) (debugAssertions : Bool)
     (compatible : LocalLayout → LocalLayout → Except StepError Bool)
     (id : MIR.LocalId) (known : Option LocalLayout) : MachineHooks.M K User LocalLayout := do
@@ -120,10 +72,10 @@ def localSpan (p : CompilerProviders.Prepared) (supplied : MIR.Body) (id : MIR.L
   let frame ← MachineHooks.currentFrame
   unless supplied == frame.body do throw (.invalidProgram "local span body differs from active frame")
   let body ← lift (bodyOfFrame p frame)
-  let some decl := body.input.locals[id]? | throw (.invalidProgram "local source span index is absent")
-  match p.program.bundle.spans.toList.idxOf? decl.sourceInfo.span with
-  | some index => pure ⟨index⟩
-  | none => throw (.unsupported "exact local source span is absent from canonical span table")
+  let some decl := body.input.localSources[id]? | throw (.invalidProgram "local source span index is absent")
+  if decl.spanId < p.program.bundle.spans.size then
+    pure ⟨decl.spanId⟩
+  else throw (.unsupported "exact local source span is absent from canonical span table")
 
 /-- Return the actual existing MIR node; no second executable instruction IR. -/
 def instruction (p : CompilerProviders.Prepared) :
@@ -193,10 +145,10 @@ def compilerHooks (p : CompilerProviders.Prepared) (base : PlaceMachine.Compiler
   {base with layout := fun _ id => computeLocalLayout p id, localSpan := localSpan p}
 
 /-- Only TLS resolution remains a capability of the rvalue leaf record. -/
-def rvalueLeaves (p : CompilerProviders.Prepared)
+def rvalueLeaves (_p : CompilerProviders.Prepared)
     (threadLocalPointer : C → MIR.DefId → MachineHooks.M K User (Pointer (Option Provenance))) :
     ExecutionLeaves.Rvalue (MachineHooks.State K User) C :=
-  ⟨threadLocalPointer,fun _ ty => normalizeCastTarget p ty⟩
+  ⟨threadLocalPointer⟩
 
 /-- Close canonical frame access and local compiler leaves in the same config.
 The existing operational dictionaries retain physical/validation capabilities. -/
@@ -204,6 +156,27 @@ def executionHooks (p : CompilerProviders.Prepared)
     (base : ExecutionMachine.Config K User C Other Extern Host) :
     ExecutionMachine.Config K User C Other Extern Host :=
   {base with
-    compiler := compilerHooks p base.compiler
-    rvalues := {base.rvalues with normalize := fun _ ty => normalizeCastTarget p ty}}
+    compiler := compilerHooks p base.compiler}
+end Miri.Input.CompilerFrameContext
+
+namespace Miri.Input.CompilerFrameContext
+open Miri Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter
+set_option autoImplicit false
+variable {K U : Type}
+ theorem localSpan_known (p : CompilerProviders.Prepared) (body : LoadedBody) (actual : LoweredBody)
+    (fnInstance : CallInstance) (decl : SourceInfo) (span : SpanRef)
+    (row : p.program.bundle.bodies[body.identity.index]? = some actual)
+    (contents : actual.body = body.body)
+    (loader : CallResolution.loadedBodyOfInstance p.lifecycle.calls.calls fnInstance = .ok body)
+    (declaration : actual.input.localSources[0]? = some decl)
+    (indexed : decl.spanId = span.id)
+    (bounded : span.id < p.program.bundle.spans.size)
+    (frames : Array ActualFrame) (frame : ActualFrame) (machine : MachineHooks.MachineState K U)
+    (identity : frame.bodyIdentity = body.identity) (function : frame.functionInstance = fnInstance)
+    (frameBody : frame.body = body.body) :
+    localSpan p body.body 0 (⟨⟨frames.push frame⟩,machine⟩ : MachineHooks.State K U) =
+      .ok span ⟨⟨frames.push frame⟩,machine⟩ := by
+  simp [localSpan,MachineHooks.currentFrame,Stack.currentFrame?,bodyOfFrame,lift,
+    row,contents,loader,declaration,indexed,bounded,identity,function,frameBody,
+    get,getThe,MonadStateOf.get,EStateM.get,bind,EStateM.bind,pure,EStateM.pure,Except.bind,Except.pure]
 end Miri.Input.CompilerFrameContext

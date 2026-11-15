@@ -20,7 +20,6 @@ set_option maxHeartbeats 4000000
 open Miri.Frontend
 namespace Client
 import_mir {json.dumps(full)} as imported
-example : imported.executionInput.isSome = false := by rfl
 example : imported.document.producer.rustcCommit =
     "8144389c895da997dbdecaa635e41d6a50be6ffd" := by rfl
 end Client
@@ -39,12 +38,8 @@ def main : IO Unit := do
       | some (.memory memory) => !memory.relocations.isEmpty
       | _ => false) do
       throw (IO.userError "reflection fixture has no compiler relocation evidence")
-    unless Client.imported.document.raw == expected.document.raw do
-      throw (IO.userError "raw JSON changed during reflection")
-    unless Client.imported.document.sharedNodes == expected.document.sharedNodes do
-      throw (IO.userError "shared JSON catalog changed during reflection")
-    unless Client.imported.document.typedTree == expected.document.typedTree do
-      throw (IO.userError "typed diagnostic tree changed during reflection")
+    unless Lean.toExpr Client.imported.document == Lean.toExpr expected.document do
+      throw (IO.userError "typed compiler tables changed during reflection")
     unless Client.imported.document.allocations.size == expected.document.allocations.size do
       throw (IO.userError "allocation count changed during reflection")
     for (actual, expected) in Client.imported.document.allocations.zip expected.document.allocations do
@@ -65,11 +60,9 @@ open Miri.Frontend
 namespace Client
 import_mir {json.dumps(scoped)} as selected
 import_mir {json.dumps(scoped)} as selectedAgain
-example : selected.document.bodies.size = 1 := by rfl
+example : selected.document.bodyRoots.size = 1 := by rfl
 example : selected.document.types.size = {scoped_type_count} := by rfl
-example : selected.executionInput.isSome = true := by rfl
-example : selectedAgain.document.bodies.size = 1 := by rfl
-example : selectedAgain.executionInput.isSome = true := by rfl
+example : selectedAgain.document.bodyRoots.size = 1 := by rfl
 end Client
 open Lean Elab Command in
 run_cmd do
@@ -78,20 +71,8 @@ run_cmd do
       unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
         throwError "Imported value depends on an unapproved axiom: {{dependency}}"
 ''')
-    source.write_text(source.read_text() + '''
--- Runtime-only representation diagnostic; the imported declarations and their
--- kernel/axiom checks above remain safe. Pointer inspection is not a proof.
-unsafe def main : IO Unit := do
-  let value ← match Client.selected.document.raw.getObjVal? "types" with
-    | .ok value => pure value
-    | .error message => throw (IO.userError message)
-  let some node := Client.selected.document.sharedNodes.find? (· == value)
-    | throw (IO.userError "sharing fixture has no catalog entry for types")
-  unless ptrEq value node do
-    throw (IO.userError "reflected raw JSON and catalog lost runtime sharing")
-''')
-    subprocess.run(["lake", "env", "lean", "--run", str(source)], cwd=root, check=True)
-    print("MIR values reflected and kernel-checked; scoped readiness is not a safety theorem")
+    subprocess.run(["lake", "env", "lean", str(source)], cwd=root, check=True)
+    print("MIR values reflected and kernel-checked; accepted input is not a safety theorem")
     invalid = directory / "invalid.json"
     invalid.write_text('{"schema_version":999}')
     source.write_text(f'''import Miri.Frontend.ImportMIR

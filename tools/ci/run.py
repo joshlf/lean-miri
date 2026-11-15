@@ -25,6 +25,13 @@ class Suite:
 
 
 def suites(lane):
+    if lane == 'fresh':
+        # A failing guest must not prevent the other independent checks.
+        from fresh_tests import FOCUSED
+        return [Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
+                Suite('fresh-prepare', ('bash', 'tools/ci/fresh.sh', 'prepare'), 7200),
+                *[Suite(name, ('python3', 'tools/ci/fresh_tests.py', name))
+                  for name in ('query-demand', 'runtime-type-closure', 'vtable-cross-crate', *FOCUSED)]]
     if lane == 'regression':
         # check.sh already contains quick's audit/Python/inventory checks.
         # Only the two fixture hash manifests are unique to check-quick.sh.
@@ -34,9 +41,10 @@ def suites(lane):
                       'cd tests/input/fixtures && sha256sum --check SHA256SUMS')),
                 Suite('full', ('bash', 'tools/check.sh'), 14400)]
     if lane == 'replay':
-        # Freeze the full library closure before immutable-fixture replay.
+        # Freeze Lean prerequisites and build the pinned reference exporter for two live inputs.
         return [
             Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
+            Suite('reference-profile', ('bash', 'tools/build-reference-profile.sh'), 7200),
             Suite('canonical12', ('python3', 'tools/check-connected.py'), 14400),
             Suite('ordering', ('python3', 'tools/check-connected.py', '--ordering'), 7200),
             Suite('large-tb', ('python3', 'tools/check-connected.py', '--large-tb', '--timeout', '1800')),
@@ -69,9 +77,9 @@ def suites(lane):
         Suite('timezone', ('bash', 'tools/ci/fresh.sh', 'timezone')),
     ]
     for name, extra in [
-        ('hrtb', ('--require-predicate-contrast',)),
+        ('hrtb', ('--require-predicate-contrast', '--require-lockstep')),
         ('static', ()),
-        ('hrtb-upcast', ('--require-predicate-contrast', '--require-trait-vptr')),
+        ('hrtb-upcast', ('--require-predicate-contrast', '--require-trait-vptr', '--require-lockstep')),
     ]:
         result.append(Suite('vtable-' + name, (
             'python3', 'tools/check-vtable-erasure.py', f'tests/repro/vtable/{name}-erasure-control.rs',
@@ -169,7 +177,7 @@ def run_all(selected, output, metadata, root=ROOT):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('lane', choices=['regression', 'extended', 'replay'])
+    parser.add_argument('lane', choices=['regression', 'extended', 'replay', 'fresh'])
     parser.add_argument('--list', action='store_true')
     args = parser.parse_args()
     selected = suites(args.lane)

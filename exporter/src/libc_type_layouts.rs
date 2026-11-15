@@ -1,7 +1,14 @@
 //! Exact `helpers.rs::libc_ty_layout` and `libc_array_ty_layout` path queries.
 //! The finite names below were collected from pinned Miri source call sites;
-//! entries remain present when the target's libc crate lacks a path.
+//! target-specific paths follow the same source OS guards.
 use super::*;
+#[derive(serde::Serialize)]
+pub(super) struct Catalog {
+    crate_path: [&'static str; 1],
+    namespace: &'static str,
+    typing_env: &'static str,
+    entries: BTreeMap<String, u64>,
+}
 
 const LIBC_LAYOUT_PATHS: &[&str] = &[
     "_umtx_time",
@@ -46,8 +53,23 @@ const LIBC_LAYOUT_PATHS: &[&str] = &[
     "wchar_t",
 ];
 
-fn query<'tcx>(tcx: TyCtxt<'tcx>, context: &mut ExportContext<'tcx>, name: &str) -> Value {
-    let result = (|| -> Result<Value, String> {
+fn required_on(os: &rustc_target::spec::Os, name: &str) -> bool {
+    use rustc_target::spec::Os;
+    match name {
+        "_umtx_time" => os == &Os::FreeBsd,
+        "mach_timebase_info" | "os_unfair_lock_s" => os == &Os::MacOs,
+        "dirent64" | "statx" => os == &Os::Linux,
+        "epoll_event" => matches!(os, Os::Linux | Os::Android),
+        _ => true,
+    }
+}
+
+fn query<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    context: &mut ExportContext<'tcx>,
+    name: &str,
+) -> Result<u64, String> {
+    let result = (|| -> Result<u64, String> {
         // This is the same exact crate/type namespace query as Miri's
         // resolve_path(tcx, &["libc", name], TypeNS), followed by layout_of.
         let instance =
@@ -61,27 +83,51 @@ fn query<'tcx>(tcx: TyCtxt<'tcx>, context: &mut ExportContext<'tcx>, name: &str)
             return Err("libc type path did not resolve to a closed monomorphic type".into());
         }
         match tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty)) {
-            Ok(_) => Ok(type_json(context, tcx, ty)),
+            Ok(_) => Ok(type_json(context, tcx, ty)?),
             Err(error) => Err(format!(
                 "rustc layout_of failed for libc::{name}: {error:?}"
             )),
         }
     })();
-    match result {
-        Ok(value) => json!({"status":"supported","value":value}),
-        Err(reason) => json!({"status":"unsupported","value":null,"reason":reason}),
-    }
+    Ok::<_, String>(match result {
+        Ok(value) => value,
+        Err(reason) => export_failure("libc_type_layouts::query", format!("{}", reason))?,
+    })
 }
 
-pub(super) fn export<'tcx>(tcx: TyCtxt<'tcx>, context: &mut ExportContext<'tcx>) -> Value {
-    let mut entries = serde_json::Map::new();
-    for name in LIBC_LAYOUT_PATHS {
-        entries.insert((*name).to_owned(), query(tcx, context, name));
+pub(super) fn export<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    context: &mut ExportContext<'tcx>,
+) -> Result<Catalog, String> {
+    let mut entries = BTreeMap::new();
+    for name in LIBC_LAYOUT_PATHS.iter().filter(|name| {
+        (shim_abi::is_unix_target(tcx)
+            || (**name == "wchar_t" && tcx.sess.target.os != rustc_target::spec::Os::Windows))
+            && required_on(&tcx.sess.target.os, name)
+    }) {
+        entries.insert((*name).to_owned(), query(tcx, context, name)?);
     }
-    json!({
-        "crate_path": ["libc"],
-        "namespace": "TypeNS",
-        "typing_env": "fully_monomorphized",
-        "entries": entries,
+    Ok::<_, String>(Catalog {
+        crate_path: ["libc"],
+        namespace: "TypeNS",
+        typing_env: "fully_monomorphized",
+        entries,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustc_target::spec::Os;
+    #[test]
+    fn source_os_guards_select_type_layouts() {
+        assert!(required_on(&Os::Linux, "pthread_mutex_t"));
+        assert!(required_on(&Os::Linux, "statx"));
+        assert!(!required_on(&Os::MacOs, "statx"));
+        assert!(required_on(&Os::MacOs, "os_unfair_lock_s"));
+        assert!(!required_on(&Os::Linux, "os_unfair_lock_s"));
+        assert!(required_on(&Os::FreeBsd, "_umtx_time"));
+        assert!(!required_on(&Os::Android, "dirent64"));
+        assert!(required_on(&Os::Linux, "missing_required_type"));
+    }
 }

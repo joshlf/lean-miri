@@ -9,114 +9,97 @@ namespace Miri.Input.CompilerCastQueries
 open Lean Miri.ABI Miri.MIR Miri.Memory Miri.Interpreter
 abbrev Result := Except String
 private def facts (p : CompilerProviders.Prepared) := p.lifecycle.calls.symbols.facts
-private def records (p : CompilerProviders.Prepared) : Result (Array Json) := do
-  (← p.program.input.raw.getObjVal? "compiler_cast_queries").getArr?
-private def text (j : Json) (key : String) : Result String := do (← j.getObjVal? key).getStr?
-private def ref (j : Json) (key : String) : Result TyId := do
-  (← (← j.getObjVal? key).getObjVal? "type_id").getNat?
-private def value (j : Json) : Result Json := do
-  unless (← text j "typing_env") == "fully_monomorphized" do throw "cast query typing environment mismatch"
-  unless (← text j "status") == "supported" do throw "cast compiler query unavailable"
-  j.getObjVal? "value"
-private def unique (entries : Array Json) : Result Json := do
-  let some first := entries[0]? | throw "missing exact cast compiler query"
-  unless entries.all (· == first) do throw "conflicting exact cast compiler queries"
-  pure first
-private def query (p : CompilerProviders.Prepared) (kind : String) (source : TyId) : Result Json := do
-  unique ((← records p).filter fun record =>
-    (text record "query_kind").toOption == some kind && (ref record "input_type").toOption == some source)
-private def pairQuery (p : CompilerProviders.Prepared) (kind : String) (source target : TyId) : Result Json := do
-  unique ((← records p).filter fun record =>
-    (text record "query_kind").toOption == some kind &&
-    (ref record "input_source").toOption == some source && (ref record "input_target").toOption == some target)
 private def layout (p : CompilerProviders.Prepared) (id : TyId) : Result LocalLayout :=
   ((facts p).context.runtime.lookup id).mapError toString
 
-private def resolutionRecord (p : CompilerProviders.Prepared) (kind : String)
-    (definition : DefId) (args : Array GenericArg) : Result Json := do
+private def unique (entries : Array Catalog.CastQuery) : Result Catalog.CastQuery := do
+  let some first := entries[0]? | throw "missing exact cast compiler query"
+  unless entries.all (· == first) do throw "conflicting exact cast compiler queries"
+  pure first
+
+private def resolutionRecord (p : CompilerProviders.Prepared) (closure : Bool)
+    (definition : DefId) (args : Array GenericArg) : Result Catalog.CastQuery := do
   let mut matching := #[]
-  for record in ← records p do
-    if (text record "query_kind").toOption == some kind then
-      let input ← ref record "input_type"
-      let inputKind ← CompilerFactAdapters.castTypeInfo (facts p) input
-      let matchesInput := match inputKind with
-        | .fnDefinition source actual => kind == "resolve_fn_ptr" && source == definition && actual == args
-        | .closure source actual _ => kind == "resolve_closure_fn_once" && source == definition && actual == args
-        | _ => false
-      if matchesInput then matching := matching.push record
+  for record in p.program.input.queries.casts do
+    let input ← match record with
+      | .resolveFnPtr input _ _ => if closure then continue else pure input
+      | .resolveClosureFnOnce input _ _ => if closure then pure input else continue
+      | _ => continue
+    let inputKind ← CompilerFactAdapters.castTypeInfo (facts p) input
+    let matchesInput := match inputKind with
+      | .fnDefinition source actual => !closure && source == definition && actual == args
+      | .closure source actual _ => closure && source == definition && actual == args
+      | _ => false
+    if matchesInput then matching := matching.push record
   unique matching
-private def decodeInstance (p : CompilerProviders.Prepared) (j : Json) : Result CallInstance := do
-  let tables := p.program.compilerTables
-  let (resolved,next) ← CompilerInstance.decode p.loweringContext tables j
-  unless next.definitions == tables.definitions && next.typeConstants == tables.typeConstants do
-    throw "cast resolution requires unprepared shared compiler identities"
-  pure resolved
 
 def resolveFunction (p : CompilerProviders.Prepared) (definition : DefId)
     (args : Array GenericArg) : Result (Option CallInstance) := do
-  let result ← value (← resolutionRecord p "resolve_fn_ptr" definition args)
-  if result == Json.null then pure none else pure (some (← decodeInstance p result))
+  let .resolveFnPtr _ _ result ← resolutionRecord p false definition args
+    | throw "function resolution query kind mismatch"
+  if let some id := result then
+    let _ ← CompilerInstance.source p.loweringContext.instances id
+  pure result
 
 def resolveClosureFnOnce (p : CompilerProviders.Prepared) (definition : DefId)
     (args : Array GenericArg) : Result CallInstance := do
-  decodeInstance p (← value (← resolutionRecord p "resolve_closure_fn_once" definition args))
+  let .resolveClosureFnOnce _ _ result ← resolutionRecord p true definition args
+    | throw "closure resolution query kind mismatch"
+  let _ ← CompilerInstance.source p.loweringContext.instances result
+  pure result
 
 def noBoundVars (p : CompilerProviders.Prepared) (args : Array GenericArg) : Result Bool := do
   let mut evidence := #[]
-  for record in ← records p do
-    if (text record "query_kind").toOption == some "resolve_fn_ptr" then
-      let input ← ref record "input_type"
+  for record in p.program.input.queries.casts do
+    if let .resolveFnPtr input value _ := record then
       if let .fnDefinition _ actual ← CompilerFactAdapters.castTypeInfo (facts p) input then
-        if actual == args then
-          unless (← text record "typing_env") == "fully_monomorphized" do throw "no_bound_vars typing environment mismatch"
-          evidence := evidence.push (← (← record.getObjVal? "args_no_bound_vars").getBool?)
+        if actual == args then evidence := evidence.push value
   let some first := evidence[0]? | throw "missing exact generic arguments no_bound_vars query"
   unless evidence.all (· == first) do throw "conflicting no_bound_vars evidence"
   pure first
 
 def lockstepTails (p : CompilerProviders.Prepared) (source target : TyId) : Result (TyId × TyId) := do
-  let result ← value (← pairQuery p "lockstep_tails" source target)
-  let source ← ref result "source_tail"
-  let target ← ref result "target_tail"
+  let result ← unique (p.program.input.queries.casts.filter fun row => match row with
+    | .lockstepTails a b _ _ => a == source && b == target
+    | _ => false)
+  let .lockstepTails _ _ source target := result | throw "lockstep query kind mismatch"
   let _ ← layout p source
   let _ ← layout p target
   pure (source,target)
 
 def boxLayout (p : CompilerProviders.Prepared) (pointee : TyId) : Result LocalLayout := do
-  let result ← value (← query p "box_type" pointee)
-  let id ← (← result.getObjVal? "type_id").getNat?
+  let result ← unique (p.program.input.queries.casts.filter fun row => match row with
+    | .boxType input _ => input == pointee | _ => false)
+  let .boxType _ id := result | throw "box query kind mismatch"
   layout p id
 
 def supertraitSlot (p : CompilerProviders.Prepared) (source target : TyId) : Result (Option Nat) := do
-  let result ← value (← pairQuery p "supertrait_slot" source target)
-  if result == Json.null then pure none else pure (some (← result.getNat?))
-
-private def principalValue (j : Json) : Result (Option Nat) := do
-  let result ← j.getObjVal? "principal_predicate"
-  if result == Json.null then pure none else pure (some (← (← result.getObjVal? "predicate_id").getNat?))
+  let result ← unique (p.program.input.queries.casts.filter fun row => match row with
+    | .supertraitSlot a b _ => a == source && b == target | _ => false)
+  let .supertraitSlot _ _ slot := result | throw "supertrait query kind mismatch"
+  pure slot
 
 /-- Full predicate-list identity is the key. The principal is exported by the
 compiler, not reconstructed by picking the first non-auto predicate. -/
-def principal (p : CompilerProviders.Prepared) (token : Nat) : Result (Option Nat) := do
-  let some predicates := (facts p).dynamicPredicates[token]? | throw "missing full dynamic predicate-list identity"
+def principal (p : CompilerProviders.Prepared) (predicates : PredicateList) : Result (Option Nat) := do
   let mut results := #[]
   for node in p.runtime.source.types do
     if node.shapeKind == .dynamicTraitObject then
-      let shape ← node.payload.getObjVal? "shape"
-      if (← shape.getObjVal? "predicates") == predicates then results := results.push (← principalValue shape)
+      let .dynamicTraitObject ids principal _ := node.shape | throw "dynamic type shape mismatch"
+      if ids == predicates then results := results.push principal
   for allocation in p.program.input.allocations do
     if let some (.vtable source) := allocation.data then
-      if (← source.payload.getObjVal? "predicates") == predicates then
-        results := results.push (← principalValue source.payload)
+      if source.predicates == predicates then
+        results := results.push source.principalPredicate
   let some first := results[0]? | throw "missing compiler principal query for exact predicate list"
   unless results.all (· == first) do throw "conflicting compiler principal queries"
   pure first
 
-def normalizePrincipal (p : CompilerProviders.Prepared) (token : Nat) : Result (Option Nat) := do
-  let some id ← principal p token | return none
+def normalizePrincipal (p : CompilerProviders.Prepared) (predicates : PredicateList) : Result (Option Nat) := do
+  let some id ← principal p predicates | return none
   let entries := p.program.input.compilerPredicates.filter (·.id == id)
   let some entry := entries[0]? | throw "missing principal predicate normalization evidence"
-  unless entries.all (·.payload == entry.payload) do throw "conflicting principal normalization evidence"
+  unless entries.all (fun row => row.normalizedId == entry.normalizedId && row.stableKey == entry.stableKey && row.autoTrait == entry.autoTrait) do throw "conflicting principal normalization evidence"
   pure (some (← CompilerVTableFacts.normalizePredicate (facts p) ⟨id,entry.stableKey,entry.autoTrait⟩))
 
 /-- The runtime VTableEntry representation stores the target principal. The
@@ -128,21 +111,13 @@ def eraseSelfTraitRef (p : CompilerProviders.Prepared) (token : Nat) : Result Na
   for allocation in p.program.input.allocations do
     if let some (.vtable source) := allocation.data then
       for entry in source.entries do
-        if entry.status == .supported && entry.kind == .supertraitVtablePointer then
+        if entry.kind == .supertraitVtablePointer then
           if (CompilerVTableRuntime.supertraitPrincipal runtime source.typeId entry).toOption == some token then
             return token
-  let queryRows ← (← p.program.input.raw.getObjVal? "compiler_vtable_queries").getArr?
-  for row in queryRows do
-    let some metadata := (row.getObjVal? "vtable_metadata").toOption | continue
-    unless (metadata.getObjValAs? String "status").toOption == some "supported" do continue
-    let some typeRef := (row.getObjVal? "input_type").toOption | continue
-    let some sourceType := (typeRef.getObjValAs? Nat "type_id").toOption | continue
-    let some entryValues := ((metadata.getObjVal? "entries").bind Json.getArr?).toOption | continue
-    for (entryValue, index) in entryValues.toList.zipIdx do
-      let some entry := (Input.decodeVtableEntry entryValue
-        s!"$.compiler_vtable_queries.vtable_metadata.entries[{index}]").toOption | continue
-      if entry.status == .supported && entry.kind == .supertraitVtablePointer &&
-          (CompilerVTableRuntime.supertraitPrincipal runtime sourceType entry).toOption == some token then
+  for row in p.program.input.queries.vtables do
+    for entry in row.metadata.entries do
+      if entry.kind == .supertraitVtablePointer &&
+          (CompilerVTableRuntime.supertraitPrincipal runtime row.inputType entry).toOption == some token then
         return token
   throw "missing exact exported TraitVPtr erase_self_ty relation"
 private def lift (query : Result A) : RvalueM S A :=

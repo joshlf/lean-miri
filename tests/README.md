@@ -117,11 +117,17 @@ Scripts are the authority for individual cases and build behavior.
 | --- | --- | --- |
 | `bash tools/check-quick.sh` | Source pins/audits, Python tool tests, obligation inventory, saved-fixture hashes. No Lean or exporter build; audit generation needs the Rust analyzer. | Much of the audit/Python work overlaps, but this script and its two fixture hash-manifest checks are not called. |
 | `bash tools/check-build.sh` | Build library, self-contained tests, frontend and choice policy; run self-contained assertions and audit axioms. | Its build, runtime and axiom work overlaps; this script is not called. |
-| `bash tools/check-decoder.sh` | 16 saved-expectation decoder cases plus 4 shared-ID checks; generated mutations and retained genuine schema-3 exports. | No. Other decoder tests run, but these dedicated checks do not. |
-| `bash tools/check-structural-regressions.sh` | Context/provider/primitive rebinding, maps, zero width, thread-clock reuse and collection QA; proofs, `#eval` and runtime assertions. Uses adapted pinned unit inputs or no input. | Migrated self-contained cases are built/run through `MiriTests`; input-dependent cases are not included as a suite. |
+| `bash tools/check-decoder.sh` | Strict success/failure boundaries, 16 saved-expectation cases and 4 shared-ID checks; unit mutations with exact malformed-field and reference diagnostics. | No. Other decoder tests run, but these dedicated checks do not. |
+| `bash tools/check-structural-regressions.sh` | Context/provider/primitive rebinding, maps, zero width, thread-clock reuse, typed descriptor destruction and collection QA; proofs, `#eval` and runtime assertions. Uses adapted pinned unit inputs or no input. | Migrated self-contained cases are built/run through `MiriTests`; input-dependent cases are not included as a suite. |
 | `bash tools/check-performance-regressions.sh` | Finite equivalence/error-order/state-retention checks for indexes, ABI/backtrace caches, decoder caching, profiles and imported allocations. | Includes migrated self-contained cases and some input/memory overlap; dedicated input-driven parity cases still require this suite. |
 | `bash tools/check-connected-proofs.sh` | Build/audit `MiriTests` (including connected component proofs) and typecheck the retained SC projection and graph runner. | Component proofs are included; graph-runner typechecking is separate. |
 | `bash tools/check.sh` | Source audits, selected component tests, exporter contracts and fresh producer-to-consumer/execution checks. | This is the broad regression entry point, not an all-tests command. |
+
+The dedicated decoder mutations use `input/fixtures/strict-unit.json`, a
+synthetic document for schema and identity checks. It is not evidence
+of a Rust execution. Retained historical exporter files remain unchanged; their
+wire formats are not compatibility inputs for the current importer. Fresh
+exporter and frontend checks exercise current producer-to-consumer agreement.
 
 **“Performance regressions” here means preserving behavior through optimizations.**
 That script does not use speed thresholds to decide success.
@@ -158,12 +164,14 @@ The ordered list is maintained in [the script](../tools/check.sh). Its phases ar
    `runtime_metadata/run.py` and `execution/run{,_calls,_globals}.py`.
 6. Compare the extracted obligation inventory with the checked-in fixture.
 
-The input check freshly exports Rust, exercises full/runtime decoding, lowering,
+The input check freshly exports Rust, exercises typed-table decoding, lowering,
 preparation and selected allocator-world metadata. The frontend check imports
 fresh JSON into Lean constants. Runtime-metadata checks connect fresh compiler
 queries to Lean providers. Execution checks compare selected arithmetic, calls
-and globals with pinned Miri. Eval-core's six checks instead use hash-checked old
-exports converted into schema-3 **unit fixtures**; they are not fresh exports.
+and globals with pinned Miri. Eval-core's six checks use three hash-checked
+compiler exports mechanically projected to schema 11. The projection removes unused
+diagnostic fields and checks every retained payload exactly. The preparation helper preserves their current
+decompressed bytes exactly; the projection manifest pins both original and retained expanded data.
 
 The script uses `set -euo pipefail`: a failure stops it and later phases remain
 unexecuted. A timeout is not a pass. Python discovery does not recursively run
@@ -180,17 +188,26 @@ None of these top-level commands is called by `tools/check.sh`:
 
 | Command | Checks |
 | --- | --- |
-| `python3 tools/check-connected.py` | Replay canonical12 saved genuine exports: protectors, races, DST, TLS, ordinary main, upcasts, SC and Relaxed. Nine normal and three expected-UB cases. |
+| `python3 tools/check-connected.py` | Run canonical12 genuine exports (11 saved, DST fresh): protectors, races, DST, TLS, ordinary main, upcasts, SC and Relaxed. Nine normal and three expected-UB cases. |
 | `python3 tools/check-connected.py --case 198-sc-base` | Select one canonical case; `--case` can be repeated. |
 | `python3 tools/check-connected.py --ordering` | Four matched SC/weak controls, choice domains, typed prefixes and operation/scheduler order. |
 | `python3 tools/check-sc-schedules.py` | SC diagnostic seeds 0–11 and rejection of truncated/out-of-support/missing-post-step logs. |
-| `python3 tools/check-connected.py --large-tb` | Larger saved Rust export; assert the expected Frozen-tag write UB. |
+| `python3 tools/check-connected.py --large-tb` | Fresh larger Rust export; assert the expected Frozen-tag write UB. |
 | `python3 tests/connected/compare_selector.py` | Finite comparison of choice selection with extracted upstream code; does not execute the whole Miri interpreter. |
 
-Replay uses stored reference observations; it does not rerun rustc/exporter or
-reference Miri. The references specify the same prepared TyCtxt after snapshot
-capture, not vanilla Miri's allocation-ID history. Fresh generation is a separate
-operation via [tools/export-connected.py](../tools/export-connected.py).
+Fifteen cases use stored same-TyCtxt reference observations and schema-11 payload
+projections of the original compiler data. Sidecars retain the original byte binding
+under `wire_projection`; no new Miri execution is claimed for that transformation.
+The DST and large Tree Borrows cases generate fresh exports and same-TyCtxt
+Miri references in CI from tracked Rust sources, unchanged flags and exactly
+reviewed guest configuration/argv0. Their Lean assertions and choice tapes
+remain fixed. Replay therefore needs the pinned Rust/sysroot and reference
+exporter build; these two cases no longer compare immutable saved allocation
+histories. Their historical archives are not CI inputs. The 17-case Lean connected run
+passes under schema 7 with the unchanged expected outcomes. The full CI matrix
+remains unexecuted.
+Fresh generation is a separate operation via
+[tools/export-connected.py](../tools/export-connected.py).
 Changing exporter/query collection requires fresh checks as well as replay:
 unchanged saved JSON cannot expose a new producer defect.
 
@@ -210,7 +227,7 @@ under ignored `scratch/`.
 | --- | --- |
 | `python3 tools/check-powi-zero.py scratch/powi-zero-new` | Fresh same-prepared-TyCtxt comparison with Miri; 16 f32/f64 exponent-zero exact result-bit assertions. Reference-feature exporter, MIR sysroot and Lean dependencies required. |
 | `python3 tools/check-math-nohost.py scratch/math-nohost-new` | Fresh sin(1)/cos(0) controls with/without math host; checks exact capability Unsupported and rejects wrong terminal expectations. Requires reference-feature exporter and sysroot. |
-| `tools/check-vtable-erasure.py` | Fresh query/predicate/vtable allocation joins, including HRTB/upcast/static and separately built cross-crate metadata controls. Takes source/output and expectation arguments; identity controls are not nonidentity witnesses. |
+| `tools/check-vtable-erasure.py` | Fresh query/predicate/vtable allocation joins, including HRTB/upcast/static and separately built cross-crate metadata controls. Also runs `input/DecoderDirectLockstep2026.lean`: direct inputs must decode; with `--require-lockstep`, genuine upcast answers are required and restoring only their obsolete envelopes must reject the exact upcast evidence. Other controls require absent lockstep rows. Takes source/output and expectation arguments; identity controls are not nonidentity witnesses. |
 | `tools/check-timezone.py` | Fresh localtime_r guest comparison with standalone pinned Miri in a separate TyCtxt; requires matching libc rlib, reference build record, sysroot and ordinary exporter. Takes output and `--libc` arguments. |
 
 [connected/focused/](connected/focused/README.md) contains additional atomic
@@ -279,22 +296,26 @@ when changing it.
 
 | Check / invocation | What it adds |
 | --- | --- |
+| `lake env lean --run tests/run_loop/HostStdioReplay.lean` | Pure typed stdio replay checks: exact requests, response bounds, first-pending cleanup retention, missing-state rejection and unchanged choice/RNG state. Included in structural regressions; it supplies no host IO capability. |
+| `lake env lean --run tests/run_loop/NativeStdioProtocol.lean` | Pure control-option and JSON framing checks, including escaped spoofed output. Included in structural regressions after the runner module build. |
+| `flock /tmp/lean-miri-ci-guest.lock python3 tests/stdio/check.py --output scratch/stdio-new` | Fresh pinned-reference/guest comparison for explicit stdio: repeated writes, binary bytes, spoofed result lines and preserved muted ordinary descriptors. Requires coherent reference exporter/native runner; unsupported and timeout outcomes fail. |
 | `python3 tests/intrinsic_float/source_compare.py` | Finite intrinsic helper comparison against pinned APFloat: FMA, rounding, min/max and NaN handling. Requires its Rust oracle dependencies. |
 | `python3 tests/aes/source_compare.py` | Compare pinned AES fixslice bodies; requires offline vendor configuration at `scratch/cargo-vendor.toml` and matching crates. |
+| `flock /tmp/lean-miri-ci-guest.lock python3 tests/x86_pack/check.py --output scratch/x86-pack-new` | Fresh pinned-reference/guest comparisons for 128/256/512-bit signed and unsigned saturation boundaries and 128-bit chunk/lane order; requires a reference-feature exporter and matching native runner. Unsupported and timeouts fail the check. |
 | `python3 tests/random_memory/source_compare.py` | Extracted gen_random outer-body ordering and failure propagation; RNG/host/write leaves are fixtures. |
 | `python3 tests/producer/primitive_ranges.py` | Genuine u128/niche metadata and Lean decoder boundaries; requires built debug exporter and MIR sysroot. |
 | `cargo +miri-exporter-8144389c895d test --manifest-path exporter/Cargo.toml --locked --offline` | Rust/Python exporter tests, four fixture scripts and four producer checks; included in `check.sh`. Requires pinned toolchain, MIR sysroot and offline dependencies. |
-| `python3 -m unittest discover -s exporter/tests -p 'test_*.py' -v` | Python shared-transport loader unit tests, outside the main discovery root. |
+| `python3 -m unittest discover -s exporter/tests -p 'test_*.py' -v` | Python typed-table schema loader tests, outside the main discovery root. |
 | `lake env lean MiriTests/Cast/Typed.lean` | Cast dispatcher, check order and size-mismatch cases; now included in `lake build MiriTests`. |
 | `lake env lean --run MiriTests/Native/BytesOwnership.lean` | Included in `lake exe miri_tests`: host-byte ownership, release and copy-failure cleanup using fixture hosts. “Native” here names the boundary, not an execution mode. |
 | `python3 tests/scheduling/test_source_prefix.py` | Extracted scheduler service prefix with fixture leaves, and `Stateful.lean` proof examples. |
 | `MiriTests/FunctionPointers/*.lean` | Self-contained persistent reservation assertions are included in the runtime registry. |
-| `tests/query_demand/make_cases.py` + `CatalogRoles.lean` | Generate mutations from fresh compiler evidence, then run readiness/obligation/provider assertions. Generator needs base/output paths, optional TLS base; run Lean `--run` with the generated directory. |
+| `tests/query_demand/make_cases.py` + `CatalogRoles.lean` | Generate mutations from fresh compiler evidence, then run readiness/obligation/provider assertions. Native-signature and TLS cases run in the fresh CI lane; the existing missing TLS consumer provider branch remains a visible failure. |
 
-`exporter/tests/compare_shared_graph.py`, `compare_source126_compact.py` and
-`check_runtime_type_closure.py` are additional argument-driven helpers. Read their
-interfaces and supply matching inputs; merely placing them under `tests/` does
-not schedule them.
+`exporter/tests/check_runtime_type_closure.py` checks a supplied compiler export.
+The fresh CI lane exports its fixture and runs the helper. See
+[CI coverage](../tools/ci/README.md) and the
+[upstream UI contract](upstream_ui/README.md) for scheduled entry points.
 
 ## Choosing checks after a change
 
@@ -306,7 +327,7 @@ affect several rows below.
 | Change | Checks to select in addition to broad regression coverage |
 | --- | --- |
 | Export schema, rustc query collection, roots or allocation identities | Exporter fixtures and transport tests; producer tests; input/frontend/runtime-metadata checks; fresh execution or fresh connected cases. Saved replay alone cannot test a changed exporter. |
-| Decoder IDs, shared payloads or validation | Dedicated decoder suite, relevant input checks, transport tests, optimization parity if caches are involved; query-demand rejection cases where applicable. |
+| Typed pool IDs or validation | Dedicated decoder suite, relevant input checks, pool-reference tests and query-demand rejection cases. |
 | Lowering, compiler providers, primitive binding or preparation | Structural suite, relevant input/runtime-metadata cases, optimization suite for indexes/caches, and an assembled execution exercising the changed path. |
 | Indexes, memoization, profiles, rollback or retained state | Optimization suite plus the relevant feature tests and end-to-end control; use the profiling protocol separately for speed claims. |
 | Arithmetic, casts, intrinsics or AES | Relevant component runner/Lean assertions; standalone cast/APFloat/AES checks as applicable; fresh guest comparison when dispatch/input integration changes. |
@@ -357,6 +378,10 @@ not executed. Normal termination for selected programs/seeds is finite evidence.
 UB freedom requires excluding UB on every reachable permitted finite prefix;
 local proofs, open graph exploration and source inventories do not establish that
 whole-machine claim.
+
+`bash tools/check-lowering-reader.sh [INPUT.json ...]` checks source paths and
+compiler pool IDs across lowering for root, instance and promoted bodies.
+The default input is the fixed empty-function fixture.
 
 ## Duplicate-prefix proof and wildcard postorder regressions
 

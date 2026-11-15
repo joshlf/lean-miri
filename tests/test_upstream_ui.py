@@ -1,0 +1,357 @@
+"""Acceptance-oracle regressions: unrelated failures must never become passes."""
+from pathlib import Path
+import sys
+import tempfile
+import subprocess
+import json
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'upstream_ui'))
+from suite import (Case, category_reference, compare, discover, reference_oracle,
+                   reference_profile_differences, runtime_profile)
+
+
+def sidecar(kind='miri_evaluation_error', status='failed'):
+    return {'reference': {'status': status, 'config': {'same_tcx': True,
+            'environment_policy': 'empty', 'num_cpus': 1, 'rng_seed': 0, 'validation': 'Shallow',
+            'alignment_check': 'Int', 'provenance_mode': 'Default',
+            'data_race_detector': True, 'weak_memory_emulation': True,
+            'ignore_leaks': False, 'genmc': False, 'native_libraries': 0,
+            'short_fd_operations': True, 'float_nondeterminism': True,
+            'cmpxchg_weak_failure_rate': 0.8, 'fixed_scheduling': False,
+            'address_reuse_cross_thread_rate': 0.1, 'collect_leak_backtraces': True,
+            'borrow_tracker': 'tree_borrows', 'tree_borrows': {
+                'precise_interior_mut': True, 'implicit_writes': False}}, 'outcome': {'kind': kind}}}
+
+
+class UpstreamUiTests(unittest.TestCase):
+    def test_all_sources_and_revisions_are_discovered(self):
+        cases = list(discover())
+        root = Path(__file__).resolve().parents[1] / 'upstream/miri-source/tests'
+        expected = {p.relative_to(root).as_posix() for group in ('pass', 'fail')
+                    for p in (root / group).rglob('*.rs')}
+        self.assertEqual({c.path for c in cases}, expected)
+        self.assertEqual(len(cases), len({c.id for c in cases}))
+        self.assertGreater(sum(not c.reasons for c in cases), 500)
+
+    def test_revisions_flags_and_annotation_continuations(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'fail').mkdir()
+            (root / 'pass').mkdir()
+            (root / 'fail/test.rs').write_text('''//@revisions: stack tree implicit
+//@[tree]compile-flags: -Zmiri-tree-borrows
+//@[implicit]compile-flags: -Zmiri-tree-borrows-implicit-writes
+fn main() {
+    bad();
+    //~[stack]^ ERROR: sb
+    //~[tree]| ERROR: tb
+}
+''')
+            cases = {c.revision: c for c in discover(root)}
+            self.assertEqual(cases['tree'].errors, [(5, 'tb')])
+            self.assertEqual(cases['tree'].flags, [])
+            self.assertEqual(cases['tree'].reasons, [])
+            self.assertTrue(cases['implicit'].reasons)
+            self.assertTrue(cases['stack'].reasons)
+
+    def test_cli_shards_partition_the_entire_inventory(self):
+        runner = Path(__file__).resolve().parents[1] / 'tools/check-upstream-ui.py'
+        partitions = []
+        for shard in range(2):
+            result = subprocess.run([sys.executable, str(runner), '--inventory',
+                                     '--shard-index', str(shard), '--shard-count', '2'],
+                                    check=True, text=True, capture_output=True)
+            partitions.append({c['id'] for c in json.loads(result.stdout)})
+        self.assertFalse(partitions[0] & partitions[1])
+        self.assertEqual(partitions[0] | partitions[1], {c.id for c in discover()})
+
+    def test_base_flags_precede_revision_flags_even_when_written_later(self):
+        case = next(c for c in discover() if c.id ==
+                    'pass/tree_borrows/tree-borrows.rs@tree_implicit_writes')
+        self.assertEqual(case.runtime_flags[:2], ['-Zmiri-tree-borrows',
+                                                 '-Zmiri-tree-borrows-implicit-writes'])
+        self.assertTrue(runtime_profile(case.runtime_flags)['tree_borrows']['implicit_writes'])
+
+    def test_unknown_directive_and_runtime_flags_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'pass').mkdir()
+            (root / 'fail').mkdir()
+            (root / 'pass/test.rs').write_text('//@mystery: value\n//@compile-flags: -Zmiri-unknown-setting\nfn main() {}')
+            case, = discover(root)
+            self.assertEqual(len(case.reasons), 2)
+            self.assertEqual(case.flags, [])
+
+    def test_reference_requires_ub_annotation_and_location(self):
+        case = Case('fail/test.rs', errors=[(3, 'expected a boolean')])
+        diagnostic = 'error: Undefined Behavior: expected a boolean\n  --> tests/fail/test.rs:3:5\n'
+        self.assertEqual(reference_oracle(case, sidecar(), diagnostic), ('ready', 'invalid_bool'))
+        self.assertEqual(reference_oracle(case, sidecar(), diagnostic.replace(':3:', ':4:'))[0], 'reference_site_mismatch')
+        self.assertEqual(reference_oracle(case, sidecar(), diagnostic.replace('expected a boolean', 'uninitialized'))[0], 'reference_annotation_mismatch')
+        self.assertEqual(reference_oracle(case, sidecar('miri_panicked'), diagnostic)[0], 'reference_mismatch')
+        self.assertEqual(reference_oracle(case, sidecar(), 'error: compiler failed')[0], 'reference_mismatch')
+        altered = sidecar()
+        altered['reference']['config']['same_tcx'] = False
+        self.assertEqual(reference_oracle(case, altered, diagnostic)[0], 'reference_profile_mismatch')
+
+    def test_runtime_settings_must_match_the_independent_reference(self):
+        flags = ['-Zmiri-disable-stacked-borrows', '-Zmiri-disable-validation',
+                 '-Zmiri-symbolic-alignment-check', '-Zmiri-strict-provenance']
+        case = Case('pass/test.rs', runtime_flags=flags)
+        ref = sidecar('exit_zero', 'completed')
+        ref['reference']['config'].update(runtime_profile(flags))
+        self.assertEqual(reference_oracle(case, ref, ''), ('ready', None))
+        ref['reference']['config']['validation'] = 'Shallow'
+        self.assertEqual(reference_oracle(case, ref, '')[0], 'reference_profile_mismatch')
+        self.assertEqual(runtime_profile(flags)['borrow_tracker'], 'none')
+        self.assertEqual(runtime_profile(['-Zmiri-tree-borrows-implicit-writes',
+                                         '-Zmiri-tree-borrows'])['tree_borrows']['implicit_writes'], False)
+        with self.assertRaises(ValueError):
+            runtime_profile(['-Zmiri-disable-stacked-borrows', '-Zmiri-tree-borrows-implicit-writes'])
+
+    def test_reference_profile_diagnostics_preserve_observed_and_missing_values(self):
+        case = Case('pass/test.rs')
+        ref = sidecar('exit_zero', 'completed')
+        config = ref['reference']['config']
+        config['environment_policy'] = 'host snapshot'
+        config['rng_seed'] = None
+        del config['num_cpus']
+        self.assertEqual(reference_profile_differences(case, ref), {
+            'environment_policy': {'expected': 'empty', 'actual': 'host snapshot', 'missing': False},
+            'rng_seed': {'expected': 0, 'actual': None, 'missing': False},
+            'num_cpus': {'expected': 1, 'actual': None, 'missing': True},
+        })
+        self.assertEqual(reference_oracle(case, ref, '')[0], 'reference_profile_mismatch')
+        config.update(runtime_profile([]))
+        config['same_tcx'] = 1
+        self.assertIn('same_tcx', reference_profile_differences(case, ref))
+        self.assertEqual(reference_oracle(case, ref, '')[0], 'reference_profile_mismatch')
+
+    def test_expected_ub_rejects_unrelated_stop_kind_and_site(self):
+        case = Case('fail/test.rs', errors=[(3, 'expected a boolean')])
+        terminal = {'kind': 'ub', 'detail': 'invalidBool 2', 'frames': [
+            {'file': 'Real("tests/fail/test.rs")', 'line': 3, 'end_line': 3}]}
+        self.assertEqual(compare(case, terminal, 'invalid_bool'), 'passed')
+        for kind in ('unsupported', 'failed', 'pending', 'exit'):
+            self.assertNotEqual(compare(case, terminal | {'kind': kind}, 'invalid_bool'), 'passed')
+        self.assertEqual(compare(case, terminal | {'detail': 'outOfBounds'}, 'invalid_bool'), 'ub_kind_mismatch')
+        self.assertEqual(compare(case, terminal | {'frames': []}, 'invalid_bool'), 'ub_site_mismatch')
+        self.assertEqual(compare(case, terminal | {'frames': [{'file': case.path, 'line': 1, 'end_line': 9}]}, 'invalid_bool'), 'ub_site_mismatch')
+        self.assertEqual(compare(case, terminal, None), 'ub_kind_mismatch')
+
+    def test_vtable_null_and_shim_convention_keep_exact_categories(self):
+        self.assertEqual(category_reference(
+            'encountered null pointer, but expected a vtable pointer'), 'invalid_vtable')
+        for message in ('null pointer', 'null reference', 'dereferencing a null box'):
+            self.assertEqual(category_reference(message), 'null_pointer')
+        case = Case('fail/test.rs', errors=[(3, 'invalid value')])
+        terminal = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+        for category, detail, negatives in (
+            ('invalid_vtable', 'InvalidVTablePointer',
+             ('nullPointer', 'InvalidVTableTrait', 'DanglingIntPointer')),
+            ('calling_convention',
+             'Miri.Interpreter.StepError.undefinedBehavior "shim calling convention mismatch"',
+             ('shim variadic ABI mismatch', 'shim argument count mismatch',
+              'shim return ABI mismatch', 'shim argument ABI mismatch', 'ABI mismatch',
+              'C math shim calling convention mismatch',
+              '"shim calling convention mismatch extra"')),
+        ):
+            actual = terminal | {'detail': detail}
+            self.assertEqual(compare(case, actual, category), 'passed')
+            for negative in negatives:
+                self.assertEqual(compare(case, terminal | {'detail': negative}, category),
+                                 'ub_kind_mismatch')
+            self.assertEqual(compare(case, actual | {'frames': [{'file': case.path, 'line': 4}]},
+                                     category), 'ub_site_mismatch')
+            self.assertEqual(compare(case, actual | {'kind': 'unsupported'}, category),
+                             'lean_unsupported')
+
+    def test_nonzero_dangling_integer_has_exact_no_provenance_cause(self):
+        case = Case('fail/test.rs', errors=[(3, 'is a dangling pointer')])
+        terminal = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+        detail = 'Miri.Memory.AccessError.danglingIntegerPointer 16 4'
+        actual = terminal | {'detail': detail}
+        self.assertEqual(compare(case, actual, 'no_provenance'), 'passed')
+        self.assertEqual(compare(case, actual, 'null_pointer'), 'ub_kind_mismatch')
+        for negative in ('Miri.Memory.AccessError.danglingIntegerPointer 0 4',
+                         'Other.AccessError.danglingIntegerPointer 16 4',
+                         'Other.Miri.Memory.AccessError.danglingIntegerPointer 16 4',
+                         'OtherMiri.Memory.AccessError.danglingIntegerPointer 16 4',
+                         'miri.Memory.AccessError.danglingIntegerPointer 16 4',
+                         'Miri.Memory.AccessError.DanglingIntegerPointer 16 4',
+                         'Miri.Memory.AccessError.danglingIntegerPointer 16.5 4',
+                         'Miri.Memory.AccessError.danglingIntegerPointer 16-4',
+                         'Miri.Memory.AccessError.danglingIntegerPointer 16e4',
+                         'Miri.Memory.AccessError.danglingIntegerPointer 016 4',
+                         'Miri.Memory.AccessError.danglingIntegerPointer 16suffix 4',
+                         'Miri.Memory.AccessError.pointerOutOfBounds', 'deadAllocation',
+                         'InvalidVTablePointer', 'undefinedBehavior'):
+            self.assertEqual(compare(case, terminal | {'detail': negative}, 'no_provenance'),
+                             'ub_kind_mismatch')
+        self.assertEqual(compare(case, actual | {'frames': [{'file': case.path, 'line': 4}]},
+                                 'no_provenance'), 'ub_site_mismatch')
+        self.assertEqual(compare(case, actual | {'kind': 'unsupported'}, 'no_provenance'),
+                         'lean_unsupported')
+        # Existing zero-pointer and null-box classifications stay separate.
+        for detail in ('nullPointer', 'dereferencing a null box'):
+            self.assertEqual(compare(case, terminal | {'detail': detail}, 'null_pointer'), 'passed')
+            self.assertEqual(compare(case, terminal | {'detail': detail}, 'no_provenance'),
+                             'ub_kind_mismatch')
+
+    def test_uninitialized_bool_is_not_an_invalid_bool_oracle(self):
+        case = Case('fail/test.rs', errors=[(3, 'uninitialized')])
+        diagnostic = ('error: Undefined Behavior: constructing invalid value of type bool: '
+                      'encountered uninitialized memory, but expected a boolean\n'
+                      ' --> fail/test.rs:3:5\n')
+        self.assertEqual(reference_oracle(case, sidecar(), diagnostic), ('ready', 'uninitialized'))
+        terminal = {'kind': 'ub', 'detail': 'validation.uninitialized: invalidBool 2',
+                    'frames': [{'file': case.path, 'line': 3, 'end_line': 3}]}
+        self.assertEqual(compare(case, terminal, 'uninitialized'), 'ub_kind_mismatch')
+        terminal['detail'] = 'InvalidUninitBytes'
+        self.assertEqual(compare(case, terminal, 'uninitialized'), 'passed')
+
+    def test_tree_borrows_direction_cannot_be_substituted(self):
+        case = Case('fail/test.rs', errors=[(3, '/write access through .* is forbidden/')])
+        terminal = {'kind': 'ub', 'detail': 'Tree Borrows write access: ChildAccessForbidden Frozen',
+                    'frames': [{'file': 'fail/test.rs', 'line': 3, 'end_line': 3}]}
+        self.assertEqual(compare(case, terminal, 'tb_write'), 'passed')
+        self.assertEqual(compare(case, terminal | {'detail': terminal['detail'].replace('write', 'read')}, 'tb_write'), 'ub_kind_mismatch')
+        self.assertEqual(compare(case, terminal | {'detail': 'Tree Borrows reborrow: ChildAccessForbidden Frozen'}, 'tb_write'), 'ub_kind_mismatch')
+
+    def test_deallocation_layout_takes_precedence_over_alignment(self):
+        message = ('incorrect layout on deallocation: alloc1 has size 1 and alignment 1, '
+                   'but gave size 2 and alignment 1')
+        self.assertEqual(category_reference(message), 'deallocation_layout')
+        self.assertEqual(category_reference('accessing memory with alignment 1, but alignment 2 is required'),
+                         'alignment')
+        case = Case('fail/test.rs', errors=[(3, 'incorrect layout on deallocation')])
+        terminal = {'kind': 'ub', 'detail': 'deallocation: Miri.Memory.MemoryLifecycleError.layoutMismatch',
+                    'frames': [{'file': case.path, 'line': 3}]}
+        self.assertEqual(compare(case, terminal, 'deallocation_layout'), 'passed')
+        for unrelated in ('misaligned pointer', 'outOfBounds', 'MemoryLifecycleError.memoryKindMismatch'):
+            self.assertEqual(compare(case, terminal | {'detail': unrelated}, 'deallocation_layout'),
+                             'ub_kind_mismatch')
+
+    def test_exact_validation_diagnostics_keep_their_semantic_categories(self):
+        case = Case('fail/test.rs', errors=[(3, 'invalid value')])
+        terminal = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+        for category, actual, unrelated in (
+                ('never', 'validation: zero-variant enum value', 'validation: invalid enum tag'),
+                ('metadata_size', 'InvalidMeta(TooBig)', 'InvalidMeta(TooSmall)')):
+            with self.subTest(category=category):
+                self.assertEqual(compare(case, terminal | {'detail': actual}, category), 'passed')
+                self.assertEqual(compare(case, terminal | {'detail': unrelated}, category), 'ub_kind_mismatch')
+                self.assertEqual(compare(case, terminal | {'detail': actual, 'frames': []}, category),
+                                 'ub_site_mismatch')
+
+    def test_variadic_exhaustion_requires_the_exact_typed_cause(self):
+        case = Case('fail/test.rs', errors=[(3, 'more C-variadic arguments read than were passed')])
+        terminal = {'kind': 'ub', 'detail': 'VaArgOutOfBounds', 'frames': [{'file': case.path, 'line': 3}]}
+        self.assertEqual(compare(case, terminal, 'variadic_exhausted'), 'passed')
+        for unrelated in ('VaArgMismatch', 'VaArgTypeMismatch', 'outOfBounds', 'DataRace'):
+            self.assertEqual(compare(case, terminal | {'detail': unrelated}, 'variadic_exhausted'),
+                             'ub_kind_mismatch')
+
+    def test_exact_tag_and_null_box_diagnostics_do_not_accept_generic_ub(self):
+        case = Case('fail/test.rs', errors=[(3, 'original reference annotation')])
+        terminal = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+        observations = (
+            ('invalid_discriminant', 'InvalidTag(outside valid range)',
+             ('InvalidTag(unknown variant)', 'NotInvalidTag(outside valid range)',
+              'InvalidTag(outside valid ranges)', 'dereferencing a null box')),
+            ('null_pointer', 'dereferencing a null box',
+             ('null box', 'dereferencing a null boxish', 'InvalidTag(outside valid range)')),
+        )
+        for category, diagnostic, unrelated in observations:
+            with self.subTest(category=category):
+                detail = 'Miri.Interpreter.StepError.undefinedBehavior "' + diagnostic + '"'
+                self.assertEqual(compare(case, terminal | {'detail': detail}, category), 'passed')
+                self.assertEqual(compare(case, terminal | {'detail': detail, 'frames': []}, category),
+                                 'ub_site_mismatch')
+                self.assertNotEqual(compare(case, terminal | {'detail': detail, 'kind': 'unsupported'}, category),
+                                    'passed')
+                for other in (*unrelated, 'undefined behavior', 'invalid value', 'invalidBool 2', 'outOfBounds'):
+                    self.assertEqual(compare(case, terminal | {'detail': other}, category),
+                                     'ub_kind_mismatch', other)
+
+    def test_shim_argument_and_niched_write_keep_specific_causes(self):
+        argument = 'calling a function whose parameter #2 has type i32 passing argument of type u8'
+        niche = 'trying to set discriminant of a Option<std::num::NonZero<i32>> to the niched variant, but the value does not match'
+        self.assertEqual(category_reference(argument), 'argument_type')
+        self.assertEqual(category_reference(niche), 'niched_variant_write')
+        self.assertEqual(category_reference('enum value has invalid tag'), 'invalid_discriminant')
+        for category, detail, negatives in (
+            ('argument_type', 'shim argument ABI mismatch',
+             ('shim calling convention mismatch', 'shim return ABI mismatch',
+              'shim argument count mismatch', 'shim variadic ABI mismatch', 'ABI mismatch',
+              'shim argument ABI mismatch extra', 'C math shim argument ABI mismatch',
+              '"shim argument ABI mismatch" trailing', '"shim argument ABI mismatch',
+              'shim argument ABI mismatch"')),
+            ('niched_variant_write', 'InvalidNichedEnumVariantWritten',
+             ('InvalidTag(outside valid range)', 'UninhabitedEnumVariantRead(1)',
+              'invalid discriminant', 'InvalidNichedEnumVariantWrittenExtra',
+              'InvalidNichedEnumVariantWritten extra', 'prefix InvalidNichedEnumVariantWritten',
+              'invalidnichedenumvariantwritten', '"InvalidNichedEnumVariantWritten" trailing',
+              '"InvalidNichedEnumVariantWritten', 'InvalidNichedEnumVariantWritten"')),
+        ):
+            case = Case('fail/test.rs', errors=[(3, 'expected UB')])
+            base = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+            for exact in (detail, 'Miri.Interpreter.StepError.undefinedBehavior "' + detail + '"'):
+                actual = base | {'detail': exact}
+                self.assertEqual(compare(case, actual, category), 'passed')
+                self.assertEqual(compare(case, actual | {'frames': [{'file': case.path, 'line': 4}]}, category), 'ub_site_mismatch')
+                self.assertEqual(compare(case, actual | {'frames': [{'file': 'unrelated.rs', 'line': 3}]}, category), 'ub_site_mismatch')
+                for terminal in ('unsupported', 'failed', 'pending', 'exit'):
+                    self.assertNotEqual(compare(case, actual | {'kind': terminal}, category), 'passed')
+            for other in (*negatives, 'invalidBool 2', 'outOfBounds', 'undefined behavior'):
+                self.assertEqual(compare(case, base | {'detail': other}, category), 'ub_kind_mismatch', other)
+        case = Case('fail/test.rs', errors=[(3, 'expected enum read UB')])
+        self.assertEqual(compare(case, {'kind': 'ub', 'detail': 'InvalidNichedEnumVariantWritten',
+                                       'frames': [{'file': case.path, 'line': 3}]},
+                                 'invalid_discriminant'), 'ub_kind_mismatch')
+        self.assertEqual(compare(case, {'kind': 'ub', 'detail': 'shim argument ABI mismatch',
+                                       'frames': [{'file': case.path, 'line': 3}]},
+                                 'calling_convention'), 'ub_kind_mismatch')
+
+    def test_extern_static_layout_is_distinct_from_other_layout_causes(self):
+        template = 'extern static `FOO` has been declared as `wrong_size::main::FOO` with a size of {} bytes and alignment of {} bytes, but {} a size of {} bytes and alignment of {} bytes'
+        for declaration, backing in [((2,2),(1,1)), ((10,1),(8,8)), ((1,2),(1,1))]:
+            for source in ('the exported static with that name has', 'Miri emulates it via an extern static shim with'):
+                self.assertEqual(category_reference(template.format(*declaration,source,*backing)), 'extern_static_layout')
+        self.assertEqual(category_reference('accessing memory with alignment 1, but alignment 8 is required'), 'alignment')
+        self.assertEqual(category_reference('extern static `FOO`, but the backing static is mutable'), 'extern_mutability')
+        case = Case('fail/test.rs', errors=[(3, 'extern static layout')])
+        terminal = {'kind': 'ub', 'frames': [{'file': case.path, 'line': 3}]}
+        for symbol in ('FOO', 'environ'):
+            detail = 'extern static `' + symbol + '` declaration exceeds backing size or alignment'
+            for exact in (detail, 'Miri.Interpreter.StepError.undefinedBehavior "' + detail + '"'):
+                actual = terminal | {'detail': exact}
+                self.assertEqual(compare(case, actual, 'extern_static_layout'), 'passed')
+                self.assertEqual(compare(case, actual | {'frames': [{'file': case.path, 'line': 4}]}, 'extern_static_layout'), 'ub_site_mismatch')
+                for kind in ('unsupported', 'failed', 'pending', 'exit'):
+                    self.assertNotEqual(compare(case, actual | {'kind': kind}, 'extern_static_layout'), 'passed')
+            for other in ('AlignmentCheckFailed', 'pointerOutOfBounds', 'layoutMismatch',
+                          'extern static declaration and backing mutability disagree',
+                          'extern static `FOO` is not supported by Miri',
+                          detail + ' extra', '"' + detail + '" trailing', 'invalidBool 2',
+                          'unrelated read error: "' + detail + '"',
+                          'Miri.Interpreter.StepError.invalidProgram "' + detail + '"',
+                          '"' + detail + '"', 'prefix ' + detail):
+                self.assertEqual(compare(case, terminal | {'detail': other}, 'extern_static_layout'), 'ub_kind_mismatch')
+
+    def test_generic_race_is_not_a_mixed_size_race(self):
+        case = Case('fail/test.rs', errors=[(3, 'Race condition detected')])
+        terminal = {'kind': 'ub', 'detail': 'MixedSizeRace', 'frames': [{'file': case.path, 'line': 3}]}
+        self.assertEqual(compare(case, terminal, 'mixed_size_race'), 'passed')
+        self.assertEqual(compare(case, terminal | {'detail': 'DataRace'}, 'mixed_size_race'), 'ub_kind_mismatch')
+
+    def test_pass_requires_final_exit_zero(self):
+        case = Case('pass/test.rs')
+        self.assertEqual(compare(case, {'kind': 'exit', 'detail': '0'}, None), 'passed')
+        for terminal in ({}, {'kind': 'exit', 'detail': '1'}, {'kind': 'pending'}, {'kind': 'ub'}):
+            self.assertNotEqual(compare(case, terminal, None), 'passed')
+
+
+if __name__ == '__main__':
+    unittest.main()

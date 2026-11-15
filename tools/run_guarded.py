@@ -6,10 +6,10 @@ import subprocess
 import time
 
 
-def run(command, *, cwd, env, log, timeout, memory_limit):
+def run(command, *, cwd, env, log, timeout, memory_limit, pass_fds=()):
     memory = Path('/sys/fs/cgroup/memory.current')
     def exceeded():
-        return memory.exists() and int(memory.read_text()) > memory_limit
+        return memory_limit is not None and memory.exists() and int(memory.read_text()) > memory_limit
     if exceeded():
         raise RuntimeError('shared cgroup memory limit exceeded before launch; NOT RUN')
     events = Path('/sys/fs/cgroup/memory.events')
@@ -17,10 +17,10 @@ def run(command, *, cwd, env, log, timeout, memory_limit):
     started = time.monotonic()
     with log.open('w') as stream:
         process = subprocess.Popen(command, cwd=cwd, env=env, stdout=stream,
-                                   stderr=subprocess.STDOUT, start_new_session=True)
+                                   stderr=subprocess.STDOUT, start_new_session=True, pass_fds=pass_fds)
         reason = None
         while process.poll() is None:
-            if time.monotonic() - started > timeout:
+            if timeout is not None and time.monotonic() - started > timeout:
                 reason = 'walltime limit'
             elif exceeded():
                 reason = 'shared cgroup memory limit'

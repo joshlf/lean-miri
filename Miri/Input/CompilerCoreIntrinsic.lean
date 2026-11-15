@@ -13,23 +13,15 @@ private def lift (value : Except String A) : EStateM StepError S A :=
 def variantCount (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except StepError Nat := do
   let get := fun id => do
     let source ← (p.runtime.node id).mapError (fun e => StepError.unsupported (toString e))
-    unless source.shapeStatus == .supported do
-      throw (.unsupported "variant_count compiler shape unresolved")
     pure source
   let source ← get ty
-  let source ← if source.shapeKind == .patternType then do
-      let id ← ((source.payload.getObjVal? "shape").bind (·.getObjVal? "base") >>= fun value =>
-        value.getObjValAs? Nat "type_id").mapError StepError.unsupported
-      get id
-    else pure source
-  match source.shapeKind with
-  | .alias | .parameter | .placeholderType | .inferenceType =>
-    throw (.invalidProgram "TooGeneric in variant_count")
-  | .patternType | .boundType => throw (.invalidProgram "source invariant: invalid nested pattern/bound type in variant_count")
-  | .unknown _ => throw (.unsupported "variant_count compiler shape unknown")
-  | .adt =>
-    let variants ← ((source.payload.getObjVal? "shape").bind (·.getObjVal? "variants") >>= Json.getArr?).mapError StepError.unsupported
-    pure variants.size
+  let source ← match source.shape with
+    | .patternType base _ => get base
+    | _ => pure source
+  match source.shape with
+  | .alias .. => throw (.invalidProgram "TooGeneric in variant_count")
+  | .patternType .. => throw (.invalidProgram "source invariant: invalid nested pattern/bound type in variant_count")
+  | .adt data => pure data.variants.size
   | _ => pure 0
 
 structure Queries (S C : Type) where

@@ -1,5 +1,4 @@
 import Miri.Input.Model
-import Miri.Input.Decoder
 import Miri.Memory.MemoryState
 
 /-! Validated installation of the optional prepared post-export rustc
@@ -9,9 +8,8 @@ namespace Miri.Input.CompilerAllocIdWorld
 open Miri.Memory
 
 set_option autoImplicit false in
-def install {P E K : Type} (raw : Lean.Json) (world? : Option CompilerAllocIdWorld) (nodes : Array AllocationNode)
+def install {P E K : Type} (world? : Option CompilerAllocIdWorld) (nodes : Array AllocationNode)
     (memory : MemoryState P E K) : Except String (MemoryState P E K) := do
-  Miri.Input.validateCompilerAllocIdWorldRaw raw nodes world?
   let some world := world? | return memory
   if memory.sourceAllocIdWorldActive then throw "source AllocId world is already installed"
   if !memory.live.isEmpty || !memory.dead.isEmpty || !memory.extraFnPtrIds.isEmpty ||
@@ -20,9 +18,9 @@ def install {P E K : Type} (raw : Lean.Json) (world? : Option CompilerAllocIdWor
   unless memory.sourceAllocIdByRuntime.isEmpty && memory.runtimeBySourceAllocId.isEmpty &&
       memory.opaqueSourceGlobalIds.isEmpty do
     throw "source AllocId runtime crosswalk was partially initialized"
-  let supportedNodeCount := nodes.filter (·.status == .supported) |>.size
-  unless memory.importedGlobalIds.size == supportedNodeCount && memory.globals.size == supportedNodeCount do
-    throw "source AllocId world must cover every supported already-imported allocation"
+  let nodeCount := nodes |>.size
+  unless memory.importedGlobalIds.size == nodeCount && memory.globals.size == nodeCount do
+    throw "source AllocId world must cover every already-imported allocation"
   let mut runtimeByExport : Std.HashMap Nat AllocId := {}
   for (graphId, runtimeId) in memory.importedGlobalIds do
     if runtimeByExport.contains graphId then throw "duplicate imported exporter graph identity"
@@ -49,11 +47,6 @@ def install {P E K : Type} (raw : Lean.Json) (world? : Option CompilerAllocIdWor
     | .opaque =>
       unless row.kind != .dangling && row.allocationId.isNone do
         throw "source AllocId opaque pool row has an invalid shape"
-      if let some graphId := row.opaqueAllocationId then
-        let some nodeIndex := nodeIndexByExport[graphId]? | throw "opaque source AllocId graph node is absent"
-        let some node := nodes[nodeIndex]? | throw "opaque source AllocId graph node index is absent"
-        unless node.sourceAllocId == some row.sourceAllocId && node.status != .supported do
-          throw "opaque source AllocId graph node does not match its unsupported raw identity"
       opaqueRawIds := opaqueRawIds.push row.sourceAllocId
     | .serialized =>
       unless row.kind != .dangling do throw "source AllocId serialized row is marked dangling"

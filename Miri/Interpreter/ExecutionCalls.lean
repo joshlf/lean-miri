@@ -70,7 +70,6 @@ def make [DecidableEq K] (leaves : ExecutionCallLeaves.Hooks (State K U) C Other
    frameIndex := do match (← get).stack.frameIndex with
       | .ok index => pure index | .error error => throw (.stack error)
    evalOperand := fun c operand => OperandMachine.evalOperand operands c operand none
-   evalOperandAt := fun c path operand => OperandMachine.evalOperandAt operands c path operand none
    evalPlace := fun c dest skip => return (← PlaceDynamic.evalPlace projection c dest skip).stackView
    placeToOp := fun c dest => placeToOp place c dest.toRuntimePlace
    forceAllocation := fun c dest => forceAllocation place c dest.toRuntimePlace
@@ -82,6 +81,9 @@ def make [DecidableEq K] (leaves : ExecutionCallLeaves.Hooks (State K U) C Other
       lift (scalar.toPointer access.runtime.base |>.mapError ScalarOps.scalarError)
    getPtrFn := fun _ pointer => FunctionPointers.getPtrFn functions pointer
    resolve := leaves.compiler.resolve
+   instanceKind := leaves.compiler.instanceKind
+   instanceArgs := leaves.compiler.instanceArgs
+   itemInstance := leaves.compiler.itemInstance
    fnAbiOfFnPtr := leaves.compiler.fnAbiOfFnPtr
    fnAbiOfInstance := leaves.compiler.fnAbiOfInstance
    requiresCallerLocation := virtual.compiler.requiresCallerLocation

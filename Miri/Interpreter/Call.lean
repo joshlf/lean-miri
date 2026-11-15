@@ -1,4 +1,4 @@
-import Miri.Interpreter.OperandPath
+import Miri.ABI.FnAbi
 import Miri.Interpreter.ControlFlow
 import Miri.Interpreter.Rvalue
 import Miri.Interpreter.LocalAccess
@@ -66,7 +66,6 @@ structure CallHooks (P S C E Other Extern FnABI ArgABI : Type) where
   setFrame : Frame P LocalLayout E → CallM S Unit
   frameIndex : CallM S Nat
   evalOperand : C → MIR.Operand → CallM S (OpTy P)
-  evalOperandAt : C → OperandPath → MIR.Operand → CallM S (OpTy P) := fun c _ => evalOperand c
   evalPlace : C → MIR.Place → Bool → CallM S (RuntimeStackPlace P)
   placeToOp : C → RuntimeStackPlace P → CallM S (OpTy P)
   forceAllocation : C → RuntimeStackPlace P → CallM S (MPlaceTy P)
@@ -77,6 +76,9 @@ structure CallHooks (P S C E Other Extern FnABI ArgABI : Type) where
   resolve : C → DefId → Array GenericArg → CallM S CallInstance
   fnAbiOfFnPtr : C → LocalLayout → Array TyId → CallM S FnABI
   fnAbiOfInstance : C → CallInstance → Array TyId → CallM S FnABI
+  instanceKind : CallInstance → CallM S CallInstanceKind
+  instanceArgs : CallInstance → CallM S (Array GenericArg)
+  itemInstance : DefId → Array GenericArg → CallM S CallInstance
   requiresCallerLocation : CallInstance → CallM S Bool
   callerLocation : CallM S SpanRef
   abiCanUnwind : FnABI → Bool
@@ -160,10 +162,10 @@ def moveDefinitelyDisjoint (args : Array SpannedOperand) (dest : Place) : Bool :
     seen := seen.push place.localId
   return true
 
-def evalFnCallArgumentAt (h : Hooks) (choice : C) (operand : MIR.Operand)
-    (disjoint : Bool) (path : OperandPath) : M (FnArg P) := do
+def evalFnCallArgument (h : Hooks) (choice : C) (operand : MIR.Operand)
+    (disjoint : Bool) : M (FnArg P) := do
   match operand with
-  | .Copy _ | .Constant _ | .RuntimeChecks _ => return .Copy (← h.evalOperandAt choice path operand)
+  | .Copy _ | .Constant _ | .RuntimeChecks _ => return .Copy (← h.evalOperand choice operand)
   | .Move place =>
     let place ← h.evalPlace choice place true
     if disjoint then
@@ -173,18 +175,14 @@ def evalFnCallArgumentAt (h : Hooks) (choice : C) (operand : MIR.Operand)
       | .immediate _ => return .Copy op
     else return .InPlace (← h.forceAllocation choice place)
 
-def evalFnCallArgument (h : Hooks) (choice : C) (operand : MIR.Operand)
-    (disjoint : Bool) : M (FnArg P) :=
-  evalFnCallArgumentAt h choice operand disjoint #[]
-
 def evalCalleeAndArgs (h : Hooks) (choice : C) (func : MIR.Operand)
     (args : Array SpannedOperand) (dest : Place) : M (EvaluatedCall P Other Extern FnABI) := do
-  let func ← h.evalOperandAt choice (OperandPath.instruction "function") func
+  let func ← h.evalOperand choice func
   let disjoint := moveDefinitelyDisjoint args dest
   let mut evaluated := #[]
   for index in [:args.size] do
     let some arg := args[index]? | throw (.invalidProgram "missing source call argument")
-    evaluated := evaluated.push (← evalFnCallArgumentAt h choice arg.operand disjoint (OperandPath.argument index))
+    evaluated := evaluated.push (← evalFnCallArgument h choice arg.operand disjoint)
   let (inputCount, externAbi) ← h.functionSignature choice func.layout
   require (inputCount ≤ evaluated.size) "call has fewer args than normalized signature"
   let extra := (evaluated.extract inputCount evaluated.size).map fun arg => arg.layout.ty
@@ -196,10 +194,10 @@ def evalCalleeAndArgs (h : Hooks) (choice : C) (func : MIR.Operand)
     return ⟨fnVal, evaluated, externAbi, some abi, false⟩
   | .FnDef definition args =>
     let fnInstance ← h.resolve choice definition args
-    let abi ← match fnInstance.kind with
+    let abi ← match ← h.instanceKind fnInstance with
       | .LlvmIntrinsic _ => pure none
       | .Intrinsic definition =>
-        pure (some (← h.fnAbiOfInstance choice ⟨.Item definition, fnInstance.args⟩ extra))
+        pure (some (← h.fnAbiOfInstance choice (← h.itemInstance definition (← h.instanceArgs fnInstance)) extra))
       | _ => pure (some (← h.fnAbiOfInstance choice fnInstance extra))
     return ⟨.Instance fnInstance, evaluated, externAbi, abi, ← h.requiresCallerLocation fnInstance⟩
   | .invalid => throw (.invalidProgram "invalid callee type")
@@ -369,7 +367,7 @@ def initFnCallStep (h : Hooks) (choice : C) (request : CallRequest P Other Exter
     h.callExtra choice extra (← needAbi) request.args request.destination request.target request.unwind
     pure none
   | .Instance fnInstance =>
-    match fnInstance.kind with
+    match ← h.instanceKind fnInstance with
     | .Intrinsic _ =>
       require (!request.withCallerLocation) "intrinsic received caller location"
       let fallback ← h.callIntrinsic choice fnInstance (request.args.map FnArg.copyFnArg)
@@ -377,7 +375,7 @@ def initFnCallStep (h : Hooks) (choice : C) (request : CallRequest P Other Exter
       match fallback with
       | none => pure none
       | some fallback =>
-        match fallback.kind with
+        match ← h.instanceKind fallback with
         | .Item _ => pure ()
         | _ => throw (.invalidProgram "intrinsic fallback must be Item")
         return some { request with
@@ -525,3 +523,131 @@ def run (computation : CallM S A) (state : S) : StepResult S A :=
 
 end Call
 end Miri.Interpreter
+
+namespace Miri.Interpreter.Call
+open Miri Miri.ABI Miri.Memory Miri.MIR
+set_option autoImplicit false
+variable {P S C E Other Extern : Type}
+abbrev ZeroHooks (P S C E Other Extern : Type) := CallHooks P S C E Other Extern (FnAbi TyId) (ArgAbi TyId)
+ def zeroCore (h : ZeroHooks P S C E Other Extern) (choice : C) (fnInstance : CallInstance) (body : LoadedBody)
+    (abi : FnAbi TyId) (destination : MPlaceTy P) (cont : ReturnContinuation) : CallM S Unit := do
+  let cont := if h.abiCanUnwind abi then cont else
+    match cont with
+    | .stop _ => cont
+    | .goto ret _ => .goto ret .Unreachable
+  h.pushRaw choice fnInstance body (.memory destination) cont
+  let frame ← h.getFrame
+  let preamble ← match frame.location with
+    | .unwinding span => pure span
+    | .mir _ => throw (.invalidProgram "raw frame does not have preamble location")
+  h.setFrame {frame with trackCallerArg := none}
+  let (_,calleeIndex) ← h.withRetagMode choice .FnEntry (pure (0,0))
+  setSpan h (← h.localSpan body.body 0)
+  unless ← h.checkArgumentCompat choice abi.ret abi.ret do
+    throw (.undefinedBehavior "AbiMismatchReturn")
+  h.protectArgument choice destination
+  setSpan h preamble
+  require (calleeIndex == 0) "mismatch between callee ABI and callee body arguments"
+  h.afterFrameInit choice
+  h.pushDone choice
+ theorem zero_entry_core (h : ZeroHooks P S C E Other Extern) (choice : C) (fnInstance : CallInstance)
+    (body : LoadedBody) (abi : FnAbi TyId) (destination : MPlaceTy P) (cont : ReturnContinuation)
+    (requires : h.requiresCallerLocation fnInstance = pure false)
+    (instanceAbi : h.fnAbiOfInstance choice fnInstance #[] = pure abi)
+    (features : h.checkTargetFeatures choice fnInstance = pure ())
+    (memory : h.placeToOp choice (.memory destination) = pure ⟨.indirect destination.mplace,destination.layout⟩)
+    (closure : h.nonCapturingClosure choice fnInstance abi = pure false)
+    (variadic : h.abiVariadic abi = false)
+    (convention : h.sameConvention abi abi = true)
+    (arguments : h.abiArgs abi = #[])
+    (ret : h.abiReturn abi = abi.ret)
+    (count : body.body.argumentCount = 0) :
+    initStackFrame h choice fnInstance body abi #[] false (.memory destination) cont =
+      zeroCore h choice fnInstance body abi destination cont := by
+  simp [initStackFrame,zeroCore,requires,instanceAbi,features,memory,closure,variadic,
+    convention,arguments,ret,count,require,setSpan,bind_assoc]
+
+/-- Source specialization for a zero-argument call whose actual preflight
+operand is immediate. The preflight equation is an internal composition edge. -/
+def zeroImmediateCore (h : ZeroHooks P S C E Other Extern) (choice : C)
+    (fnInstance : CallInstance) (body : LoadedBody) (abi : FnAbi TyId)
+    (destination : RuntimeStackPlace P) (cont : ReturnContinuation) : CallM S Unit := do
+  let cont := if h.abiCanUnwind abi then cont else
+    match cont with | .stop _ => cont | .goto ret _ => .goto ret .Unreachable
+  h.pushRaw choice fnInstance body destination cont
+  let frame ← h.getFrame
+  let preamble ← match frame.location with
+    | .unwinding span => pure span
+    | .mir _ => throw (.invalidProgram "raw frame does not have preamble location")
+  h.setFrame {frame with trackCallerArg := none}
+  let (_,calleeIndex) ← h.withRetagMode choice .FnEntry (pure (0,0))
+  setSpan h (← h.localSpan body.body 0)
+  unless ← h.checkArgumentCompat choice abi.ret abi.ret do
+    throw (.undefinedBehavior "AbiMismatchReturn")
+  setSpan h preamble
+  require (calleeIndex == 0) "mismatch between callee ABI and callee body arguments"
+  h.afterFrameInit choice
+  h.pushDone choice
+
+ theorem zero_entry_immediate (h : ZeroHooks P S C E Other Extern) (choice : C)
+    (fnInstance : CallInstance) (body : LoadedBody) (abi : FnAbi TyId)
+    (destination : RuntimeStackPlace P) (cont : ReturnContinuation)
+    (before cached : S) (value : Immediate P) (layout : LocalLayout)
+    (requires : h.requiresCallerLocation fnInstance = pure false)
+    (instanceAbi : h.fnAbiOfInstance choice fnInstance #[] = pure abi)
+    (features : h.checkTargetFeatures choice fnInstance = pure ())
+    (immediate : h.placeToOp choice destination before = .ok ⟨.immediate value,layout⟩ cached)
+    (closure : h.nonCapturingClosure choice fnInstance abi = pure false)
+    (variadic : h.abiVariadic abi = false) (convention : h.sameConvention abi abi = true)
+    (arguments : h.abiArgs abi = #[]) (ret : h.abiReturn abi = abi.ret)
+    (count : body.body.argumentCount = 0) :
+    initStackFrame h choice fnInstance body abi #[] false destination cont before =
+      zeroImmediateCore h choice fnInstance body abi destination cont cached := by
+  simp only [initStackFrame,zeroImmediateCore,requires,instanceAbi,features,closure,variadic,
+    convention,arguments,ret,count,require,setSpan,bind_assoc,pure_bind]
+  simp [bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,immediate]
+  rfl
+
+
+def zeroIndirectCore (h : ZeroHooks P S C E Other Extern) (choice : C) (fnInstance : CallInstance) (body : LoadedBody)
+    (abi : FnAbi TyId) (destination : RuntimeStackPlace P) (memory : MPlaceTy P) (cont : ReturnContinuation) : CallM S Unit := do
+  let cont := if h.abiCanUnwind abi then cont else
+    match cont with
+    | .stop _ => cont
+    | .goto ret _ => .goto ret .Unreachable
+  h.pushRaw choice fnInstance body destination cont
+  let frame ← h.getFrame
+  let preamble ← match frame.location with
+    | .unwinding span => pure span
+    | .mir _ => throw (.invalidProgram "raw frame does not have preamble location")
+  h.setFrame {frame with trackCallerArg := none}
+  let (_,calleeIndex) ← h.withRetagMode choice .FnEntry (pure (0,0))
+  setSpan h (← h.localSpan body.body 0)
+  unless ← h.checkArgumentCompat choice abi.ret abi.ret do
+    throw (.undefinedBehavior "AbiMismatchReturn")
+  h.protectArgument choice memory
+  setSpan h preamble
+  require (calleeIndex == 0) "mismatch between callee ABI and callee body arguments"
+  h.afterFrameInit choice
+  h.pushDone choice
+
+ theorem zero_entry_indirect (h : ZeroHooks P S C E Other Extern) (choice : C)
+    (fnInstance : CallInstance) (body : LoadedBody) (abi : FnAbi TyId)
+    (destination : RuntimeStackPlace P) (cont : ReturnContinuation)
+    (before cached : S) (memory : MPlaceTy P)
+    (requires : h.requiresCallerLocation fnInstance = pure false)
+    (instanceAbi : h.fnAbiOfInstance choice fnInstance #[] = pure abi)
+    (features : h.checkTargetFeatures choice fnInstance = pure ())
+    (indirect : h.placeToOp choice destination before = .ok ⟨.indirect memory.mplace,memory.layout⟩ cached)
+    (closure : h.nonCapturingClosure choice fnInstance abi = pure false)
+    (variadic : h.abiVariadic abi = false) (convention : h.sameConvention abi abi = true)
+    (arguments : h.abiArgs abi = #[]) (ret : h.abiReturn abi = abi.ret)
+    (count : body.body.argumentCount = 0) :
+    initStackFrame h choice fnInstance body abi #[] false destination cont before =
+      zeroIndirectCore h choice fnInstance body abi destination memory cont cached := by
+  simp only [initStackFrame,zeroIndirectCore,requires,instanceAbi,features,closure,variadic,
+    convention,arguments,ret,count,require,setSpan,bind_assoc,pure_bind]
+  simp [bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,indirect]
+  rfl
+
+end Miri.Interpreter.Call

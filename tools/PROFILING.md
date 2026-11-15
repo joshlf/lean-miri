@@ -73,7 +73,7 @@ For an already frozen native binary, pass
 For Lean `--run`, explicitly pass `--runner tools/Run.lean` and
 `--lean-path FROZEN_LIB`. These modes are mutually exclusive. The collector
 records execution mode, artifact hash and any build-log path. Both modes accept
-`--seed U64` and `--profile`; omitting the seed preserves the existing bounded
+`--seed U64` and `--profile`; omitting the seed selects the
 diagnostic zero policy. Explicit Lean runners require a prebuilt module closure.
 
 To regenerate the large catch-panic workload after Rust/sysroot setup, build the
@@ -90,6 +90,25 @@ Unscoped exports also emit generic closure templates as independent roots and
 can fail readiness. Use one unchanged export across every paired trial; a fresh
 export of the same Rust source need not match a historical artifact's bytes.
 
+A smaller completed collection workload is
+`tests/repro/execution/vector-sort.rs`: it allocates 16 integers, sorts them,
+and checks an iterator-based weighted checksum:
+
+```bash
+LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1 bash tools/export-mir.sh \
+  --output scratch/vector-sort.json --root main -- \
+  tests/repro/execution/vector-sort.rs --crate-name vector_sort
+bash tools/run.sh scratch/vector-sort.json --profile
+```
+
+Use the same exported file for both binaries; source paths and compiler allocation
+identities can differ between fresh exports. Its successful outcome is
+`finalized_exit code=0`. The native runner continues until a terminal/error
+outcome or process interruption (Ctrl-C); it has no scheduler-iteration or
+generated-choice cap. Diagnostic choices are generated on demand and retained
+for replay, so longer runs still require host memory. Explicitly bounded
+proof/test APIs retain `pending` for an incomplete prefix.
+
 For hotspot attribution, `--profile` additionally reports complete scheduler
 iterations taking at least 10ms as `execution.iteration_N.*`. The label records
 the starting canonical body index as well as definition ID and MIR/unwind
@@ -100,30 +119,14 @@ The progress summarizer lists the slowest reported iterations separately from
 sampled before/after completion boundaries. Below-threshold iterations are
 absent, so the reported duration sum is incomplete.
 
-The diagnostic `lake build profile_json_sharing` target constructs compact
-shared JSON DAGs and times structural hashing. Run its executable separately
-from application benchmarks, with the same CPU/thread controls. It demonstrates
-hash traversal scaling; it does not measure the fraction of decoder time spent
-in hashing or establish an application speedup.
+Compiler metadata uses separate typed tables for types, layouts, function ABIs,
+allocations, instances, spans, definitions and type constants. Import retains
+numeric references. The runtime validates and reads the corresponding table
+when an operation needs its compiler value. There is no generic JSON payload
+graph or shared decoding cache.
 
-The decoder retains the exporter's document-local shared-node IDs. Runtime-value
-memoization and validation visits use those IDs; inline values and cheap scalars
-are traversed directly. Context flags and diagnostic rebasing remain per
-occurrence. Structural hashes remain for value-based ABI deduplication, and
-noncanonical Raw objects retain the original full-value key comparison/hash.
-`decodeRuntimeJsonReference` and `decodeJsonReference` run the uncached traversal
-path for regression checks; neither bypasses validation.
-
-Import-time `decoder.compiler_abi_queries` and `decoder.compiler_values` spans
-prepare complete typed FnAbi/generic-argument/span projections for the native
-runtime input. Preparation still converts and validates ABI results against the
-current runtime. `prepare.typed_abi_index` replaces per-call linear scans of
-source ABI payloads. Since work moves from preparation into decoding, compare
-whole-process and combined decode/preparation costs rather than interpreting a
-shorter preparation span alone as a speedup. Diagnostic/reflected imports retain
-the schema-only document and use the compatibility path.
-
-Caller-location queries reuse a span index within each demand; runtime Location
-roots remain fresh per intrinsic evaluation. See [STATUS.md](../STATUS.md) for
-measured inputs, limits and remaining costs, and
-`tools/check-performance-regressions.sh` for parity checks.
+Measure decoding, preparation and execution together as well as separately.
+Changes that move work between these phases can improve one span without
+improving total runtime. A schema change requires fresh exports from identical
+Rust source, compiler configuration and guest settings; record both serialized
+artifact hashes and sizes, and compare outcomes before interpreting timings.

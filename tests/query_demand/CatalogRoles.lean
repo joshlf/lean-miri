@@ -3,14 +3,14 @@ import Miri.Input.CompilerNativeSignatures
 import Miri.Input.CompilerThreadLocal
 
 /-! Finite decoder/provider checks on mutations of fresh compiler exports.
-Manifest cases retain separate baselines, exact obligations and demanded query
+Manifest cases retain separate baselines, readiness and demanded query
 failures. This does not execute MIR or certify completeness of query roles. -/
 open Lean Miri.Input Miri.Interpreter
 private def must (value : Except String A) : IO A :=
   match value with | .ok value => pure value | .error error => throw (IO.userError error)
 private def check (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
-private def read (dir file : String) : IO DecodeResult := do
+private def read (dir file : String) : IO ExecutionInput := do
   must (decodeJson (← IO.FS.readFile (dir ++ "/" ++ file)))
 private def arr (value : Json) (key : String) : Except String (Array Json) :=
   (value.getObjVal? key).bind Json.getArr?
@@ -23,27 +23,35 @@ def main (args : List String) : IO Unit := do
   let mut count := 0
   for row in ← must (arr manifest "cases") do
     let name ← must (row.getObjValAs? String "file")
-    let baseline ← read dir (← must (row.getObjValAs? String "baseline"))
-    let decoded ← read dir name
-    let expected ← must (row.getObjValAs? Bool "ready")
-    check (baseline.executionInput.isSome) s!"fresh compiler baseline not structurally ready: {name}"
-    check (decoded.executionInput.isSome == expected) s!"query role readiness mismatch: {name}"
-    for issue in baseline.document.obligations do
-      check (decoded.document.obligations.any fun actual => actual.path == issue.path && actual.message == issue.message)
-        s!"baseline obligation erased in {name}: {issue.path}"
-    check (decoded.document.obligations.size > baseline.document.obligations.size)
-      s!"mutated unsupported evidence disappeared: {name}"
-    let provider ← must (row.getObjValAs? String "provider")
-    if provider != "none" then
-      let program ← must (lowerProgram decoded.document)
-      let p ← must (CompilerProviders.prepare program)
-      let index ← must (row.getObjValAs? Nat "index")
-      let unavailable ← match provider with
-        | "native" => do
-          let entry ← must (getAt (← must (arr program.input.raw "compiler_native_signature_queries")) index)
-          let (callee,_) ← must (CompilerInstance.decode (LowerContext.ofDocument program.input) program.compilerTables entry)
-          pure (!(CompilerNativeSignatures.query p callee).isOk)
-        | _ => throw (IO.userError s!"unknown provider case: {provider}")
-      check unavailable s!"demanded missing provider silently succeeded: {name}"
+    let source ← IO.FS.readFile (dir ++ "/" ++ name)
+    let ready ← must (row.getObjValAs? Bool "ready")
+    let full := decodeJson source
+    check (full.isOk == ready) s!"decoder readiness differs: {name}"
+    if ready then
+      let provider ← must (row.getObjValAs? String "provider")
+      unless provider == "none" do
+        let baseline ← read dir (← must (row.getObjValAs? String "baseline"))
+        let decoded ← must full
+        let program ← must (lowerProgram baseline.document)
+        let prepared ← must (CompilerProviders.prepare program)
+        let mutated ← must (CompilerProviders.prepare (← must (lowerProgram decoded.document)))
+        match provider with
+        | "native" =>
+          let entry ← must (getAt baseline.document.queries.nativeSignatures (← must (row.getObjValAs? Nat "index")))
+          let callee := entry.instanceId
+          discard <| must (CompilerNativeSignatures.query prepared callee)
+          let invalidId := prepared.program.input.instances.size
+          let queries := prepared.program.input.queries
+          let invalidQueries := {queries with nativeSignatures := #[{entry with instanceId := invalidId}]}
+          let invalidProgram := {prepared.program with input := {prepared.program.input with queries := invalidQueries}}
+          let invalid := {prepared with program := invalidProgram}
+          check (!(CompilerNativeSignatures.query invalid invalidId).isOk)
+            "native query accepted out-of-bounds full-instance identity"
+          discard <| must (CompilerNativeSignatures.query mutated callee)
+        | "tls" =>
+          let definition ← must (row.getObjValAs? Nat "definition")
+          discard <| must (CompilerThreadLocal.forDefinition prepared.program definition)
+          discard <| must (CompilerThreadLocal.forDefinition mutated.program definition)
+        | provider => throw (IO.userError s!"unknown demand provider: {provider}")
     count := count + 1
-  IO.println s!"catalog demand roles: {count} finite readiness/obligation/provider cases passed; no MIR equivalence claim"
+  IO.println s!"catalog cases: {count} checked at decoder and demanded-provider boundaries; no MIR equivalence claim"

@@ -22,8 +22,7 @@ structure Winner where
   definition : Option MIR.DefId
   kind : String
   allocation : Option AllocationId
-  status : String
-  reason : String
+  result : Except StepError Unit
 
 structure Selected where
   symbol : String
@@ -42,159 +41,82 @@ structure TargetFacts where
 structure Prepared where
   program : LoweredProgram
   runtime : RuntimeMetadata
-  sourceStatus : Except String Unit
+  sourceResult : Except String Unit
   targetFacts : Except String TargetFacts
   declarations : Array Declaration
   selected : Array Selected
 
-private def field (j : Json) (key : String) : Except String Json := j.getObjVal? key
-private def str (j : Json) (key : String) : Except String String := do
-  (← field j key).getStr?
-private def nat (j : Json) (key : String) : Except String Nat := do
-  (← field j key).getNat?
-private def statusResult (j : Json) : Except String Json := do
-  match ← str j "status" with
-  | "supported" => field j "value"
-  | "unsupported" =>
-    let reason := match (field j "reason").bind Json.getStr? with
-      | .ok reason => reason
-      | .error _ => "compiler extern-static query unavailable"
-    throw reason
-  | value => throw s!"unknown compiler extern-static status `{value}`"
+private def definition (tables : CompilerTables) (id : Nat) : Except String MIR.DefId := do
+  unless id < tables.definitions.size do throw "compiler definition ID out of bounds"
+  pure id
 
-private def definition (tables : CompilerTables) (raw : Json) :
-    Except String (MIR.DefId × CompilerTables) := do
-  let source : DefinitionId := ⟨← nat raw "crate", ← nat raw "index"⟩
-  match lookupDefinitionId tables.definitions source with
-  | .ok id => pure (id,tables)
-  | .error _ => pure (tables.definitions.size,{tables with definitions := tables.definitions.push source})
+private def linkage : Catalog.ImportLinkage → ExternStatic.ImportLinkage
+  | .none => .none | .externalWeak _ => .externalWeak | .other _ => .other
 
-private def linkage (raw : Json) : Except String ExternStatic.ImportLinkage := do
-  let kind ← str raw "kind"
-  match kind with
-  | "none" => pure .none
-  | "external_weak" => pure .externalWeak
-  | "other" => pure .other
-  | _ => throw s!"unknown compiler extern-static import linkage `{kind}`"
-
-private def decodeDeclaration (ctx : LowerContext) (tables : CompilerTables) (raw : Json) :
-    Except String (Declaration × CompilerTables) := do
-  let (definitionId,tables) ← definition tables (← field raw "definition")
+private def decodeDeclaration (ctx : LowerContext) (tables : CompilerTables)
+    (raw : Catalog.ExternDeclaration) : Except String Declaration := do
+  let definitionId ← definition tables raw.definition
   let result := do
-    unless (← str raw "status") == "supported" do
-      let reason := match (field raw "reason").bind Json.getStr? with
-        | .ok reason => reason
-        | .error _ => "compiler extern-static declaration query unavailable"
-      throw reason
-    unless (← str raw "typing_env") == "fully_monomorphized" do
-      throw "extern-static declaration has a non-canonical typing environment"
-    let ty ← nat (← field raw "type") "type_id"
-    unless ctx.containsTypeId ty do throw "extern-static declaration references absent compiler type"
-    let layout ← field raw "layout"
-    let size ← RuntimeMetadata.size (← nat layout "size_bytes") |>.mapError toString
-    let align ← RuntimeMetadata.alignment (← nat layout "abi_align_bytes") |>.mapError toString
-    let mutable ← (← field raw "decl_is_mut").getBool?
-    let definitionMutability ← str raw "definition_mutability"
-    let typeIsFreeze ← (← field raw "type_is_freeze").getBool?
-    let sourceMutability ← match definitionMutability with
-      | "mutable" => pure true
-      | "immutable" => pure (!typeIsFreeze)
-      | other => throw s!"unknown source static mutability `{other}`"
-    unless mutable == sourceMutability do
+    unless ctx.containsTypeId raw.typeId do throw "extern-static declaration references absent compiler type"
+    let some layout := ctx.layouts[raw.layoutId]? | throw "extern-static layout ID out of bounds"
+    let some bytes := layout.sizeBytes | throw "extern-static layout size missing"
+    let some alignment := layout.abiAlignBytes | throw "extern-static layout alignment missing"
+    let size ← RuntimeMetadata.size bytes |>.mapError toString
+    let align ← RuntimeMetadata.alignment alignment |>.mapError toString
+    let sourceMutability := raw.definitionMutability == MemoryMutability.mutable || !raw.typeIsFreeze
+    unless raw.declIsMut == sourceMutability do
       throw "extern-static declaration mutability disagrees with definition mutability and Freeze query"
-    pure (← str raw "symbol",size,align,← linkage (← field raw "import_linkage"),mutable)
-  let decoded ← match result with
-    | .ok (symbol,size,align,linkage,mutable) =>
-      pure ⟨definitionId,symbol,size,align,linkage,mutable,.ok ()⟩
-    | .error reason =>
-      let symbol := ((field raw "symbol").bind Json.getStr?).toOption.getD ""
-      pure ⟨definitionId,symbol,.ZERO,.ONE,.other,false,.error reason⟩
-  pure (decoded,tables)
+    pure (size, align)
+  match result with
+  | .ok (size, align) => pure ⟨definitionId, raw.symbol, size, align, linkage raw.importLinkage, raw.declIsMut, .ok ()⟩
+  | .error reason => pure ⟨definitionId, raw.symbol, .ZERO, .ONE, .other, false, .error reason⟩
 
 private def selectedWinner (ctx : LowerContext) (tables : CompilerTables)
-    (raw : Json) :
-    Except String (Winner × CompilerTables) := do
-  let status ← str raw "status"
-  if status == "ambiguous" then
-    return (⟨none,"ambiguous",none,status,((field raw "reason").bind Json.getStr?).toOption.getD "ambiguous exported symbol"⟩,tables)
-  if status != "supported" then
-    return (⟨none,"unknown",none,status,((field raw "reason").bind Json.getStr?).toOption.getD "exported symbol query unavailable"⟩,tables)
-  let (definitionId,tables) ← definition tables (← field raw "definition")
-  let kind ← str raw "kind"
-  if kind != "static" then
-    return (⟨some definitionId,kind,none,status,""⟩,tables)
-  let (embedded,tables) ← decodeDeclaration ctx tables (← field raw "declaration")
-  unless embedded.definition == definitionId do
-    throw "selected exported static declaration DefId differs from its winner"
-  unless embedded.symbol == (← str raw "symbol") do
-    throw "selected exported static declaration symbol differs from its winner"
-  -- The exported definition is a distinct compiler item from the foreign
-  -- declaration that demanded this symbol. `declarations` records only the
-  -- latter; the selected winner carries its own exact declaration facts.
-  if let .error reason := embedded.result then
-    return (⟨some definitionId,kind,none,"unsupported",reason⟩,tables)
-  let allocationResult := do
-    let allocation ← statusResult (← field raw "allocation")
-    let id ← nat allocation "allocation_id"
-    unless ctx.containsAllocationId id do throw "selected exported static allocation is absent from compiler graph"
-    pure id
-  let allocation ← match allocationResult with
-    | .ok id => pure (some id)
-    | .error reason =>
-      return (⟨some definitionId,kind,none,"unsupported",reason⟩,tables)
-  return (⟨some definitionId,kind,allocation,status,""⟩,tables)
+    (raw : Catalog.SelectedExport) : Except String (String × Winner) := do
+  match raw with
+  | .ambiguous symbol reason => pure (symbol, ⟨none, "ambiguous", none, .error (.machineStop reason)⟩)
+  | .other symbol kind id _ =>
+    let id ← definition tables id
+    pure (symbol, ⟨some id, kind, none, .ok ()⟩)
+  | .static symbol id declaration allocation =>
+    let id ← definition tables id
+    let embedded ← decodeDeclaration ctx tables declaration
+    unless embedded.definition == id do throw "selected exported static declaration DefId differs from its winner"
+    unless embedded.symbol == symbol do throw "selected exported static declaration symbol differs from its winner"
+    if let .error reason := embedded.result then
+      return (symbol, ⟨some id, "static", none, .error (.unsupported s!"compiler extern-static query: {reason}")⟩)
+    unless ctx.containsAllocationId allocation do throw "selected exported static allocation is absent from compiler graph"
+    pure (symbol, ⟨some id, "static", some allocation, .ok ()⟩)
 
-def prepare (runtime : RuntimeMetadata) (program : LoweredProgram)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw) := none) : Except String Prepared := do
-  unless RuntimeMetadata.JsonReflexivity.matchesRightOr sourceEquality program.input.raw do
-    throw "extern-static metadata document mismatch"
+def prepare (runtime : RuntimeMetadata) (program : LoweredProgram) : Except String Prepared := do
   let ctx := LowerContext.ofDocument program.input
-  let sourceResult := do
-    let queries ← field program.input.raw "compiler_runtime_queries"
-    let foreign ← field queries "foreign_symbols"
-    let source ← field foreign "extern_statics"
-    let source ← statusResult source
-    unless (← str source "typing_env") == "fully_monomorphized" do
-      throw "extern-static table has a non-canonical typing environment"
-    pure source
+  let source := program.input.queries.runtime.foreignSymbols
   let targetResult := do
-    let queries ← field program.input.raw "compiler_runtime_queries"
-    let foreign ← field queries "foreign_symbols"
-    let target ← statusResult (← field foreign "target")
-    let os ← str target "os"
-    let env ← str target "env"
-    let binaryFormat ← str target "binary_format"
-    let families ← (← field target "families").getArr?
-    let mut parsed := #[]
-    for family in families do
-      let family ← family.getStr?
-      if parsed.contains family then throw "duplicate rustc target family"
-      parsed := parsed.push family
-    pure ⟨os,env,binaryFormat,parsed⟩
-  match sourceResult with
-  | .error reason =>
-    pure ⟨program,runtime,.error reason,targetResult,#[],#[]⟩
-  | .ok source => do
-    let mut tables := program.compilerTables
-    let mut declarations := #[]
-    let mut selected := #[]
-    for raw in ← (← field source "declarations").getArr? do
-      let (entry,next) ← decodeDeclaration ctx tables raw
-      tables := next
-      if let some old := declarations.find? (·.definition == entry.definition) then
-        unless old == entry do throw "conflicting exact extern-static declaration queries"
-      else declarations := declarations.push entry
-    for raw in ← (← field source "selected_exported").getArr? do
-      let symbol ← str raw "symbol"
-      if selected.any (·.symbol == symbol) then throw "duplicate selected exported symbol row"
-      let (winner,next) ← selectedWinner ctx tables raw
-      tables := next
-      selected := selected.push ⟨symbol,winner⟩
-    pure ⟨program.withCompilerTables tables,runtime,.ok (),targetResult,declarations,selected⟩
+    let mut families := #[]
+    for family in source.families do
+      if families.contains family then throw "duplicate rustc target family"
+      families := families.push family
+    pure (⟨source.os, source.env, source.binaryFormat, families⟩ : TargetFacts)
+  let some records := source.externDeclarations |
+    pure ⟨program, runtime, .error "compiler extern-static declarations absent", targetResult, #[], #[]⟩
+  let some winners := source.selectedExports |
+    pure ⟨program, runtime, .error "compiler selected exports absent", targetResult, #[], #[]⟩
+  let mut declarations := #[]
+  for record in records do
+    let entry ← decodeDeclaration ctx program.compilerTables record
+    if let some old := declarations.find? (·.definition == entry.definition) then
+      unless old == entry do throw "conflicting exact extern-static declaration queries"
+    else declarations := declarations.push entry
+  let mut selected := #[]
+  for record in winners do
+    let (symbol, winner) ← selectedWinner ctx program.compilerTables record
+    if selected.any (·.symbol == symbol) then throw "duplicate selected exported symbol row"
+    selected := selected.push ⟨symbol, winner⟩
+  pure ⟨program, runtime, .ok (), targetResult, declarations, selected⟩
 
 private def declaration (p : Prepared) (id : MIR.DefId) : Except String Declaration := do
   let some entry := p.declarations.find? (·.definition == id)
-    | match p.sourceStatus with
+    | match p.sourceResult with
       | .ok () => throw "missing exact compiler extern-static declaration row"
       | .error reason => throw reason
   match entry.result with
@@ -211,13 +133,12 @@ private def runtimeDeclaration (p : Prepared) (id : MIR.DefId) :
 
 private def selected (p : Prepared) (name : String) : ExternStatic.M S (Option Winner) := do
   let some entry := p.selected.find? (·.symbol == name)
-    | match p.sourceStatus with
+    | match p.sourceResult with
       | .ok () => return none
       | .error reason => throw (stepError reason)
-  match entry.winner.status with
-  | "supported" => return some entry.winner
-  | "ambiguous" => throw (.machineStop entry.winner.reason)
-  | _ => throw (stepError entry.winner.reason)
+  match entry.winner.result with
+  | .ok () => return some entry.winner
+  | .error error => throw error
 
 private def liftMemory (result : Except ε A) (showError : ε → String) : ExternStatic.M S A :=
   match result with

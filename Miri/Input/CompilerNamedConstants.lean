@@ -3,7 +3,7 @@ import Miri.Interpreter.Constant
 
 /-! Actual compiler ValueNS path resolution and const_eval_instance evidence
 for helpers.rs::eval_path_scalar/eval_libc. Original full constant identity,
-query environment, type, value and raw payload remain available. Allocation
+type and value remain available. Allocation
 values use the canonical Constant pipeline, preserving graph provenance.
 -/
 namespace Miri.Input.CompilerNamedConstants
@@ -14,51 +14,30 @@ structure Value where
   value : MIR.ConstValue
 structure Entry where
   name : String
-  result : Except String Value
-  payload : Json
+  result : Value
 structure Prepared where
   program : LoweredProgram
   runtime : RuntimeMetadata
   entries : Array Entry
-private def supported (j : Json) : Except String Unit := do
-  unless (← (← j.getObjVal? "status").getStr?) == "supported" do
-    throw s!"named compiler constant unavailable: {((j.getObjVal? "reason").bind Json.getStr?).toOption}"
-
-def prepare (runtime : RuntimeMetadata) (program : LoweredProgram)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw) := none) : Except String Prepared := do
-  unless RuntimeMetadata.JsonReflexivity.matchesRightOr sourceEquality program.input.raw do
-    throw "named constant metadata document mismatch"
-  let records ← (← program.input.raw.getObjVal? "compiler_named_constants").getArr?
+def prepare (runtime : RuntimeMetadata) (program : LoweredProgram) : Except String Prepared := do
+  let records := program.input.queries.namedConstants.getD #[]
   let ctx := LowerContext.ofDocument program.input
-  let mut tables := program.compilerTables
   let mut entries := #[]
   for record in records do
-    let name ← (← record.getObjVal? "name").getStr?
+    let name := record.name
     unless !(entries.any (·.name == name)) do throw "duplicate compiler named constant query"
-    unless (← (← record.getObjVal? "typing_env").getStr?) == "fully_monomorphized" do
-      throw "named constant compiler environment mismatch"
-    let query ← record.getObjVal? "query"
-    let origin := do
-      supported query
-      CompilerInstance.decode ctx tables query
-    let result ← match origin with
-      | .error reason => pure (.error reason)
-      | .ok (sourceInstance,next) =>
-        tables := next
-        pure (do
-          let ty ← (← (← query.getObjVal? "type").getObjVal? "type_id").getNat?
-          unless ctx.containsTypeId ty do throw "named constant references missing compiler type"
-          let evaluated ← query.getObjVal? "evaluation"
-          supported evaluated
-          let value ← lowerCompilerConstValue ctx ty (← ctx.decodeCompilerValue (← evaluated.getObjVal? "value"))
-          pure (⟨sourceInstance,ty,value⟩ : Value))
-    entries := entries.push ⟨name,result,record⟩
-  pure ⟨program.withCompilerTables tables,runtime,entries⟩
+    let sourceInstance := record.instanceId
+    let _ ← CompilerInstance.source ctx.instances sourceInstance
+    let ty := record.typeId
+    unless ctx.containsTypeId ty do throw "named constant references missing compiler type"
+    let result : Value := ⟨sourceInstance, ty, record.value⟩
+    entries := entries.push ⟨name, result⟩
+  pure ⟨program, runtime, entries⟩
 
 def value (prepared : Prepared) (name : String) : Except String Value := do
   let some entry := prepared.entries.find? (·.name == name)
     | throw s!"missing compiler named constant query {name}"
-  entry.result
+  pure entry.result
 
 /-- Scalar-only fast path preserves the actual bits and byte width. Allocation
 pointers/slices/indirect values require toOp and actual global memory hooks. -/
@@ -84,7 +63,7 @@ def i32 (prepared : Prepared) (name : String) : Except String Int32 := do
   let some integer := integer | throw "libc i32 bits exceed compiler scalar width"
   integer.toInt32 |>.mapError (fun error => reprStr error)
 
-def toOp [DecidableEq K] (prepared : Prepared) (queries : ConstantQueries P E K H) (name : String) :
+def toOp [DecidableEq K] (prepared : Prepared) (queries : ConstantValueQueries P E K H) (name : String) :
     ConstantM P E K H (OpTy P) := do
   let entry ← match value prepared name with
     | .ok value => pure value

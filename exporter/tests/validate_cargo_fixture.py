@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
-from mir_json import load_mir_document
+from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 root = Path(sys.argv[1])
 documents = {}
@@ -19,29 +19,30 @@ for path in glob.glob(str(root / "**/lean-miri-mir/*.json"), recursive=True):
 
 assert "exporter_helper" in documents, f"dependency crate MIR JSON absent: {list(documents)}"
 assert "exporter_cargo_app" in documents, f"application crate MIR JSON absent: {list(documents)}"
+assert "build_script_build" not in documents, "host build scripts are not guest input"
 app = documents["exporter_cargo_app"]
 instances = [
     item for item in app["instances"]
-    if item.get("kind") == "instance_mir" and item.get("status") == "supported"
+    if item.get("kind") == "instance_mir" and "status" not in item
 ]
 # A DefId/path can have several distinct generic instantiations. Discovery
-# retains symbolic instances too; choose the concrete full argument key.
+# chooses the concrete full argument key.
 types = {item["type_id"]: item for item in app["types"]}
 def u32_argument(instance):
     args = instance.get("generic_args", [])
-    return len(args) == 1 and args[0].get("kind") == "type" and types[args[0]["value"]["type_id"]]["display"] == "u32"
+    return len(args) == 1 and args[0].get("kind") == "type" and types[args[0]["value"]]["display"] == "u32"
 wrap = next(item for item in instances if item["def_path"].endswith("::wrap") and u32_argument(item))
 identity = next(item for item in instances if item["def_path"].endswith("::identity") and item["generic_args"] == wrap["generic_args"])
 assert identity["instance_id"] != wrap["instance_id"]
-assert wrap["body_instantiation"] == {"kind": "substituted_and_normalized", "status": "supported"}
-assert identity["body_instantiation"]["status"] == "supported"
+assert pool_entry(app, "bodies", wrap["body"])["instance_id"] == wrap["instance_id"]
+assert pool_entry(app, "bodies", identity["body"])["instance_id"] == identity["instance_id"]
 
 types = {item["type_id"]: item for item in app["types"]}
 
 def local_displays(instance):
     return {
-        types[local["type"]["type_id"]]["display"]
-        for local in instance["body"]["locals"]
+        types[local["type"]]["display"]
+        for local in pool_entry(app, "bodies", instance["body"])["locals"]
     }
 
 assert "u32" in local_displays(wrap), "external generic wrapper MIR was not monomorphized"
@@ -55,6 +56,6 @@ if os.environ.get("MIRI_SYSROOT"):
         item for item in instances
         if "Vec" in item.get("def_path", "") and item.get("def_path", "").endswith("::len")
     )
-    assert vector_len["body_instantiation"]["status"] == "supported"
+    assert pool_entry(app, "bodies", vector_len["body"])["instance_id"] == vector_len["instance_id"]
     assert any("Vec<u32>" in ty for ty in local_displays(vector_len)), "Miri sysroot std MIR was not monomorphized"
 print(f"validated Cargo MIR for {len(documents)} crates and concrete external generic closure")

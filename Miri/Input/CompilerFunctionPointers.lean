@@ -6,17 +6,13 @@ import Miri.Interpreter.FunctionPointers
 identity bridge. Exported compiler function reservations use CTFE_ALLOC_SALT=0. -/
 namespace Miri.Input.CompilerFunctionPointers
 open Lean Miri.Memory Miri.Interpreter
-structure Prepared where
-  calls : CompilerCallPipeline.Prepared
-  inlineAttributes : Array (CallInstance × Bool)
-
 private abbrev FunctionKeyIndex := Std.HashMap (Nat × Nat) (Array Nat)
 private abbrev AllocIdIndex := Std.HashMap UInt64 Bool
 abbrev InlineIndex := Std.HashMap Nat (Array (CallInstance × Bool))
 
 private def addFunctionKey (index : FunctionKeyIndex) (callee : CallInstance)
     (salt : Nat) (position : Nat) : FunctionKeyIndex :=
-  let key := (callee.defId, salt)
+  let key := (callee, salt)
   index.insert key ((index[key]?).getD #[] |>.push position)
 
 private def functionKeyIndex (functions : Array FunctionPointers.FunctionEntry) : FunctionKeyIndex := Id.run do
@@ -33,51 +29,44 @@ private def functionAllocIndex (registry : FunctionPointers.Registry Other) : Al
 
 private def findFunctionKey (functions : Array FunctionPointers.FunctionEntry) (index : FunctionKeyIndex)
     (callee : CallInstance) (salt : Nat) : Option FunctionPointers.FunctionEntry := Id.run do
-  let key := (callee.defId, salt)
+  let key := (callee, salt)
   for position in (index[key]?).getD #[] do
     if let some entry := functions[position]? then
       if entry.callee == callee && entry.salt.val == salt then return some entry
   return none
 
-structure InlineLookup (prepared : Prepared) where
+structure InlineLookup where
   private mk ::
-  private rows : Array (CallInstance × Bool)
   private index : InlineIndex
-  private exactRows : rows = prepared.inlineAttributes
 
-def InlineLookup.prepare (prepared : Prepared) : InlineLookup prepared := Id.run do
-  let rows := prepared.inlineAttributes
-  let mut index : InlineIndex := {}
-  for entry in rows do
-    let key := entry.1.defId
-    index := index.insert key ((index[key]?).getD #[] |>.push entry)
-  return ⟨rows,index,rfl⟩
+/-- Compilation-local metadata, shared by every execution configuration. -/
+structure Prepared where
+  calls : CompilerCallPipeline.Prepared
+  inlineLookup : InlineLookup
 
-def inlineNeverUsing (lookup : InlineLookup prepared) (callee : CallInstance) :
+def inlineNeverUsing (lookup : InlineLookup) (callee : CallInstance) :
     Option Bool := Id.run do
-  for (candidate, value) in (lookup.index[callee.defId]?).getD #[] do
+  for (candidate, value) in (lookup.index[callee]?).getD #[] do
     if candidate == callee then return some value
   return none
 
 def prepare (calls : CompilerCallPipeline.Prepared) : Except String Prepared := do
-  let raw ← (← (← calls.calls.program.input.raw.getObjVal? "compiler_runtime_queries").getObjVal? "instances").getArr?
+  let records := calls.calls.program.input.queries.runtime.instances
   let ctx := LowerContext.ofDocument calls.calls.program.input
-  let tables := calls.calls.program.compilerTables
-  let mut entries := #[]
   let mut indexed : InlineIndex := {}
-  for record in raw do
-    let (callee,next) ← CompilerInstance.decode ctx tables record
-    unless next.definitions == tables.definitions && next.typeConstants == tables.typeConstants do
-      throw "function inline query requires unprepared shared compiler identities"
-    let never ← (← record.getObjVal? "inline_never").getBool?
-    let key := callee.defId
+  for record in records do
+    let callee := record.instanceId
+    let _ ← CompilerInstance.source ctx.instances callee
+    let never := record.inlineNever
+    let key := callee
     let bucket := (indexed[key]?).getD #[]
     if let some (_,old) := bucket.find? (fun e : CallInstance × Bool => e.1 == callee) then
       unless old == never do throw "conflicting exact full-instance inline attribute"
     else
-      entries := entries.push (callee,never)
       indexed := indexed.insert key (bucket.push (callee,never))
-  return ⟨calls,entries⟩
+  -- Retain the index constructed while validating the rows. Hook assembly only
+  -- captures this immutable value; it never traverses the compiler catalog.
+  return ⟨calls,⟨indexed⟩⟩
 
 private def lift (result : Except String A) : MachineHooks.M K User A :=
   match result with
@@ -86,15 +75,15 @@ private def lift (result : Except String A) : MachineHooks.M K User A :=
 
 def hooks (p : Prepared) (image : AllocationImage.Imported)
     (base : FunctionPointers.Hooks K User Other) : FunctionPointers.Hooks K User Other :=
-  let lookup := CompilerVTableRuntime.GlobalLookup.prepare p.calls.symbols
-  let inlineLookup := InlineLookup.prepare p
   {base with
+    instanceArgs := fun inst => lift (CompilerInstance.argsOf
+      p.calls.calls.program.input.instances inst)
     inlineNever := fun callee => lift do
-      let some never := inlineNeverUsing inlineLookup callee
+      let some never := inlineNeverUsing p.inlineLookup callee
         | throw "exact full-instance inline attribute absent"
       pure never
     importedFunction := fun id => do
-      lift (CompilerVTableRuntime.globalFunctionUsing p.calls.symbols lookup image (← get).machine.memory id)}
+      lift (CompilerVTableRuntime.globalFunction p.calls.symbols image (← get).machine.memory id)}
 
 /-- Seed actual compiler-image function reservations before execution. Reject
 conflicting salt-zero identities rather than pick an arbitrary matching body. -/
@@ -104,19 +93,16 @@ private def seedImportedImpl (p : Prepared) (image : AllocationImage.Imported)
   let mut registry := initial
   let mut keys := functionKeyIndex registry.functions
   let mut allocated := functionAllocIndex registry
-  let lookup := CompilerVTableRuntime.GlobalLookup.prepare p.calls.symbols
   let input := p.calls.calls.program.input
   let world? := input.compilerAllocIdWorld
   if let some world := world? then
     unless memory.sourceAllocIdWorldActive do
       throw "prepared function catalog requires the active source AllocId world"
-    unless image.source == input.allocations.filter (·.status == .supported) do
+    unless image.source == input.allocations do
       throw "prepared function catalog allocation image differs from its owning program"
-    Miri.Input.validateCompilerAllocIdWorldRaw input.raw input.allocations (some world)
-      |>.mapError fun error => s!"prepared AllocId world: {error}"
   else
     for (_,id) in memory.importedGlobalIds do
-      if let some callee ← CompilerVTableRuntime.globalFunctionUsing p.calls.symbols lookup image memory id then
+      if let some callee ← CompilerVTableRuntime.globalFunction p.calls.symbols image memory id then
         if let some old := findFunctionKey registry.functions keys callee 0 then
           unless old.allocation == id do throw "conflicting imported salt-zero function allocations"
         else
@@ -129,14 +115,14 @@ private def seedImportedImpl (p : Prepared) (image : AllocationImage.Imported)
     for row in world.dedupCatalog do
       if row.keyKind == .function then
         let keyRuntime ← AllocationImage.runtimeId memory row.keyAllocationId
-        let some keyCallee ← CompilerVTableRuntime.globalFunctionUsing p.calls.symbols lookup image memory keyRuntime
+        let some keyCallee ← CompilerVTableRuntime.globalFunction p.calls.symbols image memory keyRuntime
           | throw "prepared function key witness is not a symbolic function"
         for result in row.salts do
           if saltBound : result.salt < 32 then
             let resultRuntime ← AllocationImage.runtimeId memory result.allocationId
             unless memory.sourceAllocIdForRuntime? resultRuntime == some result.sourceAllocId do
               throw "prepared function result raw AllocId does not match the active memory world"
-            let some resultCallee ← CompilerVTableRuntime.globalFunctionUsing p.calls.symbols lookup image memory resultRuntime
+            let some resultCallee ← CompilerVTableRuntime.globalFunction p.calls.symbols image memory resultRuntime
               | throw "prepared function salt result is not a symbolic function"
             unless resultCallee == keyCallee do
               throw "prepared function salt result does not match its exact compiler Instance key"

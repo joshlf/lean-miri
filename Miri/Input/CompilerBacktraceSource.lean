@@ -10,7 +10,7 @@ structure Position where
   bytePosition : UInt32
   line : Nat
   column : Nat
-  filename : String
+  filename : Nat
   deriving DecidableEq
 structure SpanEntry where
   span : MIR.SpanRef
@@ -21,41 +21,34 @@ structure Prepared where
   positions : Array Position
   names : Array (CallInstance × String)
 
-private def natural (j : Json) (key : String) : Except String Nat := do
-  (← j.getObjVal? key).getNat?
-private def position (j : Json) : Except String Position := do
-  let offset ← natural j "byte_position"
-  unless offset < 2^32 do throw "compiler BytePos exceeds u32"
-  return ⟨UInt32.ofNat offset,← natural j "line",← natural j "zero_based_char_column",
-    ← (← j.getObjVal? "filename").getStr?⟩
-private def spans (ctx : LowerContext) (interner : CompilerSpanInterner) (payload : Json) :
-    Except String (Array SpanEntry × CompilerSpanInterner) := do
-  let records ← (← payload.getObjVal? "backtrace_spans").getArr?
-  let mut interner := interner
+private def position (files : Array String) (source : CompilerSourcePosition) : Except String Position := do
+  unless source.filename < files.size do throw "backtrace filename ID out of bounds"
+  unless source.bytePosition < 2^32 do throw "compiler BytePos exceeds u32"
+  pure ⟨UInt32.ofNat source.bytePosition,source.line,source.column,source.filename⟩
+private def spans (files : Array String) (ctx : LowerContext) (tables : CompilerTables) (body : BodyCore) :
+    Except String (Array SpanEntry × CompilerTables) := do
+  let mut tables := tables
   let mut entries := #[]
-  for record in records do
-    let (span,next) ← lowerCompilerSpanWithInterner interner
-      (← ctx.decodeCompilerValue (← record.getObjVal? "span"))
-    interner := next
-    let location ← position (← record.getObjVal? "source_position")
-    unless (← natural record "collapsed_lo") == location.bytePosition.toNat do
-      throw "collapsed hygiene BytePos/source-map position mismatch"
+  for record in body.backtraceSpans do
+    unless record.spanId < tables.spans.size do throw "backtrace span ID out of bounds"
+    let span : MIR.SpanRef := ⟨record.spanId⟩
+    let location ← position files record.position
     if let some old := entries.find? (fun entry : SpanEntry => entry.span == span) then
       unless old.position == location do throw "conflicting body/span hygiene query"
     else entries := entries.push ⟨span,location⟩
-  return (entries,interner)
+  return (entries,tables)
 
 def prepare (program : LoweredProgram) : Except String Prepared := do
   let ctx := LowerContext.ofDocument program.input
-  let mut interner := CompilerSpanInterner.ofTables program.compilerTables
+  let mut tables := program.compilerTables
   let mut bodySpans := #[]
   let mut positions := #[]
   let mut positionIndex : Std.HashMap UInt32 Position := {}
   for body in program.bundle.bodies do
-    match spans ctx interner body.input.payload with
+    match spans program.input.files ctx tables body.input with
     | .error error => bodySpans := bodySpans.push (.error error)
     | .ok (entries,next) =>
-      interner := next
+      tables := next
       bodySpans := bodySpans.push (.ok entries)
       for entry in entries do
         if let some old := positionIndex.get? entry.position.bytePosition then
@@ -64,15 +57,14 @@ def prepare (program : LoweredProgram) : Except String Prepared := do
           positionIndex := positionIndex.insert entry.position.bytePosition entry.position
           positions := positions.push entry.position
   let ctx := LowerContext.ofDocument program.input
-  let records ← (← (← program.input.raw.getObjVal? "compiler_runtime_queries").getObjVal? "instances").getArr?
+  let records := program.input.queries.runtime.instances
   let mut names := #[]
   let mut namesByDefinition : Std.HashMap Nat (Array Nat) := {}
-  let mut tables := interner.getTables
   for record in records do
-    let (callee,next) ← CompilerInstance.decode ctx tables record
-    tables := next
-    let name ← (← record.getObjVal? "display").getStr?
-    let candidates := namesByDefinition.getD callee.defId #[]
+    let callee := record.instanceId
+    let _ ← CompilerInstance.source ctx.instances callee
+    let name := record.display
+    let candidates := namesByDefinition.getD callee #[]
     if let some index := candidates.find? fun index =>
         match names[index]? with
         | some (oldCallee,_) => oldCallee == callee
@@ -82,7 +74,7 @@ def prepare (program : LoweredProgram) : Except String Prepared := do
     else
       let index := names.size
       names := names.push (callee,name)
-      namesByDefinition := namesByDefinition.insert callee.defId (candidates.push index)
+      namesByDefinition := namesByDefinition.insert callee (candidates.push index)
   return ⟨program.withCompilerTables tables,bodySpans,positions,names⟩
 
 private def lift (result : Except String A) : EStateM StepError S A :=
@@ -114,7 +106,10 @@ def source (p : Prepared) (hostUsizeMax : Nat)
   renderInstance := fun callee => lift do
     let some (_,name) := p.names.find? (·.1 == callee) | throw "exact full-instance rendering absent"
     return name
-  remappedFilename := fun location => pure location.filename }
+  remappedFilename := fun location => lift do
+    let some filename := p.program.input.files[location.filename]?
+      | throw "backtrace filename ID out of bounds"
+    return filename }
 
 def hooks (p : Prepared) (base : Backtrace.Hooks P S D MD B I E Position) :
     Backtrace.Hooks P S D MD B I E Position :=
@@ -133,5 +128,8 @@ def hooks (p : Prepared) (base : Backtrace.Hooks P S D MD B I E Position) :
     renderInstance := fun callee => lift do
       let some (_,name) := p.names.find? (·.1 == callee) | throw "exact full-instance rendering absent"
       return name
-    remappedFilename := fun location => pure location.filename }
+    remappedFilename := fun location => lift do
+      let some filename := p.program.input.files[location.filename]?
+        | throw "backtrace filename ID out of bounds"
+      return filename }
 end Miri.Input.CompilerBacktraceSource

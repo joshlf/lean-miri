@@ -35,12 +35,12 @@ structure AccessConfig (K User : Type) where
   retainTouched : Machine K User → Option (AllocationAccessRef Provenance BorrowTree) → Machine K User
   memoryError : MemoryOperandError → StepError
 
-private def treeError (status : BorrowTree.BorrowTreeAccessStatus) : StepError :=
+private def treeError (write : Bool) (status : BorrowTree.BorrowTreeAccessStatus) : StepError :=
   match status with
   | .AccessFailure _ (.TransitionError ..)
   | .WildcardFailure _ (.TransitionError ..)
   | .WildcardFailure _ (.NoValidExposedReferences ..) =>
-    .undefinedBehavior s!"Tree Borrows: {reprStr status}"
+    .undefinedBehavior s!"Tree Borrows {if write then "write" else "read"} access: {reprStr status}"
   | _ => .invalidProgram s!"Tree Borrows invariant: {reprStr status}"
 
 private def bridge (state : AccessState K User) (action : MachineM K User A) :
@@ -73,7 +73,7 @@ def memoryAccess (config : AccessConfig K User) (write : Bool)
       (if write then .Write else .Read) tracker.global.protectedTags .VisitChildrenOfAccessed
     tree := accessed.tree
     if accessed.status != .Completed then
-      let error := treeError accessed.status
+      let error := treeError write accessed.status
       return ⟨{state with pendingError := some error}, tree, .error (reprStr error)⟩
   let sync := bridge state (config.syncAccess write allocId range)
   return ⟨sync.state, tree, sync.outcome⟩
@@ -125,6 +125,53 @@ def writeMemory [DecidableEq K] (config : AccessConfig K User)
   commit config result.memory result.hooks result.touched
   finish config result.hooks result.outcome
 
+/-- Write uninitialized bytes across the full dynamic place, as required by
+retag-in-place. Unlike an immediate write, this also handles unsized places. -/
+def writeUninitMemory [DecidableEq K] (config : AccessConfig K User)
+    (place : MPlaceTy Provenance) : M K User Unit := do
+  let state ← get
+  let result := writeUninitToMplace state.machine.memory ⟨state.machine, none⟩
+    ⟨place.mplace, localMemoryLayout place.layout⟩ config.runtime config.ghostMode config.globalKind
+    config.globalHooks (accessHooks config) config.dynamicLayout
+  commit config result.memory result.hooks result.touched
+  finish config result.hooks result.outcome
+
+/-- Full-place uninitialization of a zero-sized memory place preserves every
+machine/stack field without resolving an allocation or invoking access hooks. -/
+theorem writeUninitMemory_zero [DecidableEq K]
+    (config : AccessConfig K User) (place : MPlaceTy Provenance)
+    (pointer : Pointer (Option Provenance)) (ty : Option Nat) (pointerSize : Size)
+    (unitLayout : localMemoryLayout place.layout =
+      ⟨Size.ZERO, Align.ONE, .Memory (sized := true), ty⟩)
+    (placeMemory : place.mplace = ⟨pointer, .none, none⟩)
+    (pointerMetadata : config.runtime.pointerSizeIn config.runtime.defaultAddressSpace = .ok pointerSize)
+    (retain : ∀ machine, config.retainTouched machine none = machine)
+    (state : State K User) :
+    writeUninitMemory config place state = .ok () state := by
+  simp only [writeUninitMemory, unitLayout, placeMemory]
+  simp only [zero_uninit_full_write (pointerSize := pointerSize) (pointerMetadata := pointerMetadata)]
+  simp [commit, finish, retain]
+  with_unfolding_all rfl
+
+/-- The canonical zero-sized unit write preserves the entire machine and stack.
+No allocation lookup, pointer resolution or permission transition is assumed.
+The layout and pointer-size premises concern compiler/target data only. -/
+theorem writeMemory_zero_uninit [DecidableEq K]
+    (config : AccessConfig K User) (later : MemoryOperandLayout → Bool)
+    (place : MPlaceTy Provenance) (pointer : Pointer (Option Provenance))
+    (ty : Option Nat) (pointerSize : Size)
+    (unitLayout : localMemoryLayout place.layout =
+      ⟨Size.ZERO, Align.ONE, .Memory (sized := true), ty⟩)
+    (placeMemory : place.mplace = ⟨pointer, .none, none⟩)
+    (pointerMetadata : config.runtime.pointerSizeIn config.runtime.defaultAddressSpace = .ok pointerSize)
+    (retain : ∀ machine, config.retainTouched machine none = machine)
+    (state : State K User) :
+    writeMemory config later .uninit place state = .ok () state := by
+  simp only [writeMemory, unitLayout, placeMemory]
+  simp only [zero_uninit_write (pointerSize := pointerSize) (pointerMetadata := pointerMetadata)]
+  simp [commit, finish, retain]
+  with_unfolding_all rfl
+
 /-- Source stack init_allocation: root borrow tree before allocation race
 state. Stack allocation time comes from the active thread; historical local
 clocks are transferred by afterLocalMovedToMemory later. Span-only diagnostic
@@ -158,9 +205,36 @@ structure AllocationConfig (K User : Type) where
   nativeDrop : Option (Allocation Provenance Unit → M K User Unit) := none
   diagnostic : AllocId → Size → Align → MachineM K User Unit
   allocationTail : AllocId → Size → Align → MachineM K User Unit
+  /-- Source allocation backtraces need the actual active stack at allocation
+  time. Disabled configurations do not inspect or retain that stack. -/
+  allocationBacktrace : Option (AllocId → MemoryKind K → M K User Unit) := none
+  /-- Per-kind source allocation spans are saved after backtrace collection. -/
+  allocationSpan : AllocId → Size → Align → MachineM K User Unit := fun _ _ _ => pure ()
+  /-- Roll back side indices only when initialization failed before insertion. -/
+  discardUninserted : AllocId → MachineM K User Unit := fun _ => pure ()
   /-- Actual address-map allocation with the existing root tag. This must not
   replace the tag or derive an absolute address from allocation identity. -/
   adjustRootAddress : AllocId → BorTag → M K User (Pointer Provenance)
+
+private def allocationMachine (action : MachineM K User A) : M K User A := fun state =>
+  match action state.machine with
+  | .ok value machine => .ok value {state with machine}
+  | .error error machine => .error error {state with machine}
+
+/-- Source init_allocation order: diagnostics, tree/race/weak extras, optional
+allocation-time stack capture, then per-kind allocation span. Every callback
+sees the same reserved ID before it is published as live memory. -/
+def initializeAllocation (config : AllocationConfig K User) (id : AllocId)
+    (kind : MemoryKind K) (size : Size) (align : Align) : M K User BorrowTree := do
+  allocationMachine (config.diagnostic id size align)
+  let tree ← allocationMachine (initStackExtra config.allocationTail id size align)
+  try
+    if let some capture := config.allocationBacktrace then capture id kind
+    allocationMachine (config.allocationSpan id size align)
+    return tree
+  catch error =>
+    allocationMachine (config.discardUninserted id)
+    throw error
 
 /-- Actual uninitialized stack allocation, with root/tree/clock effects
 retained when a later root-address adjustment fails. -/
@@ -181,17 +255,7 @@ def allocateStackRaw [DecidableEq K] (config : AllocationConfig K User) (size : 
     let id ← match reserved with
       | .ok id => pure id
       | .error e => throw (.resourceExhaustion s!"stack allocation ID: {repr e}")
-    let initialized : MachineM K User BorrowTree := do
-      config.diagnostic id size align
-      initStackExtra config.allocationTail id size align
-    let state ← get
-    let tree ← match initialized state.machine with
-      | .ok tree machine =>
-        set {state with machine}
-        pure tree
-      | .error error machine =>
-        set {state with machine}
-        throw error
+    let tree ← initializeAllocation config id .stack size align
     modify fun state => {state with machine := {state.machine with memory :=
       {state.machine.memory with live := state.machine.memory.live.push (id, ⟨.stack, allocation.withExtra tree⟩)}}}
     let state ← get
@@ -289,7 +353,7 @@ def retagHooks [DecidableEq K] (access : AccessConfig K User) (queries : RetagQu
   reconstructImmediate := queries.reconstructImmediate
   preparePlaceProtection := queries.preparePlaceProtection
   ensureTreeExtra := queries.ensureTreeExtra
-  writeUninit := writeMemory access (fun _ => false) .uninit }
+  writeUninit := writeUninitMemory access }
 
 /-- Bind canonical typed places and actual retag/race hooks to the existing
 rvalue interpreter. The supplied evaluator is normally PlaceDynamic.evalPlace;
@@ -325,5 +389,62 @@ def bindRvalue [DecidableEq K]
     enforceValidity := compiler.enforceValidity
     copyOp := fun c source dest => copyRuntimePlace place copy c source dest false
     copyOpAllowTransmute := fun c source dest => copyRuntimePlace place copy c source dest true }
+
+end Miri.Interpreter.PlaceMachine
+
+namespace Miri.Interpreter.PlaceMachine
+open Miri.ABI Miri.Memory Miri.TreeBorrows
+set_option autoImplicit false
+set_option maxRecDepth 65536
+set_option maxHeartbeats 2000000
+variable {K User : Type}
+/-- Internal stage composition for the fresh allocation's first whole write.
+The caller discharges diagnostic/weak/sync edges from the current raw machine. -/
+theorem memoryAccess_fresh_write (config : AccessConfig K User)
+    (machine : Machine K User) (id : AllocId) (tag : BorTag) (size : Size)
+    (noClocks : machine.dataRace = none)
+    (diagnostic : config.diagnostic true id (allocRange Size.ZERO size) machine = .ok () machine)
+    (weak : config.weakMemoryWrite id (allocRange Size.ZERO size) machine = .ok () machine)
+    (sync : config.syncAccess true id (allocRange Size.ZERO size) machine = .ok () machine) :
+    memoryAccess config true ⟨machine,none⟩ (BorrowTree.new tag size) id (.concrete tag)
+      (allocRange Size.ZERO size) = ⟨⟨machine,none⟩,BorrowTree.new tag size,.ok ()⟩ := by
+  unfold memoryAccess bridge
+  dsimp only [Id.run]
+  rw [diagnostic]
+  simp only [Id.run,bind,Bind.bind,pure,Pure.pure,MachineHooks.memoryRaceAccess,noClocks]
+  rw [weak]
+  cases tracked : machine.borrowTracker with
+  | none => simp [tracked,sync,bind,Bind.bind,pure,Pure.pure]
+  | some tracker =>
+    have tree := BorrowTree.fresh_root_full_write tag size tracker.global.protectedTags
+    simp only [tracked,allocRange,↓reduceIte]
+    rw [tree.1,tree.2]
+    simp only [allocRange] at sync
+    simp [sync,bind,Bind.bind,pure,Pure.pure]
+/-- An internal exact resolver equation lifted through the production bridge. -/
+theorem resolvePointer_ok (config : AccessConfig K User) (memory : MemoryState Provenance BorrowTree K)
+    (machine : Machine K User) (pointer : Pointer (Option Provenance)) (amount : Int)
+    (result : Except UInt64 (ResolvedPointer ProvenanceExtra))
+    (resolved : config.resolvePointer memory pointer amount machine = .ok result machine) :
+    (accessHooks config).resolvePointer memory ⟨machine,none⟩ pointer amount = ⟨⟨machine,none⟩,.ok result⟩ := by
+  simp [accessHooks,bridge,resolved]
+
+/-- Commit a successful actual operand mutation through the production
+memory writer; every stack/user field outside memory is retained exactly. -/
+theorem writeMemory_of_result [DecidableEq K] (config : AccessConfig K User)
+    (later : MemoryOperandLayout → Bool) (value : Immediate Provenance) (place : MPlaceTy Provenance)
+    (state : State K User) (memory : MemoryState Provenance BorrowTree K)
+    (touched : Option (AllocationAccessRef Provenance BorrowTree))
+    (retain : config.retainTouched = fun machine _ => machine)
+    (operand : writeImmediateToMplaceNoValidate state.machine.memory ⟨state.machine,none⟩ value
+      ⟨place.mplace,localMemoryLayout place.layout⟩ config.runtime config.ghostMode config.globalKind
+      config.globalHooks (accessHooks config) config.dynamicLayout later =
+      ⟨memory,⟨state.machine,none⟩,touched,.ok ()⟩) :
+    writeMemory config later value place state = .ok () {state with machine := {state.machine with memory}} := by
+  unfold writeMemory
+  simp only [get,getThe,MonadStateOf.get,EStateM.get,bind,Bind.bind,EStateM.bind]
+  rw [operand]
+  simp [commit,finish,retain,modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet,
+    pure,Pure.pure,EStateM.pure,bind,Bind.bind,EStateM.bind]
 
 end Miri.Interpreter.PlaceMachine

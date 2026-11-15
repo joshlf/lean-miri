@@ -1,6 +1,7 @@
 import Miri.Input.EvalConfiguration
 import Miri.Interpreter.NativeAllocationLifecycle
 import Miri.Interpreter.MemoryErrors
+import Miri.Interpreter.LeakCheck
 import Miri.Interpreter.ConcurrencyErrors
 import Miri.Input.EvalAccessMachine
 import Miri.Input.EvalPointerSource
@@ -21,9 +22,10 @@ import Miri.Input.CompilerPlaceTypes
 import Miri.Input.CompilerValidityLeaves
 import Miri.Input.CompilerVTableLeaves
 import Miri.Input.CompilerSignatureAbi
-import Miri.Input.CompilerOperandSites
+import Miri.Interpreter.ConstantMachine
 import Miri.Input.CompilerIntrinsicSymbols
 import Miri.Input.CompilerBodySpan
+import Miri.Input.CompilerAllocationBacktrace
 import Miri.Input.CompilerCoreIntrinsic
 import Miri.Input.CompilerValueConstants
 import Miri.Input.EvalCallerLocationConstruction
@@ -78,6 +80,9 @@ structure Options where
   /-- Bound host write-all retries independently of guest string scans or ABI
   work. Exhaustion is an explicit resource outcome, never successful output. -/
   miriWriteRetryBudget : Nat := 65536
+  /-- Optional source allocation-time FrameInfo capture. Ordinary diagnostic
+  configurations retain their existing collection policy unless enabled. -/
+  collectLeakBacktraces : Bool := false
 
 /-- Genuine residual effects and compiler queries. Physical reads/writes,
 local storage, retagging, calls/returns and every ordinary MIR operation are
@@ -428,6 +433,16 @@ def makeWithForeignContext {Assembly : Type}
     let allocation := EvalConfiguration.allocation maximum leaves.storage
       (fun _ _ _ => pure ()) pointers extra
     let allocation := {allocation with
+      allocationBacktrace := if options.collectLeakBacktraces then some (fun id kind => do
+        unless LeakCheck.mayLeak kind do
+          let trace ← match CompilerAllocationBacktrace.collect p (← get).stack.frames with
+            | .ok trace => pure trace
+            | .error reason => throw (.unsupported s!"compiler allocation backtrace: {reason}")
+          let state ← get
+          match MemoryExtras.recordBacktrace extra id trace state.machine with
+          | .ok () machine => set {state with machine}
+          | .error error machine => set {state with machine}; throw error)
+        else none
       nativeStorage := some (fun size align init => do
         let state : State Os R P H D O Aff B Host ← get
         if (leaves.pointerSource.nativeLibraryPaths state.machine.user.payload.payload.user.host).isEmpty then
@@ -461,10 +476,8 @@ def makeWithForeignContext {Assembly : Type}
       dereference
       runtimeChecks := CompilerScalarLeaves.runtimeChecks p
       boolLayout := CompilerScalarLeaves.boolLayout p
-      constant := fun _ _ _ => throw (.unsupported "constant operand requires an exact structural source site")
-      constantAt := fun _ path constant known => do
-        let site ← CompilerOperandSites.current path
-        CompilerConstantMachine.evalAtBound p.constantBinding site functions pointers.arithmetic
+      constant := fun _ constant known =>
+        ConstantMachine.evalOperandWithLayout p.runtime functions pointers.arithmetic
           externStatic MemoryErrors.constant constant known
           (if options.place.debugAssertions then some (fun computed expected => physical (compatibility computed expected)) else none) }
     let callBackend : CallDispatchMachine.Backend (State Os R P H D O Aff B Host) := {
@@ -482,9 +495,7 @@ def makeWithForeignContext {Assembly : Type}
       chooseNaN := fun _ => ExecutionChoiceBindings.nanChoice EvalCoreMachine.tape }
     let isRaw := fun (_ : C) ty => do
       let node ← query (p.runtime.node ty |>.mapError toString)
-      match node.shapeKind with
-      | .unknown _ => throw (.unsupported "raw pointer compiler type kind unavailable")
-      | kind => pure (kind == .rawPointer)
+      pure (node.shapeKind == .rawPointer)
     let usize := fun (_ : C) => query (p.primitiveLayout "usize")
     let pointeeLayout := fun (_ : C) ty => do
       let some pointee ← query (CompilerFacts.builtinDeref context ty true)
@@ -630,7 +641,6 @@ def makeWithForeignContext {Assembly : Type}
         chooseStaticKnown := fun _ => ExecutionChoices.boolean EvalCoreMachine.tape .staticKnown }
         simd atomic typeId varArgs
         (fun c op => OperandMachine.evalOperand operands c op none)
-        (fun c path op => OperandMachine.evalOperandAt operands c path op none)
         (fun c op => do let place ← dereference c op; pure ⟨.memory place.mplace,place.layout⟩)
         (fun c value => do let place ← PointerPlaceMachine.fromImmediate access pointerCompiler c value; pure ⟨.indirect place.mplace,place.layout⟩)
         scalar floats (Discriminant.readDiscriminant discr) (Discriminant.discriminantForVariant discr)
@@ -643,7 +653,7 @@ def makeWithForeignContext {Assembly : Type}
     let ⟨helpers⟩ ← liftConstruction (pureQuery (CompilerCallConstruction.helpers p rootSpan (CompilerSignatureAbi.hook p)))
     let config : ExecutionMachine.Config MiriMemoryKind (User Os R P H D O Aff B Host) C O ABI.ExternAbi ClockHost := {
       access,allocation,compiler,projection,copy,retag,validity,lifecycle,functions,atomics,varArgs,intrinsics,floats
-      operands := ⟨operands.checkPlaceType,operands.dereference,operands.runtimeChecks,operands.boolLayout,operands.constantAt⟩
+      operands := ⟨operands.checkPlaceType,operands.dereference,operands.runtimeChecks,operands.boolLayout,operands.constant⟩
       validationRecursive := fun _ _ => ValidityMachine.enforceValidityRecursively
       calls := CompilerCallConstruction.leaves p options.compatibilityBudget
         (foreignOverride.orElse fun _ => leaves.foreign.map pure) callBackend leaves.dynSymName llvm
@@ -942,20 +952,7 @@ private def buildSourceCallbacks [DecidableEq MiriMemoryKind] [DecidableEq Os]
                 .ok (product,afterFutex)
 
 private def sourcePanicUnwinds (p : CompilerProviders.Prepared) : Except StepError Bool := do
-  let producer ← (p.program.input.raw.getObjVal? "producer").mapError fun _ =>
-    StepError.unsupported "source compiler panic strategy is missing"
-  let settings ← (producer.getObjVal? "input_settings").mapError fun _ =>
-    StepError.unsupported "source compiler panic strategy is missing"
-  let status ← (settings.getObjVal? "status").mapError fun _ =>
-    StepError.unsupported "source compiler settings status is missing"
-  let status ← status.getStr?.mapError fun _ =>
-    StepError.unsupported "source compiler settings status is malformed"
-  unless status == "supported" do
-    throw (.unsupported "source compiler settings are not supported")
-  let strategy ← (settings.getObjVal? "effective_panic_strategy").mapError fun _ =>
-    StepError.unsupported "source compiler panic strategy is missing"
-  let strategy ← strategy.getStr?.mapError fun _ =>
-    StepError.unsupported "source compiler panic strategy is malformed"
+  let strategy := p.program.input.producerSettings.effectivePanicStrategy
   match strategy with
   | "unwind" => pure true
   | "abort" | "immediate-abort" => pure false
@@ -993,7 +990,16 @@ def makeFromSourcePackage [DecidableEq Os]
         spans := sourceLeaves.spans
         foreign := none
         dynSymName := sourceLeaves.dynSymName
-        checkLlvmSymbolClash := sourceLeaves.checkLlvmSymbolClash
+        -- sig.rs::check_shim_symbol_clash uses the same compiler export
+        -- registry for LLVM intrinsics and ordinary foreign shims. This is
+        -- compiler evidence, independent of the fixture's host capabilities.
+        checkLlvmSymbolClash := fun symbol => do
+          let symbols ← match p.foreignSymbols with
+            | .ok value => pure value
+            | .error reason => throw (.unsupported s!"compiler foreign-symbol query: {reason}")
+          match CompilerForeignSymbols.checkSymbolClash symbols symbol with
+          | .ok () => pure ()
+          | .error error => throw error
         math := sourceLeaves.math
         mathError := sourceLeaves.mathError
         control := sourceLeaves.control
@@ -1703,4 +1709,21 @@ def step (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
   match make p image bytes options leaves choice options.callbackCapacity with
   | .error error => (state,.error error)
   | .ok config => ExecutionStateTransport.step config options.limits choice state
+/-- Public proof boundary for the canonical factory. Operational dictionaries
+remain exactly those assembled by `makeWithForeignContext`. -/
+theorem make_eq_context (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
+    (bytes : CompilerGlobalBytes.Prepared) (options : Options)
+    (leaves : Leaves Os R P H D O Aff B Host C ClockHost) (choice : C) (capacity : Nat) :
+    make p image bytes options leaves choice capacity =
+      (makeWithForeignContext (Assembly := Unit) p image bytes options leaves choice none none capacity).map Prod.fst := rfl
+
+/-- Reveal only the pure construction-error adapter to client proofs. -/
+theorem pureQuery_eq {A : Type} (value : Except String A) :
+    pureQuery value = value.mapError StepError.unsupported := rfl
+
+/-- Reveal only the universe lift used during factory construction. -/
+theorem liftConstruction_eq {A : Type} (value : Except StepError A) :
+    liftConstruction value = value.map (fun item => (ULift.up item : ULift.{1} A)) := by
+  cases value <;> rfl
+
 end Miri.Input.EvalConfigurationCore

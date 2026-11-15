@@ -61,8 +61,10 @@ reference toolchain or source audit generator.
 ## Check commands
 
 The [Miri regression workflow](../.github/workflows/miri-regression.yml) runs the
-maintained regression, extended comparison and saved-replay lanes on every
-`main` push. See [CI coverage and reproduction](../tools/ci/README.md) for
+maintained regression, extended comparison, fresh supplemental and saved-replay
+lanes on every `main` push or manual dispatch. A separate upstream UI workflow
+executes PR #9’s test harness against the current implementation; profile
+mismatches and unsupported outcomes remain visible failures. See [CI coverage and reproduction](../tools/ci/README.md) for
 the exact scope, setup, timing records and retained logs. This workflow uses the
 current exporter Cargo test entry point and does not reorganize test ownership.
 
@@ -91,7 +93,7 @@ Additional structural regressions are checked with
 `bash tools/check-structural-regressions.sh` (typechecking, kernel examples,
 #eval and executable assertions with pinned unit fixtures or no input). This is
 distinct from running supplemental guest harnesses that need fresh exports. The structural
-checker prepares pinned adapted schema3 unit fixtures and passes them to
+checker copies pinned schema-11 unit fixtures without changing their bytes and passes them to
 `LowerContext`, `ProviderContext` and `PrimitiveRebinding`, including their runtime
 source/cache and error-order assertions. These are not fresh producer comparisons.
 `tools/prepare-source-audit.py`
@@ -166,3 +168,67 @@ observing process output does not establish successful execution or safety.
 
 See the [profiling guide](../tools/PROFILING.md) for measurement modes, profiler
 boundaries, sampling and interpretation of results.
+
+## Building the API reference
+
+Documentation uses a separate `docbuild` Lake project with doc-gen4 pinned to the
+Lean release in `lean-toolchain`. `MiriApi.lean` includes the `Miri` library and the frontend, execution-choice
+policy and TLS callback modules outside its import closure;
+Rust setup and the comparison fixtures are not required.
+
+After installing the pinned Lean toolchain, run from the repository root:
+
+```bash
+(cd docbuild && flock /tmp/lean-miri-lake-build.lock lake build MiriApi:docs)
+python3 -m http.server --directory docbuild/.lake/build/doc 8000
+```
+
+Open `http://localhost:8000/Miri.html`. Serve the files over HTTP so that search
+works. When upgrading Lean, update the doc-gen4 revision in
+`docbuild/lakefile.toml` to the matching release and regenerate its manifest with
+`(cd docbuild && flock /tmp/lean-miri-lake-build.lock lake update doc-gen4)`.
+
+The `Miri API documentation` workflow builds on pull requests and publishes on
+`main` pushes or manual dispatch from `main`. In repository Settings → Pages,
+select **GitHub Actions** as the source. The published API entry point is
+<https://proofs-rs.github.io/lean-miri/Miri.html>.
+
+## MIR lowering
+
+The input decoder makes one forward pass over JSON, constructing final compiler
+tables, MIR bodies, catalog values and per-node facts. Each schema object uses a
+local typed accumulator, so fields may appear in any order, including bodies
+before types and layouts. Duplicate fields are rejected; unknown fields are
+skipped structurally and still require valid JSON.
+
+Scalar constants carry their compiler byte width. Their range and constructor
+shape are checked immediately, along with local body bounds and table identities.
+Only compact numeric MIR-reference summaries and type/width pairs remain pending
+until the relevant tables are complete. `parseDocument` checks these forward
+references, cross-table joins and required execution graphs before returning the
+final `ImportDocument`; its completion bookkeeping is private and discarded.
+Pool IDs remain numeric and local to the input, with runtime bounds checks.
+Neither JSON ranges nor a generic value tree nor a second MIR spine is retained.
+
+Since schema 7, allocation byte vectors are stored once in the document-local
+`byte_images` array. Memory payloads retain independent size, alignment, mutability,
+initialization and relocation metadata and reference an exact byte image by ID.
+Function payloads group one Instance with ordered graph/source identity pairs;
+expansion preserves both identity namespaces. Prepared allocator-world raw slots
+use their array index plus one as the source ID. A null slot refers to its unique
+serialized node; opaque and dangling slots remain explicit. Salt arrays contain
+graph IDs in source salt order, including all 32 results for applicable families.
+The reader rejects unmatched slots, repeated identities and out-of-range image IDs.
+Earlier schema versions require fresh export.
+
+Use `decodeJson` or `decodeFile` for the complete checked execution input, or
+`JsonReader.run (parseDocument {}) text` for the checked `ImportDocument`.
+Individual codecs expose forward parsers consumed with `JsonReader.run`.
+`decodeFile` still reads the complete file as a `String`, so this is not a
+bounded-memory streaming file reader.
+
+`lowerProgram` packages the decoded MIR and typed compiler metadata for execution.
+The input API remains experimental. `bash tools/check-lowering-reader.sh
+[INPUT.json ...]` checks body paths, MIR, identity tables and source spans. Its
+default input is the fixed empty-function fixture. Run `bash tools/check-empty-function.sh` for its
+UB-freedom proof and axiom audit.

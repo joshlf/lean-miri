@@ -4,7 +4,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))
-from mir_json import load_mir_document
+from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 
 def require(condition: bool, message: str) -> None:
@@ -12,13 +12,9 @@ def require(condition: bool, message: str) -> None:
         raise SystemExit(message)
 
 
-def function_key(node: dict) -> tuple:
-    return (
-        node["instance_id"],
-        node["instance_def_id"],
-        node["instance_def_path"],
-        node["generic_args"],
-    )
+def function_key(document: dict, node: dict) -> tuple:
+    instance = pool_entry(document, "instances", node["instance_id"])
+    return (node["instance_id"], instance["def_id"], instance["def_path"], instance["generic_args"])
 
 
 def vtable_key(node: dict) -> tuple:
@@ -28,7 +24,7 @@ def vtable_key(node: dict) -> tuple:
 def main(path: str) -> None:
     document = load_mir_document(path)
     world = document["compiler_alloc_id_world"]
-    require(world["schema"] == "rustc_alloc_id_world_v1", "wrong world schema")
+    require(world["schema"] == "rustc_alloc_id_world_v2", "wrong world schema")
     require(world["profile"] == "prepared_post_export", "wrong prepared profile")
     rows = world["raw_pool"]
     frontier = world["frontier"]
@@ -36,17 +32,21 @@ def main(path: str) -> None:
     require(len(rows) == through, "raw pool length differs from source frontier")
     require(frontier["final_sentinel_source_alloc_id"] == through, "wrong final sentinel")
     require(frontier["next_source_alloc_id"] == through + 1, "wrong next source ID")
-    by_source = {}
-    for index, row in enumerate(rows, 1):
-        require(row["source_alloc_id"] == index, f"noncontiguous source ID at row {index}")
-        by_source[index] = row
-    sentinel = rows[-1]
-    require((sentinel["kind"], sentinel["status"], sentinel["allocation_id"]) ==
-            ("dangling", "dangling", None), "final pool row is not dangling")
+    require(rows[-1] == {"kind": "dangling", "status": "dangling"},
+            "final pool row is not dangling")
+    graph_count = sum(len(row["identities"]) if row["kind"] == "function" else 1
+                      for row in document["allocations"])
+    nodes = {graph: pool_entry(document, "allocations", graph) for graph in range(graph_count)}
+    sources = set()
+    for graph, node in nodes.items():
+        source = node["source_alloc_id"]
+        require(type(source) is int and 1 <= source <= through, "source AllocId outside raw prefix")
+        require(source not in sources, "duplicate source AllocId witness")
+        sources.add(source)
+        require(rows[source - 1] is None, "serialized source lacks an implicit raw slot")
+    require(sum(row is None for row in rows) == len(nodes), "unmatched serialized raw slot")
 
-    nodes = {node["allocation_id"]: node for node in document["allocations"]}
     selected_counts = {"function": 0, "vtable": 0}
-    probe_counts = {"preexisting_hit": 0, "miss_reserved_by_probe": 0}
     for row_index, catalog in enumerate(world["dedup_catalog"]):
         kind = catalog["key_kind"]
         if kind not in selected_counts:
@@ -55,41 +55,33 @@ def main(path: str) -> None:
         salts = catalog["salts"]
         require(len(salts) == 32, f"catalog row {row_index} does not have 32 salts")
         key_node = nodes[catalog["key_allocation_id"]]
-        require(key_node["kind"] == kind and key_node["status"] == "supported",
+        require(key_node["kind"] == kind and "status" not in key_node,
                 f"catalog row {row_index} key node has wrong kind/status")
-        typed_key = function_key(key_node) if kind == "function" else vtable_key(key_node)
-        require(salts[0]["allocation_id"] == catalog["key_allocation_id"],
+        typed_key = function_key(document, key_node) if kind == "function" else vtable_key(key_node)
+        require(salts[0] == catalog["key_allocation_id"],
                 f"catalog row {row_index} salt zero is not the selected key node")
         for salt, result in enumerate(salts):
-            require(result["salt"] == salt, f"catalog row {row_index} salt ordering differs")
-            outcome = result["probe_result"]
-            require(outcome in probe_counts, f"unknown probe outcome {outcome}")
-            probe_counts[outcome] += 1
-            pool_row = by_source[result["source_alloc_id"]]
-            require(pool_row["status"] == "serialized" and
-                    pool_row["allocation_id"] == result["allocation_id"],
+            require(type(result) is int, f"catalog row {row_index} salt {salt} is not a graph ID")
+            result_node = nodes[result]
+            require(rows[result_node["source_alloc_id"] - 1] is None,
                     f"catalog row {row_index} salt {salt} source/graph crosswalk differs")
-            result_node = nodes[result["allocation_id"]]
-            require(result_node["source_alloc_id"] == result["source_alloc_id"],
-                    f"catalog row {row_index} salt {salt} node/source witness differs")
-            require(result_node["kind"] == kind and result_node["status"] == "supported",
+            require(result_node["kind"] == kind and "status" not in result_node,
                     f"catalog row {row_index} salt {salt} node kind/status differs")
-            result_key = function_key(result_node) if kind == "function" else vtable_key(result_node)
+            result_key = function_key(document, result_node) if kind == "function" else vtable_key(result_node)
             require(result_key == typed_key,
                     f"catalog row {row_index} salt {salt} changes its exact typed key")
 
     require(selected_counts == {"function": 1, "vtable": 1}, "fixture must select exactly one function and one vtable key")
-    require(probe_counts == {"preexisting_hit": 0, "miss_reserved_by_probe": 64}, "selected salt probes differ from the captured fixture expectations")
     require(world["complete_key_families"] == ["byte_memory"],
             "selected functions/vtables were incorrectly marked exhaustive")
-    require({"function", "vtable"}.issubset(set(world["unsupported_key_families"])),
-            "nonexhaustive function/vtable families are not marked unsupported")
+    require({"function", "vtable"}.issubset(set(world["non_exhaustive_key_families"])),
+            "nonexhaustive function/vtable families are not marked non-exhaustive")
     print(
         "producer crosswalk PASS: "
         f"prefix={through}, function_keys={selected_counts['function']}, "
         f"vtable_keys={selected_counts['vtable']}, "
         f"selected_salts={sum(selected_counts.values()) * 32}, "
-        f"probe_outcomes={probe_counts}, complete={world['complete_key_families']}"
+        f"complete={world['complete_key_families']}"
     )
 
 

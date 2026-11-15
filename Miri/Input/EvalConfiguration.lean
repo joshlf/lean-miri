@@ -23,15 +23,14 @@ def functions (p : CompilerProviders.Prepared) (image : AllocationImage.Imported
     (pointers : PointerMachine.Hooks MiriMemoryKind
       (ValidityMachine.Control (Stored Os R P H D O Aff B Host))) :
     FunctionPointers.Hooks MiriMemoryKind (User Os R P H D O Aff B Host) O := Id.run do
-  let lookup := CompilerVTableRuntime.GlobalLookup.prepare p.lifecycle.calls.symbols
-  let inlineLookup := CompilerFunctionPointers.InlineLookup.prepare p.pointers
   return {
     registry := fun user => user.payload.payload.user.functions
     putRegistry := fun user functions => {user with payload := {user.payload with payload :=
       {user.payload.payload with user := {user.payload.payload.user with functions}}}}
+    instanceArgs := fun inst => lift (CompilerInstance.argsOf p.loweringContext.instances inst)
     crossCrateInlineAlways := crossCrateInlineAlways
     inlineNever := fun callee => lift do
-      let some never := CompilerFunctionPointers.inlineNeverUsing inlineLookup callee
+      let some never := CompilerFunctionPointers.inlineNeverUsing p.pointers.inlineLookup callee
         | throw "exact full-instance inline attribute absent"
       pure never
     chooseSalt := do
@@ -43,7 +42,7 @@ def functions (p : CompilerProviders.Prepared) (image : AllocationImage.Imported
       let address ← ExecutionAddressChoices.addrFromAllocId EvalCoreMachine.tape pointers id (some .other)
       pure (Pointer.new (Provenance.concrete id tag) (Size.ofBytes address))
     importedFunction := fun id => do
-      lift (CompilerVTableRuntime.globalFunctionUsing p.lifecycle.calls.symbols lookup image (← get).machine.memory id)
+      lift (CompilerVTableRuntime.globalFunction p.lifecycle.calls.symbols image (← get).machine.memory id)
   }
 
 /-- Real symbolic memory maps, distinct from function/vtable registries. Empty
@@ -71,6 +70,7 @@ def allocation
   maximumObjectSize := maximumObjectSize
   zeroedStorage := storage
   diagnostic := diagnostic
+  discardUninserted := fun id => modify (fun machine => MemoryExtras.discardUninserted extras id machine)
   allocationTail := fun id _ _ => do
     let selected ← match EvalBackendMachine.handler (← get) with
       | .ok selected => pure selected | .error error => throw error

@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
-from mir_json import load_mir_document
+from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
 
 
 def require(condition, message):
@@ -24,16 +24,30 @@ queries = document["compiler_runtime_queries"]
 virtual_rows = queries["virtual"]
 covariance = document["compiler_covariance_queries"]
 
+# The catalog is a projection of the final pool. Each exact ordered pair must
+# occur once, retain both boolean answers, and reference fully emitted types.
+pair_keys = [(row["source_type"], row["target_type"]) for row in covariance]
+require(pair_keys == sorted(set(pair_keys)),
+        "covariance pairs are duplicated or not in numeric type-ID order")
+for row in covariance:
+    require(row["source_type"] in types and row["target_type"] in types,
+            "covariance pair references a missing type definition")
+    require(row["source_type"] != row["target_type"],
+            "covariance catalog contains a redundant reflexive pair")
+    require(type(row["value"]) is bool,
+            "covariance answer is not a compiler boolean")
+
+
 
 def display(type_ref):
-    if not isinstance(type_ref, dict):
+    if not isinstance(type_ref, int):
         return ""
-    node = types.get(type_ref.get("type_id"), {})
+    node = types.get(type_ref, {})
     return node.get("display", "")
 
 
 def type_id(type_ref):
-    return type_ref.get("type_id") if isinstance(type_ref, dict) else None
+    return type_ref if isinstance(type_ref, int) else None
 
 
 def relation_ids(source_ref, target_ref):
@@ -46,6 +60,13 @@ def relation_ids(source_ref, target_ref):
     )
 
 
+def require_false_relation(source_ref, target_ref, label):
+    rows = [row for row in covariance
+            if row["source_type"] == source_ref and row["target_type"] == target_ref]
+    require(len(rows) == 1 and rows[0]["value"] is False,
+            f"{label}: exact negative covariance answer was lost")
+
+
 def require_transfer(source_ref, target_ref, label):
     require(source_ref is not None and target_ref is not None,
             f"{label}: source/destination type ID is missing")
@@ -55,12 +76,12 @@ def require_transfer(source_ref, target_ref, label):
 
 
 def body_payload(row):
-    return row.get("body", row)
+    return pool_entry(document, "bodies", row["body"])
 
 
 instance_rows = document["instances"]
-all_body_rows = list(document["bodies"]) + [
-    row for row in instance_rows if isinstance(row.get("body"), dict)
+all_body_rows = list(document["body_roots"]) + [
+    row for row in instance_rows if isinstance(row.get("body"), int)
 ]
 
 
@@ -113,7 +134,7 @@ call_body, call = indirect_call
 pointer_target_rows = [row for row in instance_rows if row.get("def_path", "").endswith("pointer_target")]
 require(pointer_target_rows, "pointer_target candidate instance/body is absent")
 pointer_target_body = next(
-    (row for row in pointer_target_rows if row.get("body_instantiation", {}).get("status") == "supported"),
+    (row for row in pointer_target_rows if "body" in row),
     None,
 )
 require(pointer_target_body, "pointer_target candidate has no substituted MIR body")
@@ -121,7 +142,7 @@ argument_source = operand_type_ref(call.get("args", [{}])[0].get("operand"))
 argument_target = local_type_ref(pointer_target_body, 1)
 return_source = local_type_ref(pointer_target_body, 0)
 return_target = call.get("destination", {}).get("type")
-require(argument_source and argument_target and return_source and return_target,
+require(all(value is not None for value in [argument_source, argument_target, return_source, return_target]),
         "indirect pointer call/candidate transfer types could not be recovered")
 require(type_id(argument_source) != type_id(argument_target),
         "indirect FnPtr argument fixture did not preserve its distinct MIR types")
@@ -136,12 +157,12 @@ require_transfer(return_source, return_target, "indirect FnPtr return")
 resolved_virtual = [
     row
     for row in virtual_rows
-    if row.get("resolved", {}).get("status") == "supported"
+    if isinstance(row.get("resolved"), int)
 ]
 require(resolved_virtual, "TransferObject::get has no validated virtual target row")
 instance_by_id = {item["instance_id"]: item for item in document["instances"]}
 fixture_virtual_targets = [
-    instance_by_id.get(row.get("resolved", {}).get("value", {}).get("instance_id"), {})
+    instance_by_id.get(row.get("resolved"), {})
     for row in resolved_virtual
 ]
 fixture_virtual_targets = [
@@ -168,26 +189,28 @@ require(virtual_callsite, "trait-object virtual callsite is absent")
 virtual_target = fixture_virtual_targets[0]
 virtual_target_body = next(
     (row for row in instance_rows
-     if row.get("instance_id") == virtual_target.get("instance_id")
-     and row.get("body_instantiation", {}).get("status") == "supported"),
+     if row.get("instance_id") == virtual_target.get("instance_id") and "body" in row),
     None,
 )
 require(virtual_target_body, "validated virtual target has no substituted MIR body")
 receiver_source = next(
     (
-        {"type_id": item["type_id"]}
+        item["type_id"]
         for item in types.values()
         if item.get("shape", {}).get("kind") == "raw_pointer"
         and item.get("shape", {}).get("mutability", {}).get("kind") == "mutable"
         and "ConcreteObject"
-        in types.get(item.get("shape", {}).get("pointee", {}).get("type_id"), {})
+        in types.get(item.get("shape", {}).get("pointee"), {})
         .get("shape", {}).get("def_path", "")
     ),
     None,
 )
 receiver_target = local_type_ref(virtual_target_body, 1)
-require(receiver_source and receiver_target and relation_ids(receiver_source, receiver_target),
+require(receiver_source is not None and receiver_target is not None and relation_ids(receiver_source, receiver_target),
         "exact virtual receiver transfer from *mut ConcreteObject to callee local is absent")
+# Receiver ABI compatibility does not make a raw pointer covariant with a
+# reference. Demand discovery must preserve this negative compiler answer.
+require_false_relation(receiver_source, receiver_target, "virtual receiver")
 virtual_argument_source = operand_type_ref(virtual_callsite.get("args", [{}, {}])[1].get("operand"))
 virtual_argument_target = local_type_ref(virtual_target_body, 2)
 virtual_return_source = local_type_ref(virtual_target_body, 0)
@@ -218,23 +241,23 @@ callback_data_source = operand_type_ref(pthread_callsite["args"][3]["operand"])
 callback_operand_type = operand_type_ref(pthread_callsite["args"][2]["operand"])
 callback_rows = [row for row in instance_rows if row.get("def_path", "").endswith("thread_start")]
 callback_body = next(
-    (row for row in callback_rows if row.get("body_instantiation", {}).get("status") == "supported"),
+    (row for row in callback_rows if "body" in row),
     None,
 )
-require(callback_body and callback_data_source and callback_operand_type,
+require(callback_body is not None and callback_data_source is not None and callback_operand_type is not None,
         "pthread callback target or registration data operand is absent")
 callback_signature = display(callback_operand_type)
 require("c_void" in callback_signature and "*mut" in callback_signature,
         "pthread callback operand is not the fixture's mutable c_void callback")
 callback_argument_target = local_type_ref(callback_body, 1)
 require(
-    callback_argument_target
+    callback_argument_target is not None
     and type_id(callback_data_source) == type_id(callback_argument_target),
     "pthread registration data operand does not match the callback MIR argument local",
 )
 callback_return_source = local_type_ref(callback_body, 0)
 require(
-    callback_return_source
+    callback_return_source is not None
     and type_id(callback_return_source) == type_id(callback_argument_target),
     "thread_start return local does not preserve its callback argument type",
 )
@@ -246,7 +269,7 @@ def is_mutable_unit_pointer(node):
         return False
     if shape.get("mutability", {}).get("kind") != "mutable":
         return False
-    pointee = types.get(shape.get("pointee", {}).get("type_id"), {})
+    pointee = types.get(shape.get("pointee"), {})
     return (
         pointee.get("shape", {}).get("kind") == "tuple"
         and pointee.get("shape", {}).get("elements", []) == []
@@ -255,7 +278,7 @@ def is_mutable_unit_pointer(node):
 
 unit_pointer_destination = next(
     (
-        {"type_id": item["type_id"]}
+        item["type_id"]
         for item in types.values()
         if is_mutable_unit_pointer(item)
     ),
@@ -266,6 +289,9 @@ require_transfer(callback_return_source, unit_pointer_destination,
 require(type_id(callback_return_source) != type_id(unit_pointer_destination),
         "pthread callback return did not exercise *mut c_void to *mut ()")
 
+require_false_relation(callback_return_source, unit_pointer_destination,
+                       "pthread generated callback return")
+
 # Confirm the registration call itself is retained as an indirect FnPtr call
 # and its exact foreign function identity is in the exported instance graph.
 instances = document["instances"]
@@ -273,7 +299,7 @@ pthread_instances = [
     item
     for item in instances
     if item.get("def_path", "").endswith("pthread_create")
-    or item.get("symbol_name", {}).get("value") == "pthread_create"
+    or item.get("symbol_name") == "pthread_create"
 ]
 require(pthread_instances, "pthread_create foreign instance/candidate is absent")
 

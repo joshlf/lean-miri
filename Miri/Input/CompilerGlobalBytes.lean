@@ -27,6 +27,19 @@ private def hexBytes (value : String) : Except String (Array UInt8) := do
     bytes := bytes.push (UInt8.ofNat (16*(← digit hi)+(← digit lo)))
   pure bytes
 
+private def matchesHex (hex : String) (bytes : Array UInt8) : Bool := Id.run do
+  let text := hex.toUTF8
+  unless text.size == 2 * bytes.size do return false
+  let digit := fun n => UInt8.ofNat (if n < 10 then n + 48 else n + 87)
+  for index in [:bytes.size] do
+    let some raw := bytes[index]? | return false
+    let some hi := text[2 * index]? | return false
+    let some lo := text[2 * index + 1]? | return false
+    let byte := raw.toNat
+    unless hi == digit (byte / 16) && lo == digit (byte % 16) do
+      return false
+  return true
+
 private def candidate (global : GlobalAllocation) : Except String (Option (Array UInt8)) := do
   let some (.memory allocation) := global.payload | return none
   if allocation.mutability != .Not || allocation.align != .ONE then return none
@@ -41,43 +54,46 @@ private def candidate (global : GlobalAllocation) : Except String (Option (Array
 The exported graph must be the same complete identity universe that was probed.
 Compiler pool identity/serialization remains an explicit exporter trust boundary. -/
 def prepare (program : LoweredProgram) (runtime : RuntimeMetadata)
-    (memory : MemoryState P E K)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw) := none) : Except String Prepared := do
-  unless RuntimeMetadata.JsonReflexivity.matchesRightOr sourceEquality program.input.raw do
-    throw "global byte query metadata document mismatch"
+    (memory : MemoryState P E K) : Except String Prepared := do
   if memory.byteGlobalKeysReady || !memory.byteGlobalKeys.isEmpty then
     throw "global byte keys already initialized"
-  let source ← program.input.raw.getObjVal? "compiler_global_byte_queries"
-  unless (← source.getObjValAs? String "status") == "supported" do throw "global byte compiler queries unavailable"
-  unless (← source.getObjValAs? Nat "salt_count") == 32 do throw "global byte salt support differs from pinned source"
+  let source := program.input.queries.globalBytes
+  unless source.saltCount == 32 do throw "global byte salt support differs from pinned source"
   let mut keys := #[]
   if let some world := program.input.compilerAllocIdWorld then
-    Miri.Input.validateCompilerAllocIdWorldRaw program.input.raw program.input.allocations
-      (some world) |>.mapError fun error => s!"compiler AllocId world: {error}"
     unless memory.sourceAllocIdWorldActive do
       throw "prepared source AllocId world was not installed before byte-key attachment"
     let mut runtimeByGraph : Std.HashMap Nat AllocId := {}
     for (graphId, runtimeId) in memory.importedGlobalIds do
       if runtimeByGraph.contains graphId then throw "duplicate imported graph ID while preparing byte-key catalog"
       runtimeByGraph := runtimeByGraph.insert graphId runtimeId
-    let mut seen : Std.HashMap (String × Nat) Bool := {}
+    let mut seen : Std.HashMap (Array UInt8 × Nat) Bool := {}
     for row in world.dedupCatalog do
       if row.keyKind == .bytes then
         let some imageHex := row.byteImageHex | throw "prepared byte-key catalog row lacks its exact image"
-        let bytes ← hexBytes imageHex
+        let some keyNode := program.input.allocations[row.keyAllocationId]? |
+          throw "prepared byte-key catalog key allocation is absent"
+        unless keyNode.id == row.keyAllocationId && keyNode.kind == .memory do
+          throw "prepared byte-key catalog key graph identity/kind disagrees"
+        let some (.memory image) := keyNode.data | throw "prepared byte-key catalog key is not memory"
+        unless image.mutability == .immutable && image.alignBytes == 1 && image.relocations.isEmpty &&
+            image.initializationRanges.all (·.initialized) do
+          throw "prepared byte-key catalog key is not eligible immutable memory"
+        let bytes ← image.bytesHex.checkedBytes
+        unless matchesHex imageHex bytes do
+          throw "prepared byte-key catalog image differs from its key allocation"
         for result in row.salts do
           if proof : result.salt < 32 then
             let some id := runtimeByGraph[result.allocationId]? | throw s!"missing runtime mapping for compiler allocation {result.allocationId}"
             unless memory.sourceAllocIdForRuntime? id == some result.sourceAllocId do
               throw "prepared byte result raw AllocId does not match the active memory world"
-            if seen.contains (imageHex, result.salt) then
+            if seen.contains (bytes, result.salt) then
               throw "prepared source AllocId world contains duplicate byte key/salt results"
-            seen := seen.insert (imageHex, result.salt) true
+            seen := seen.insert (bytes, result.salt) true
             keys := keys.push (bytes,⟨result.salt,proof⟩,id)
           else throw "prepared source AllocId world byte-key salt exceeds 31"
   else
-    let covered ← (← source.getObjVal? "covered_allocation_ids").getArr?
-    let ids ← covered.mapM Json.getNat?
+    let ids := source.coveredAllocations
     let expected := program.input.allocations.map (·.id)
     unless ids.size == expected.size && ids.all expected.contains && expected.all ids.contains do
       throw "global byte query coverage differs from imported graph"
@@ -90,50 +106,46 @@ def prepare (program : LoweredProgram) (runtime : RuntimeMetadata)
     for global in memory.globals do
       if let some bytes ← candidate global then candidates := candidates.push (bytes,global.allocId)
     let mut seen : Array (Array UInt8) := #[]
-    for row in ← (← source.getObjVal? "candidates").getArr? do
-      let bytes ← hexBytes (← row.getObjValAs? String "bytes_hex")
+    for row in source.candidates do
+      let bytes ← hexBytes row.bytesHex
       unless candidates.any (·.1 == bytes) do throw "global byte query contains a noncandidate allocation"
       if seen.contains bytes then throw "duplicate global byte query content"
       seen := seen.push bytes
-      let salts ← (← row.getObjVal? "salts").getArr?
+      let salts := row.salts
       unless salts.size == 32 do throw "global byte candidate omits salt outcomes"
       for index in [:32] do
         let some result := salts[index]? | throw "global byte salt result absent"
-        unless (← result.getObjValAs? Nat "salt") == index do throw "global byte salt index mismatch"
-        let allocation ← result.getObjVal? "existing_allocation"
-        unless allocation == .null do
-          let id ← AllocationImage.runtimeId memory (← allocation.getObjValAs? Nat "allocation_id")
+        unless result.1 == index do throw "global byte salt index mismatch"
+        if let some allocation := result.2 then
+          let id ← AllocationImage.runtimeId memory allocation
           unless candidates.any (fun entry => entry.1 == bytes && entry.2 == id) do
             throw "global byte salt query refers to incompatible global contents"
           if proof : index < 32 then keys := keys.push (bytes,⟨index,proof⟩,id)
           else throw "global byte salt exceeds support"
     unless candidates.all (fun entry => seen.contains entry.1) do
       throw "global byte query omits imported candidate content"
-  let strType ← (← source.getObjVal? "str_type").getObjValAs? Nat "type_id"
+  let strType := source.strType
   let node ← runtime.node strType |>.mapError toString
-  unless node.shapeStatus == .supported && node.shapeKind == .str do
+  unless node.shapeKind == .str do
     throw "global byte str type is not the compiler str primitive"
   pure ⟨strType,keys⟩
 
-def attachProfiled (profile : Lean.Options) (program : LoweredProgram) (runtime : RuntimeMetadata)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw) := none) : MachineHooks.M K U Prepared := do
+def attachProfiled (profile : Lean.Options) (program : LoweredProgram) (runtime : RuntimeMetadata) : MachineHooks.M K U Prepared := do
   let state ← get
   let prepared ← match profileit "startup.alloc_bytes" profile fun _ =>
-      prepare program runtime state.machine.memory sourceEquality with
+      prepare program runtime state.machine.memory with
     | .ok value => pure value | .error error => throw (.unsupported error)
   modify fun state => {state with machine := {state.machine with memory :=
     {state.machine.memory with byteGlobalKeys := prepared.keys, byteGlobalKeysReady := true}}}
   pure prepared
 
-def attach (program : LoweredProgram) (runtime : RuntimeMetadata)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw) := none) :
+def attach (program : LoweredProgram) (runtime : RuntimeMetadata) :
     MachineHooks.M K U Prepared :=
-  attachProfiled {} program runtime sourceEquality
+  attachProfiled {} program runtime
 
-theorem attach_profile_identity {K U : Type} (program : LoweredProgram) (runtime : RuntimeMetadata)
-    (sourceEquality : Option (RuntimeMetadata.JsonReflexivity runtime.source.raw)) :
-    attach (K := K) (U := U) program runtime sourceEquality =
-      attachProfiled (K := K) (U := U) {} program runtime sourceEquality := rfl
+theorem attach_profile_identity {K U : Type} (program : LoweredProgram) (runtime : RuntimeMetadata) :
+    attach (K := K) (U := U) program runtime =
+      attachProfiled (K := K) (U := U) {} program runtime := rfl
 
 def strLayout (runtime : RuntimeMetadata) (prepared : Prepared) : MachineHooks.M K U LocalLayout :=
   match runtime.lookup prepared.strType with
