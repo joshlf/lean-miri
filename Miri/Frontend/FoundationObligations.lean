@@ -1,4 +1,5 @@
 import Miri.Frontend.Foundation
+import Miri.Frontend.FoundationTraitClaims
 
 /-! Pure checks for the small set of obligations understood by the restricted
 foundation fixture evaluator. Unknown traits and forms remain errors. -/
@@ -60,16 +61,17 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
       let definition ← num clause "definition"
       let some row := d.definitions[definition]? | throw "unknown trait definition"
       let path ← str row "path"
-      unless path == "std::marker::Copy" || path == "std::marker::Sized" ||
-          path == "core::marker::Copy" || path == "core::marker::Sized" do
-        throw s!"unsupported trait obligation {path}"
       let arguments ← arr clause "arguments"
       unless arguments.size == 1 do throw "unsupported trait argument count"
       let some arg := arguments[0]? | throw "missing trait self argument"
       unless (← str arg "kind") == "type" do throw "non-type trait self argument"
       let source ← typeExpr d (← num arg "type")
       let ty ← instantiate typeArgs constArgs source
-      unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"
+      if path == "std::marker::Copy" || path == "std::marker::Sized" ||
+          path == "core::marker::Copy" || path == "core::marker::Sized" then
+        unless sizedAndCopy 1024 ty do throw s!"unresolved trait obligation {path}"
+      else
+        unless (← localTraitClaim row ty) do throw s!"unsatisfied local trait obligation {path}"
     | "const_has_type" =>
       let ty ← instantiate typeArgs constArgs (← typeExpr d (← num clause "type"))
       let .primitive "uint" "usize" := ty | throw "unsupported const parameter type"
