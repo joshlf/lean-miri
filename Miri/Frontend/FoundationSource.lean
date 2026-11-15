@@ -8,6 +8,8 @@ open Lean
 
 set_option autoImplicit false in
 structure SourceSpan where
+  identity : Nat
+  parentLocalDefinition : Option Nat
   isDummy : Bool
   lo : Nat
   hi : Nat
@@ -25,10 +27,12 @@ structure SourceInfo where
   scope : Nat
   deriving Repr, DecidableEq
 
-private def span (j : Json) : Except String SourceSpan := do
+def sourceSpan (j : Json) : Except String SourceSpan := do
   let start ← j.getObjVal? "start"
   let finish ← j.getObjVal? "end"
   let result : SourceSpan := {
+    identity := ← j.getObjValAs? Nat "span_id"
+    parentLocalDefinition := ← j.getObjValAs? (Option Nat) "parent_local_definition"
     isDummy := ← j.getObjValAs? Bool "is_dummy"
     lo := ← j.getObjValAs? Nat "lo"
     hi := ← j.getObjValAs? Nat "hi"
@@ -59,7 +63,7 @@ def sourceBacktraces (body : Json) : Except String (Array SourceBacktrace) := do
   for record in records do
     let position ← record.getObjVal? "source_position"
     let entry : SourceBacktrace := {
-      span := ← span (← record.getObjVal? "span")
+      span := ← sourceSpan (← record.getObjVal? "span")
       bytePosition := ← position.getObjValAs? Nat "byte_position"
       line := ← position.getObjValAs? Nat "line"
       zeroBasedCharColumn := ← position.getObjValAs? Nat "zero_based_char_column"
@@ -74,14 +78,14 @@ def sourceBacktraces (body : Json) : Except String (Array SourceBacktrace) := do
 private def info (scopeCount : Nat) (j : Json) : Except String SourceInfo := do
   let scope ← j.getObjValAs? Nat "scope"
   unless scope < scopeCount do throw "source scope is out of bounds"
-  return ⟨← span (← j.getObjVal? "span"), scope⟩
+  return ⟨← sourceSpan (← j.getObjVal? "span"), scope⟩
 
 /-- Check identities and parallel source arrays against the captured MIR spine.
 Inlining is rejected by the producer and remains unsupported here. -/
 def validateSourceMetadata (body : Json) : Except String Unit := do
   let source ← body.getObjVal? "source_metadata"
-  let mut required := #[← span (← source.getObjVal? "span"),
-    ← span (← source.getObjVal? "definition_span")]
+  let mut required := #[← sourceSpan (← source.getObjVal? "span"),
+    ← sourceSpan (← source.getObjVal? "definition_span")]
   let backtraces ← sourceBacktraces body
   let phase ← source.getObjVal? "phase"
   unless (← phase.getObjValAs? String "kind") == "runtime" do
@@ -90,7 +94,7 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
   let scopes ← source.getObjValAs? (Array Json) "scopes"
   for h : i in [:scopes.size] do
     let scope := scopes[i]
-    let _ ← span (← scope.getObjVal? "span")
+    let _ ← sourceSpan (← scope.getObjVal? "span")
     let parent ← scope.getObjValAs? (Option Nat) "parent"
     if let some parent := parent then
       unless parent < i do throw "source scope parent must precede child"

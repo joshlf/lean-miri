@@ -74,7 +74,8 @@ class FoundationExport(unittest.TestCase):
                 position["filename"] = legacy["files"][position["filename"]]
                 expected.append({"span":raw,"source_position":position})
             actual = foundation["bodies"][0]["source_metadata"]["backtrace_spans"]
-            self.assertEqual(actual, expected)
+            comparable = [{"span":{k:v for k,v in row["span"].items() if k not in ("span_id", "parent_local_definition")}, "source_position":row["source_position"]} for row in actual]
+            self.assertEqual(comparable, expected)
             self.assertTrue(any(row["span"]["ctxt"] != "#0" for row in actual))
 
     def test_source_signatures_preserve_generic_safety_and_abi(self):

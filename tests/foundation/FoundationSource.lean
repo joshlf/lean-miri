@@ -4,7 +4,7 @@ open Lean Miri.Frontend.Foundation
 
 private def fixture (scope : Nat := 0) (parent : String := "null")
     (localCount : String := "[0]") (traceMode : Nat := 0) : Except String Json := do
-  let span := "{\"is_dummy\":false,\"lo\":10,\"hi\":20,\"ctxt\":\"#0\",\"file\":\"fixture.rs\",\"start\":{\"line\":1,\"column\":0},\"end\":{\"line\":1,\"column\":10}}"
+  let span := "{\"span_id\":0,\"parent_local_definition\":null,\"is_dummy\":false,\"lo\":10,\"hi\":20,\"ctxt\":\"#0\",\"file\":\"fixture.rs\",\"start\":{\"line\":1,\"column\":0},\"end\":{\"line\":1,\"column\":10}}"
   let backtrace := "{\"span\":" ++ span ++ ",\"source_position\":{\"byte_position\":10,\"line\":1,\"zero_based_char_column\":0,\"filename\":\"fixture.rs\"}}"
   let traces := if traceMode == 1 then "" else if traceMode == 2 then backtrace ++ "," ++ backtrace else backtrace
   let info := "{\"span\":" ++ span ++ ",\"scope\":" ++ toString scope ++ "}"
