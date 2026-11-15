@@ -55,3 +55,9 @@ pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
             "statements":b.statements.iter().map(|s|info(&mut ids,tcx,s.source_info)).collect::<Vec<_>>(),
             "terminator":info(&mut ids,tcx,b.terminator().source_info)})).collect::<Vec<_>>()})
 }
+
+// eval.rs constructs InterpCx with the actual compiler DUMMY_SP. This uses a
+// session-local span identity namespace, separate from each body registry.
+pub(super) fn root_span(tcx: TyCtxt<'_>) -> Value {
+    span(&mut SpanIds::new(), tcx, rustc_span::DUMMY_SP)
+}

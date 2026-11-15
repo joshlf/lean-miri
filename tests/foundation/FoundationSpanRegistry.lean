@@ -9,6 +9,8 @@ def main (args : List String) : IO Unit := do
     let bodies ← document.getObjValAs? (Array Json) "bodies"
     for body in bodies do
       let registry ← buildSpanRegistry body
+      let (withRoot, rootId) ← appendSessionRootSpan registry document
+      unless (withRoot.spans[rootId]?).any (fun (entry : Miri.Input.SourceSpanData) => entry.isDummy) do throw "missing session root span"
       unless registry.spans.size == registry.compilerSpans.size do throw "span registry lost identity"
       let metadata ← body.getObjVal? "source_metadata"
       let scopes ← metadata.getObjValAs? (Array Json) "scopes"

@@ -53,4 +53,26 @@ def buildSpanRegistry (body : Json) : Except String SpanRegistry := do
       position := ⟨entry.bytePosition, entry.line, entry.zeroBasedCharColumn, file⟩ : Input.BacktraceSpan }
   return ⟨files, spans, compilerSpans, positions⟩
 
+/-- Parse the compiler's actual session DUMMY_SP. Its identity namespace is
+session-local; callers relocate it after the body registry, without conflating
+it with a body span that has the same local numeric identity. -/
+def sessionRootSpan (document : Json) : Except String SourceSpan := do
+  let session ← document.getObjVal? "session"
+  let root ← sourceSpan (← session.getObjVal? "root_span")
+  unless root.identity == 0 && root.isDummy && root.lo == 0 && root.hi == 0 &&
+      root.parentLocalDefinition.isNone && root.context == "#0" do
+    throw "invalid compiler session DUMMY_SP"
+  return root
+
+def appendSessionRootSpan (registry : SpanRegistry) (document : Json) :
+    Except String (SpanRegistry × Nat) := do
+  let root ← sessionRootSpan document
+  let (files, file) := internFile registry.files root.file
+  let row : Input.SourceSpanData := {
+    isDummy := root.isDummy, lo := root.lo, hi := root.hi
+    start := ⟨root.startLine, root.startColumn⟩
+    «end» := ⟨root.endLine, root.endColumn⟩
+    context := root.context, file }
+  return ({ registry with files, spans := registry.spans.push row }, registry.spans.size)
+
 end Miri.Frontend.Foundation

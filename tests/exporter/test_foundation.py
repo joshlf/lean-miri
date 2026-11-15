@@ -25,6 +25,8 @@ class FoundationExport(unittest.TestCase):
                 doc = json.loads(output.read_text())
                 self.assertEqual((doc["schema"], doc["schema_version"]), ("lean-miri-foundation", 1))
                 self.assertEqual(doc["target"]["architecture"], "x86_64")
+                root_span = doc["session"]["root_span"]
+                self.assertEqual((root_span["is_dummy"], root_span["lo"], root_span["hi"], root_span["ctxt"]), (True, 0, 0, "#0"))
                 self.assertEqual(len(doc["bodies"]), 1)
                 self.assertEqual(doc["bodies"][0]["required_consts"], [])
                 self.assertEqual(doc["bodies"][0]["promoted_count"], 0)
