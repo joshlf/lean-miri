@@ -1,0 +1,145 @@
+import Miri.Frontend.FoundationMIR
+import Miri.Input.LowerMIR
+
+/-! Explicit joins at the fixed-interpreter boundary. This does not create
+physical type, instance, backtrace or required-constant evidence. Callers supply
+those facts from their document; missing facts are errors, never defaults. -/
+namespace Miri.Frontend.Foundation
+open Lean
+
+structure PhysicalTypeBinding where
+  concrete : ConcreteType
+  typeId : Input.TypeId
+
+/-- Remaining compiler-owned facts not present in a syntax candidate.
+`backtraceSpans` must come from the compiler's body-dependent hygiene collapse;
+ordinary source-span starts cannot substitute for these positions. Physical
+bindings must come from the same document's type/layout construction. -/
+structure BodyBindings where
+  types : Array PhysicalTypeBinding
+  physicalTypeIds : Array Input.TypeId
+  spans : Array Input.SourceSpanData
+  files : Array String
+  definitionId : Input.DefinitionRef
+  instanceNode : Input.InstanceNode
+  defPath : String
+  sourcePath : String
+  backtraceSpans : Array Input.BacktraceSpan
+  requiredConsts : Array MIR.ConstOperand
+
+private def joinSpan (bindings : BodyBindings) (j : Json) : Except String Nat := do
+  let start ← j.getObjVal? "start"
+  let finish ← j.getObjVal? "end"
+  let filename ← j.getObjValAs? String "file"
+  let some file := bindings.files.findIdx? (· == filename)
+    | throw "foundation body span filename is not interned"
+  let expected : Input.SourceSpanData := {
+    isDummy := ← j.getObjValAs? Bool "is_dummy"
+    lo := ← j.getObjValAs? Nat "lo", hi := ← j.getObjValAs? Nat "hi"
+    start := ⟨← start.getObjValAs? Nat "line", ← start.getObjValAs? Nat "column"⟩
+    «end» := ⟨← finish.getObjValAs? Nat "line", ← finish.getObjValAs? Nat "column"⟩
+    context := ← j.getObjValAs? String "ctxt", file }
+  unless expected.lo ≤ expected.hi do throw "foundation body reversed span"
+  let some index := bindings.spans.findIdx? (· == expected)
+    | throw "foundation body source span is not interned"
+  return index
+
+private def joinInfo (bindings : BodyBindings) (scopeCount : Nat) (j : Json) :
+    Except String Input.SourceInfo := do
+  let scope ← j.getObjValAs? Nat "scope"
+  unless scope < scopeCount do throw "foundation body source scope out of bounds"
+  return ⟨← joinSpan bindings (← j.getObjVal? "span"), scope⟩
+
+private def phase (j : Json) : Except String MIR.MirPhase := do
+  unless (← j.getObjValAs? String "kind") == "runtime" do
+    throw "foundation body injection phase is unsupported"
+  match ← j.getObjValAs? String "phase" with
+  | "initial" => return .Runtime .Initial
+  | "post_cleanup" => return .Runtime .PostCleanup
+  | "optimized" => return .Runtime .Optimized
+  | _ => throw "foundation body injection phase is unsupported"
+
+/-- Relocate supported whole-local Copy/Move assignments and Return into a
+BodyCore. Metadata and instructions are read afresh from the prepared item,
+so a caller cannot smuggle an arbitrary mutated candidate into this boundary.
+This is a partial join, not a whole-document compiler-evidence validator. -/
+def lowerPreparedBodyCore (prepared : PreparedItem) (bindings : BodyBindings) :
+    Except String Input.BodyCore := do
+  let candidate ← lowerPreparedMIR prepared
+  unless (← prepared.item.source.getObjValAs? (Array Json) "required_consts").isEmpty &&
+      bindings.requiredConsts.isEmpty do
+    throw "foundation BodyCore requires a required-constant operand join"
+  for backtrace in bindings.backtraceSpans do
+    unless backtrace.spanId < bindings.spans.size &&
+        backtrace.position.filename < bindings.files.size do
+      throw "foundation body invalid compiler backtrace reference"
+  unless bindings.instanceNode.kind == .instanceMir do
+    throw "foundation body requires an item MIR instance"
+  match bindings.instanceNode.instanceKind with
+  | .Item definition =>
+    unless definition == bindings.definitionId do
+      throw "foundation body item definition mismatch"
+  | _ => throw "foundation body shim or trait dispatch is unsupported"
+  unless bindings.instanceNode.definitionId == some bindings.definitionId do
+    throw "foundation body instance definition mismatch"
+  unless bindings.instanceNode.defPath == some bindings.defPath do
+    throw "foundation body instance path mismatch"
+  let mut localIds := #[]
+  for ty in candidate.localTypes do
+    let entries := bindings.types.filter (fun entry => sameConcrete 1024 entry.concrete ty)
+    unless entries.size == 1 do throw "foundation body missing or duplicate physical type binding"
+    let some entry := entries[0]? | throw "foundation body missing physical type"
+    unless bindings.physicalTypeIds.contains entry.typeId do
+      throw "foundation body physical type is not in document"
+    localIds := localIds.push entry.typeId
+  let metadata := candidate.sourceMetadata
+  let sourceScopes ← metadata.getObjValAs? (Array Json) "scopes"
+  let mut scopes := #[]
+  for h : i in [:sourceScopes.size] do
+    let source := sourceScopes[i]
+    let parent ← source.getObjValAs? (Option Nat) "parent"
+    if let some p := parent then
+      unless p < i do throw "foundation body invalid source parent"
+    scopes := scopes.push {
+      id := i, parent := parent
+      spanId := ← joinSpan bindings (← source.getObjVal? "span"),
+      inlined := none, inlinedParent := none : Input.SourceScope }
+  let mut localSources := #[]
+  for source in (← metadata.getObjValAs? (Array Json) "locals") do
+    localSources := localSources.push (← joinInfo bindings scopes.size
+      (← source.getObjVal? "source_info"))
+  let mut locations := #[]
+  for source in candidate.sourceLocations do
+    let info ← joinInfo bindings scopes.size source
+    unless bindings.backtraceSpans.any (fun b => b.spanId == info.spanId) do
+      throw "foundation body missing compiler backtrace position"
+    locations := locations.push info
+  let mut blocks := #[]
+  for block in candidate.body.basicBlocks do
+    let mut statements := #[]
+    for statement in block.statements do
+      let some info := locations[statement.sourceInfo.span.id]?
+        | throw "foundation body instruction source is missing"
+      statements := statements.push { statement with sourceInfo := ⟨⟨info.spanId⟩, info.scope⟩ }
+    let some info := locations[block.terminator.sourceInfo.span.id]?
+      | throw "foundation body terminator source is missing"
+    blocks := blocks.push { block with
+      statements := statements
+      terminator := { block.terminator with sourceInfo := ⟨⟨info.spanId⟩, info.scope⟩ } }
+  let injection ← metadata.getObjVal? "injection_phase"
+  let injectionPhase ← if injection == Json.null then pure none else some <$> phase injection
+  return {
+    mir := { candidate.body with locals := localIds, basicBlocks := blocks }
+    definitionId := some bindings.definitionId, instanceId := bindings.instanceNode.id
+    defPath := bindings.defPath, sourcePath := bindings.sourcePath
+    spanId := ← joinSpan bindings (← metadata.getObjVal? "span")
+    preambleDefSpanId := ← joinSpan bindings (← metadata.getObjVal? "definition_span")
+    injectionPhase, localSources, sourceScopes := scopes
+    backtraceSpans := bindings.backtraceSpans
+    callEvidence := #[none]
+    nodeFacts := blocks.map (fun block => Array.replicate (block.statements.size + 1)
+      { places := (localIds.toList.zipIdx.map fun (typeId, index) =>
+          { place := ⟨index, #[]⟩, typeId, projectionTypes := #[] } : List Input.PlaceFact).toArray })
+    requiredConsts := bindings.requiredConsts }
+
+end Miri.Frontend.Foundation
