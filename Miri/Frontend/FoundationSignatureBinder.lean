@@ -56,7 +56,9 @@ private def eraseType (document : Document) (variables : Array MIR.BoundVariable
     (fuel : Nat) (path : Array Nat) (rows : Array Json) (id : Nat) : Except String (Array Json) := do
   let .succ fuel := fuel | throw "signature type erasure traversal exhausted"
   unless !path.contains id do throw "cyclic signature type erasure reference"
-  let some row := rows[id]? | throw "signature type erasure row absent"
+  -- Validate every occurrence against retained source, not a row already
+  -- erased along a different binder path.
+  let some row := document.types[id]? | throw "signature type erasure row absent"
   unless (← row.getObjValAs? Nat "type_id") == id do throw "signature type table identity mismatch"
   let shape ← row.getObjVal? "shape"
   let kind ← shape.getObjValAs? String "kind"
@@ -100,7 +102,16 @@ private def eraseType (document : Document) (variables : Array MIR.BoundVariable
       | "auto_trait" => pure ()
       | _ => throw "signature existential predicate unsupported"
     children rows ids
-  | "function_pointer" => throw "nested function-pointer binder context unsupported"
+  | "function_pointer" =>
+    let signature ← shape.getObjVal? "signature"
+    unless (← signature.getObjValAs? (Array Json) "bound_variables").isEmpty do
+      throw "nested function-pointer binder context unsupported"
+    let inputs ← signature.getObjValAs? (Array Nat) "inputs"
+    let output ← signature.getObjValAs? Nat "output"
+    -- An empty inner binder may contain Static/Erased regions, but it must
+    -- not capture an outer bound region at a different de Bruijn depth.
+    (inputs.push output).foldlM (fun rows child =>
+      eraseType document #[] fuel path rows child) rows
   | _ => throw "signature binder type shape unsupported"
 termination_by fuel
 
