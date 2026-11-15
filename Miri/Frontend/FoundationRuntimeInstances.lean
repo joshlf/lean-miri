@@ -24,19 +24,42 @@ def frameMetadataOfSource (document : Document) : Except String Input.Catalog.Fr
     unless crates.any (·.1 == crateId) do throw "definition frame crate identity absent"
   return ⟨localCrate, crates⟩
 
-private def scalarArgumentDisplay : ConcreteType → Except String String
-  | .primitive "bool" "" => pure "bool"
-  | .primitive "char" "" => pure "char"
-  | .primitive "uint" name =>
-    if name ∈ ["u8", "u16", "u32", "u64", "u128", "usize"] then pure name
-    else throw "unsupported runtime instance unsigned argument display"
-  | .primitive "int" name =>
-    if name ∈ ["i8", "i16", "i32", "i64", "i128", "isize"] then pure name
-    else throw "unsupported runtime instance signed argument display"
-  | _ => throw "unsupported runtime instance argument display"
+/-- Restricted pinned Rust type spelling for source item diagnostics. This
+covers startup's unit, thin raw pointers and ordinary Rust function pointers;
+unknown regions, arrays and other structural forms remain errors. -/
+def concreteRuntimeDisplay (ty : ConcreteType) : Except String String := go 64 ty
+where
+  go (fuel : Nat) (ty : ConcreteType) : Except String String := do
+    let .succ fuel := fuel | throw "runtime type display depth exhausted"
+    match ty with
+    | .primitive "bool" "" => pure "bool"
+    | .primitive "char" "" => pure "char"
+    | .primitive "uint" name =>
+      if name ∈ ["u8", "u16", "u32", "u64", "u128", "usize"] then pure name
+      else throw "unsupported runtime unsigned type display"
+    | .primitive "int" name =>
+      if name ∈ ["i8", "i16", "i32", "i64", "i128", "isize"] then pure name
+      else throw "unsupported runtime signed type display"
+    | .tuple elements =>
+      unless elements.isEmpty do throw "runtime tuple display unsupported"
+      pure "()"
+    | .pointer kind pointee =>
+      let pointerPrefix ← match kind with
+        | "raw_pointer_const" => pure "*const "
+        | "raw_pointer_mut" => pure "*mut "
+        | _ => throw "runtime reference/pointer display unsupported"
+      pure (pointerPrefix ++ (← go fuel pointee))
+    | .functionPointer inputs output safety abi variadic =>
+      unless abi == "rust" && !variadic do throw "runtime function-pointer ABI display unsupported"
+      unless safety == "safe" || safety == "unsafe" do throw "runtime function-pointer safety display unsupported"
+      let inputs ← inputs.mapM (go fuel)
+      let output ← go fuel output
+      pure ((if safety == "unsafe" then "unsafe " else "") ++ "fn(" ++
+        String.intercalate ", " inputs.toList ++ ")" ++ (if output == "()" then "" else " -> " ++ output))
+    | _ => throw "unsupported runtime instance argument display"
 
 /-- Runtime facts for a generated ordinary Item identity. Generic display is
-restricted to one primitive type argument, and definition paths to local root
+restricted to one supported type argument, and definition paths to local root
 functions with unambiguous ordinary names. Symbol mangling is not implemented:
 `symbolName = none` retains the genuine absent-query boundary for later demands. -/
 def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
@@ -58,7 +81,7 @@ def runtimeInstanceOfItem (document : Document) (item : ItemTemplate)
     throw "runtime instance nontrivial definition path display unsupported"
   let display ← match item.arguments.toList with
     | [] => pure name
-    | [.type ty] => do pure (name ++ "::<" ++ (← scalarArgumentDisplay ty) ++ ">")
+    | [.type ty] => do pure (name ++ "::<" ++ (← concreteRuntimeDisplay ty) ++ ">")
     | _ => throw "runtime instance generic display unsupported"
   let attrs ← item.source.getObjVal? "function_attributes"
   let track ← attrs.getObjValAs? Bool "track_caller"

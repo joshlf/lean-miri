@@ -54,7 +54,7 @@ private def shiftOperand (offset : Nat) : MIR.Operand → MIR.Operand
   | .Constant c => .Constant { c with span := ⟨c.span.id + offset⟩ }
   | op => op
 
-private def shiftBody (body : Input.BodyCore) (offset : Nat) (files : Array Nat) :
+def relocateBodySource (body : Input.BodyCore) (offset : Nat) (files : Array Nat) :
     Except String Input.BodyCore := do
   let mut backtraces := #[]
   for b in body.backtraceSpans do
@@ -62,7 +62,11 @@ private def shiftBody (body : Input.BodyCore) (offset : Nat) (files : Array Nat)
     backtraces := backtraces.push { b with spanId := b.spanId + offset, position := { b.position with filename := file } }
   let blocks := body.mir.basicBlocks.map fun block => {
     block with
-    statements := block.statements.map fun s => { s with sourceInfo := { s.sourceInfo with span := ⟨s.sourceInfo.span.id + offset⟩ } }
+    statements := block.statements.map fun s => { s with
+      sourceInfo := { s.sourceInfo with span := ⟨s.sourceInfo.span.id + offset⟩ }
+      kind := match s.kind with
+        | .Assign destination (.Use operand retag) => .Assign destination (.Use (shiftOperand offset operand) retag)
+        | kind => kind }
     terminator := {
       sourceInfo := { block.terminator.sourceInfo with span := ⟨block.terminator.sourceInfo.span.id + offset⟩ }
       kind := match block.terminator.kind with
@@ -76,7 +80,8 @@ private def shiftBody (body : Input.BodyCore) (offset : Nat) (files : Array Nat)
     preambleDefSpanId := body.preambleDefSpanId + offset
     localSources := body.localSources.map fun s => { s with spanId := s.spanId + offset }
     sourceScopes := body.sourceScopes.map fun s => { s with spanId := s.spanId + offset }
-    backtraceSpans := backtraces }
+    backtraceSpans := backtraces
+    requiredConsts := body.requiredConsts.map fun c => { c with span := ⟨c.span.id + offset⟩ } }
 
 /-- Build exactly two source-derived bodies and direct call evidence. Every
 nonprimitive runtime operation domain remains absent; effect checks restrict
@@ -160,7 +165,7 @@ def restrictedDirectCallProgram (document : Document) (definition : Nat) :
     for span in sourcePool.spans do
       let some file := fileIds[span.file]? | throw "span file relocation absent"
       globalSpans := globalSpans.push { span with file }
-    let relocated ← shiftBody body offset fileIds
+    let relocated ← relocateBodySource body offset fileIds
     bodies := bodies.push { relocated with promotedBodies := #[] }
   let rootSpanSource ← sessionRootSpan document.source
   let rootFile := (globalFiles.findIdx? (· == rootSpanSource.file)).getD globalFiles.size

@@ -173,12 +173,7 @@ def finishFunctionTypes (pool : DirectCallPool) : Except String FunctionTypes :=
 where
   signatureTypeDisplay (physical : PhysicalTypeRegistry) (id : Nat) : Except String String := do
     let some entry := physical.registry.entries[id]? | throw "function signature type absent"
-    match entry.type with
-    | .primitive "bool" "" => pure "bool"
-    | .primitive "char" "" => pure "char"
-    | .primitive "uint" name | .primitive "int" name => pure name
-    | .tuple ts => if ts.isEmpty then pure "()" else throw "function signature tuple display unsupported"
-    | _ => throw "function signature display unsupported"
+    concreteRuntimeDisplay entry.type
   reconstructArguments (physical : PhysicalTypeRegistry) (args : Array MIR.GenericArg) :
       Except String (Array ItemArgument) := args.mapM fun arg => do
     match arg with
