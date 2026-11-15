@@ -62,7 +62,16 @@ def prepareMainEntries (initial : DirectCallPool) :
     pool := next
     let ordinal := (pool.functionInstances.findIdx? (· == node.id)).getD pool.functionInstances.size
     if ordinal == pool.functionInstances.size then
-      pool := { pool with functionInstances := pool.functionInstances.push node.id }
+      pool := { pool with
+        functionInstances := pool.functionInstances.push node.id
+        functionSourceDefinitions := pool.functionSourceDefinitions.push start
+        functionSourceArguments := pool.functionSourceArguments.push #[.type result] }
+    else
+      unless pool.functionSourceDefinitions[ordinal]? == some start do
+        throw "compiler start FnDef source identity mismatch"
+      let some arguments := pool.functionSourceArguments[ordinal]? | throw "compiler start FnDef source arguments absent"
+      let [.type argument] := arguments.toList | throw "compiler start FnDef source argument count/kind mismatch"
+      unless sameConcrete 1024 argument result do throw "compiler start FnDef source type argument mismatch"
     startInstance := some node.id
     startFunctionOrdinal := some ordinal
   let entry := PendingMainEntry.mk selected.definition mainNode.id returnType functionPointerType

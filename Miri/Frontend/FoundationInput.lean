@@ -1,7 +1,8 @@
 import Miri.Frontend.FoundationCompilerEntryProgram
 import Miri.Input.Decoder
 
-/-! Normal-runner input dispatch. Valid schema-12 inputs retain the existing
+/-! Transitional normal-runner input dispatch while general foundation entry
+assembly is incomplete. Valid schema-12 inputs retain the existing
 single decoder path. Foundation material produces a checked source-derived
 ImportDocument and then uses the normal lowerer/preparation/interpreter. Unknown
 source demands are errors, never a fallback to a special evaluator. -/

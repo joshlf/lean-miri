@@ -3,6 +3,7 @@ import Miri.Frontend.FoundationMainEntries
 import Miri.Frontend.FoundationStartup
 import Miri.Frontend.FoundationLinkSections
 import Miri.Frontend.FoundationAllocations
+import Miri.Frontend.FoundationNamedTypes
 
 /-! Restricted compiler-selected entry composition. The accepted custom
 lang-start returns its argc argument; it intentionally does not invoke the main
@@ -127,6 +128,8 @@ def restrictedCompilerEntryDocument (document : Document) : Except String Input.
       physical := next
   let (withPrimitives, primitives) ← physicalPrimitiveCatalog physical
   physical := withPrimitives
+  let (withNamed, namedTypes) ← startupNamedTypes physical
+  physical := withNamed
   let knownFacts := physical.registry.entries.toList.zipIdx.filterMap fun (item, index) =>
     if (primitiveFactsDomain item.type).isOk then some index else none
   physical ← physical.withPrimitiveFactsFor knownFacts.toArray
@@ -196,7 +199,7 @@ def restrictedCompilerEntryDocument (document : Document) : Except String Input.
     globalBytes, callerLocations := #[]
     main := { mainCatalog with linkSections := some (← checkedEmptyLinkSections document.source) }
     primitives
-    vtables := #[], namedTypes := none, shimAbis := none, namedShimAbis := none
+    vtables := #[], namedTypes := some namedTypes, shimAbis := none, namedShimAbis := none
     libcTypeLayouts := none, windowsTypeLayouts := none, namedConstants := none, namedStatics := none }
   let (producer, producerSettings) ← producerOfDocument document
   let input : Input.ImportDocument := {
