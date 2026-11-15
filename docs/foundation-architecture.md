@@ -42,7 +42,9 @@ frame; the observed return is 42 and the frame stack becomes empty. The same
 source-derived path executes a scalar const-item body using `VALUE: u8 = 37`,
 retaining its required constant before the fixed frame returns 37. A genuine
 two-function `calls(42_u8)` run enters a callee frame and returns 42 through
-both fixed interpreter frames. A byte-array literal returns a provenance
+both fixed interpreter frames. The same checked call path preserves u16
+`0xBEEF` and usize `0x123456789ABCDEF0` through real callee/return frames,
+matching independent schema-12 runs. A byte-array literal returns a provenance
 pointer whose four bytes read `Miri` in the fixed memory machine. A separate
 no_std custom `#[lang=start]` executable passes the fixed compiler-selected
 startup path and exits zero after thread/TLS cleanup; its start returns `argc`

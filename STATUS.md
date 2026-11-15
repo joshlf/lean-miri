@@ -43,7 +43,9 @@ spans, function-pointer types, and compiler allocation images/raw identities.
 Lean derives direct FnDef callee/ABI evidence and imports source memory graphs
 through the existing checked importer. A genuine two-function `calls(42_u8)`
 now enters the fixed interpreter's callee frame, executes both Returns and
-observes 42 with an empty stack. A separate no_std custom `#[lang=start]`
+observes 42 with an empty stack. The same checked two-body path preserves
+u16 `0xBEEF` and usize `0x123456789ABCDEF0` across real callee/return frames;
+independent schema-12 fixed runs agree on the full-width values. A separate no_std custom `#[lang=start]`
 executable reaches the fixed compiler-selected process entry, constructs the
 main function pointer, runs the custom start MIR and exits zero after TLS
 cleanup. That start returns `argc` without invoking main; ordinary std main
