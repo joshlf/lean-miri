@@ -464,7 +464,7 @@ def makeWithForeignContext {Assembly : Type}
       match EvalProjectionMachine.memoryOffset pointers (← get) place amount mode metadataValue with
       | .ok value => pure value
       | .error error => throw (IntrinsicVectorMachine.projectionError error)
-    let table := CompilerVTableLeaves.make p image engine memoryOffset
+    let table := CompilerVTableLeaves.make p image EvalCoreMachine.sourceCompilerAccess engine memoryOffset
     let nested : Unit → Except StepError (ExecutionMachine.Config MiriMemoryKind (User Os R P H D O Aff B Host) C O ABI.ExternAbi ClockHost) := fun _ =>
       (makeWithForeignContext p image bytes options leaves choice sourceHostConfiguration foreignBuilder remaining).map Prod.fst
     let validate := fun c place => do

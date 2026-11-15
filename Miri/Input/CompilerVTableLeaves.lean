@@ -1,5 +1,7 @@
 import Miri.Input.CompilerProviders
 import Miri.Input.CompilerVirtualLeaves
+import Miri.Input.SourceCompilerVTables
+import Miri.Input.SourceCompilerRuntime
 
 /-! Complete symbolic-vtable dictionary without an overwritten baseline.
 Only actual memory offsets are supplied by physical consumers. ABI checks
@@ -10,15 +12,26 @@ open Miri.ABI Miri.Interpreter Miri.Memory
 private def lift (value : Except String A) : EStateM StepError S A :=
   match value with | .ok value => pure value | .error e => throw (.unsupported e)
 
+private def source (access : SourceCompilerWorld.Access S)
+    (query : SourceCompilerWorld.World → Except String A) : EStateM StepError S A := do
+  let some world := access.get (← get) | throw (.unsupported "source vtable World unavailable")
+  lift (query world)
+
 def make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
+    (access : SourceCompilerWorld.Access (MachineHooks.State K U))
     (engine : VTableMachine.Hooks K U Other)
     (memoryOffset : C → MemPlace Provenance → Size → OffsetMode → MemPlaceMeta Provenance →
       MachineHooks.M K U (MemPlace Provenance)) :
     VTableHooks Provenance (MachineHooks.State K U) C CallInstance (FnAbi MIR.TyId) :=
   let facts := p.lifecycle.calls.symbols.facts
   let engine := CompilerVTableMachine.hooks p.vtables image engine
+  let sourceMode := p.runtime.source.sourceMaterial.isSome
+
   { target := p.runtime.target.base
-    isDynamic := fun _ ty => lift (CompilerFacts.boolean facts.context ty "is_dynamic")
+    isDynamic := fun _ ty => if sourceMode then do
+      let runtime ← SourceCompilerRuntime.current p.runtime.target access
+      return (← lift (runtime.node ty |>.mapError toString)).shapeKind == .dynamicTraitObject
+      else lift (CompilerFacts.boolean facts.context ty "is_dynamic")
     memoryOffset := memoryOffset
     resolvePointer := fun _ pointer => do
       match pointer.intoPointerOrAddr with
@@ -33,17 +46,33 @@ def make (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
       if registry.extras.any (·.1 == id) then
         throw (.unsupported "FullInstance vtable dictionary cannot represent machine extra function")
       FunctionPointers.globalFunction engine.functions id
-    predicates := fun _ token => lift (CompilerVTableFacts.predicates facts token)
-    normalizePredicate := fun _ predicate => lift (CompilerVTableFacts.normalizePredicate facts predicate)
-    layoutOf := fun _ ty => lift (CompilerFacts.layoutOf facts.context ty)
-    eraseAndAnonymize := fun _ ty token => lift (CompilerVTableQueries.eraseAndAnonymize p.vtables.queries ty token)
-    ensureMonomorphicType := fun _ ty => lift (CompilerVTableQueries.ensureMonomorphicType p.vtables.queries ty)
-    ensureMonomorphicDyn := fun _ token => lift (CompilerVTableQueries.ensureMonomorphicDyn p.vtables.queries token)
+    predicates := fun _ token => if sourceMode then
+      throw (.unsupported "source vtable predicate stable comparison evidence unavailable")
+      else lift (CompilerVTableFacts.predicates facts token)
+    normalizePredicate := fun _ predicate => if sourceMode then
+      throw (.unsupported "source vtable predicate normalization unavailable")
+      else lift (CompilerVTableFacts.normalizePredicate facts predicate)
+    layoutOf := fun _ ty => if sourceMode then do
+      let runtime ← SourceCompilerRuntime.current p.runtime.target access
+      lift (runtime.lookup ty |>.mapError toString)
+      else lift (CompilerFacts.layoutOf facts.context ty)
+    eraseAndAnonymize := fun _ ty token => if sourceMode then
+      source access (SourceCompilerVTables.erasedPair · ty token)
+      else lift (CompilerVTableQueries.eraseAndAnonymize p.vtables.queries ty token)
+    ensureMonomorphicType := fun _ ty => if sourceMode then
+      source access (SourceCompilerCasts.ensureMonomorphic · ty)
+      else lift (CompilerVTableQueries.ensureMonomorphicType p.vtables.queries ty)
+    ensureMonomorphicDyn := fun _ token => if sourceMode then
+      source access (SourceCompilerVTables.ensureMonomorphicPredicates · token)
+      else lift (CompilerVTableQueries.ensureMonomorphicDyn p.vtables.queries token)
     globalSalt := fun _ => return (← engine.functions.chooseSalt).val
     reserveVTable := fun _ ty token salt => do
+      if sourceMode then throw (.unsupported "source vtable allocation identity witness unavailable")
       if bound : salt < 32 then VTableMachine.reserve engine ty token ⟨salt,bound⟩
       else throw (.invalidProgram "vtable source salt outside 0..32")
-    globalRootPointer := fun _ id => return (← FunctionPointers.rootPointer engine.functions id).withOptionalProvenance
+    globalRootPointer := fun _ id => do
+      if sourceMode then throw (.unsupported "source vtable allocation root witness unavailable")
+      return (← FunctionPointers.rootPointer engine.functions id).withOptionalProvenance
     entries := fun _ principal ty => lift
       (CompilerVTableRuntime.entries p.lifecycle.calls.symbols principal ty)
     assertVirtualInstanceMatches := VirtualCalls.assertConcrete (CompilerVirtualLeaves.make p.lifecycle.calls) }
