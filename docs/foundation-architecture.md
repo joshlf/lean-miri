@@ -34,9 +34,8 @@ fixed interpreter also now computes canonical nested-array layouts on demand
 from its imported type graph, with explicit cycle, overflow and contradiction
 errors.
 
-The restricted foundation evaluator still exercises identity and array-body
-fixtures as a fixture validator. Separately, Lean derives physical primitive
-types and layouts, a limited direct function ABI, ordinary item and frame
+Lean derives physical primitive types and layouts, a limited direct function
+ABI, ordinary item and frame
 identities, source spans, session settings, primitive and foreign catalogs, and
 the required input graph from the finite document. For a checked `u8` identity
 body, the canonical compiler provider preparation and the **fixed Miri

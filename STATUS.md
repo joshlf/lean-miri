@@ -25,8 +25,7 @@ primitive/array layouts and partial ABI components as pure on-demand queries.
 It also derives source span identities, producer/session evidence, primitive
 and foreign catalogs, ordinary item instances and frames, and a restricted
 `BodyCore`. The existing fixed interpreter separately computes nested array
-layouts on demand from imported material. A restricted straight-line fixture
-evaluator remains distinct from the fixed interpreter.
+layouts on demand from imported material.
 
 Fresh generic Rust `u8` identity and scalar const-item sources now pass finite
 end-to-end execution through source-derived assembly, canonical compiler
