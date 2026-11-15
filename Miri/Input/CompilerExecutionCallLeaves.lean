@@ -1,4 +1,6 @@
+import Miri.Input.SourceCompilerWorldAbi
 import Miri.Input.CompilerProviders
+import Miri.Input.SourceCompilerInstances
 import Miri.Input.CompilerCallFacts
 import Miri.Input.CompilerTargetFeatures
 import Miri.Interpreter.ExecutionCallLeaves
@@ -29,18 +31,17 @@ def closureUpvarCount (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except 
 
 /-- Exact source ExternAbi identity, canonical FnAbi records, shared DefIds/
 TypeConstIds and actual current BodyIdentity all belong to this same program. -/
-def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat) :
+def make (p : CompilerProviders.Prepared) (compatibilityBudget : Nat)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U)) :
     ExecutionCallLeaves.Compiler (MachineHooks.State K U) C ABI.ExternAbi := {
-  functionSignature := fun _ layout => lift do
-    let (count,sourceAbi) ← CompilerFunctionFacts.signature p.functions layout.ty
-    pure (count, sourceAbi)
-  instanceKind := fun inst => lift (CompilerInstance.kindOf p.loweringContext.instances inst)
-  instanceArgs := fun inst => lift (CompilerInstance.argsOf p.loweringContext.instances inst)
-  itemInstance := fun definition args => lift (CompilerInstance.item p.loweringContext.instances definition args)
-  functionKind := fun ty => lift (CompilerFunctionFacts.kind p.functions ty)
-  resolve := fun _ definition args => CompilerProviders.resolveCurrent p definition args
-  fnAbiOfFnPtr := fun _ layout extra => lift (CompilerFunctionFacts.pointerAbi p.functions layout.ty extra)
-  fnAbiOfInstance := fun _ callee extra => lift (CompilerInstanceAbi.abiOfInstance p.lifecycle.instances callee extra)
+  functionSignature := fun _ layout => SourceCompilerWorld.demandFunctionSignature world layout.ty
+  instanceKind := SourceCompilerInstances.instanceKind world
+  instanceArgs := SourceCompilerInstances.instanceArgs world
+  itemInstance := SourceCompilerInstances.itemInstance world
+  functionKind := SourceCompilerInstances.functionKind world
+  resolve := fun _ definition args => CompilerProviders.resolveCurrent world definition args
+  fnAbiOfFnPtr := fun _ layout extra => SourceCompilerWorld.demandFunctionPointerAbi world layout.ty extra
+  fnAbiOfInstance := fun _ callee extra => SourceCompilerWorld.demandInstanceAbi world callee extra
   isRustCall := fun abi => abi == .RustCall
   rustAbi := .Rust
   checkArgumentCompat := fun _ caller callee =>

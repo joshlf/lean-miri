@@ -12,9 +12,19 @@ private def lift (query : Except String A) : MachineHooks.M K U A :=
   match query with | .ok value => pure value | .error error => throw (.unsupported error)
 
 /-- Canonical full compiler dictionary, including target-feature policy. -/
-def compiler (p : CompilerProviders.Prepared) (budget : Nat) :
+def compiler (p : CompilerProviders.Prepared) (budget : Nat)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U)) :
     ExecutionCallLeaves.Compiler (MachineHooks.State K U) C ABI.ExternAbi :=
-  CompilerExecutionCallLeaves.make p budget
+  CompilerExecutionCallLeaves.make p budget world
+
+/-- Layout-only compatibility is independent of instance lookup and World
+state. Host wrappers must not construct a full compiler dictionary merely to
+project this leaf, especially when their machine payload is polymorphic. -/
+def argumentCompat (p : CompilerProviders.Prepared) (budget : Nat) (_choice : C)
+    (caller callee : ArgAbi MIR.TyId) : EStateM StepError S Bool :=
+  LayoutCompat.checkArgumentCompat
+    (CompilerFacts.compatibilityQueries p.lifecycle.calls.symbols.facts.context)
+    budget caller callee
 
 /-- Foreign emulation and real backend hooks are actual source interpreters;
 MIR loading is the same exact LoadedBody provider used by helper/root calls. -/
@@ -44,7 +54,7 @@ def leaves (p : CompilerProviders.Prepared)
     (backend : CallDispatchMachine.Backend (MachineHooks.State K U)) (dynSymName : Other → String)
     (llvm : CallInstance → MachineHooks.M K U (IntrinsicArchitecture.DispatchHooks Provenance (MachineHooks.State K U) C (RuntimePlace Provenance))) :
     ExecutionCallLeaves.Hooks (MachineHooks.State K U) C Other ABI.ExternAbi :=
-  ⟨compiler p compatibilityBudget,dispatch p world foreign backend dynSymName,llvm⟩
+  ⟨compiler p compatibilityBudget world,dispatch p world foreign backend dynSymName,llvm⟩
 /-- Shared canonical vtable queries plus the exact compiler virtual leaves;
 receiver reads, projections and pointer construction are not caller callbacks. -/
 def virtual (p : CompilerProviders.Prepared)

@@ -8,11 +8,18 @@ inductive ItemKind where
   | function | associatedFunction
   deriving Repr, DecidableEq
 
+/-- Declaration attributes/lang-item role, not an instance-resolution answer.
+Unknown source evidence never defaults to an ordinary Item selection. -/
+inductive ItemRole where
+  | ordinary | intrinsic | dropGlue | foreign | unavailable
+  deriving Repr, DecidableEq
+
 structure ItemDeclaration where
   definition : DefinitionId
   path : String
   kind : ItemKind
   parameters : Array SourceSymbols.ParameterKind
+  role : ItemRole := .unavailable
   deriving Repr, DecidableEq
 
 structure Target where

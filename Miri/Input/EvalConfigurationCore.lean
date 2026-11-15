@@ -1161,7 +1161,7 @@ def makeFromSourcePackage [DecidableEq Os]
             virtual := callbacks.socket.virtual.source
             expectedAbi := fun name => CompilerNamedShimAbi.query p.namedAbi name
             argumentCompat := fun caller callee =>
-              (CompilerCallConstruction.compiler p options.compatibilityBudget).checkArgumentCompat
+              (CompilerCallConstruction.argumentCompat p options.compatibilityBudget)
                 selectedChoice caller callee
             checkSymbolClash := baseCore.checkSymbolClash
             transmute := fun operand target => do
@@ -1189,7 +1189,7 @@ def makeFromSourcePackage [DecidableEq Os]
             pollAndUnblockZero
             pollAbi := CompilerNamedShimAbi.query p.namedAbi "poll"
             argumentCompat := fun caller callee =>
-              (CompilerCallConstruction.compiler p options.compatibilityBudget).checkArgumentCompat
+              (CompilerCallConstruction.argumentCompat p options.compatibilityBudget)
                 selectedChoice caller callee
             checkSymbolClash := baseCore.checkSymbolClash
             transmute := fun operand target => do
@@ -1361,7 +1361,7 @@ def makeFromSourcePackage [DecidableEq Os]
                 expectedAbi := fun name _signature => CompilerNamedShimAbi.query p.namedAbi name
                 systemConvention := pure .C
                 argumentCompat := fun caller callee =>
-                  (CompilerCallConstruction.compiler p options.compatibilityBudget).checkArgumentCompat
+                  (CompilerCallConstruction.argumentCompat p options.compatibilityBudget)
                     selectedChoice caller callee
                 checkSymbolClash := baseCore.checkSymbolClash
                 transmute := fun operand target => do
@@ -1616,7 +1616,7 @@ def makeFromSourcePackage [DecidableEq Os]
                   directories, times, temporary
                   expectedAbi := fun symbol _signature => CompilerNamedShimAbi.query p.namedAbi symbol
                   argumentCompat := fun caller callee =>
-                    (CompilerCallConstruction.compiler p options.compatibilityBudget).checkArgumentCompat
+                    (CompilerCallConstruction.argumentCompat p options.compatibilityBudget)
                       selectedChoice caller callee
                   checkSymbolClash := assembly.foreign.toCore.checkSymbolClash
                   transmute := fun operand target => do

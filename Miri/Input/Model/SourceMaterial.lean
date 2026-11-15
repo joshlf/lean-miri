@@ -8,6 +8,7 @@ an executable body nor an ABI. -/
 namespace Miri.Input
 namespace SourceMaterial
 abbrev ItemKind := SourceDeclarations.ItemKind
+abbrev ItemRole := SourceDeclarations.ItemRole
 abbrev ItemDeclaration := SourceDeclarations.ItemDeclaration
 abbrev Target := SourceDeclarations.Target
 abbrev GenericParameter := SourceDeclarations.GenericParameter

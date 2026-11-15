@@ -283,7 +283,7 @@ private def environment
   let symbols ← p.foreignSymbols |>.mapError fun reason =>
     StepError.unsupported s!"compiler foreign-symbol table for Unix environment shims: {reason}"
   let frame := CompilerFrameMetadata.hooks p.lifecycle.frames userRelevantCrates
-  let callCompiler := CompilerCallConstruction.compiler p compatibilityBudget
+  let checkArgumentCompat := CompilerCallConstruction.argumentCompat p compatibilityBudget
   let u32Layout ← match p.primitiveLayout "u32" with
     | .ok value => pure ⟨value.ty,value.layout⟩
     | .error reason => throw (.unsupported s!"compiler u32 layout for errno: {reason}")
@@ -310,7 +310,7 @@ private def environment
     env := source
     frameInStd := FrameMetadata.frameInStd frame
     expectedAbi := CompilerNamedShimAbi.query p.namedAbi
-    argumentCompat := callCompiler.checkArgumentCompat choice
+    argumentCompat := checkArgumentCompat choice
     checkSymbolClash := fun name =>
       match CompilerForeignSymbols.checkSymbolClash symbols name with
       | .ok () => pure ()

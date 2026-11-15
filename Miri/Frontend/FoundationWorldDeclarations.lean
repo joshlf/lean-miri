@@ -12,6 +12,28 @@ private def headerRows (document : Document) : Except String (Array Json) :=
   | .ok value => fromJson? value
   | .error _ => pure #[]
 
+/-- Preserve explicit declaration-role evidence. A signature-only header may
+lack runtime declaration attributes; that means unavailable, never ordinary. -/
+private def sourceItemRole (source : Json) : Except String Input.SourceMaterial.ItemRole := do
+  let abi ← match source.getObjVal? "signature" >>= fun signature =>
+      signature.getObjVal? "abi" >>= fun abi => abi.getObjValAs? String "kind" with
+    | .ok abi => pure abi
+    | .error _ => return .unavailable
+  if abi == "llvm_intrinsic" then return .intrinsic
+  let attributes ← match source.getObjVal? "function_attributes" with
+    | .ok attributes => pure attributes
+    | .error _ => return .unavailable
+  let dropGlue ← attributes.getObjValAs? Bool "is_drop_glue"
+  let foreign ← attributes.getObjValAs? Bool "is_foreign"
+  if dropGlue then return .dropGlue
+  let runtime ← match source.getObjVal? "runtime_source" with
+    | .ok runtime => pure runtime
+    | .error _ => return (if foreign then .foreign else .unavailable)
+  let intrinsic ← runtime.getObjValAs? Bool "rustc_intrinsic"
+  if intrinsic then return .intrinsic
+  if foreign then return .foreign
+  return .ordinary
+
 /-- A body and a signature-only declaration can both witness the same source
 header, but their original environments must agree. Associated classification
 is retained and does not select a trait implementation. -/
@@ -47,7 +69,11 @@ def sourceItemDeclaration (document : Document) (definition : Nat) :
     parameters := parameters.push kind
   let raw : Input.DefinitionId := ⟨← row.getObjValAs? Nat "crate_index",← row.getObjValAs? Nat "index"⟩
   unless raw.crateIndex < 2^32 && raw.index < 2^32 do throw "Item source DefId exceeds rustc index width"
-  return ⟨raw,← row.getObjValAs? String "path",kind,parameters⟩
+  let role ← match bodies[0]?,headers[0]? with
+    | some body,_ => sourceItemRole body
+    | none,some header => sourceItemRole header
+    | none,none => throw "Item declaration role source absent"
+  return ⟨raw,← row.getObjValAs? String "path",kind,parameters,role⟩
 
 /-- Only finite declaration owners are traversed, never argument combinations.
 A missing function header is not replaced by guessed parameter slots. -/

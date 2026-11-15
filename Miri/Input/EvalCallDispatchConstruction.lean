@@ -818,7 +818,7 @@ def fromSeedEnvironment [DecidableEq MiriMemoryKind]
     match operand.transmute projection target |>.mapError IntrinsicVectorMachine.projectionError with
     | .ok value => pure value
     | .error error => throw error
-  let callCompiler := CompilerCallConstruction.compiler p compatibilityBudget
+  let checkArgumentCompat := CompilerCallConstruction.argumentCompat p compatibilityBudget
   let fdDispatch : UnixFdDispatch.Hooks
       (State Os R EvalSyncPayload.Payload H D Aff B Poll Instant System Native Profiler Raw Listener TcpStream Error)
       H D (Other Raw Listener TcpStream Error) Error Meta Path := {
@@ -830,7 +830,7 @@ def fromSeedEnvironment [DecidableEq MiriMemoryKind]
       unless expected.args == request.args && expected.ret == request.ret && expected.variadic == request.variadic do
         throw (.invalidProgram s!"Unix FD signature recipe disagrees with `{name}`")
       CompilerNamedShimAbi.query p.namedAbi name
-    argumentCompat := callCompiler.checkArgumentCompat choice
+    argumentCompat := checkArgumentCompat choice
     checkSymbolClash := fun name =>
       match CompilerForeignSymbols.checkSymbolClash sourceSymbols name with
       | .ok () => pure () | .error error => throw error

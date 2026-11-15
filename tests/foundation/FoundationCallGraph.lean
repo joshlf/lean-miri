@@ -51,12 +51,26 @@ private def run (path referencePath name : String) (nodes sites : Nat)
   let some leaf := document.bodies.find? (fun body =>
       (body.getObjValAs? Nat "definition").toOption == some leafId) | throw (IO.userError "leaf absent")
   rejected (scalarCallGraphProgram { document with bodies := document.bodies.push leaf } root)
-  let missingSites := { program.input with bodies := program.input.bodies.map fun body =>
-    { body with callEvidence := body.callEvidence.map fun _ => none } }
-  match Input.lowerProgram missingSites >>= Input.CompilerProviders.prepare with
-  | .error _ => pure ()
-  | .ok prepared => rejected (FixedDirectCallRun.runPrepared prepared 0xBEEF frames)
-  IO.println s!"{name}: complete-key dedup and missing/duplicate template/site controls passed"
+  -- Runtime reads the original FnDef shape and interns that complete source
+  -- key. Imported per-call winners and FunctionType->instance answers are not
+  -- prerequisites and cannot redirect a call to an equally-shaped leaf.
+  let facts := { program.input.queries.functionFacts with types := #[] }
+  let queries := { program.input.queries with functionFacts := facts }
+  let missingSites := { program.input with
+    queries
+    bodies := program.input.bodies.map fun body => { body with callEvidence := #[] } }
+  let withoutAnswers ← checked (Input.lowerProgram missingSites >>= Input.CompilerProviders.prepare)
+  IO.println (← checked (FixedDirectCallRun.runPrepared withoutAnswers 0xBEEF frames))
+  if name == "chain" then
+    let some leafNode := program.input.instances.find? (fun node => node.definitionId == some leafId)
+      | throw (IO.userError "canonical leaf instance absent")
+    let forgedBodies := program.input.bodies.map fun body => {
+      body with callEvidence := body.callEvidence.map fun record => record.map fun resolution =>
+        { resolution with instanceId := some leafNode.id } }
+    let forgedInput := { program.input with queries, bodies := forgedBodies }
+    let forged ← checked (Input.lowerProgram forgedInput >>= Input.CompilerProviders.prepare)
+    IO.println (← checked (FixedDirectCallRun.runPrepared forged 0xBEEF frames))
+  IO.println s!"{name}: complete-key dedup/template controls pass; missing/forged call answers cannot redirect source FnDef execution"
 
 def main (paths : List String) : IO Unit := do
   let [chain, chainReference, twice, twiceReference, recursive, mutualPath] := paths

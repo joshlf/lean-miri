@@ -8,6 +8,7 @@ bash tools/export-mir.sh --foundation --output scratch/source-compiler-bodies/so
   --root chain --root middle --root identity -- \
   "$PWD/exporter/fixtures/foundation_call_graph.rs" --crate-type=lib --crate-name=source_compiler_bodies
 flock /tmp/lean-miri-lake-build.lock bash -c '
-  .elan/bin/lake build Miri.Input.SourceCompilerBodies Miri.Input.CompilerCallPipeline Miri.Frontend.FoundationCallGraphProgram
+  .elan/bin/lake build Miri.Input.SourceCompilerBodies Miri.Input.CompilerCallPipeline Miri.Input.SourceCompilerInstances Miri.Frontend.FoundationSourceMaterial Miri.Frontend.FoundationCallGraphProgram
   .elan/bin/lake env lean --run tests/input/SourceCompilerBodies.lean scratch/source-compiler-bodies/source.json
+  .elan/bin/lake env lean --run tests/input/SourceCompilerInstances.lean scratch/source-compiler-bodies/source.json
 '
