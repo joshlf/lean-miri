@@ -529,7 +529,7 @@ def makeWithForeignContext {Assembly : Type}
         FunctionCalls.callFunction helper c callee ABI.ExternAbi.Rust args none continuation
     let unwind := EvalCallRuntime.unwind access projection functions options.panicUnwinds callFunction
     let lifecycle := CompilerCallConstruction.lifecycle p EvalCoreMachine.sourceCompilerAccess options.userRelevantCrates
-      (CompilerStorage.hooks p allocation projection.dynamic projection.dynamicFuel choice deallocateStack)
+      (CompilerStorage.hooks p EvalCoreMachine.sourceCompilerAccess allocation projection.dynamic projection.dynamicFuel choice deallocateStack)
       EvalConfiguration.identity unwind
     let ⟨math⟩ ← liftConstruction (EvalMathMachine.hooks p (EvalMathMachine.optionalHost leaves.math) leaves.mathError none access projection.place scalar floats returnToBlock)
     let atomics := ExecutionIntrinsic.Atomic.access {

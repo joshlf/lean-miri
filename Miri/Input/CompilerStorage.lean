@@ -36,13 +36,14 @@ def veryTriviallySized (runtime : RuntimeMetadata) (ty : TyId) : Except StepErro
 stack allocator, and dynamic size/alignment queries execute before reserving
 an allocation ID. Deallocation is the actual allocation-lifecycle operation. -/
 def hooks [DecidableEq K] (p : CompilerProviders.Prepared)
+    (world : SourceCompilerWorld.Access (MachineHooks.State K U))
     (allocation : PlaceMachine.AllocationConfig K U)
     (dynamic : DynamicLayoutHooks Provenance (MachineHooks.State K U) C)
     (dynamicBudget : Nat) (choice : C)
     (deallocateStack : Pointer (Option Provenance) → MachineHooks.M K U Unit) :
     MachineHooks.StorageHooks K U where
   veryTriviallySized := veryTriviallySized p.runtime
-  layout := CompilerFrameContext.computeLocalLayout p
+  layout := CompilerFrameContext.computeLocalLayout p world
   allocateDyn := fun layout metadataValue => do
     let some (size,align) ← DynamicLayout.sizeAndAlignFromMeta dynamic choice dynamicBudget metadataValue layout
       | throw (.invalidProgram "cannot allocate space for extern type with unknown size")
