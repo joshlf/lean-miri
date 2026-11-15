@@ -29,6 +29,9 @@ def buildSpanRegistry (body : Json) : Except String SpanRegistry := do
   for call in (← metadata.getObjValAs? (Array Json) "call_spans") do
     if call != Json.null then
       sources := sources.push (← sourceSpan (← call.getObjVal? "function"))
+      let operand ← call.getObjVal? "function_operand"
+      if operand != Json.null then
+        sources := sources.push (← sourceSpan operand)
       for argument in (← call.getObjValAs? (Array Json) "arguments") do
         sources := sources.push (← sourceSpan argument)
   let sorted := sources.qsort (fun a b => a.identity < b.identity)

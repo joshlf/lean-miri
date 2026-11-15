@@ -55,8 +55,12 @@ pub(super) fn capture(tcx: TyCtxt<'_>, body: &mir::Body<'_>) -> Value {
     // Argument and function spans are independent rustc Span identities. They
     // share this body's exact namespace with ordinary source locations.
     let call_spans = body.basic_blocks.iter().map(|b|match &b.terminator().kind {
-        mir::TerminatorKind::Call {args,fn_span,..} => json!({
+        mir::TerminatorKind::Call {func,args,fn_span,..} => json!({
             "function":span(&mut ids,tcx,*fn_span),
+            "function_operand":match func {
+                mir::Operand::Constant(c) => Some(span(&mut ids,tcx,c.span)),
+                _ => None,
+            },
             "arguments":args.iter().map(|arg|span(&mut ids,tcx,arg.span)).collect::<Vec<_>>()
         }),
         _ => Value::Null,

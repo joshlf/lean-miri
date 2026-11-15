@@ -122,6 +122,9 @@ def validateSourceMetadata (body : Json) : Except String Unit := do
   for (block, call) in blocks.zip callSpans do
     if (← (← block.getObjVal? "terminator").getObjValAs? String "kind") == "call" then
       let _ ← sourceSpan (← call.getObjVal? "function")
+      let functionOperand ← call.getObjVal? "function_operand"
+      if functionOperand != Json.null then
+        let _ ← sourceSpan functionOperand
       let arguments ← (← block.getObjVal? "terminator").getObjValAs? (Array Json) "arguments"
       let spans ← call.getObjValAs? (Array Json) "arguments"
       unless spans.size == arguments.size do throw "call argument source span count mismatch"
