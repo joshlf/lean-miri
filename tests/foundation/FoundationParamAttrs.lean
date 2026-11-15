@@ -61,7 +61,16 @@ def main (args : List String) : IO Unit := do
     unless message.startsWith "typed ABI indirect parameter 1 requires defining" ||
         message == "typed ABI indirect parameter 1 requires caller incremental source" do
       throw (IO.userError s!"return no-adjustment witness failed: {message}")
-  | .ok (_,abi) =>
+  | .ok (derived,abi) =>
+    let some mir := source.genericMir | throw (IO.userError "selected MIR source absent")
+    let [body] := (mir.bodies.filter (fun body => body.definition == function.definition && body.promoted.isNone)).toList
+      | throw (IO.userError "selected catch body absent/ambiguous")
+    let some returnLocal := body.locals[0]? | throw (IO.userError "selected return local absent")
+    let returnType ← IO.ofExcept (SourceTypes.instantiate physical
+      #[some concrete,some (.primitive "int" "isize")] #[] returnLocal.type >>= SourceTypes.eraseRegions)
+    let (_,returnType) ← IO.ofExcept (SourcePhysical.intern derived returnType)
+    unless abi.returnValue.typeId == returnType do
+      throw (IO.userError "normalized ABI return and erased MIR local identities differ")
     let disabled := callerDisabled || use.compilation.any (fun c => c.optimization == .no || c.incremental ||
       c.freezeLangItemPresent == some false) || use.alwaysConst == some true
     unless disabled do

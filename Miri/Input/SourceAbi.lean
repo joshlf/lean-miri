@@ -451,7 +451,10 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
   world := updated
   let attrs := function.attributes
   unless !attrs.trackCaller && !attrs.foreignItem && !attrs.dropGlue do throw "typed ABI function attribute adjustment unsupported"
+  -- FnAbiDesc::for_instance normalizes the instantiated signature with
+  -- erased regions. Preserve source identities until this codegen boundary.
   let output ← SourceTypes.instantiate physical types constants signature.output signature.boundVariables
+    >>= SourceTypes.eraseRegions
   let (updated,result) ← SourcePhysical.intern world output
   world := updated
   let some resultNode := world.canonical.types[result]? | throw "typed ABI result type absent"
@@ -459,6 +462,7 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
   let mut inputs := #[]
   for (sourceType,index) in signature.inputs.zipIdx do
     let type ← SourceTypes.instantiate physical types constants sourceType signature.boundVariables
+      >>= SourceTypes.eraseRegions
     let (updated,id) ← SourcePhysical.intern world type
     world := updated
     let some node := world.canonical.types[id]? | throw "typed ABI input type absent"
