@@ -42,7 +42,8 @@ def main():
             and reference.get('snapshot_fnv1a64') == f'{digest:016x}'):
         raise SystemExit('same-TyCtxt Miri did not complete with exit zero')
     with (output / 'lean.log').open('x') as log:
-        run = subprocess.run([str(ROOT / '.lake/build/bin/native_runner'), str(document)],
+        run = subprocess.run([str(ROOT / '.lake/build/bin/native_runner'), str(document),
+                              '--ui-source', str(source), '--ui-flags', '[]'],
                              cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
                              timeout=args.timeout, env=env)
     if document.read_bytes() != original:
