@@ -1,8 +1,8 @@
-error: Undefined Behavior: pointer not dereferenceable: pointer must point to some allocation, but got null pointer
-  --> tests/fail/shims/backtrace/bad-backtrace-ptr.rs:LL:CC
+error: Undefined Behavior: calling a function where the caller and callee disagree on whether the function is C-variadic
+  --> tests/fail/function_calls/c-variadic-mismatch2.rs:LL:CC
    |
-LL |         miri_resolve_frame(std::ptr::null_mut(), 0);
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
+LL |     unsafe { weird(1_i32) };
+   |              ^^^^^^^^^^^^ Undefined Behavior occurred here
    |
    = help: this indicates a bug in the program: it performed an invalid operation, and caused Undefined Behavior
    = help: see https://doc.rust-lang.org/nightly/reference/behavior-considered-undefined.html for further information

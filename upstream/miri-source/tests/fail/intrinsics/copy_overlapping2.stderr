@@ -1,8 +1,8 @@
-error: Undefined Behavior: calling a function where the caller and callee disagree on whether the function is C-variadic
-  --> tests/fail/c-variadic-mismatch.rs:LL:CC
+error: Undefined Behavior: `copy_nonoverlapping` called on overlapping ranges
+  --> tests/fail/intrinsics/copy_overlapping2.rs:LL:CC
    |
-LL |         f(1i32, 1i64);
-   |         ^^^^^^^^^^^^^ Undefined Behavior occurred here
+LL |     unsafe { std::intrinsics::copy_nonoverlapping(p, p.add(1), 3) };
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
    |
    = help: this indicates a bug in the program: it performed an invalid operation, and caused Undefined Behavior
    = help: see https://doc.rust-lang.org/nightly/reference/behavior-considered-undefined.html for further information

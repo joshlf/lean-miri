@@ -1,8 +1,8 @@
-error: Undefined Behavior: bad declaration of miri_resolve_frame - should return a struct with 5 fields
-  --> tests/fail/shims/backtrace/bad-backtrace-decl.rs:LL:CC
+error: Undefined Behavior: accessing memory with alignment ALIGN, but alignment ALIGN is required
+  --> tests/fail/intrinsics/write_bytes_unaligned.rs:LL:CC
    |
-LL | ...   miri_resolve_frame(*frame, 0);
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
+LL |     unsafe { std::intrinsics::write_bytes(p, 0, 1) };
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
    |
    = help: this indicates a bug in the program: it performed an invalid operation, and caused Undefined Behavior
    = help: see https://doc.rust-lang.org/nightly/reference/behavior-considered-undefined.html for further information

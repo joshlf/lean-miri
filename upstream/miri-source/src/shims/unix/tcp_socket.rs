@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell, RefMut};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -12,7 +12,6 @@ use rustc_middle::throw_unsup_format;
 use rustc_target::spec::Os;
 
 use crate::shims::files::{EvalContextExt as _, FdNum, FileDescription, FileDescriptionRef};
-use crate::shims::sig::Varargs;
 use crate::shims::unix::UnixFileDescription;
 use crate::shims::unix::socket::{EvalContextExt, UnixSocketFileDescription};
 use crate::*;
@@ -117,7 +116,11 @@ pub(super) struct TcpSocket {
 }
 
 impl TcpSocket {
-    pub fn new(family: socket2::Domain, is_non_block: bool) -> io::Result<Self> {
+    pub fn new<'tcx>(
+        family: socket2::Domain,
+        is_non_block: bool,
+        ecx: &mut MiriInterpCx<'tcx>,
+    ) -> io::Result<FileDescriptionRef<Self>> {
         let socket =
             socket2::Socket::new(family, socket2::Type::STREAM, Some(socket2::Protocol::TCP))?;
         // The underlying host socket needs to be non-blocking. The actual
@@ -131,7 +134,7 @@ impl TcpSocket {
         // does have a static initial readiness until `connect` or `listen` is
         // invoked on it.
 
-        Ok(TcpSocket {
+        let tcp_socket = TcpSocket {
             family,
             state: RefCell::new(SocketState::Initial(socket)),
             is_non_block: Cell::new(is_non_block),
@@ -141,22 +144,24 @@ impl TcpSocket {
             read_timeout: Cell::new(None),
             write_timeout: Cell::new(None),
             watched: ReadinessWatched::default(),
-        })
+        };
+
+        Ok(ecx.machine.fds.new_ref(tcp_socket))
     }
 }
 
 impl FileDescription for TcpSocket {
     fn name(&self) -> &'static str {
-        "socket"
+        "tcp socket"
     }
 
     fn read<'tcx>(
         self: FileDescriptionRef<Self>,
         communicate_allowed: bool,
         ptr: Pointer,
-        len: usize,
+        len: u64,
         ecx: &mut MiriInterpCx<'tcx>,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
     ) -> InterpResult<'tcx> {
         self.recv(
             communicate_allowed,
@@ -165,7 +170,13 @@ impl FileDescription for TcpSocket {
             /* is_peek */ false,
             /* is_non_block */ false,
             ecx,
-            finish,
+            callback!(
+                @capture<'tcx> {
+                    finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
+                } |ecx, result: Result<(u64, Option<SocketAddr>), IoError>| {
+                    finish.call(ecx, result.map(|(bytes, _)| bytes))
+                }
+            ),
         )
     }
 
@@ -173,11 +184,19 @@ impl FileDescription for TcpSocket {
         self: FileDescriptionRef<Self>,
         communicate_allowed: bool,
         ptr: Pointer,
-        len: usize,
+        len: u64,
         ecx: &mut MiriInterpCx<'tcx>,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
     ) -> InterpResult<'tcx> {
-        self.send(communicate_allowed, ptr, len, /* is_non_block */ false, ecx, finish)
+        self.send(
+            communicate_allowed,
+            ptr,
+            len,
+            /* is_non_block */ false,
+            /* dest_addr */ None,
+            ecx,
+            finish,
+        )
     }
 
     fn short_fd_operations(&self) -> bool {
@@ -233,41 +252,6 @@ impl UnixFileDescription for TcpSocket {
         }
 
         interp_ok(Scalar::from_i32(0))
-    }
-
-    fn ioctl<'tcx>(
-        &self,
-        op: Scalar,
-        args: Varargs<'tcx, '_>,
-        ecx: &mut MiriInterpCx<'tcx>,
-    ) -> InterpResult<'tcx, i32> {
-        assert!(ecx.machine.communicate(), "cannot have `TcpSocket` with isolation enabled!");
-
-        let fionbio = ecx.eval_libc("FIONBIO");
-
-        if op == fionbio {
-            // On these OSes, Rust uses the ioctl, so we trust that it is reasonable and controls
-            // the same internal flag as fcntl.
-            if !matches!(ecx.tcx.sess.target.os, Os::Linux | Os::Android | Os::MacOs | Os::FreeBsd)
-            {
-                // FIONBIO cannot be used to change the blocking mode of a socket on solarish targets:
-                // <https://github.com/rust-lang/rust/commit/dda5c97675b4f5b1f6fdab64606c8a1f21021b0a>
-                // Since there might be more targets which do weird things with this option, we use
-                // an allowlist instead of just denying solarish targets.
-                throw_unsup_format!(
-                    "ioctl: setting FIONBIO on sockets is unsupported on target {}",
-                    ecx.tcx.sess.target.os
-                );
-            }
-
-            let ([value_ptr], _) = ecx.check_varargs(shim_varargs![*i32], args, "ioctl")?;
-            let value = ecx.deref_pointer_as(&value_ptr, ecx.machine.layouts.i32)?;
-            let non_block = ecx.read_scalar(&value)?.to_i32()? != 0;
-            self.is_non_block.set(non_block);
-            return interp_ok(0);
-        }
-
-        throw_unsup_format!("ioctl: unsupported operation {op:#x} on socket");
     }
 
     fn as_socket(
@@ -401,29 +385,19 @@ impl UnixSocketFileDescription for TcpSocket {
             unreachable!()
         };
 
-        // FIXME: Rustfmt has a bug where it incorrectly removes the outer braces of {{ .. }} inside
-        // a `cfg_select!` block. See <https://github.com/rust-lang/rustfmt/issues/7045>.
-        #[rustfmt::skip]
         let listener = cfg_select! {
             // Turn the `socket2::Socket` into a `mio::TcpListener`.
             // We follow Tokio's TCP socket implementation:
             // See <https://github.com/tokio-rs/tokio/blob/2120bee/tokio/src/net/tcp/socket.rs#L906-L925>
-            // SAFETY: mio specifies that it is safe to use `from_raw_fd` and
-            // `from_raw_socket` as long as it's ensured that the socket is non-blocking.
-            // Because we immediately make the socket non-blocking after creation, that
-            // is always guaranteed.
-
             unix => {{
-                use std::os::fd::{IntoRawFd, FromRawFd};
-                let raw_fd = socket.into_raw_fd();
-                unsafe { TcpListener::from_raw_fd(raw_fd) }
+                use std::os::fd::OwnedFd;
+                TcpListener::from(OwnedFd::from(socket))
             }},
             windows => {{
-                use std::os::windows::io::{IntoRawSocket, FromRawSocket};
-                let raw_socket = socket.into_raw_socket();
-                unsafe { TcpListener::from_raw_socket(raw_socket) }
+                use std::os::windows::io::OwnedSocket;
+                TcpListener::from(OwnedSocket::from(socket))
             }},
-            _ => unreachable!("unsupported host platform")
+            _ => unreachable!("unsupported host platform"),
         };
 
         *state = SocketState::Listening(listener);
@@ -539,30 +513,20 @@ impl UnixSocketFileDescription for TcpSocket {
             unreachable!()
         };
 
-        // FIXME: Rustfmt has a bug where it incorrectly removes the outer braces of {{ .. }} inside
-        // a `cfg_select!` block. See <https://github.com/rust-lang/rustfmt/issues/7045>.
-        #[rustfmt::skip]
         let stream = cfg_select! {
             // Turn the `socket2::Socket` into a `mio::TcpStream`.
             // We follow Tokio's TCP socket implementation:
             // See <https://github.com/tokio-rs/tokio/blob/2120bee/tokio/src/net/tcp/socket.rs#L841-L869>
-            // SAFETY: mio specifies that it is safe to use `from_raw_fd` and
-            // `from_raw_socket` as long as it's ensured that the socket is non-blocking.
-            // Because we immediately make the socket non-blocking after creation, that
-            // is always guaranteed.
-
-             unix => {{
-                 use std::os::fd::{IntoRawFd, FromRawFd};
-                 let raw_fd = socket.into_raw_fd();
-                 unsafe { TcpStream::from_raw_fd(raw_fd) }
-             }},
-             windows => {{
-                 use std::os::windows::io::{IntoRawSocket, FromRawSocket};
-                 let raw_socket = socket.into_raw_socket();
-                 unsafe { TcpStream::from_raw_socket(raw_socket) }
-             }},
-             _ => unreachable!("unsupported host platform")
-         };
+            unix => {{
+                use std::os::fd::OwnedFd;
+                TcpStream::from(OwnedFd::from(socket))
+            }},
+            windows => {{
+                use std::os::windows::io::OwnedSocket;
+                TcpStream::from(OwnedSocket::from(socket))
+            }},
+            _ => unreachable!("unsupported host platform"),
+        };
 
         *state = SocketState::Connecting(stream);
         drop(state);
@@ -613,15 +577,15 @@ impl UnixSocketFileDescription for TcpSocket {
                     @capture<'tcx> {
                         socket: FileDescriptionRef<TcpSocket>,
                         finish: DynMachineCallback<'tcx, Result<(), IoError>>,
-                    } |this, result: Result<(), ()>| {
+                    } |ecx, result: Result<(), ()>| {
                         if result.is_err() {
                             // An error occurred whilst connecting. We know
                             // that it has been consumed by `ensure_connected`
                             // and is now stored in `socket.error`.
                             let err = socket.error.take().unwrap();
-                            finish.call(this, Err(IoError::HostError(err)))
+                            finish.call(ecx, Err(IoError::HostError(err)))
                         } else {
-                            finish.call(this, Ok(()))
+                            finish.call(ecx, Ok(()))
                         }
                     }
                 ),
@@ -633,10 +597,13 @@ impl UnixSocketFileDescription for TcpSocket {
         self: FileDescriptionRef<Self>,
         communicate_allowed: bool,
         ptr: Pointer,
-        len: usize,
+        len: u64,
         is_non_block: bool,
+        // For stream-based sockets `send` and `sendto` are equivalent and
+        // we can thus ignore the destination address.
+        _dest_addr: Option<SocketAddr>,
         ecx: &mut MiriInterpCx<'tcx>,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
     ) -> InterpResult<'tcx> {
         assert!(communicate_allowed, "cannot have `TcpSocket` with isolation enabled!");
 
@@ -653,23 +620,23 @@ impl UnixSocketFileDescription for TcpSocket {
                     socket: FileDescriptionRef<TcpSocket>,
                     deadline: Option<Deadline>,
                     ptr: Pointer,
-                    len: usize,
+                    len: u64,
                     is_non_block: bool,
-                    finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
-                } |this, result: Result<(), ()>| {
+                    finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
+                } |ecx, result: Result<(), ()>| {
                     if result.is_err() {
-                        return finish.call(this, Err(LibcError("ENOTCONN")))
+                        return finish.call(ecx, Err(LibcError("ENOTCONN")))
                     }
 
                     if is_non_block {
                         // We have a non-blocking operation or a non-blocking socket and
                         // thus don't want to block until we can send.
-                        let result = this.try_non_block_send(&socket, ptr, len)?;
-                        finish.call(this, result)
+                        let result = ecx.try_non_block_send(&socket, ptr, len)?;
+                        finish.call(ecx, result)
                     } else {
                         // The socket is in blocking mode and thus the send call should block
                         // until we can send some bytes into the socket or the timeout exceeded.
-                        this.block_for_send(socket, deadline, ptr, len, finish)
+                        ecx.block_for_send(socket, deadline, ptr, len, finish)
                     }
                 }
             ),
@@ -680,17 +647,25 @@ impl UnixSocketFileDescription for TcpSocket {
         self: FileDescriptionRef<Self>,
         communicate_allowed: bool,
         ptr: Pointer,
-        len: usize,
+        len: u64,
         is_peek: bool,
         is_non_block: bool,
         ecx: &mut MiriInterpCx<'tcx>,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        finish: DynMachineCallback<'tcx, Result<(u64, Option<SocketAddr>), IoError>>,
     ) -> InterpResult<'tcx> {
         assert!(communicate_allowed, "cannot have `TcpSocket` with isolation enabled!");
 
         let is_non_block = is_non_block || self.is_non_block.get();
         let deadline = ecx.action_deadline(is_non_block, self.read_timeout.get());
 
+        let finish = callback!(
+            @capture<'tcx> {
+                finish: DynMachineCallback<'tcx, Result<(u64, Option<SocketAddr>), IoError>>,
+            } |ecx, result: Result<u64, IoError>| {
+                // The source address of the data isn't available for stream-based sockets.
+                finish.call(ecx, result.map(|bytes| (bytes, None)))
+            }
+        );
         let socket = self;
         ecx.ensure_connected(
             socket.clone(),
@@ -701,24 +676,24 @@ impl UnixSocketFileDescription for TcpSocket {
                     socket: FileDescriptionRef<TcpSocket>,
                     deadline: Option<Deadline>,
                     ptr: Pointer,
-                    len: usize,
+                    len: u64,
                     is_peek: bool,
                     is_non_block: bool,
-                    finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
-                } |this, result: Result<(), ()>| {
+                    finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
+                } |ecx, result: Result<(), ()>| {
                     if result.is_err() {
-                        return finish.call(this, Err(LibcError("ENOTCONN")))
+                        return finish.call(ecx, Err(LibcError("ENOTCONN")))
                     }
 
                     if is_non_block {
                         // We have a non-blocking operation or a non-blocking socket and
                         // thus don't want to block until we can receive.
-                        let result = this.try_non_block_recv(&socket, ptr, len, is_peek)?;
-                        finish.call(this, result)
+                        let result = ecx.try_non_block_recv(&socket, ptr, len, is_peek)?;
+                        finish.call(ecx, result)
                     } else {
                         // The socket is in blocking mode and thus the receive call should block
                         // until we can receive some bytes from the socket or the timeout exceeded.
-                        this.block_for_recv(socket, deadline, ptr, len, is_peek, finish)
+                        ecx.block_for_recv(socket, deadline, ptr, len, is_peek, finish)
                     }
                 }
             ),
@@ -846,9 +821,9 @@ impl UnixSocketFileDescription for TcpSocket {
                 @capture<'tcx> {
                     socket: FileDescriptionRef<TcpSocket>,
                     finish: DynMachineCallback<'tcx, Result<SocketAddr, IoError>>,
-                } |this, result: Result<(), ()>| {
+                } |ecx, result: Result<(), ()>| {
                     if result.is_err() {
-                        return finish.call(this, Err(LibcError("ENOTCONN")))
+                        return finish.call(ecx, Err(LibcError("ENOTCONN")))
                     };
 
                     let SocketState::Connected(stream) = &*socket.state.borrow() else {
@@ -856,7 +831,7 @@ impl UnixSocketFileDescription for TcpSocket {
                     };
 
                     let result = stream.peer_addr().map_err(IoError::HostError);
-                    finish.call(this, result)
+                    finish.call(ecx, result)
                 }
             ),
         )
@@ -974,14 +949,14 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         is_non_block: bool,
         action_timeout: Option<Duration>,
     ) -> Option<Deadline> {
-        let this = self.eval_context_ref();
+        let ecx = self.eval_context_ref();
 
         if is_non_block {
             // Non-blocking sockets always have a zero timeout.
-            Some(this.machine.monotonic_clock.now().into())
+            Some(ecx.machine.monotonic_clock.now().into())
         } else {
             action_timeout
-                .map(|duration| this.machine.monotonic_clock.now().add_lossy(duration).into())
+                .map(|duration| ecx.machine.monotonic_clock.now().add_lossy(duration).into())
         }
     }
 
@@ -999,11 +974,11 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         is_client_sock_nonblock: bool,
         finish: DynMachineCallback<'tcx, Result<(FdNum, SocketAddr), IoError>>,
     ) -> InterpResult<'tcx> {
-        let this = self.eval_context_mut();
+        let ecx = self.eval_context_mut();
         // Since the callback holds a strong reference to the socket, the file description
         // won't be closed as long as some thread is blocked on it. While this reflects
         // what Linux does, for other Unix systems this might differ from the native behavior.
-        this.block_thread_for_io(
+        ecx.block_thread_for_io(
             socket.clone(),
             BlockingIoInterest::Read,
             /* deadline */ None,
@@ -1011,23 +986,23 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 socket: FileDescriptionRef<TcpSocket>,
                 is_client_sock_nonblock: bool,
                 finish: DynMachineCallback<'tcx, Result<(FdNum, SocketAddr), IoError>>,
-            } |this, kind: UnblockKind| {
+            } |ecx, kind: UnblockKind| {
                 // Remove the blocking I/O interest for unblocking this thread.
-                this.machine.blocking_io.remove_blocked_thread(socket.id(), this.machine.threads.active_thread());
+                ecx.machine.blocking_io.remove_blocked_thread(socket.id(), ecx.machine.threads.active_thread());
 
                 match kind {
                     UnblockKind::Ready => { /* fall-through to below */ },
                     // When the read timeout is exceeded EAGAIN/EWOULDBLOCK is returned.
-                    UnblockKind::TimedOut => return finish.call(this, Err(LibcError("EWOULDBLOCK")))
+                    UnblockKind::TimedOut => return finish.call(ecx, Err(LibcError("EWOULDBLOCK")))
                 }
 
-                match this.try_non_block_accept(&socket, is_client_sock_nonblock)? {
-                    Ok((sockfd, addr)) => finish.call(this, Ok((sockfd, addr))),
+                match ecx.try_non_block_accept(&socket, is_client_sock_nonblock)? {
+                    Ok((sockfd, addr)) => finish.call(ecx, Ok((sockfd, addr))),
                     Err(IoError::HostError(e)) if e.kind() == io::ErrorKind::WouldBlock => {
                         // We need to block the thread again as it would still block.
-                        this.block_for_accept(socket, is_client_sock_nonblock, finish)
+                        ecx.block_for_accept(socket, is_client_sock_nonblock, finish)
                     }
-                    Err(e) => finish.call(this, Err(e)),
+                    Err(e) => finish.call(ecx, Err(e)),
                 }
             }),
         )
@@ -1044,7 +1019,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         socket: &FileDescriptionRef<TcpSocket>,
         is_client_sock_nonblock: bool,
     ) -> InterpResult<'tcx, Result<(FdNum, SocketAddr), IoError>> {
-        let this = self.eval_context_mut();
+        let ecx = self.eval_context_mut();
 
         let state = socket.state.borrow();
         let SocketState::Listening(listener) = &*state else {
@@ -1058,7 +1033,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                 // We know that the source is not readable so we need to update its readiness.
                 socket.io_readiness.borrow_mut().readable = false;
-                this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
+                ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
 
                 return interp_ok(Err(IoError::HostError(e)));
             }
@@ -1070,7 +1045,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             SocketAddr::V6(_) => socket2::Domain::IPV6,
         };
 
-        let fd = this.machine.fds.new_ref(TcpSocket {
+        let fd = ecx.machine.fds.new_ref(TcpSocket {
             family,
             state: RefCell::new(SocketState::Connected(stream)),
             is_non_block: Cell::new(is_client_sock_nonblock),
@@ -1084,8 +1059,10 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         });
         // Register the socket to the blocking I/O manager because
         // there is an associated host socket.
-        this.machine.blocking_io.register(fd.clone());
-        let sockfd = this.machine.fds.insert(fd);
+        ecx.machine.blocking_io.register(fd.clone());
+        let Some(sockfd) = ecx.machine.fds.insert(fd) else {
+            return interp_ok(Err(LibcError("EMFILE")));
+        };
         interp_ok(Ok((sockfd, addr)))
     }
 
@@ -1101,14 +1078,14 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         socket: FileDescriptionRef<TcpSocket>,
         deadline: Option<Deadline>,
         buffer_ptr: Pointer,
-        length: usize,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        length: u64,
+        finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
     ) -> InterpResult<'tcx> {
-        let this = self.eval_context_mut();
+        let ecx = self.eval_context_mut();
         // Since the callback holds a strong reference to the socket, the file description
         // won't be closed as long as some thread is blocked on it. While this reflects
         // what Linux does, for other Unix systems this might differ from the native behavior.
-        this.block_thread_for_io(
+        ecx.block_thread_for_io(
             socket.clone(),
             BlockingIoInterest::Write,
             deadline.clone(),
@@ -1116,24 +1093,24 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 socket: FileDescriptionRef<TcpSocket>,
                 deadline: Option<Deadline>,
                 buffer_ptr: Pointer,
-                length: usize,
-                finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
-            } |this, kind: UnblockKind| {
+                length: u64,
+                finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
+            } |ecx, kind: UnblockKind| {
                 // Remove the blocking I/O interest for unblocking this thread.
-                this.machine.blocking_io.remove_blocked_thread(socket.id(), this.machine.threads.active_thread());
+                ecx.machine.blocking_io.remove_blocked_thread(socket.id(), ecx.machine.threads.active_thread());
 
                 match kind {
                     UnblockKind::Ready => { /* fall-through to below */ },
                     // When the write timeout is exceeded EAGAIN/EWOULDBLOCK is returned.
-                    UnblockKind::TimedOut => return finish.call(this, Err(LibcError("EWOULDBLOCK")))
+                    UnblockKind::TimedOut => return finish.call(ecx, Err(LibcError("EWOULDBLOCK")))
                 }
 
-                match this.try_non_block_send(&socket, buffer_ptr, length)? {
+                match ecx.try_non_block_send(&socket, buffer_ptr, length)? {
                     Err(IoError::HostError(e)) if e.kind() == io::ErrorKind::WouldBlock => {
                         // We need to block the thread again as it would still block.
-                        this.block_for_send(socket, deadline, buffer_ptr, length, finish)
+                        ecx.block_for_send(socket, deadline, buffer_ptr, length, finish)
                     },
-                    result => finish.call(this, result)
+                    result => finish.call(ecx, result)
                 }
             }),
         )
@@ -1147,9 +1124,9 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         &mut self,
         socket: &FileDescriptionRef<TcpSocket>,
         buffer_ptr: Pointer,
-        length: usize,
-    ) -> InterpResult<'tcx, Result<usize, IoError>> {
-        let this = self.eval_context_mut();
+        length: u64,
+    ) -> InterpResult<'tcx, Result<u64, IoError>> {
+        let ecx = self.eval_context_mut();
 
         let mut state = socket.state.borrow_mut();
         let SocketState::Connected(stream) = &mut *state else {
@@ -1157,7 +1134,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         };
 
         // This is a *non-blocking* write.
-        let result = this.write_to_host(stream, length, buffer_ptr)?;
+        let result = ecx.write_to_host(buffer_ptr, length, |buf| stream.write(buf))?;
 
         drop(state);
 
@@ -1172,7 +1149,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             {
                 // We know that the source is not writable so we need to update its readiness.
                 socket.io_readiness.borrow_mut().writable = false;
-                this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
+                ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
 
                 // On Windows hosts, `send` can return WSAENOTCONN where EAGAIN or EWOULDBLOCK
                 // would be returned on UNIX-like systems. We thus remap this error to an EWOULDBLOCK.
@@ -1202,7 +1179,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     target_os = "watchos",
                 )) {
                     socket.io_readiness.borrow_mut().writable = false;
-                    this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
+                    ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
                 } else {
                     // On hosts which don't use the `epoll` or `kqueue` backends, a short write
                     // doesn't imply a full write buffer. However, the target we are emulating might
@@ -1213,7 +1190,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     // This results in an unrealistic execution but we don't have another way of
                     // finding out whether the write buffer is full. The "default case" of linux
                     // host and linux target isn't affected by this.
-                    this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::FORCE_EDGE)?;
+                    ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::FORCE_EDGE)?;
                 }
                 interp_ok(result)
             }
@@ -1233,15 +1210,15 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         socket: FileDescriptionRef<TcpSocket>,
         deadline: Option<Deadline>,
         buffer_ptr: Pointer,
-        length: usize,
+        length: u64,
         should_peek: bool,
-        finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
+        finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
     ) -> InterpResult<'tcx> {
-        let this = self.eval_context_mut();
+        let ecx = self.eval_context_mut();
         // Since the callback holds a strong reference to the socket, the file description
         // won't be closed as long as some thread is blocked on it. While this reflects
         // what Linux does, for other Unix systems this might differ from the native behavior.
-        this.block_thread_for_io(
+        ecx.block_thread_for_io(
             socket.clone(),
             BlockingIoInterest::Read,
             deadline.clone(),
@@ -1249,25 +1226,25 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                 socket: FileDescriptionRef<TcpSocket>,
                 deadline: Option<Deadline>,
                 buffer_ptr: Pointer,
-                length: usize,
+                length: u64,
                 should_peek: bool,
-                finish: DynMachineCallback<'tcx, Result<usize, IoError>>,
-            } |this, kind: UnblockKind| {
+                finish: DynMachineCallback<'tcx, Result<u64, IoError>>,
+            } |ecx, kind: UnblockKind| {
                 // Remove the blocking I/O interest for unblocking this thread.
-                this.machine.blocking_io.remove_blocked_thread(socket.id(), this.machine.threads.active_thread());
+                ecx.machine.blocking_io.remove_blocked_thread(socket.id(), ecx.machine.threads.active_thread());
 
                 match kind {
                     UnblockKind::Ready => { /* fall-through to below */ },
                     // When the read timeout is exceeded EAGAIN/EWOULDBLOCK is returned.
-                    UnblockKind::TimedOut => return finish.call(this, Err(LibcError("EWOULDBLOCK")))
+                    UnblockKind::TimedOut => return finish.call(ecx, Err(LibcError("EWOULDBLOCK")))
                 }
 
-                match this.try_non_block_recv(&socket, buffer_ptr, length, should_peek)? {
+                match ecx.try_non_block_recv(&socket, buffer_ptr, length, should_peek)? {
                     Err(IoError::HostError(e)) if e.kind() == io::ErrorKind::WouldBlock => {
                         // We need to block the thread again as it would still block.
-                        this.block_for_recv(socket, deadline, buffer_ptr, length, should_peek, finish)
+                        ecx.block_for_recv(socket, deadline, buffer_ptr, length, should_peek, finish)
                     },
-                    result => finish.call(this, result)
+                    result => finish.call(ecx, result)
                 }
             }),
         )
@@ -1281,10 +1258,10 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         &mut self,
         socket: &FileDescriptionRef<TcpSocket>,
         buffer_ptr: Pointer,
-        length: usize,
+        length: u64,
         should_peek: bool,
-    ) -> InterpResult<'tcx, Result<usize, IoError>> {
-        let this = self.eval_context_mut();
+    ) -> InterpResult<'tcx, Result<u64, IoError>> {
+        let ecx = self.eval_context_mut();
 
         let mut state = socket.state.borrow_mut();
         let SocketState::Connected(stream) = &mut *state else {
@@ -1292,13 +1269,9 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         };
 
         // This is a *non-blocking* read/peek.
-        let result = this.read_from_host(
-            |buf| {
-                if should_peek { stream.peek(buf) } else { stream.read(buf) }
-            },
-            length,
-            buffer_ptr,
-        )?;
+        let result = ecx.read_from_host(buffer_ptr, length, |buf| {
+            if should_peek { stream.peek(buf) } else { stream.read(buf) }
+        })?;
 
         drop(state);
 
@@ -1308,7 +1281,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
             {
                 // We know that the source is not readable so we need to update its readiness.
                 socket.io_readiness.borrow_mut().readable = false;
-                this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
+                ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
 
                 // On Windows hosts, `recv` can return WSAENOTCONN where EAGAIN or EWOULDBLOCK
                 // would be returned on UNIX-like systems. We thus remap this error to an EWOULDBLOCK.
@@ -1347,7 +1320,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     target_os = "watchos",
                 )) {
                     socket.io_readiness.borrow_mut().readable = false;
-                    this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
+                    ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::DEFAULT)?;
                 } else {
                     // On hosts which don't use the `epoll` or `kqueue` backends, a short read
                     // doesn't imply an empty read buffer. However, the target we are emulating
@@ -1358,7 +1331,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     // This results in an unrealistic execution but we don't have another way of
                     // finding out whether the read buffer is empty. The "default case" of linux
                     // host and linux target isn't affected by this.
-                    this.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::FORCE_EDGE)?;
+                    ecx.update_fd_readiness(socket.clone(), ReadinessUpdateFlags::FORCE_EDGE)?;
                 }
                 interp_ok(result)
             }
@@ -1385,19 +1358,19 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         foreign_name: &'static str,
         action: DynMachineCallback<'tcx, Result<(), ()>>,
     ) -> InterpResult<'tcx> {
-        let this = self.eval_context_mut();
+        let ecx = self.eval_context_mut();
 
         let state = socket.state.borrow();
         match &*state {
             SocketState::Connecting(_) => { /* fall-through to below */ }
             SocketState::Connected(_) => {
                 drop(state);
-                return action.call(this, Ok(()));
+                return action.call(ecx, Ok(()));
             }
             _ => {
                 drop(state);
-                this.ensure_not_failed(&socket, foreign_name)?;
-                return action.call(this, Err(()));
+                ecx.ensure_not_failed(&socket, foreign_name)?;
+                return action.call(ecx, Err(()));
             }
         };
 
@@ -1406,7 +1379,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
         // We're currently connecting. Since the underlying mio socket is non-blocking,
         // the only way to determine whether we are done connecting is by polling.
 
-        this.block_thread_for_io(
+        ecx.block_thread_for_io(
             socket.clone(),
             BlockingIoInterest::Write,
             deadline,
@@ -1415,13 +1388,13 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     socket: FileDescriptionRef<TcpSocket>,
                     foreign_name: &'static str,
                     action: DynMachineCallback<'tcx, Result<(), ()>>,
-                } |this, kind: UnblockKind| {
+                } |ecx, kind: UnblockKind| {
                     // Remove the blocking I/O interest for unblocking this thread.
-                    this.machine.blocking_io.remove_blocked_thread(socket.id(), this.machine.threads.active_thread());
+                    ecx.machine.blocking_io.remove_blocked_thread(socket.id(), ecx.machine.threads.active_thread());
 
                     if UnblockKind::TimedOut == kind {
                         // This then means that the socket is not yet connected.
-                        return action.call(this, Err(()))
+                        return action.call(ecx, Err(()))
                     }
 
                     // The thread woke up because it's ready, indicating a writeable or error event.
@@ -1433,7 +1406,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                             drop(state);
                             // This can happen because we blocked the thread:
                             // maybe another thread "upgraded" the connection in the meantime.
-                            return action.call(this, Ok(()))
+                            return action.call(ecx, Ok(()))
                         },
                         _ => {
                             drop(state);
@@ -1441,20 +1414,20 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                             // Since this thread just got rescheduled, it could be that another
                             // thread realized that the connection failed and we're thus in
                             // an "invalid state".
-                            this.ensure_not_failed(&socket, foreign_name)?;
-                            return action.call(this, Err(()))
+                            ecx.ensure_not_failed(&socket, foreign_name)?;
+                            return action.call(ecx, Err(()))
                         }
                     };
 
                     drop(state);
 
                     // Set `socket.error` if `socket` currently has an error.
-                    this.update_last_error(&socket);
+                    ecx.update_last_error(&socket);
 
                     if socket.error.borrow().is_some() {
                         // There was an error during connecting.
                         // It's the program's responsibility to read SO_ERROR itself.
-                        return action.call(this, Err(()))
+                        return action.call(ecx, Err(()))
                     }
 
                     // There was no error during connecting. Mio advises also reading the peer address
@@ -1483,7 +1456,7 @@ trait EvalContextPrivExt<'tcx>: crate::MiriInterpCxExt<'tcx> {
                     *state = SocketState::Connected(stream);
                     drop(state);
 
-                    action.call(this, Ok(()))
+                    action.call(ecx, Ok(()))
                 }
             ),
         )

@@ -16,19 +16,19 @@
         {
           "line": 1354,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl FrameState::local_read"
         },
         {
           "line": 1324,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl FrameState::local_write"
         },
         {
           "line": 1373,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl FrameState::local_moved_to_memory"
         }
       ],
@@ -52,9 +52,9 @@
       ],
       "source_refs": [
         {
-          "line": 448,
+          "line": 260,
           "path": "upstream/miri-source/src/concurrency/sync.rs",
-          "source_sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43",
+          "source_sha256": "19ff5f7f755cb9cbbed59caae483bab8b40e2b40caa5a10d7555eebe3ef7d39e",
           "symbol": "mutex_lock"
         }
       ],
@@ -78,9 +78,9 @@
       ],
       "source_refs": [
         {
-          "line": 756,
+          "line": 758,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "trait EvalContextExt::terminate_active_thread"
         }
       ],
@@ -182,15 +182,15 @@
       ],
       "source_refs": [
         {
-          "line": 627,
+          "line": 629,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "trait EvalContextExt::get_or_create_thread_local_alloc"
         },
         {
           "line": 590,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl InterpCx < 'tcx , M >::eval_mir_constant"
         }
       ],
@@ -214,13 +214,13 @@
         {
           "line": 237,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-          "source_sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f",
+          "source_sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363",
           "symbol": "trait EvalContextPrivExt::tb_reborrow"
         },
         {
-          "line": 1053,
+          "line": 1052,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl InterpCx < 'tcx , M >::force_allocation"
         }
       ],
@@ -241,9 +241,9 @@
       ],
       "source_refs": [
         {
-          "line": 44,
+          "line": 77,
           "path": "upstream/miri-source/src/concurrency/scheduler.rs",
-          "source_sha256": "de8d43ad437dce996cb45200ac4a8dc05c88d46cb0f8a07969fb924dea6a9d73",
+          "source_sha256": "7e5e7aaa7658b8eece8485b6e890fd3ad490d0778435be73de9639cca15b2ecf",
           "symbol": "trait EvalContextPrivExt::schedule"
         }
       ],
@@ -264,21 +264,21 @@
       ],
       "source_refs": [
         {
-          "line": 181,
+          "line": 179,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "MiriMemoryKind"
         },
         {
           "line": 220,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "MayLeak::may_leak"
         },
         {
           "line": 231,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "MiriMemoryKind::should_save_allocation_span"
         }
       ],
@@ -406,7 +406,7 @@
         {
           "line": 237,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-          "source_sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f",
+          "source_sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363",
           "symbol": "trait EvalContextPrivExt::tb_reborrow"
         }
       ],
@@ -427,9 +427,9 @@
       ],
       "source_refs": [
         {
-          "line": 466,
+          "line": 465,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "trait EvalContextExt::visit_freeze_sensitive"
         }
       ],
@@ -450,9 +450,9 @@
       ],
       "source_refs": [
         {
-          "line": 1701,
+          "line": 1688,
           "path": "upstream/rustc-source/compiler/rustc_abi/src/lib.rs",
-          "source_sha256": "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94",
+          "source_sha256": "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954",
           "symbol": "FieldsShape"
         }
       ],
@@ -476,9 +476,9 @@
       ],
       "source_refs": [
         {
-          "line": 1701,
+          "line": 1688,
           "path": "upstream/rustc-source/compiler/rustc_abi/src/lib.rs",
-          "source_sha256": "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94",
+          "source_sha256": "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954",
           "symbol": "FieldsShape"
         }
       ],
@@ -506,7 +506,7 @@
         {
           "line": 1,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "source module (individual hooks and residual scope documented in linked implementation)"
         },
         {
@@ -516,9 +516,9 @@
           "symbol": "InterpCx::local_to_op"
         },
         {
-          "line": 731,
+          "line": 730,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "InterpCx::write_immediate_no_validate"
         }
       ],
@@ -545,15 +545,15 @@
       ],
       "source_refs": [
         {
-          "line": 275,
+          "line": 292,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl InterpCx < 'tcx , M >::layout_compat"
         },
         {
           "line": 206,
           "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/mod.rs",
-          "source_sha256": "33bf5c63819d302eec20eb85cf033b26ab26e7cb997da46f851a85720e3e95c8",
+          "source_sha256": "cef77cab4f3767f567b241a66ab5ad9742971dbf6b674f482c9c9b7c7a8d0c04",
           "symbol": "impl ArgAttributes::eq_abi"
         }
       ],
@@ -613,7 +613,7 @@
         {
           "line": 590,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl InterpCx < 'tcx , M >::eval_mir_constant"
         }
       ],
@@ -636,41 +636,41 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
+        "upstream/miri-source/src/concurrency/scheduler.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-        "upstream/miri-source/src/concurrency/scheduler.rs"
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs"
       ],
       "source_refs": [
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "InterpCx::step"
         },
         {
           "line": 604,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
-          "source_sha256": "f7145bfe88cc3229b7186a476428b9fb442a2a2520c3839de089edf3fbd0d600",
+          "source_sha256": "41e4325244d66409f5f0a732ba63c78155ed939cc60f668388f3c51e58d76118",
           "symbol": "InterpCx::storage_dead"
         },
         {
-          "line": 1134,
+          "line": 1150,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "InterpCx::return_from_current_stack_frame"
         },
         {
           "line": 517,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "InterpCx::go_to_block"
         },
         {
-          "line": 174,
+          "line": 205,
           "path": "upstream/miri-source/src/concurrency/scheduler.rs",
-          "source_sha256": "de8d43ad437dce996cb45200ac4a8dc05c88d46cb0f8a07969fb924dea6a9d73",
+          "source_sha256": "7e5e7aaa7658b8eece8485b6e890fd3ad490d0778435be73de9639cca15b2ecf",
           "symbol": "step_current_thread"
         }
       ],
@@ -701,13 +701,13 @@
         {
           "line": 417,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl InterpCx < 'tcx , M >::size_and_align_from_meta"
         },
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs",
-          "source_sha256": "149df3c55567b4579bc02f23acb2c4c4c4a7adca536b3068b4633f9685ff8476",
+          "source_sha256": "92b8021df9fe6c187fdc72be71be09c73e507a9622154652eb6669f17e4f1292",
           "symbol": "impl InterpCx < 'tcx , M >::get_vtable_size_and_align"
         }
       ],
@@ -741,7 +741,7 @@
         {
           "line": 74,
           "path": "upstream/miri-source/src/operator.rs",
-          "source_sha256": "d7dd1447a5c0886c845dbacfc713181ea168f6567cf424835065407660c46be2",
+          "source_sha256": "a555d16da959fa8c660ccf61742cc16158a44dea2d7745470d80f18690fb5dac",
           "symbol": "trait EvalContextExt::generate_nan"
         }
       ],
@@ -765,27 +765,27 @@
       ],
       "source_refs": [
         {
-          "line": 734,
+          "line": 750,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "init_fn_call"
         },
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "step"
         },
         {
-          "line": 436,
+          "line": 446,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "eval_callee_and_args"
         },
         {
           "line": 60,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/instance.rs",
-          "source_sha256": "8088daed4e592943728a3408474e6f1a82754de3ad1acd7694b966fddf17f2b8",
+          "source_sha256": "34d2121bcc1190733a59848b0740954afaf07f7be54aa519bd13e87746570753",
           "symbol": "InstanceKind"
         }
       ],
@@ -810,15 +810,15 @@
       ],
       "source_refs": [
         {
-          "line": 33,
+          "line": 25,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operand.rs",
           "source_sha256": "b0c33657c833a2b29d5dcfe1d27ef03fb174e8c62461b7b3e6353d57276212a7",
           "symbol": "Immediate"
         },
         {
-          "line": 26,
+          "line": 24,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "MemPlaceMeta"
         }
       ],
@@ -844,21 +844,21 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operator.rs",
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs"
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs"
       ],
       "source_refs": [
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "step"
         },
         {
-          "line": 436,
+          "line": 446,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "eval_callee_and_args"
         },
         {
@@ -868,9 +868,9 @@
           "symbol": "binary_op"
         },
         {
-          "line": 750,
+          "line": 743,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "get_ptr_alloc"
         }
       ],
@@ -904,7 +904,7 @@
         {
           "line": 1,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "source module (individual hooks and residual scope documented in linked implementation)"
         }
       ],
@@ -990,15 +990,15 @@
       ],
       "source_refs": [
         {
-          "line": 169,
+          "line": 168,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "impl InterpCx < 'tcx , M >::eval_intrinsic"
         },
         {
-          "line": 945,
+          "line": 860,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "impl InterpCx < 'tcx , M >::eval_nondiverging_intrinsic"
         }
       ],
@@ -1021,9 +1021,9 @@
       ],
       "source_refs": [
         {
-          "line": 138,
+          "line": 136,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
-          "source_sha256": "f7145bfe88cc3229b7186a476428b9fb442a2a2520c3839de089edf3fbd0d600",
+          "source_sha256": "41e4325244d66409f5f0a732ba63c78155ed939cc60f668388f3c51e58d76118",
           "symbol": "LocalState"
         }
       ],
@@ -1053,21 +1053,21 @@
       ],
       "source_refs": [
         {
-          "line": 480,
+          "line": 476,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operand.rs",
           "source_sha256": "b0c33657c833a2b29d5dcfe1d27ef03fb174e8c62461b7b3e6353d57276212a7",
           "symbol": "Operand"
         },
         {
-          "line": 55,
+          "line": 53,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "MemPlace"
         },
         {
-          "line": 138,
+          "line": 136,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
-          "source_sha256": "f7145bfe88cc3229b7186a476428b9fb442a2a2520c3839de089edf3fbd0d600",
+          "source_sha256": "41e4325244d66409f5f0a732ba63c78155ed939cc60f668388f3c51e58d76118",
           "symbol": "LocalState"
         }
       ],
@@ -1091,27 +1091,27 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs"
       ],
       "source_refs": [
         {
           "line": 498,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "check_ptr_access_signed"
         },
         {
-          "line": 1069,
+          "line": 1028,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "ptr_offset_inbounds"
         },
         {
           "line": 80,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "offset_with_meta_"
         }
       ],
@@ -1133,9 +1133,9 @@
       ],
       "source_refs": [
         {
-          "line": 1671,
+          "line": 1684,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/validity.rs",
-          "source_sha256": "7c038fb90de6b06a67124f8ab603d32bb73b68eb0cce9ad2d8766c9c171c5676",
+          "source_sha256": "dc21437da9edd4d65069b48b9621ec1d5f7baeac51c40194aed30900d5533cbc",
           "symbol": "impl InterpCx < 'tcx , M >::validate_place"
         }
       ],
@@ -1156,15 +1156,15 @@
       ],
       "source_refs": [
         {
-          "line": 1053,
+          "line": 1052,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl InterpCx < 'tcx , M >::force_allocation"
         },
         {
-          "line": 575,
+          "line": 574,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl InterpCx < 'tcx , M >::local_to_place"
         }
       ],
@@ -1189,12 +1189,12 @@
       ],
       "proofs": [],
       "source_modules": [
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/discriminant.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operand.rs",
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operator.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/projection.rs",
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/operator.rs",
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/discriminant.rs"
+        "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs"
       ],
       "source_refs": [
         {
@@ -1204,9 +1204,9 @@
           "symbol": "InterpCx::local_to_op"
         },
         {
-          "line": 731,
+          "line": 730,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "InterpCx::write_immediate_no_validate"
         },
         {
@@ -1224,7 +1224,7 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "InterpCx::step"
         },
         {
@@ -1263,13 +1263,13 @@
         {
           "line": 316,
           "path": "upstream/rustc-source/compiler/rustc_abi/src/lib.rs",
-          "source_sha256": "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94",
+          "source_sha256": "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954",
           "symbol": "TargetDataLayout"
         },
         {
-          "line": 2221,
+          "line": 2211,
           "path": "upstream/rustc-source/compiler/rustc_abi/src/lib.rs",
-          "source_sha256": "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94",
+          "source_sha256": "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954",
           "symbol": "LayoutData"
         }
       ],
@@ -1297,9 +1297,9 @@
       ],
       "source_refs": [
         {
-          "line": 308,
+          "line": 300,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/syntax.rs",
-          "source_sha256": "b2f38c58405cfb5999cbdf50770e151910c796a7f20c82456d37a3f39481f4e1",
+          "source_sha256": "9524753adde68df0bdccbfaf43390ad5cb0aaf9401f6f6c9dc1f273a27fa936e",
           "symbol": "StatementKind"
         }
       ],
@@ -1327,19 +1327,19 @@
         {
           "line": 132,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::perform_access"
         },
         {
           "line": 139,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "Permission::perform_access"
         },
         {
           "line": 140,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "TransitionError::ChildAccessForbidden"
         }
       ],
@@ -1369,19 +1369,19 @@
         {
           "line": 64,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::new_non_accessed"
         },
         {
           "line": 73,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::new_accessed"
         },
         {
           "line": 78,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::possible"
         }
       ],
@@ -1409,13 +1409,13 @@
         {
           "line": 182,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::skip_if_known_noop"
         },
         {
           "line": 240,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::record_new_access"
         }
       ],
@@ -1445,13 +1445,13 @@
         {
           "line": 991,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "Tree::perform_normal_access"
         },
         {
           "line": 89,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree_visitor.rs",
-          "source_sha256": "3aad8463a0a7a3b20d61f411b240a7ee258aeb158b70d3ad2a3ad1398395c622",
+          "source_sha256": "ad0b8db9a7521484dcc450655dc0a9e2e0afeee0e71c804fd90a8fd88cac1b3b",
           "symbol": "TreeVisitorStack::go_upwards_from_accessed"
         }
       ],
@@ -1681,31 +1681,31 @@
         {
           "line": 623,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "Tree::perform_access"
         },
         {
           "line": 913,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationTree::perform_access"
         },
         {
           "line": 991,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationTree::perform_normal_access"
         },
         {
           "line": 95,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-          "source_sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2",
+          "source_sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581",
           "symbol": "LocationState::perform_transition"
         },
         {
           "line": 89,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree_visitor.rs",
-          "source_sha256": "3aad8463a0a7a3b20d61f411b240a7ee258aeb158b70d3ad2a3ad1398395c622",
+          "source_sha256": "ad0b8db9a7521484dcc450655dc0a9e2e0afeee0e71c804fd90a8fd88cac1b3b",
           "symbol": "TreeVisitorStack::go_upwards_from_accessed"
         },
         {
@@ -1756,9 +1756,9 @@
       ],
       "source_refs": [
         {
-          "line": 115,
+          "line": 116,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/validity.rs",
-          "source_sha256": "7c038fb90de6b06a67124f8ab603d32bb73b68eb0cce9ad2d8766c9c171c5676",
+          "source_sha256": "dc21437da9edd4d65069b48b9621ec1d5f7baeac51c40194aed30900d5533cbc",
           "symbol": "impl fmt :: Display for PtrKind::fmt"
         },
         {
@@ -1789,13 +1789,13 @@
         {
           "line": 20,
           "path": "upstream/miri-source/src/shims/env.rs",
-          "source_sha256": "d0d079209c60fbbd52c5c9dc226401c75dbf41c2ed300e5f0c23ad2504e20953",
+          "source_sha256": "7c7bc9168d5d25db7c13696cffd648fd37cb5197999cc7cac6c9323bc10f08de",
           "symbol": "impl VisitProvenance for EnvVars < '_ >::visit_provenance"
         },
         {
           "line": 9,
           "path": "upstream/miri-source/src/shims/extern_static.rs",
-          "source_sha256": "932b392b7790d341ee2e51c1afcf95526325c8102498fd9271808ce3b2182956",
+          "source_sha256": "77b245ced9038b07995e6eb869d9720956be35c3f231c90ffd716df33a5a0acc",
           "symbol": "impl MiriMachine < 'tcx >::add_extern_static"
         }
       ],
@@ -1816,9 +1816,9 @@
       ],
       "source_refs": [
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         }
       ],
@@ -1842,7 +1842,7 @@
         {
           "line": 63,
           "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-          "source_sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6",
+          "source_sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e",
           "symbol": "impl VisitProvenance for GlobalStateInner::visit_provenance"
         }
       ],
@@ -1868,13 +1868,13 @@
         {
           "line": 11,
           "path": "upstream/miri-source/src/intrinsics/simd.rs",
-          "source_sha256": "c0a9d40ed09ed4b7ef9fa9560f5e2f69001fc5f4c51cd12871e80330cd81eb0e",
+          "source_sha256": "71f50ede9438efa76dfa7e4982543de6d1792e73d328d07566eb9dafaa31d9f8",
           "symbol": "trait EvalContextExt::emulate_simd_intrinsic"
         },
         {
           "line": 18,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics/simd.rs",
-          "source_sha256": "5cba3bde5e27d34755b928b95b54065a33843494d6e36e97b806e4ddef680be6",
+          "source_sha256": "904905b3099d0234278890c27dfef25175db3436d78544e4e89cd9b32011dd26",
           "symbol": "impl InterpCx < 'tcx , M >::eval_simd_intrinsic"
         }
       ],
@@ -1892,14 +1892,14 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/miri-source/src/concurrency/sync.rs"
+        "upstream/miri-source/src/meta_obj.rs"
       ],
       "source_refs": [
         {
-          "line": 25,
-          "path": "upstream/miri-source/src/concurrency/sync.rs",
-          "source_sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43",
-          "symbol": "impl fmt :: Display for AccessKind::fmt"
+          "line": 17,
+          "path": "upstream/miri-source/src/meta_obj.rs",
+          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
+          "symbol": "trait MetaObj::on_access"
         }
       ],
       "specifications": [],
@@ -1929,19 +1929,19 @@
         {
           "line": 54,
           "path": "upstream/miri-source/src/shims/tls.rs",
-          "source_sha256": "7df7a0191286e0756df8167561b425780fff7c16f0aaa2c3163ec2e448aa1232",
+          "source_sha256": "ced608c689c3c87cda3d257129f117c76bb6edd1511825d1c8c80fe0def3dcb8",
           "symbol": "impl Default for TlsData < 'tcx >::default"
         },
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         },
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/global_ctor.rs",
-          "source_sha256": "170a9f107b2763a46998c28fca14d075ff94e04e3841f6fa54cd99bd681d857e",
+          "source_sha256": "d473f55823b45a4b40024101cd510e7ce8619446ebaee08b97e2e389ac9fe9c5",
           "symbol": "impl GlobalCtorState < 'tcx >::on_stack_empty"
         }
       ],
@@ -1967,13 +1967,13 @@
         {
           "line": 34,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl MemPlaceMeta < Prov >::unwrap_meta"
         },
         {
           "line": 40,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "impl ThreadId::to_u32"
         }
       ],
@@ -1997,7 +1997,7 @@
         {
           "line": 30,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-          "source_sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f",
+          "source_sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363",
           "symbol": "impl Tree::new_allocation"
         }
       ],
@@ -2022,13 +2022,13 @@
         {
           "line": 35,
           "path": "upstream/miri-source/src/shims/unwind.rs",
-          "source_sha256": "4acdd880f901c371bf02635b866d4cdc7035730975b17a01b2d07eb7d8e6e488",
+          "source_sha256": "0b7b8c5b7e9d04aac36be01f88072be767d534ad67c659265d23aefba9d90152",
           "symbol": "impl VisitProvenance for CatchUnwindData < '_ >::visit_provenance"
         },
         {
           "line": 10,
           "path": "upstream/miri-source/src/shims/panic.rs",
-          "source_sha256": "00c9f15a3aa8ca0abbb10891046c45310ae3de00350f0ea318b84507df32d6e0",
+          "source_sha256": "f675a763951f32a5fd9d1977a5ba0bfc5f453fd0677978e1153fad61b617d7b0",
           "symbol": "trait EvalContextExt::start_panic"
         }
       ],
@@ -2049,9 +2049,9 @@
       ],
       "source_refs": [
         {
-          "line": 115,
+          "line": 116,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/validity.rs",
-          "source_sha256": "7c038fb90de6b06a67124f8ab603d32bb73b68eb0cce9ad2d8766c9c171c5676",
+          "source_sha256": "dc21437da9edd4d65069b48b9621ec1d5f7baeac51c40194aed30900d5533cbc",
           "symbol": "impl fmt :: Display for PtrKind::fmt"
         }
       ],
@@ -2077,13 +2077,13 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         },
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         }
       ],
@@ -2108,13 +2108,13 @@
         {
           "line": 9,
           "path": "upstream/miri-source/src/intrinsics/aarch64.rs",
-          "source_sha256": "c352213a2f789fb47233bca197a85b757b92264f857187376d1871941e2be8ae",
+          "source_sha256": "b86dfca2cd7cc9cbcb9a3be2b9cf41085943d84f241c9851e7cad4d1ac2dad4e",
           "symbol": "trait EvalContextExt::emulate_aarch64_intrinsic"
         },
         {
           "line": 9,
           "path": "upstream/miri-source/src/intrinsics/loongarch.rs",
-          "source_sha256": "bc9177a451c88aec572faba69667a04630e4efa2e904a4154be3298f005c12f1",
+          "source_sha256": "980e1c8295a5b266073067a89c62f0628eef971b6ad20a44e5de6062ed4ce115",
           "symbol": "trait EvalContextExt::emulate_loongarch_intrinsic"
         }
       ],
@@ -2147,13 +2147,13 @@
         {
           "line": 40,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "impl ThreadId::to_u32"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -2176,7 +2176,7 @@
         {
           "line": 12,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs",
-          "source_sha256": "149df3c55567b4579bc02f23acb2c4c4c4a7adca536b3068b4633f9685ff8476",
+          "source_sha256": "92b8021df9fe6c187fdc72be71be09c73e507a9622154652eb6669f17e4f1292",
           "symbol": "impl InterpCx < 'tcx , M >::get_vtable_ptr"
         }
       ],
@@ -2199,7 +2199,7 @@
         {
           "line": 22,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "try_resolve_did"
         }
       ],
@@ -2225,13 +2225,13 @@
         {
           "line": 34,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl MemPlaceMeta < Prov >::unwrap_meta"
         },
         {
           "line": 31,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
-          "source_sha256": "f7145bfe88cc3229b7186a476428b9fb442a2a2520c3839de089edf3fbd0d600",
+          "source_sha256": "41e4325244d66409f5f0a732ba63c78155ed939cc60f668388f3c51e58d76118",
           "symbol": "impl SpanGuard::new"
         }
       ],
@@ -2255,7 +2255,7 @@
         {
           "line": 13,
           "path": "upstream/miri-source/src/provenance_gc.rs",
-          "source_sha256": "06b8dd221a54bcea80c72215cf5da54f06ad33d8d4b3e757791c600a7d50c032",
+          "source_sha256": "fc1ce54de16bf2509a6626273de5efbf27e0fbdfbd782c58ace74aeb25f39976",
           "symbol": "trait VisitProvenance::visit_provenance"
         }
       ],
@@ -2278,10 +2278,10 @@
       ],
       "source_refs": [
         {
-          "line": 7,
+          "line": 6,
           "path": "upstream/miri-source/src/shims/unix/sync.rs",
-          "source_sha256": "ea34020495700fa5c854b8738e9701cc6835ffb1e03389dd9fe8a5407efa1c2e",
-          "symbol": "bytewise_equal"
+          "source_sha256": "8c89633c4415d832826c5f065f30eebf3e3ae9c8e93637e375e28fa21651d422",
+          "symbol": "is_initializer"
         }
       ],
       "specifications": [],
@@ -2305,7 +2305,7 @@
         {
           "line": 12,
           "path": "upstream/miri-source/src/shims/time.rs",
-          "source_sha256": "1b145492a8d3d7609c306903e06174a8699c302cee859d8dccb9a28d48171cb2",
+          "source_sha256": "8a3bc24c15da46fc5aeea96cb254c4f48db7460b61356538f485c33269f54d91",
           "symbol": "system_time_to_duration"
         }
       ],
@@ -2328,7 +2328,7 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         }
       ],
@@ -2354,14 +2354,14 @@
         {
           "line": 27,
           "path": "upstream/miri-source/src/concurrency/init_once.rs",
-          "source_sha256": "d6999c065b58b1e2dc357af3dbfeb3108c0ca2b57d207ede052ebfa2386d4e96",
+          "source_sha256": "3987ba94f35e90b35c6def0226ddd5c9c68abb06a01dc1df04caeca8bbda667c",
           "symbol": "impl InitOnce::status"
         },
         {
           "line": 15,
           "path": "upstream/miri-source/src/shims/windows/sync.rs",
-          "source_sha256": "3f1bceb70ea5f83d87ff8601dea8aca73a12992390e999b821a12cf8f730430e",
-          "symbol": "impl SyncObj for WindowsInitOnce::on_access"
+          "source_sha256": "faa2ba81ab88561e4ac471c612caac23302af1d5e95f270a1b884304615f48f0",
+          "symbol": "impl MetaObj for WindowsInitOnce::on_access"
         }
       ],
       "specifications": [],
@@ -2389,13 +2389,13 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         },
         {
-          "line": 68,
+          "line": 67,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/mod.rs",
-          "source_sha256": "e2b62bac03bbdcfbff6accb0b43e7f7d5b0d86c150050b001c4480fcb9edfe7d",
+          "source_sha256": "b1c5a758e39107d195db12a44f8248868b3dae2f0c786f493c20042ae2cff982",
           "symbol": "trait HasLocalDecls::local_decls"
         }
       ],
@@ -2418,15 +2418,15 @@
       ],
       "source_refs": [
         {
-          "line": 189,
+          "line": 195,
           "path": "upstream/miri-source/src/shims/sig.rs",
-          "source_sha256": "dec0df35f7cc638e69747071965a272ba90e6012a0a247c8c9a7f2f1d97606df",
+          "source_sha256": "8e119e3e2b9e4ec759947d3910a703c1c2af27e4cf61b59e494d3d0bf064a5c8",
           "symbol": "impl ShimSig < 'tcx , ARGS >::as_abi"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -2456,27 +2456,27 @@
       ],
       "source_refs": [
         {
-          "line": 23,
+          "line": 34,
           "path": "upstream/miri-source/src/shims/files.rs",
-          "source_sha256": "db9adfaf2da389bfc7331f46ff03450e2ae6788e23590428295de7fa1fe55098",
+          "source_sha256": "faccfc5ebacf76c40a7263f17eb015a90370e431131474be7c36fc751b7339c6",
           "symbol": "impl FdId::to_usize"
         },
         {
           "line": 18,
           "path": "upstream/miri-source/src/shims/io_error.rs",
-          "source_sha256": "9908fa6f56dc57146dfaad078f2cce0e93937c76ed2eb0519fe8ecd1ff562b1a",
+          "source_sha256": "79a9595dedb5eb1047a6ab1e769486ad46a13bd903d2be4c27d052fae42ca852",
           "symbol": "impl IoError::into_ntstatus"
         },
         {
           "line": 27,
           "path": "upstream/miri-source/src/shims/unix/fd.rs",
-          "source_sha256": "6b369d4b28a06aa1d0fd6fdb4c965b57bab15cc8c1a2ada2d78a6c5fb36ea03e",
+          "source_sha256": "cfe61d95b65360581d8a58a79c2662c01b7d218c14b87846a2afd2bc408f3571",
           "symbol": "trait UnixFileDescription::pread"
         },
         {
-          "line": 42,
+          "line": 46,
           "path": "upstream/miri-source/src/shims/unix/fs.rs",
-          "source_sha256": "bff9cf9dbe9870b680e8ccc297068c4fc9482385c3e2e1531324790ecd3ede77",
+          "source_sha256": "5fd89b2d5650caeedb6459d0a51a4740688a8138563d9e7ff2fffed0c0a7726b",
           "symbol": "impl DirStream::new"
         }
       ],
@@ -2505,19 +2505,19 @@
         {
           "line": 13,
           "path": "upstream/miri-source/src/math.rs",
-          "source_sha256": "44e555bbc85f2bd6bb2ec6d747d83eae1b97fd68208225af6d510f403da7c582",
+          "source_sha256": "657e1dcd2d8d1cc29b0fe93eef519bc41037e1610acbb318bece37f764cb60b8",
           "symbol": "trait ToHost::to_host"
         },
         {
-          "line": 12,
+          "line": 11,
           "path": "upstream/miri-source/src/shims/math.rs",
-          "source_sha256": "c2de6e58fc5129f87122835479b0fc0c8a15cf95bd8a5aa8d4239193402c85af",
+          "source_sha256": "43648b1d43d15b48ec0bdd4243e39fbeb8fbc9ec0cfea543ea5ae6d6dfdf9093",
           "symbol": "trait EvalContextExt::emulate_foreign_item_inner"
         },
         {
           "line": 10,
           "path": "upstream/miri-source/src/intrinsics/math.rs",
-          "source_sha256": "1557b5773e469512e31b6e8d04ac96f8533c58774166e4ec0e90119e2bd66f6c",
+          "source_sha256": "518adb54fa7d105d6a829e54539cde6f8d1bcff22007a43555e520eca592eef1",
           "symbol": "sqrt"
         }
       ],
@@ -2542,7 +2542,7 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         }
       ],
@@ -2564,9 +2564,9 @@
       ],
       "source_refs": [
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         }
       ],
@@ -2592,13 +2592,13 @@
         {
           "line": 22,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "try_resolve_did"
         },
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         }
       ],
@@ -2625,13 +2625,13 @@
         {
           "line": 40,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "impl ThreadId::to_u32"
         },
         {
           "line": 54,
           "path": "upstream/miri-source/src/shims/tls.rs",
-          "source_sha256": "7df7a0191286e0756df8167561b425780fff7c16f0aaa2c3163ec2e448aa1232",
+          "source_sha256": "ced608c689c3c87cda3d257129f117c76bb6edd1511825d1c8c80fe0def3dcb8",
           "symbol": "impl Default for TlsData < 'tcx >::default"
         }
       ],
@@ -2665,7 +2665,7 @@
         {
           "line": 28,
           "path": "upstream/miri-source/src/intrinsics/x86/mod.rs",
-          "source_sha256": "9ea5640e4b2122c2f03117fa7bc047f13a690b8b66934528df10b32bf5f72480",
+          "source_sha256": "4e0706262acc061f00cceda041c9a9eaebce2e48fdb3625920d4ed95bbbb7c90",
           "symbol": "trait EvalContextExt::emulate_x86_intrinsic"
         },
         {
@@ -2697,7 +2697,7 @@
         {
           "line": 10,
           "path": "upstream/miri-source/src/shims/backtrace.rs",
-          "source_sha256": "2f986d09e60db60a37920b3a2c8fcc3b659f5b1053e718349030e01d1c72d08b",
+          "source_sha256": "4b616c327aaeb69f3cfa932380df2db4ef0cc6c0b5e639b927011b6a9c1dbee4",
           "symbol": "trait EvalContextExt::handle_miri_backtrace_size"
         }
       ],
@@ -2727,13 +2727,13 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         },
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         }
       ],
@@ -2756,7 +2756,7 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         }
       ],
@@ -2785,7 +2785,7 @@
         {
           "line": 41,
           "path": "upstream/miri-source/src/shims/native_lib/mod.rs",
-          "source_sha256": "6431a4e7307f096534989a87d19a5458016094fcec027d413b42ff7078d664a3",
+          "source_sha256": "1e889363d22a86870ba3bc56af10ecf2a8b53165474d6b31d4493177631e1f9b",
           "symbol": "impl OwnedArg::new"
         }
       ],
@@ -2811,13 +2811,13 @@
         {
           "line": 20,
           "path": "upstream/miri-source/src/shims/os_str.rs",
-          "source_sha256": "d68b95f6754728d8eb9277293fa6cafa8bfbf948bdf73c8a62400e4314cc80a8",
+          "source_sha256": "d9a40cd72f8cbe5930c7d97903ed0a5f3e0e81ce71550b125f23ac8b35b89c6a",
           "symbol": "bytes_to_os_str"
         },
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/unix/mem.rs",
-          "source_sha256": "65763b3d77a1147e3d77b54ecd5256007d487fae1a10a22d3290430426854819",
+          "source_sha256": "ca88c0c2551af1b1e57f8e52d86d0db2bb6eb3c4a73f7726177d76f577164950",
           "symbol": "trait EvalContextExt::mmap"
         }
       ],
@@ -2842,13 +2842,13 @@
         {
           "line": 20,
           "path": "upstream/miri-source/src/intrinsics/mod.rs",
-          "source_sha256": "16978e1cc79b224daa0a94f49ca16e6bd335b56e3dda00e4048497d181ac095a",
+          "source_sha256": "130847b0cce1433c367d38373a1fc74f6fa987a09f152ef9764862a86a8de01d",
           "symbol": "check_intrinsic_arg_count"
         },
         {
           "line": 76,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl AtomicRwOrd::from"
         }
       ],
@@ -2879,19 +2879,19 @@
         {
           "line": 31,
           "path": "upstream/miri-source/src/shims/readiness.rs",
-          "source_sha256": "eba25a296d049ca58393b589cd787da165ad9149d1fb44ba66cabca0e9b7750a",
+          "source_sha256": "ecd836cda8e22fbc7c06e402bca313f4f99557755688e3ae81f127f017318444",
           "symbol": "impl std :: ops :: BitAnd for Readiness::bitand"
         },
         {
           "line": 19,
           "path": "upstream/miri-source/src/concurrency/blocking_io.rs",
-          "source_sha256": "5ea900b3022db1ada549770804e3ad05d37f1227d017cff64b617471fd5dabb0",
+          "source_sha256": "f57181bbb7f87ad8ba0abb36e8816238ed9469b5993bfd74f983e8bfdaf55ca0",
           "symbol": "trait SourceFileDescription::with_source"
         },
         {
           "line": 20,
           "path": "upstream/miri-source/src/shims/unix/linux_like/epoll.rs",
-          "source_sha256": "f0af3dcf8aced81f7ba14728d0049771dac7cfafdcd26be1cd50d5e37e497605",
+          "source_sha256": "771586ad2cd7deebe515d9f63669303778469699513d2cf481438b1fc7abdc36",
           "symbol": "impl FileDescription for Epoll::name"
         }
       ],
@@ -2914,15 +2914,15 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         },
         {
           "line": 17,
           "path": "upstream/miri-source/src/shims/windows/foreign_items.rs",
-          "source_sha256": "6e07813055481f5d715be5843ee6c3a5630e09a75d2713360b5f007f90f811d2",
+          "source_sha256": "72abf1f065dd0485420504141c65b51be49879636f5eccb541532c1d2b25ee38",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -2948,13 +2948,13 @@
         {
           "line": 40,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "impl ThreadId::to_u32"
         },
         {
-          "line": 30,
+          "line": 63,
           "path": "upstream/miri-source/src/concurrency/scheduler.rs",
-          "source_sha256": "de8d43ad437dce996cb45200ac4a8dc05c88d46cb0f8a07969fb924dea6a9d73",
+          "source_sha256": "7e5e7aaa7658b8eece8485b6e890fd3ad490d0778435be73de9639cca15b2ecf",
           "symbol": "trait EvalContextPrivExt::run_on_stack_empty"
         }
       ],
@@ -2984,15 +2984,15 @@
       ],
       "source_refs": [
         {
-          "line": 42,
+          "line": 46,
           "path": "upstream/miri-source/src/shims/unix/fs.rs",
-          "source_sha256": "bff9cf9dbe9870b680e8ccc297068c4fc9482385c3e2e1531324790ecd3ede77",
+          "source_sha256": "5fd89b2d5650caeedb6459d0a51a4740688a8138563d9e7ff2fffed0c0a7726b",
           "symbol": "impl DirStream::new"
         },
         {
           "line": 27,
           "path": "upstream/miri-source/src/shims/unix/fd.rs",
-          "source_sha256": "6b369d4b28a06aa1d0fd6fdb4c965b57bab15cc8c1a2ada2d78a6c5fb36ea03e",
+          "source_sha256": "cfe61d95b65360581d8a58a79c2662c01b7d218c14b87846a2afd2bc408f3571",
           "symbol": "trait UnixFileDescription::pread"
         }
       ],
@@ -3017,13 +3017,13 @@
         {
           "line": 22,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "try_resolve_did"
         },
         {
-          "line": 189,
+          "line": 195,
           "path": "upstream/miri-source/src/shims/sig.rs",
-          "source_sha256": "dec0df35f7cc638e69747071965a272ba90e6012a0a247c8c9a7f2f1d97606df",
+          "source_sha256": "8e119e3e2b9e4ec759947d3910a703c1c2af27e4cf61b59e494d3d0bf064a5c8",
           "symbol": "impl ShimSig < 'tcx , ARGS >::as_abi"
         }
       ],
@@ -3050,13 +3050,13 @@
         {
           "line": 25,
           "path": "upstream/miri-source/src/shims/cpu_affinity.rs",
-          "source_sha256": "1c1c63f589bc6c19d71d4e8b74642d4050e61d96035b7c18934c20d9ade4cbc7",
+          "source_sha256": "da3a92d2658c3f252e047ccb11c9c590319fa2101bfe7b9d46965ef4f5d61d71",
           "symbol": "impl CpuAffinityMask::new"
         },
         {
-          "line": 10,
+          "line": 9,
           "path": "upstream/miri-source/src/shims/unix/freebsd/foreign_items.rs",
-          "source_sha256": "08428ffa9a1cbd89a32ae60822a2eefc8b55ac1b845a350e8162f6e0a306aa40",
+          "source_sha256": "1124542128f69414cf1febbac31b3baae91465069f8e8cce9fad2f9bd2ceaf00",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -3081,13 +3081,13 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -3111,13 +3111,13 @@
         {
           "line": 13,
           "path": "upstream/miri-source/src/provenance_gc.rs",
-          "source_sha256": "06b8dd221a54bcea80c72215cf5da54f06ad33d8d4b3e757791c600a7d50c032",
+          "source_sha256": "fc1ce54de16bf2509a6626273de5efbf27e0fbdfbd782c58ace74aeb25f39976",
           "symbol": "trait VisitProvenance::visit_provenance"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -3142,13 +3142,13 @@
         {
           "line": 34,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl MemPlaceMeta < Prov >::unwrap_meta"
         },
         {
           "line": 11,
           "path": "upstream/miri-source/src/intrinsics/simd.rs",
-          "source_sha256": "c0a9d40ed09ed4b7ef9fa9560f5e2f69001fc5f4c51cd12871e80330cd81eb0e",
+          "source_sha256": "71f50ede9438efa76dfa7e4982543de6d1792e73d328d07566eb9dafaa31d9f8",
           "symbol": "trait EvalContextExt::emulate_simd_intrinsic"
         }
       ],
@@ -3173,13 +3173,13 @@
         {
           "line": 90,
           "path": "upstream/rustc-source/compiler/rustc_abi/src/layout.rs",
-          "source_sha256": "8ede3de7c80443f48368f61729d7f15fb93a71891972ed77565297a0902ff036",
+          "source_sha256": "df60b0bbca2a2761ae10854c13285cbee6a3bef15fba54b438900efdb609f2e8",
           "symbol": "absent"
         },
         {
           "line": 20,
           "path": "upstream/miri-source/src/shims/os_str.rs",
-          "source_sha256": "d68b95f6754728d8eb9277293fa6cafa8bfbf948bdf73c8a62400e4314cc80a8",
+          "source_sha256": "d9a40cd72f8cbe5930c7d97903ed0a5f3e0e81ce71550b125f23ac8b35b89c6a",
           "symbol": "bytes_to_os_str"
         }
       ],
@@ -3236,13 +3236,13 @@
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/unix/mem.rs",
-          "source_sha256": "65763b3d77a1147e3d77b54ecd5256007d487fae1a10a22d3290430426854819",
+          "source_sha256": "ca88c0c2551af1b1e57f8e52d86d0db2bb6eb3c4a73f7726177d76f577164950",
           "symbol": "trait EvalContextExt::mmap"
         },
         {
           "line": 18,
           "path": "upstream/miri-source/src/shims/io_error.rs",
-          "source_sha256": "9908fa6f56dc57146dfaad078f2cce0e93937c76ed2eb0519fe8ecd1ff562b1a",
+          "source_sha256": "79a9595dedb5eb1047a6ab1e769486ad46a13bd903d2be4c27d052fae42ca852",
           "symbol": "impl IoError::into_ntstatus"
         }
       ],
@@ -3260,20 +3260,20 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/miri-source/src/borrow_tracker/mod.rs",
+        "upstream/miri-source/src/meta_obj.rs",
         "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs"
       ],
       "source_refs": [
         {
-          "line": 22,
-          "path": "upstream/miri-source/src/borrow_tracker/mod.rs",
-          "source_sha256": "a06b4fe54f6b4d428fbbc305bd046a8130b70c353fe241ce55855f331dd314a3",
-          "symbol": "impl fmt :: Display for AccessKind::fmt"
+          "line": 17,
+          "path": "upstream/miri-source/src/meta_obj.rs",
+          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
+          "symbol": "trait MetaObj::on_access"
         },
         {
           "line": 12,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs",
-          "source_sha256": "149df3c55567b4579bc02f23acb2c4c4c4a7adca536b3068b4633f9685ff8476",
+          "source_sha256": "92b8021df9fe6c187fdc72be71be09c73e507a9622154652eb6669f17e4f1292",
           "symbol": "impl InterpCx < 'tcx , M >::get_vtable_ptr"
         }
       ],
@@ -3301,13 +3301,13 @@
         {
           "line": 28,
           "path": "upstream/miri-source/src/shims/windows/handle.rs",
-          "source_sha256": "3e0f7dce0bb80e74aa65809159554a235c6e19e95776037b5806cdc20ea94d02",
+          "source_sha256": "89f8a95e3dd6b529f4e839ec14294d9a7cfa285da593acade4bac3c3b8bad062",
           "symbol": "impl PseudoHandle::value"
         },
         {
           "line": 28,
           "path": "upstream/miri-source/src/shims/windows/fs.rs",
-          "source_sha256": "c0e726c16d53775c2d4fb0e0320d4a9bc7271c4a36015a6543eb3b6bbf6f2a49",
+          "source_sha256": "08994aee8542d2273b536971593d2d4d3da06ed5ded5384dbe58329700962b28",
           "symbol": "impl CreationDisposition::new"
         }
       ],
@@ -3333,13 +3333,13 @@
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/unix/mem.rs",
-          "source_sha256": "65763b3d77a1147e3d77b54ecd5256007d487fae1a10a22d3290430426854819",
+          "source_sha256": "ca88c0c2551af1b1e57f8e52d86d0db2bb6eb3c4a73f7726177d76f577164950",
           "symbol": "trait EvalContextExt::mmap"
         },
         {
           "line": 22,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "try_resolve_did"
         }
       ],
@@ -3368,13 +3368,13 @@
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         },
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         }
       ],
@@ -3399,7 +3399,7 @@
         {
           "line": 37,
           "path": "upstream/miri-source/src/shims/unix/linux_like/eventfd.rs",
-          "source_sha256": "56f871bd28308bccbcd28ee23828f4aaa8f0b3c2e1d19a6aae236059f3592990",
+          "source_sha256": "ed3645c64a8b2f1fb23731efc28685d41eb2eecc4408ef1bbd0a6add9536356d",
           "symbol": "impl FileDescription for EventFd::name"
         }
       ],
@@ -3426,7 +3426,7 @@
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "impl InterpCx < 'tcx , M >::step"
         },
         {
@@ -3460,7 +3460,7 @@
         {
           "line": 121,
           "path": "upstream/miri-source/src/concurrency/weak_memory.rs",
-          "source_sha256": "dce36b34e8efe44a44d67c111697fb2e00313cb3a252f865385942e03f24d554",
+          "source_sha256": "363184a4a6b82a81ac0c2745a00512d27253fc7bf7fba6c350d05f643e1ac67c",
           "symbol": "impl VisitProvenance for StoreBufferAlloc::visit_provenance"
         },
         {
@@ -3472,7 +3472,7 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -3498,15 +3498,15 @@
       ],
       "source_refs": [
         {
-          "line": 189,
+          "line": 195,
           "path": "upstream/miri-source/src/shims/sig.rs",
-          "source_sha256": "dec0df35f7cc638e69747071965a272ba90e6012a0a247c8c9a7f2f1d97606df",
+          "source_sha256": "8e119e3e2b9e4ec759947d3910a703c1c2af27e4cf61b59e494d3d0bf064a5c8",
           "symbol": "impl ShimSig < 'tcx , ARGS >::as_abi"
         },
         {
           "line": 14,
           "path": "upstream/miri-source/src/shims/unix/thread.rs",
-          "source_sha256": "d096374c2352938c2c9ce5390ce69ad0d899a47deb6287118a97082361ee67e3",
+          "source_sha256": "0a1c32ed53153cda6ede4f8491a80f769f8e4b184e0db974951d0a21832b67b4",
           "symbol": "trait EvalContextExt::pthread_create"
         }
       ],
@@ -3536,27 +3536,27 @@
       ],
       "source_refs": [
         {
-          "line": 11,
+          "line": 10,
           "path": "upstream/miri-source/src/shims/unix/socket_address.rs",
-          "source_sha256": "c2729bb9cfe5447f38e05c82f8c837b1baf7a83430d2646a4b858da46980441a",
+          "source_sha256": "b4369c06b12f85ae8dbdd0375521563b7d1d967e5dd24b1436d3ba89580c6664",
           "symbol": "trait EvalContextExt::getaddrinfo"
         },
         {
           "line": 75,
           "path": "upstream/miri-source/src/shims/unix/virtual_socket.rs",
-          "source_sha256": "53c932d0531b2f41f6c976b2e78da1080ae98efa50932b8427c43a42076b86bb",
+          "source_sha256": "be7799bd67c7aeda4472489e0712848ddae37371bf0caa2c4489f6583e77d25d",
           "symbol": "impl Buffer::new"
         },
         {
-          "line": 19,
+          "line": 20,
           "path": "upstream/miri-source/src/shims/unix/socket.rs",
-          "source_sha256": "d0ae513911b4b07fc1f96bb8ae34cad4e9a000b5e5081818a69cff8599e076b0",
+          "source_sha256": "6aa1e531353d44b176f344a1af45a6602afe433ba063f17e19d526a6448ae9d5",
           "symbol": "trait UnixSocketFileDescription::bind"
         },
         {
-          "line": 71,
+          "line": 70,
           "path": "upstream/miri-source/src/shims/unix/tcp_socket.rs",
-          "source_sha256": "5534c14a7b67a283149d3983e2ae210ccdade3f94eca8eeaf09f54641e770dbb",
+          "source_sha256": "1cf0333e410319b985a12b836268058c7b77999aa6451fff06323bdd7a8a758b",
           "symbol": "impl SocketState::as_socket_ref"
         }
       ],
@@ -3583,7 +3583,7 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         },
         {
@@ -3614,7 +3614,7 @@
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/unix/env.rs",
-          "source_sha256": "5ac7a5b7948f383015f7d341479296e657fa07d1915d2dfd38c966d7cf25434b",
+          "source_sha256": "487f16c28100307e264c2ed976bfa801aa887b944bfae3de54862d1b32e7d042",
           "symbol": "impl VisitProvenance for UnixEnvVars < '_ >::visit_provenance"
         }
       ],
@@ -3638,7 +3638,7 @@
         {
           "line": 20,
           "path": "upstream/miri-source/src/intrinsics/mod.rs",
-          "source_sha256": "16978e1cc79b224daa0a94f49ca16e6bd335b56e3dda00e4048497d181ac095a",
+          "source_sha256": "130847b0cce1433c367d38373a1fc74f6fa987a09f152ef9764862a86a8de01d",
           "symbol": "check_intrinsic_arg_count"
         }
       ],
@@ -3668,13 +3668,13 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         },
         {
-          "line": 78,
+          "line": 77,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "alloc_type_name"
         }
       ],
@@ -3704,13 +3704,13 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         },
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         }
       ],
@@ -3736,21 +3736,21 @@
       ],
       "source_refs": [
         {
-          "line": 11,
+          "line": 13,
           "path": "upstream/miri-source/src/shims/unix/linux_like/syscall.rs",
-          "source_sha256": "7c0972de7782529ec9320d554f99ac21b47b7060e048cfd1cbe8800b90c31ac4",
+          "source_sha256": "99aa3e849163f517344a3415a7a7064f952b0bfd919926354f130dea1ad54801",
           "symbol": "syscall"
         },
         {
-          "line": 11,
+          "line": 16,
           "path": "upstream/miri-source/src/shims/unix/linux_like/sync.rs",
-          "source_sha256": "437c64e70dd423b16f22a2b07e254e89cfd653670ddc7dc28f9713ab0e48f30b",
+          "source_sha256": "d529d972ee2fadda5897e909cded0c578b3057066aa240ad43df01e698a69187",
           "symbol": "futex"
         },
         {
           "line": 22,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "try_resolve_did"
         }
       ],
@@ -3800,21 +3800,21 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         },
         {
-          "line": 22,
+          "line": 21,
           "path": "upstream/miri-source/src/shims/unix/linux/foreign_items.rs",
-          "source_sha256": "f66a00e98ce784653085309bd58959a5a1750ece310fd34f1c8c5fa79a7daa49",
+          "source_sha256": "fa9090d56e37f7adcabe211e322cb22c6da84365a09c5aefcab4597673971a32",
           "symbol": "is_dyn_sym"
         },
         {
-          "line": 10,
+          "line": 9,
           "path": "upstream/miri-source/src/shims/unix/macos/foreign_items.rs",
-          "source_sha256": "b420ea1445cd4f3943192a6e9a010568b3319540cc7cca5dba4b2adff636a0d3",
+          "source_sha256": "a71bd378a166bf0d4e1975d669118242af5953c6bc3a0e4cb903e8cc98ed1803",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -3842,13 +3842,13 @@
         {
           "line": 10,
           "path": "upstream/miri-source/src/shims/windows/thread.rs",
-          "source_sha256": "b0c83d6113cde8f606d84fc6a8040a9062623a1e4cf524b46909ddd449afaf48",
+          "source_sha256": "246546baca7c575be6e6b750056de0ba31b4f216ba7f3d7be1e84c63f4d6e30d",
           "symbol": "trait EvalContextExt::CreateThread"
         },
         {
           "line": 18,
           "path": "upstream/miri-source/src/shims/windows/env.rs",
-          "source_sha256": "328632c11a0198f0ba98075f29963643d5143f86bd3815eb963dbe3d6c7dbb58",
+          "source_sha256": "bf15a3b3a162850cbc1af55a4c62dc15f929ca5157fc21ba9e09e12358c4bc4b",
           "symbol": "impl VisitProvenance for WindowsEnvVars::visit_provenance"
         }
       ],
@@ -3873,15 +3873,15 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         },
         {
           "line": 17,
           "path": "upstream/miri-source/src/shims/windows/foreign_items.rs",
-          "source_sha256": "6e07813055481f5d715be5843ee6c3a5630e09a75d2713360b5f007f90f811d2",
+          "source_sha256": "72abf1f065dd0485420504141c65b51be49879636f5eccb541532c1d2b25ee38",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -3909,13 +3909,13 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         },
         {
           "line": 19,
           "path": "upstream/miri-source/src/concurrency/blocking_io.rs",
-          "source_sha256": "5ea900b3022db1ada549770804e3ad05d37f1227d017cff64b617471fd5dabb0",
+          "source_sha256": "f57181bbb7f87ad8ba0abb36e8816238ed9469b5993bfd74f983e8bfdaf55ca0",
           "symbol": "trait SourceFileDescription::with_source"
         }
       ],
@@ -3941,13 +3941,13 @@
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         },
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         }
       ],
@@ -3984,7 +3984,7 @@
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "impl InterpCx < 'tcx , M >::step"
         }
       ],
@@ -4008,7 +4008,7 @@
         {
           "line": 29,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/layout.rs",
-          "source_sha256": "c5b8b4e3d25843f524468e7631142a13b849e5fa1c03e947671c39f94e66237f",
+          "source_sha256": "c2dd3910865b3aecedd282c1f8c83afa3c6504347b8ae3df51655402cd0a9911",
           "symbol": "impl abi :: Integer::to_ty"
         }
       ],
@@ -4029,20 +4029,20 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/miri-source/src/concurrency/sync.rs",
+        "upstream/miri-source/src/meta_obj.rs",
         "upstream/miri-source/src/shims/unix/linux_like/sync.rs"
       ],
       "source_refs": [
         {
-          "line": 25,
-          "path": "upstream/miri-source/src/concurrency/sync.rs",
-          "source_sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43",
-          "symbol": "impl fmt :: Display for AccessKind::fmt"
+          "line": 17,
+          "path": "upstream/miri-source/src/meta_obj.rs",
+          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
+          "symbol": "trait MetaObj::on_access"
         },
         {
-          "line": 11,
+          "line": 16,
           "path": "upstream/miri-source/src/shims/unix/linux_like/sync.rs",
-          "source_sha256": "437c64e70dd423b16f22a2b07e254e89cfd653670ddc7dc28f9713ab0e48f30b",
+          "source_sha256": "d529d972ee2fadda5897e909cded0c578b3057066aa240ad43df01e698a69187",
           "symbol": "futex"
         }
       ],
@@ -4064,9 +4064,9 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4096,13 +4096,13 @@
         {
           "line": 24,
           "path": "upstream/miri-source/src/shims/unix/env.rs",
-          "source_sha256": "5ac7a5b7948f383015f7d341479296e657fa07d1915d2dfd38c966d7cf25434b",
+          "source_sha256": "487f16c28100307e264c2ed976bfa801aa887b944bfae3de54862d1b32e7d042",
           "symbol": "impl VisitProvenance for UnixEnvVars < '_ >::visit_provenance"
         },
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4131,13 +4131,13 @@
         {
           "line": 17,
           "path": "upstream/miri-source/src/shims/windows/foreign_items.rs",
-          "source_sha256": "6e07813055481f5d715be5843ee6c3a5630e09a75d2713360b5f007f90f811d2",
+          "source_sha256": "72abf1f065dd0485420504141c65b51be49879636f5eccb541532c1d2b25ee38",
           "symbol": "is_dyn_sym"
         },
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         }
       ],
@@ -4167,13 +4167,13 @@
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -4197,15 +4197,15 @@
       ],
       "source_refs": [
         {
-          "line": 25,
+          "line": 30,
           "path": "upstream/miri-source/src/shims/unix/freebsd/sync.rs",
-          "source_sha256": "afbf0acc6c52bf7534fa64082388ed69d9c2d34253053b9832ed959b3ef40ee8",
+          "source_sha256": "1b7b43438bdd6e45671f751a2f2e660c480003b453dc0677d58e12e441cf1c57",
           "symbol": "trait EvalContextExt::_umtx_op"
         },
         {
-          "line": 10,
+          "line": 9,
           "path": "upstream/miri-source/src/shims/unix/freebsd/foreign_items.rs",
-          "source_sha256": "08428ffa9a1cbd89a32ae60822a2eefc8b55ac1b845a350e8162f6e0a306aa40",
+          "source_sha256": "1124542128f69414cf1febbac31b3baae91465069f8e8cce9fad2f9bd2ceaf00",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4229,15 +4229,15 @@
       ],
       "source_refs": [
         {
-          "line": 40,
+          "line": 38,
           "path": "upstream/miri-source/src/shims/unix/macos/sync.rs",
-          "source_sha256": "c5c8d524d6d512192fa89bad14a4a0f0bc5129972f94e972dddccc994e1db98f",
-          "symbol": "impl SyncObj for MacOsUnfairLock::on_access"
+          "source_sha256": "5093c7bc8c3a3ddc3403685e6f329364fd80310fa421469d2149b5a82c2015d6",
+          "symbol": "impl MetaObj for MacOsUnfairLock::on_access"
         },
         {
-          "line": 10,
+          "line": 9,
           "path": "upstream/miri-source/src/shims/unix/macos/foreign_items.rs",
-          "source_sha256": "b420ea1445cd4f3943192a6e9a010568b3319540cc7cca5dba4b2adff636a0d3",
+          "source_sha256": "a71bd378a166bf0d4e1975d669118242af5953c6bc3a0e4cb903e8cc98ed1803",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4263,19 +4263,19 @@
       "proofs": [],
       "source_modules": [
         "upstream/miri-source/src/concurrency/data_race.rs",
-        "upstream/miri-source/src/concurrency/sync.rs"
+        "upstream/miri-source/src/meta_obj.rs"
       ],
       "source_refs": [
         {
-          "line": 25,
-          "path": "upstream/miri-source/src/concurrency/sync.rs",
-          "source_sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43",
-          "symbol": "impl fmt :: Display for AccessKind::fmt"
+          "line": 17,
+          "path": "upstream/miri-source/src/meta_obj.rs",
+          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
+          "symbol": "trait MetaObj::on_access"
         },
         {
           "line": 76,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl AtomicRwOrd::from"
         }
       ],
@@ -4302,13 +4302,13 @@
         {
           "line": 57,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl HasDataLayout for InterpCx < 'tcx , M >::data_layout"
         },
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "impl InterpCx < 'tcx , M >::step"
         }
       ],
@@ -4331,9 +4331,9 @@
       ],
       "source_refs": [
         {
-          "line": 13,
+          "line": 12,
           "path": "upstream/miri-source/src/shims/unix/solarish/foreign_items.rs",
-          "source_sha256": "e177bf3f7b16066404a136d6b348c3b5ae806c904a187a950b83bc18f1cca957",
+          "source_sha256": "aba64550f2293a27c45b9598a2162c56820251b6d260a5c612baa64ebba76545",
           "symbol": "is_dyn_sym"
         },
         {
@@ -4365,7 +4365,7 @@
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -4388,9 +4388,9 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4420,13 +4420,13 @@
         {
           "line": 27,
           "path": "upstream/miri-source/src/shims/unix/fd.rs",
-          "source_sha256": "6b369d4b28a06aa1d0fd6fdb4c965b57bab15cc8c1a2ada2d78a6c5fb36ea03e",
+          "source_sha256": "cfe61d95b65360581d8a58a79c2662c01b7d218c14b87846a2afd2bc408f3571",
           "symbol": "trait UnixFileDescription::pread"
         },
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4450,15 +4450,15 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         },
         {
           "line": 54,
           "path": "upstream/miri-source/src/shims/tls.rs",
-          "source_sha256": "7df7a0191286e0756df8167561b425780fff7c16f0aaa2c3163ec2e448aa1232",
+          "source_sha256": "ced608c689c3c87cda3d257129f117c76bb6edd1511825d1c8c80fe0def3dcb8",
           "symbol": "impl Default for TlsData < 'tcx >::default"
         }
       ],
@@ -4482,13 +4482,13 @@
         {
           "line": 28,
           "path": "upstream/miri-source/src/intrinsics/x86/mod.rs",
-          "source_sha256": "9ea5640e4b2122c2f03117fa7bc047f13a690b8b66934528df10b32bf5f72480",
+          "source_sha256": "4e0706262acc061f00cceda041c9a9eaebce2e48fdb3625920d4ed95bbbb7c90",
           "symbol": "trait EvalContextExt::emulate_x86_intrinsic"
         },
         {
           "line": 20,
           "path": "upstream/miri-source/src/intrinsics/mod.rs",
-          "source_sha256": "16978e1cc79b224daa0a94f49ca16e6bd335b56e3dda00e4048497d181ac095a",
+          "source_sha256": "130847b0cce1433c367d38373a1fc74f6fa987a09f152ef9764862a86a8de01d",
           "symbol": "check_intrinsic_arg_count"
         }
       ],
@@ -4517,13 +4517,13 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -4549,21 +4549,21 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 21,
           "path": "upstream/miri-source/src/shims/unix/linux/foreign_items.rs",
-          "source_sha256": "f66a00e98ce784653085309bd58959a5a1750ece310fd34f1c8c5fa79a7daa49",
+          "source_sha256": "fa9090d56e37f7adcabe211e322cb22c6da84365a09c5aefcab4597673971a32",
           "symbol": "is_dyn_sym"
         },
         {
           "line": 10,
           "path": "upstream/miri-source/src/shims/unix/linux/mem.rs",
-          "source_sha256": "f151b5846a846a55d6553014916e56d20d4a31a5f88d5d83fbe34172676582c8",
+          "source_sha256": "bf0ba14205fb0e5f22c252865c654fe7ff038dc5f4f86a021ee9b769ec854138",
           "symbol": "trait EvalContextExt::mremap"
         },
         {
-          "line": 14,
+          "line": 13,
           "path": "upstream/miri-source/src/shims/unix/android/foreign_items.rs",
-          "source_sha256": "5d58ccc75a98da8453aaed8162972a1fac692c60532fbdb8faabcfc49feb8f9f",
+          "source_sha256": "21a64b14e672441928fc07d14809114290e025d137ecd67eaac634961c61ae8b",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4594,9 +4594,9 @@
           "symbol": "trait Projectable::layout"
         },
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -4647,21 +4647,21 @@
       ],
       "proofs": [],
       "source_modules": [
-        "upstream/miri-source/src/concurrency/sync.rs",
+        "upstream/miri-source/src/meta_obj.rs",
         "upstream/miri-source/src/shims/unix/sync.rs"
       ],
       "source_refs": [
         {
-          "line": 25,
-          "path": "upstream/miri-source/src/concurrency/sync.rs",
-          "source_sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43",
-          "symbol": "impl fmt :: Display for AccessKind::fmt"
+          "line": 17,
+          "path": "upstream/miri-source/src/meta_obj.rs",
+          "source_sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03",
+          "symbol": "trait MetaObj::on_access"
         },
         {
-          "line": 7,
+          "line": 6,
           "path": "upstream/miri-source/src/shims/unix/sync.rs",
-          "source_sha256": "ea34020495700fa5c854b8738e9701cc6835ffb1e03389dd9fe8a5407efa1c2e",
-          "symbol": "bytewise_equal"
+          "source_sha256": "8c89633c4415d832826c5f065f30eebf3e3ae9c8e93637e375e28fa21651d422",
+          "symbol": "is_initializer"
         }
       ],
       "specifications": [],
@@ -4685,13 +4685,13 @@
         {
           "line": 28,
           "path": "upstream/miri-source/src/intrinsics/x86/mod.rs",
-          "source_sha256": "9ea5640e4b2122c2f03117fa7bc047f13a690b8b66934528df10b32bf5f72480",
+          "source_sha256": "4e0706262acc061f00cceda041c9a9eaebce2e48fdb3625920d4ed95bbbb7c90",
           "symbol": "trait EvalContextExt::emulate_x86_intrinsic"
         },
         {
           "line": 11,
           "path": "upstream/miri-source/src/intrinsics/simd.rs",
-          "source_sha256": "c0a9d40ed09ed4b7ef9fa9560f5e2f69001fc5f4c51cd12871e80330cd81eb0e",
+          "source_sha256": "71f50ede9438efa76dfa7e4982543de6d1792e73d328d07566eb9dafaa31d9f8",
           "symbol": "trait EvalContextExt::emulate_simd_intrinsic"
         }
       ],
@@ -4734,7 +4734,7 @@
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         }
       ],
@@ -4762,7 +4762,7 @@
         {
           "line": 34,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl MemPlaceMeta < Prov >::unwrap_meta"
         },
         {
@@ -4796,13 +4796,13 @@
         {
           "line": 36,
           "path": "upstream/miri-source/src/eval.rs",
-          "source_sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d",
+          "source_sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692",
           "symbol": "entry_fn"
         },
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         }
       ],
@@ -4826,15 +4826,15 @@
       ],
       "source_refs": [
         {
-          "line": 78,
+          "line": 77,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-          "source_sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350",
+          "source_sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79",
           "symbol": "alloc_type_name"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -4860,13 +4860,13 @@
         {
           "line": 41,
           "path": "upstream/miri-source/src/shims/native_lib/mod.rs",
-          "source_sha256": "6431a4e7307f096534989a87d19a5458016094fcec027d413b42ff7078d664a3",
+          "source_sha256": "1e889363d22a86870ba3bc56af10ecf2a8b53165474d6b31d4493177631e1f9b",
           "symbol": "impl OwnedArg::new"
         },
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         }
       ],
@@ -4895,21 +4895,21 @@
       ],
       "source_refs": [
         {
-          "line": 23,
+          "line": 34,
           "path": "upstream/miri-source/src/shims/files.rs",
-          "source_sha256": "db9adfaf2da389bfc7331f46ff03450e2ae6788e23590428295de7fa1fe55098",
+          "source_sha256": "faccfc5ebacf76c40a7263f17eb015a90370e431131474be7c36fc751b7339c6",
           "symbol": "impl FdId::to_usize"
         },
         {
           "line": 37,
           "path": "upstream/miri-source/src/shims/unix/linux_like/eventfd.rs",
-          "source_sha256": "56f871bd28308bccbcd28ee23828f4aaa8f0b3c2e1d19a6aae236059f3592990",
+          "source_sha256": "ed3645c64a8b2f1fb23731efc28685d41eb2eecc4408ef1bbd0a6add9536356d",
           "symbol": "impl FileDescription for EventFd::name"
         },
         {
           "line": 20,
           "path": "upstream/miri-source/src/shims/unix/linux_like/epoll.rs",
-          "source_sha256": "f0af3dcf8aced81f7ba14728d0049771dac7cfafdcd26be1cd50d5e37e497605",
+          "source_sha256": "771586ad2cd7deebe515d9f63669303778469699513d2cf481438b1fc7abdc36",
           "symbol": "impl FileDescription for Epoll::name"
         }
       ],
@@ -4938,19 +4938,19 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         },
         {
           "line": 38,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-          "source_sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd",
+          "source_sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c",
           "symbol": "impl FnArg < 'tcx , Prov >::layout"
         },
         {
           "line": 30,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-          "source_sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f",
+          "source_sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363",
           "symbol": "impl Tree::new_allocation"
         }
       ],
@@ -4975,15 +4975,15 @@
       ],
       "source_refs": [
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         },
         {
           "line": 10,
           "path": "upstream/miri-source/src/shims/windows/thread.rs",
-          "source_sha256": "b0c83d6113cde8f606d84fc6a8040a9062623a1e4cf524b46909ddd449afaf48",
+          "source_sha256": "246546baca7c575be6e6b750056de0ba31b4f216ba7f3d7be1e84c63f4d6e30d",
           "symbol": "trait EvalContextExt::CreateThread"
         }
       ],
@@ -5011,13 +5011,13 @@
         {
           "line": 34,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-          "source_sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc",
+          "source_sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16",
           "symbol": "impl MemPlaceMeta < Prov >::unwrap_meta"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -5045,13 +5045,13 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         },
         {
           "line": 156,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "impl std :: fmt :: Debug for FrameExtra < 'tcx >::fmt"
         }
       ],
@@ -5080,13 +5080,13 @@
         {
           "line": 63,
           "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-          "source_sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6",
+          "source_sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e",
           "symbol": "impl VisitProvenance for GlobalStateInner::visit_provenance"
         },
         {
           "line": 41,
           "path": "upstream/miri-source/src/shims/native_lib/mod.rs",
-          "source_sha256": "6431a4e7307f096534989a87d19a5458016094fcec027d413b42ff7078d664a3",
+          "source_sha256": "1e889363d22a86870ba3bc56af10ecf2a8b53165474d6b31d4493177631e1f9b",
           "symbol": "impl OwnedArg::new"
         }
       ],
@@ -5113,21 +5113,21 @@
       ],
       "source_refs": [
         {
-          "line": 71,
+          "line": 70,
           "path": "upstream/miri-source/src/shims/unix/tcp_socket.rs",
-          "source_sha256": "5534c14a7b67a283149d3983e2ae210ccdade3f94eca8eeaf09f54641e770dbb",
+          "source_sha256": "1cf0333e410319b985a12b836268058c7b77999aa6451fff06323bdd7a8a758b",
           "symbol": "impl SocketState::as_socket_ref"
         },
         {
           "line": 75,
           "path": "upstream/miri-source/src/shims/unix/virtual_socket.rs",
-          "source_sha256": "53c932d0531b2f41f6c976b2e78da1080ae98efa50932b8427c43a42076b86bb",
+          "source_sha256": "be7799bd67c7aeda4472489e0712848ddae37371bf0caa2c4489f6583e77d25d",
           "symbol": "impl Buffer::new"
         },
         {
           "line": 40,
           "path": "upstream/miri-source/src/concurrency/thread.rs",
-          "source_sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6",
+          "source_sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d",
           "symbol": "impl ThreadId::to_u32"
         }
       ],
@@ -5156,13 +5156,13 @@
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "impl InterpCx < 'tcx , M >::step"
         },
         {
           "line": 57,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl HasDataLayout for InterpCx < 'tcx , M >::data_layout"
         }
       ],
@@ -5189,13 +5189,13 @@
         {
           "line": 63,
           "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-          "source_sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6",
+          "source_sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e",
           "symbol": "impl VisitProvenance for GlobalStateInner::visit_provenance"
         },
         {
           "line": 54,
           "path": "upstream/miri-source/src/shims/tls.rs",
-          "source_sha256": "7df7a0191286e0756df8167561b425780fff7c16f0aaa2c3163ec2e448aa1232",
+          "source_sha256": "ced608c689c3c87cda3d257129f117c76bb6edd1511825d1c8c80fe0def3dcb8",
           "symbol": "impl Default for TlsData < 'tcx >::default"
         }
       ],
@@ -5219,7 +5219,7 @@
         {
           "line": 63,
           "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-          "source_sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6",
+          "source_sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e",
           "symbol": "impl VisitProvenance for GlobalStateInner::visit_provenance"
         }
       ],
@@ -5247,13 +5247,13 @@
         {
           "line": 41,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl MayLeak for MemoryKind < T >::may_leak"
         },
         {
           "line": 76,
           "path": "upstream/miri-source/src/concurrency/data_race.rs",
-          "source_sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa",
+          "source_sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c",
           "symbol": "impl AtomicRwOrd::from"
         }
       ],
@@ -5281,13 +5281,13 @@
         {
           "line": 63,
           "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-          "source_sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6",
+          "source_sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e",
           "symbol": "impl VisitProvenance for GlobalStateInner::visit_provenance"
         },
         {
-          "line": 115,
+          "line": 116,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/validity.rs",
-          "source_sha256": "7c038fb90de6b06a67124f8ab603d32bb73b68eb0cce9ad2d8766c9c171c5676",
+          "source_sha256": "dc21437da9edd4d65069b48b9621ec1d5f7baeac51c40194aed30900d5533cbc",
           "symbol": "impl fmt :: Display for PtrKind::fmt"
         }
       ],
@@ -5314,7 +5314,7 @@
         {
           "line": 30,
           "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-          "source_sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f",
+          "source_sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363",
           "symbol": "impl Tree::new_allocation"
         },
         {
@@ -5347,15 +5347,15 @@
       ],
       "source_refs": [
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         },
         {
-          "line": 12,
+          "line": 11,
           "path": "upstream/miri-source/src/shims/math.rs",
-          "source_sha256": "c2de6e58fc5129f87122835479b0fc0c8a15cf95bd8a5aa8d4239193402c85af",
+          "source_sha256": "43648b1d43d15b48ec0bdd4243e39fbeb8fbc9ec0cfea543ea5ae6d6dfdf9093",
           "symbol": "trait EvalContextExt::emulate_foreign_item_inner"
         }
       ],
@@ -5379,15 +5379,15 @@
       ],
       "source_refs": [
         {
-          "line": 1485,
+          "line": 1468,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl InterpCx < 'tcx , M >::mem_copy_repeatedly"
         },
         {
           "line": 279,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl InterpCx < 'tcx , M >::insert_allocation"
         }
       ],
@@ -5410,9 +5410,9 @@
       ],
       "source_refs": [
         {
-          "line": 308,
+          "line": 300,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/syntax.rs",
-          "source_sha256": "b2f38c58405cfb5999cbdf50770e151910c796a7f20c82456d37a3f39481f4e1",
+          "source_sha256": "9524753adde68df0bdccbfaf43390ad5cb0aaf9401f6f6c9dc1f273a27fa936e",
           "symbol": "StatementKind"
         }
       ],
@@ -5436,9 +5436,9 @@
       ],
       "source_refs": [
         {
-          "line": 22,
+          "line": 23,
           "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-          "source_sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c",
+          "source_sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85",
           "symbol": "is_dyn_sym"
         }
       ],
@@ -5463,15 +5463,15 @@
       ],
       "source_refs": [
         {
-          "line": 1485,
+          "line": 1468,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl InterpCx < 'tcx , M >::mem_copy_repeatedly"
         },
         {
           "line": 279,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "impl InterpCx < 'tcx , M >::insert_allocation"
         }
       ],
@@ -5496,9 +5496,9 @@
       ],
       "source_refs": [
         {
-          "line": 308,
+          "line": 300,
           "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/syntax.rs",
-          "source_sha256": "b2f38c58405cfb5999cbdf50770e151910c796a7f20c82456d37a3f39481f4e1",
+          "source_sha256": "9524753adde68df0bdccbfaf43390ad5cb0aaf9401f6f6c9dc1f273a27fa936e",
           "symbol": "StatementKind"
         }
       ],
@@ -5524,13 +5524,13 @@
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "impl InterpCx < 'tcx , M >::step"
         },
         {
           "line": 57,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-          "source_sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba",
+          "source_sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8",
           "symbol": "impl HasDataLayout for InterpCx < 'tcx , M >::data_layout"
         }
       ],
@@ -5555,15 +5555,15 @@
       ],
       "source_refs": [
         {
-          "line": 32,
+          "line": 33,
           "path": "upstream/miri-source/src/shims/foreign_items.rs",
-          "source_sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482",
+          "source_sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d",
           "symbol": "impl DynSym::from_str"
         },
         {
-          "line": 12,
+          "line": 11,
           "path": "upstream/miri-source/src/shims/math.rs",
-          "source_sha256": "c2de6e58fc5129f87122835479b0fc0c8a15cf95bd8a5aa8d4239193402c85af",
+          "source_sha256": "43648b1d43d15b48ec0bdd4243e39fbeb8fbc9ec0cfea543ea5ae6d6dfdf9093",
           "symbol": "trait EvalContextExt::emulate_foreign_item_inner"
         }
       ],
@@ -5589,7 +5589,7 @@
         {
           "line": 380,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-          "source_sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8",
+          "source_sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c",
           "symbol": "InterpCx::deallocate_ptr"
         }
       ],
@@ -5615,7 +5615,7 @@
         {
           "line": 35,
           "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-          "source_sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c",
+          "source_sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451",
           "symbol": "InterpCx::step"
         }
       ],
@@ -5639,9 +5639,9 @@
       ],
       "source_refs": [
         {
-          "line": 967,
+          "line": 962,
           "path": "upstream/miri-source/src/machine.rs",
-          "source_sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4",
+          "source_sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4",
           "symbol": "MiriMachine::init_allocation"
         }
       ],
@@ -5666,9 +5666,9 @@
       ],
       "source_refs": [
         {
-          "line": 119,
+          "line": 118,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "iter_exported_symbols"
         }
       ],
@@ -5695,7 +5695,7 @@
         {
           "line": 176,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "EvalContextExt::eval_path"
         }
       ],
@@ -5721,7 +5721,7 @@
         {
           "line": 176,
           "path": "upstream/miri-source/src/helpers.rs",
-          "source_sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d",
+          "source_sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705",
           "symbol": "EvalContextExt::eval_path"
         }
       ],
