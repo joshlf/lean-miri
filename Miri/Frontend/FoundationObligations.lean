@@ -1,6 +1,7 @@
 import Miri.Frontend.Foundation
 import Miri.Frontend.FoundationTraitClaims
 import Miri.Frontend.FoundationExistentialBounds
+import Miri.Frontend.FoundationFnSupertraits
 import Miri.Frontend.FoundationOutlives
 
 /-! Pure checks for the small set of obligations understood by the restricted
@@ -73,7 +74,7 @@ def checkEnvironment (d : Document) (typeArgs : Array (Option ConcreteType))
         for argument in arguments.extract 1 arguments.size do
           unless (← str argument "kind") == "type" do throw "non-type dynamic trait argument unsupported"
           traitArguments := traitArguments.push (← instantiate typeArgs constArgs (← typeExpr d (← num argument "type")))
-        checkExplicitExistentialTrait existential definition traitArguments
+        checkSourceExistentialTrait d existential definition traitArguments
         continue
       unless arguments.size == 1 do throw "unsupported trait argument count"
       if path == "std::marker::Copy" || path == "std::marker::Sized" ||
