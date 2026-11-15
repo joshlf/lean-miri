@@ -70,11 +70,14 @@ For an ordinary std executable, the finite export now selects the actual
 from source. Its body captures the main function pointer in a closure, unsizes a
 reference to `dyn Fn() -> i32 + Sync + RefUnwindSafe`, and calls
 `std::rt::lang_start_internal`. The finite source preserves the structural
-principal, projection and auto-trait predicates, and Lean checks explicit
-bound matches. Closure source, wide-reference metadata, vtable construction,
-supertrait resolution and their MIR lowering must be connected before this
-path can run. Exporting the selected template does not
-establish an ordinary std startup execution.
+principal, projection and auto-trait predicates. Lean checks their explicit
+source bounds and the Fn/FnMut/FnOnce supertrait chain. The selected closure
+template retains inherited generics, a RustCall signature, captured upvars and
+generic MIR. Finite metadata declarations and target material determine the
+supported `&dyn` layout; Fn-family declarations determine candidate vtable
+slots. HRTB signature erasure, closure instances and shims, vtable allocations,
+and fixed-interpreter lowering must be connected before this path can run.
+These source and layout comparisons do not establish ordinary std startup.
 
 Lean rejects demands outside the supported source domain. In particular,
 general trait resolution, const-MIR evaluation, indirect ABI, broader calls,

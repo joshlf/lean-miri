@@ -75,12 +75,15 @@ trust boundary and export-only performance comparison are in
 
 For ordinary std main, the selected external `std::rt::lang_start` generic MIR
 and its actual promoted table are available as finite material. A `T: 'static`
-clause is checked purely for the unit domain. The next real source boundary is
-the closure captured by that body. The actual
+clause is checked purely for the unit domain. The captured closure's inherited
+generics, RustCall signature, upvars and five-block MIR are retained as finite
+source and match an independent compiler export. The actual
 `dyn Fn<()> + Output=i32 + Sync + RefUnwindSafe` type is retained structurally;
-Lean parses its principal, projection and auto-trait bounds and checks explicit
-source-bound matches. Supertrait resolution, closure layout/calls, vtable
-construction and allocation remain unsupported.
+Lean checks explicit bounds and the Fn/FnMut/FnOnce supertrait chain. Finite
+metadata declarations produce supported `dyn` and `&dyn` layouts, while Fn
+declarations produce candidate vtable slot order. Actual closure instances,
+shims, vtable allocations, HRTB signature erasure and fixed-interpreter std
+startup remain unsupported.
 
 ## Exported input coverage
 
