@@ -17,7 +17,24 @@ abbrev World := SourceCompilerWorld.World
 private abbrev scalarConstant := SourceConcreteTypes.scalarConstant
 private abbrev concreteType := SourceConcreteTypes.concreteType
 
-private def builtin (role : BuiltinTrait) (type : SourceTypes.Concrete) : Except String Bool := go 1024 type
+private def builtin (physical : SourceTypes.Material) (target : ABI.RuntimeTargetDataLayout)
+    (role : BuiltinTrait) (type : SourceTypes.Concrete) : Except String Bool := do
+  if role != .copy then
+    -- Sizedness belongs to the complete source-derived layout, not a list of
+    -- primitive type names. Scalar backends are sized; memory carries the
+    -- explicit DST flag. Never infer Sized from a zero byte-size alone.
+    let layout ← SourcePhysical.calculate physical target type
+    let some backend := layout.backendRepresentation | throw "typed ABI sizedness backend absent"
+    let sized ← if backend.kind == .memory then
+        match backend.sized with
+        | some sized => pure sized
+        | none => throw "typed ABI memory sizedness absent"
+      else pure true
+    if sized && layout.sizeBytes.isNone then throw "typed ABI sized layout byte size absent"
+    if role == .sized then return sized
+    if sized then return true -- every Sized type is MetaSized
+    throw "typed ABI unsized MetaSized proof unsupported"
+  go 1024 type
 where
   go (fuel : Nat) (type : SourceTypes.Concrete) : Except String Bool := do
     let .succ fuel := fuel | throw "typed ABI builtin traversal exhausted"
@@ -107,22 +124,40 @@ where
       throw "typed ABI callable nominal/dyn/closure equality unsupported"
     | _,_ => pure false
 
-/-- Pinned rustc's callable builtin: safe, nonvariadic Rust fn pointers have
-exact tupled inputs and output. Higher-ranked pointers remain unsupported by
-source instantiation rather than being instantiated with guessed lifetimes. -/
-private def callableOutput (self args : SourceTypes.Concrete) : Except String SourceTypes.Concrete := do
-  let .functionPointer inputs output safety convention variadic := self
-    | throw "typed ABI callable self is not a function pointer"
-  unless safety == .Safe && convention == .Rust && !variadic do
-    throw "typed ABI callable requires safe nonvariadic Rust function pointer"
-  let .tuple elements := args | throw "typed ABI callable argument is not a tuple"
-  unless (← callableTypeEqual (.tuple inputs) (.tuple elements)) do
+/-- Pinned callable confirmation: function pointers tuple their inputs, while
+closure RustCall signatures already contain their single tupled input. -/
+private def callableOutput (physical : SourceTypes.Material) (target : ABI.RuntimeTargetDataLayout)
+    (requested : CallableKind) (self args : SourceTypes.Concrete) : Except String SourceTypes.Concrete := do
+  let .tuple _ := args | throw "typed ABI callable argument is not a tuple"
+  let (inputs, output) ← match self with
+    | .functionPointer inputs output safety convention variadic => do
+      unless safety == .Safe && convention == .Rust && !variadic do
+        throw "typed ABI callable requires safe nonvariadic Rust function pointer"
+      pure (SourceTypes.Concrete.tuple inputs, output)
+    | .closure _ arguments => do
+      let some kind := arguments[arguments.size - 3]? | throw "typed ABI closure kind absent"
+      let available ← match kind with
+        | .primitive "int" "i8" => pure CallableKind.fn
+        | .primitive "int" "i16" => pure CallableKind.fnMut
+        | .primitive "int" "i32" => pure CallableKind.fnOnce
+        | _ => throw "typed ABI closure kind unsupported"
+      unless available == .fn || requested == .fnOnce || available == requested do
+        throw "typed ABI closure callable kind obligation unsatisfied"
+      let some (.functionPointer inputs output safety _ _) := arguments[arguments.size - 2]?
+        | throw "typed ABI closure signature absent"
+      unless safety == .Safe do
+        throw "typed ABI callable closure signature is unsafe"
+      let [input] := inputs.toList | throw "typed ABI closure signature tuple arity unsupported"
+      let .tuple _ := input | throw "typed ABI closure signature input is not tupled"
+      pure (input, output)
+    | _ => throw "typed ABI callable self constructor unsupported"
+  unless (← callableTypeEqual inputs args) do
     throw "typed ABI callable input tuple mismatch"
-  unless (← builtin .sized output) do throw "typed ABI callable output is not Sized"
+  unless (← builtin physical target .sized output) do throw "typed ABI callable output is not Sized"
   return output
 
 private def checkClauses (source : Input.SourceMaterial) (abi : Material) (physical : SourceTypes.Material)
-    (types : Array (Option SourceTypes.Concrete)) (constants : Array (Option Nat)) (owner : DefinitionId) : Except String Unit :=
+    (types : Array (Option SourceTypes.Concrete)) (constants : Array (Option Nat)) (target : ABI.RuntimeTargetDataLayout) (owner : DefinitionId) : Except String Unit :=
   go (source.genericLayers.size + 1) #[] owner
 where
   go (fuel : Nat) (active : Array DefinitionId) (owner : DefinitionId) : Except String Unit := do
@@ -143,11 +178,13 @@ where
         unless declaration.definition == definition do throw "typed ABI builtin language identity mismatch"
         unless declaration.pinnedCore do throw "typed ABI builtin requires pinned core declaration source"
         let type ← SourceTypes.instantiate physical types constants self
-        unless (← builtin role type) do throw "typed ABI builtin obligation unsatisfied"
+        unless (← builtin physical target role type) do throw "typed ABI builtin obligation unsatisfied"
       | .trait definition none arguments =>
         if abi.callables.any (·.definition == definition) then
+          let [declaration] := (abi.callables.filter (·.definition == definition)).toList
+            | throw "typed ABI callable declaration ambiguous"
           let [self,args] := arguments.toList | throw "typed ABI callable trait arity unsupported"
-          let _ ← callableOutput (← SourceTypes.instantiate physical types constants self)
+          let _ ← callableOutput physical target declaration.kind (← SourceTypes.instantiate physical types constants self)
             (← SourceTypes.instantiate physical types constants args)
         else
           let [self] := arguments.toList | throw "typed ABI ordinary trait arguments unsupported"
@@ -160,7 +197,7 @@ where
           | throw "typed ABI associated projection declaration unsupported"
         unless declaration.kind == .fnOnce do throw "typed ABI projection is not FnOnce Output"
         let [self,args] := arguments.toList | throw "typed ABI callable projection arity unsupported"
-        let output ← callableOutput (← SourceTypes.instantiate physical types constants self)
+        let output ← callableOutput physical target declaration.kind (← SourceTypes.instantiate physical types constants self)
           (← SourceTypes.instantiate physical types constants args)
         unless (← callableTypeEqual output (← SourceTypes.instantiate physical types constants term)) do
           throw "typed ABI callable Output mismatch"
@@ -302,7 +339,7 @@ def derive (initial : World) (callee : CallInstance) (extra : Array MIR.TyId) : 
         | .primitive "uint" "usize" => pure ()
         | _ => throw "typed ABI declared const parameter type unsupported"
     owner := layer.parent
-  checkClauses source material physical types constants key.definition
+  checkClauses source material physical types constants (← SourcePhysical.target world) key.definition
   let signature := function.signature
   unless signature.abi == .Rust && !signature.cVariadic do
     throw "typed ABI convention/binder/variadic source unsupported"
