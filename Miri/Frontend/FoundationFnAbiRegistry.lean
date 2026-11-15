@@ -13,7 +13,7 @@ private def internAbiType (registry : PhysicalTypeRegistry) (ty : ConcreteType) 
     Except String (PhysicalTypeRegistry × AbiTypeBinding) := do
   let (registry, id) ← registry.intern ty
   let (node, layout) ← registry.lookup id
-  let expected ← layoutOfDocument registry.registry.document ty
+  let expected ← rustAbiLayoutOfDocument registry.registry.document ty
   unless layout.sizeBytes == some expected.size && layout.abiAlignBytes == some expected.align do
     throw "foundation ABI physical layout size/alignment mismatch"
   let _ ← registry.runtimeLayout id

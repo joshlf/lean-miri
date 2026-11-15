@@ -84,7 +84,9 @@ def scalarAggregateLayout (target : ABI.RuntimeTargetDataLayout)
   for i in order do
     let some field := fields[i]? | throw "aggregate source field absent"
     offset := aligned offset (field.abiAlignBytes.getD 1)
-    offsets := offsets.set! i offset
+    if h : i < offsets.size then
+      offsets := offsets.set i offset h
+    else throw "aggregate offset index absent"
     if let some n := field.largestNiche then
       if available (some n) > largest then
         largest := available (some n)

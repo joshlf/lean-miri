@@ -55,7 +55,7 @@ private def binding (r : PhysicalTypeRegistry) (ty : ConcreteType) :
     Except String (PhysicalTypeRegistry × AbiTypeBinding) := do
   let (r, id) ← r.intern ty
   let (node, layout) ← r.lookup id
-  let expected ← layoutOfDocument r.registry.document ty
+  let expected ← rustAbiLayoutOfDocument r.registry.document ty
   unless layout.sizeBytes == some expected.size && layout.abiAlignBytes == some expected.align do
     throw "signature ABI physical layout disagreement"
   let _ ← r.runtimeLayout id

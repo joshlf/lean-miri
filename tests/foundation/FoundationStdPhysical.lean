@@ -61,4 +61,21 @@ def main (paths : List String) : IO Unit := do
     let expected ← expect (Input.JsonReader.run Input.DecoderValues.decodeCompilerLayout expected.compress)
     let expected ← expect ((Input.RuntimeMetadata.layout target expected).mapError toString)
     check (actual.layout == expected) "complete source scalar wrapper differs"
-  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers; unsupported aggregate controls"
+  let methodMode ← expect (oracle.getObjVal? "exitcode_method_mode")
+  let methodDef ← expect (methodMode.getObjVal? "definition")
+  let crate ← expect (methodDef.getObjValAs? Nat "crate")
+  let index ← expect (methodDef.getObjValAs? Nat "index")
+  let some defId := closureSource.definitions.findIdx? (fun row =>
+    (row.getObjValAs? Nat "crate_index").toOption == some crate &&
+    (row.getObjValAs? Nat "index").toOption == some index)
+    | throw (IO.userError "method argument source declaration absent")
+  let expectedMode ← expect (methodMode.getObjVal? "mode")
+  let expectedMode ← expect (Input.JsonReader.run (Input.DecoderValues.parseAbiPassMode "$.mode") expectedMode.compress)
+  let actualMode ← expect (rustPassModeOfDocument closureSource false (.nominal defId #[]))
+  check (actualMode == expectedMode) "complete std ExitCode::to_i32 argument pass-mode differs"
+  rejects (rustPassMode closureSource.target closureSource.target.architecture false (.nominal defId #[]))
+  rejects (rustPassModeOfDocument { closureSource with target := { closureSource.target with architecture := "aarch64" } }
+    false (.nominal defId #[]))
+  let some result := prepared.item.localTypes[5]? | throw (IO.userError "Result source absent")
+  rejects (rustPassModeOfDocument d false result)
+  IO.println "PASS actual std prepareItem, all7 complete local layouts, direct root FnAbi, both source ExitCode wrappers/method mode; unsupported aggregate controls"

@@ -1,4 +1,5 @@
 import Miri.Frontend.FoundationLayout
+import Miri.Frontend.FoundationPhysicalTypes
 
 /-! Demand-time components of the pinned Rust ABI algorithm.
 
@@ -116,9 +117,31 @@ def rustModeShape (target : Target) (architecture : String) (isReturn : Bool)
     (ty : ConcreteType) : Except String RustModeShape :=
   rustModeCore target architecture isReturn ty (layoutOf target)
 
-/-- Use finite declaration material when a dyn pointer needs its metadata layout. -/
-def rustModeShapeOfDocument (d : Document) (isReturn : Bool) (ty : ConcreteType) : Except String RustModeShape :=
-  rustModeCore d.target d.target.architecture isReturn ty (layoutOfDocument d)
+/-- ABI layout context from the same checked pure physical construction used
+by the document registry, including supported nominal declarations. -/
+def rustAbiLayoutOfDocument (d : Document) (ty : ConcreteType) : Except String FoundationLayout := do
+  let row ← physicalLayoutOfDocument d ty
+  let some size := row.sizeBytes | throw "ABI physical size absent"
+  let some align := row.abiAlignBytes | throw "ABI physical alignment absent"
+  return ⟨size,align⟩
+
+def rustModeShapeOfDocument (d : Document) (isReturn : Bool) (ty : ConcreteType) : Except String RustModeShape := do
+  if let .nominal .. := ty then
+    unless d.target.architecture == "x86_64" && d.target.pointerSizeBits == 64 do
+      throw "nominal Rust ABI requires explicit x86_64 target"
+    let row ← physicalLayoutOfDocument d ty
+    if row.sizeBytes == some 0 then return .ignore
+    let some backend := row.backendRepresentation | throw "nominal backend absent"
+    let some scalar := backend.scalar | throw "nominal Rust ABI requires integer scalar"
+    unless backend.kind == .scalar && scalar.kind == .initialized &&
+        scalar.primitive.kind == .integer && scalar.validRange.isSome do
+      throw "nominal pointer/aggregate Rust ABI unsupported"
+    -- arg_attrs_for_rust_scalar returns NoUndef immediately for initialized
+    -- integers; adjust_for_rust_abi tests scalar validity, not nominal TyKind,
+    -- when applying bool zero-extension. No pointee/trait facts are needed.
+    return .direct (scalar.primitive.sizeBytes == 1 && scalar.primitive.signed == some false &&
+      scalar.validRange == some (0,1))
+  rustModeCore d.target d.target.architecture isReturn ty (rustAbiLayoutOfDocument d)
 
 /-- Instantiate the requested finite type before computing its mode projection. -/
 def rustModeShapeOfType (d : Document) (architecture : String) (isReturn : Bool)

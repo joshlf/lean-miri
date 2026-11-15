@@ -24,6 +24,16 @@ for t in source['types']:
             'std::process::ExitCode', 'std::sys::process::unix::common::ExitCode']:
         wrappers.append({'definition': source['definitions'][shape['def_id']],
                          'layout': source['layout_values'][source['layouts'][t['layout']]]})
+method = [r for r in source['instances'] if r.get('def_path') == 'std::process::ExitCode::to_i32']
+assert len(method) == 1
+queries = [q for q in source['compiler_instance_abis'] if q['instance_id'] == method[0]['instance_id']]
+assert len(queries) == 1 and not queries[0]['extra_argument_types']
+method_abi = source['fn_abis'][queries[0]['abi_query']]
+assert len(method_abi['arguments']) == 1
+argument = source['abi_arguments'][method_abi['arguments'][0]]
+argument_type = source['types'][argument['type']]['shape']
+assert argument_type['def_path'] == 'std::process::ExitCode'
+method_mode = {'definition': source['definitions'][argument_type['def_id']], 'mode': argument['mode']}
 json.dump({'rustc_commit': source['producer']['rustc_commit'], 'local_layouts': rows,
-           'scalar_wrappers': wrappers, 'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
+           'scalar_wrappers': wrappers, 'exitcode_method_mode': method_mode, 'capture_tuple_layout': source['layout_values'][source['layouts'][tuple_row['layout']]]},
           open(sys.argv[2], 'w'))
