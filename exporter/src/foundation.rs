@@ -3,6 +3,14 @@
 //! This format deliberately has no runtime query answers or successful fallback
 //! rows. Unsupported source forms abort export. A consumer must implement their
 //! semantics from the material; this format is not executable schema12 input.
+#[path = "foundation_signature_binder.rs"]
+mod signature_binder_material;
+#[path = "foundation_start_edge.rs"]
+mod start_edge_material;
+#[path = "foundation_fn_vtable.rs"]
+mod fn_vtable_material;
+#[path = "foundation_closure.rs"]
+mod closure_material;
 #[path = "foundation_allocations.rs"]
 mod allocation_material;
 #[path = "foundation_const_def.rs"]
@@ -15,6 +23,11 @@ mod source_material;
 mod foreign_symbol_material;
 #[path = "foundation_link_sections.rs"]
 mod link_section_material;
+
+#[path = "foundation_dynamic.rs"]
+mod dynamic_material;
+#[path = "foundation_dyn_metadata.rs"]
+mod dyn_metadata_material;
 
 use std::collections::HashMap;
 use rustc_driver::{Callbacks, Compilation};
@@ -58,7 +71,7 @@ impl<'tcx> Material<'tcx> {
         if let Some(id) = self.def_ids.get(&def) { return *id; }
         let id = self.definitions.len();
         self.def_ids.insert(def, id);
-        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def),"kind":match tcx.def_kind(def) {rustc_hir::def::DefKind::Fn=>"fn".to_string(),rustc_hir::def::DefKind::AssocFn=>"assoc_fn".to_string(),rustc_hir::def::DefKind::Const=>"const".to_string(),other=>format!("{other:?}")}}));
+        self.definitions.push(json!({"definition_id":id,"crate_index":def.krate.as_u32(),"index":def.index.as_u32(),"path":tcx.def_path_str(def),"kind":match tcx.def_kind(def) {rustc_hir::def::DefKind::Fn=>"fn".to_string(),rustc_hir::def::DefKind::AssocFn=>"assoc_fn".to_string(),rustc_hir::def::DefKind::Const=>"const".to_string(),rustc_hir::def::DefKind::Closure=>"closure".to_string(),other=>format!("{other:?}")}}));
         id
     }
     fn constant(&mut self, tcx: TyCtxt<'tcx>, c: ty::Const<'tcx>) -> Result<Value> {
@@ -101,8 +114,7 @@ impl<'tcx> Material<'tcx> {
             ty::Slice(t) => json!({"kind":"slice","element":self.ty(tcx,t)?}),
             ty::RawPtr(t,m) => json!({"kind":"raw_pointer","pointee":self.ty(tcx,t)?,"mutable":m.is_mut()}),
             ty::Ref(r,t,m) => {
-                if !matches!(r.kind(), ty::ReErased | ty::ReStatic) { return unsupported("reference region",r); }
-                json!({"kind":"reference","pointee":self.ty(tcx,t)?,"mutable":m.is_mut(),"region":if matches!(r.kind(),ty::ReStatic) {"static"} else {"erased"}})
+                json!({"kind":"reference","pointee":self.ty(tcx,t)?,"mutable":m.is_mut(),"region":self.signature_region(tcx,r)?})
             }
             ty::FnPtr(signature, header) => {
                 let signature = signature.with(header);
@@ -119,6 +131,8 @@ impl<'tcx> Material<'tcx> {
                     "c_variadic":signature.c_variadic(),
                 }})
             },
+            ty::Dynamic(predicates,region) => self.dynamic_type(tcx,predicates,region)?,
+            ty::Closure(d,a) => self.closure_type(tcx,d,a)?,
             ty::FnDef(d,a) => {
                 if !a.bound_vars().is_empty() { return unsupported("bound function arguments", a); }
                 json!({"kind":"function_definition","definition":self.definition(tcx,d),"arguments":self.args(tcx,a.skip_binder())?})
@@ -176,6 +190,16 @@ impl<'tcx> Material<'tcx> {
     fn rvalue(&mut self, tcx: TyCtxt<'tcx>, r: &mir::Rvalue<'tcx>) -> Result<Value> {
         Ok(match r {
             mir::Rvalue::Use(o,retag) => json!({"kind":"use","operand":self.operand(tcx,o)?,"retag":retag.yes()}),
+            mir::Rvalue::Ref(region,mir::BorrowKind::Shared,place) => {
+                if !matches!(region.kind(),ty::ReErased|ty::ReStatic) { return unsupported("MIR borrow region",region); }
+                json!({"kind":"ref","region":if matches!(region.kind(),ty::ReStatic){"static"}else{"erased"},"borrow_kind":"shared","place":self.place(tcx,*place)?})
+            },
+            mir::Rvalue::Aggregate(kind,operands) => match &**kind {
+                mir::AggregateKind::Closure(def,args) => json!({"kind":"aggregate_closure","definition":self.definition(tcx,*def),"arguments":self.args(tcx,args)?,"operands":operands.iter().map(|o|self.operand(tcx,o)).collect::<Result<Vec<_>>>()?}),
+                other => return unsupported("aggregate rvalue",other),
+            },
+            mir::Rvalue::Cast(mir::CastKind::PointerCoercion(ty::adjustment::PointerCoercion::Unsize,source),operand,target) =>
+                json!({"kind":"cast_unsize","source":match source {mir::CoercionSource::AsCast=>"as_cast",mir::CoercionSource::Implicit=>"implicit"},"operand":self.operand(tcx,operand)?,"target":self.ty(tcx,*target)?}),
             mir::Rvalue::BinaryOp(op,p) => json!({"kind":"binary","operator":super::binop_name(*op),"left":self.operand(tcx,&p.0)?,"right":self.operand(tcx,&p.1)?}),
             mir::Rvalue::UnaryOp(op,o) => json!({"kind":"unary","operator":super::unop_name(*op),"operand":self.operand(tcx,o)?}),
             mir::Rvalue::Repeat(o,n) => json!({"kind":"repeat","operand":self.operand(tcx,o)?,"length":self.constant(tcx,*n)?}),
@@ -218,11 +242,10 @@ impl<'tcx> Material<'tcx> {
         // Pinned rustc_ty_utils::abi::FnAbiDesc performs substitution, region
         // erasure and normalization later, when a concrete instance is demanded.
         let signature = tcx.fn_sig(def).instantiate_identity().skip_normalization();
-        if !signature.bound_vars().is_empty() {
-            return unsupported("bound function signature", signature);
-        }
+        let bound_variables = self.signature_binders(tcx,signature.bound_vars())?;
         let signature = signature.skip_binder();
         Ok(json!({
+            "bound_variables":bound_variables,
             "inputs":signature.inputs().iter().map(|t|self.ty(tcx,*t)).collect::<Result<Vec<_>>>()?,
             "output":self.ty(tcx,signature.output())?,
             "safety":match signature.safety() {rustc_hir::Safety::Safe=>"safe",rustc_hir::Safety::Unsafe=>"unsafe"},
@@ -243,7 +266,12 @@ impl<'tcx> Material<'tcx> {
             && matches!(tcx.def_kind(def), rustc_hir::def::DefKind::Fn)
             && !tcx.is_const_fn(def)
             && tcx.is_mir_available(def);
-        if !super::has_local_hir_body(tcx, def) && !external_start {
+        // The only additional external owner is validated against the exact
+        // FnDef operand of the actual generic std lang_start body.
+        let external_start_internal = !def.is_local()
+            && tcx.def_path_str(def) == "std::rt::lang_start_internal"
+            && start_edge_material::start_internal(tcx)? == Some(def);
+        if !super::has_local_hir_body(tcx, def) && !external_start && !external_start_internal {
             return unsupported("non-local promoted table owner", def);
         }
         let promoted_count = tcx.promoted_mir(def).len();
@@ -327,13 +355,23 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
             selected.push(start);
         }
     }
+    selected.extend(start_edge_material::selected(tcx,roots)?);
+    selected.extend(closure_material::selected(tcx,roots)?);
     selected.sort_by_key(|d|tcx.def_path_str(*d));
     selected.dedup();
     for root in roots {
         if !selected.iter().any(|d|tcx.def_path_str(*d) == *root) { return Err(format!("foundation: missing MIR root {root:?}")); }
     }
     if !roots.is_empty() { selected.retain(|d|roots.contains(&tcx.def_path_str(*d))); }
-    let bodies = selected.into_iter().map(|d|m.body(tcx,d)).collect::<Result<Vec<_>>>()?;
+    let mut bodies = Vec::new();
+    let mut closure_templates = Vec::new();
+    for def in selected {
+        if tcx.def_kind(def) == rustc_hir::def::DefKind::Closure {
+            closure_templates.push(m.closure_template(tcx,def)?);
+        } else {
+            bodies.push(m.body(tcx,def)?);
+        }
+    }
     let startup_material = super::foundation_startup::capture(tcx, |def|m.definition(tcx,def))?;
     // Finite source selection/configuration only. No lang_start instance or
     // function allocation is resolved or enumerated here.
@@ -345,8 +383,11 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
     if tcx.dcx().has_errors().is_some() { return Err("foundation: compiler errors during export".into()); }
     let mut session = super::foundation_session::export(tcx);
     session["root_span"] = source_material::root_span(tcx);
+    let has_dynamic = m.types.iter().any(|row| row["shape"]["kind"] == "dynamic");
+    let dyn_metadata_source = if has_dynamic { dyn_metadata_material::capture(tcx,&mut m)? } else { Value::Null };
+    let fn_vtable_source = if has_dynamic { m.fn_vtable_source(tcx)? } else { Value::Null };
     Ok(json!({
-        "schema":"lean-miri-foundation","schema_version":1,
+        "fn_vtable_source":fn_vtable_source,"schema":"lean-miri-foundation","schema_version":1,
         "rustc_commit":super::EXPECTED_RUSTC_COMMIT,
         "producer":super::foundation_producer::capture(tcx, rustc_version, rustc_args)?,
         "frame_metadata":super::foundation_runtime_instances::frames(tcx),
@@ -358,6 +399,8 @@ fn export(tcx: TyCtxt<'_>, roots: &[String], rustc_version: &str, rustc_args: &[
         "compilation":{"panic_strategy":if tcx.sess.panic_strategy().unwinds(){"unwind"}else{"abort"},"panic_in_drop":if tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(){"unwind"}else{"abort"},"opt_level":format!("{:?}",tcx.sess.opts.optimize)},
         "target":{"runtime_data_layout":super::foundation_target::export(tcx)?,"triple":tcx.sess.opts.target_triple.to_string(),"architecture":tcx.sess.target.arch.to_string(),"data_layout":tcx.sess.target.data_layout.as_ref(),"pointer_size_bits":tcx.data_layout.pointer_size().bits(),"endian":match tcx.data_layout.endian {rustc_abi::Endian::Little=>"little",rustc_abi::Endian::Big=>"big"}},
         "definitions":m.definitions,"types":m.types,"bodies":bodies,
-        "source_allocations":m.allocations
+        "closure_templates":closure_templates,
+        "source_allocations":m.allocations,
+        "dyn_metadata_source":dyn_metadata_source
     }))
 }
