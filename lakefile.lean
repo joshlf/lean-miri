@@ -31,9 +31,9 @@ target nativeStdioHost pkg : System.FilePath := do
   buildFileAfterDep archive deps fun files => do
     let source := files[0]!
     let object := files[1]!
-    let rustc := pkg.dir / ".rustup" / "toolchains" / "miri-exporter-8144389c895d" / "bin" / "rustc"
+    let rustc := pkg.dir / ".rustup" / "toolchains" / "miri-exporter-8eb778d04094" / "bin" / "rustc"
     let version ← IO.Process.output {cmd := rustc.toString, args := #["-vV"]}
-    unless version.exitCode == 0 && (version.stdout.splitOn "commit-hash: 8144389c895da997dbdecaa635e41d6a50be6ffd\n").length == 2 do
+    unless version.exitCode == 0 && (version.stdout.splitOn "commit-hash: 8eb778d04094d3af4b26580cab327e0413eb1e02\n").length == 2 do
       error "native stdio requires the pinned exporter rustc commit"
     proc {cmd := rustc.toString, args := #["--edition=2024", "--crate-type=staticlib",
       "-C", "opt-level=2", "-C", "relocation-model=pic", source.toString, "-o", archive.toString]}
@@ -90,3 +90,8 @@ lean_exe profile_runtime_decoder where
 lean_exe typed_function_abi_tests where
   srcDir := "tests/input"
   root := `TypedFunctionAbiTests
+
+-- Execute the existing provider assertions as compiled Lean against fresh inputs.
+lean_exe coroutine_native_queries where
+  srcDir := "tests/input"
+  root := `CoroutineNativeQueries

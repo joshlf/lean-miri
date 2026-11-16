@@ -13,6 +13,7 @@ private def user : SyncRuntime.UserCapture Nat TypedSyncRuntime.Dest → TypedSy
   | .macAddress r d => .macAddress ⟨r⟩ d
   | .macSemaphore d => .macSemaphore d
   | .sleep => .sleep
+  | .pause => .pause
 private def capture : SyncRuntime.Capture Nat Int32 TypedSyncRuntime.Dest → TypedSyncRuntime.Capture
   | .mutex r v => .mutex ⟨r⟩ v
   | .reader r v d => .reader ⟨r⟩ v d

@@ -51,7 +51,7 @@ structure Queries (Ty S : Type) where
   eraseUnsafeBinder : Ty → M S Ty
   normalize : Ty → M S Ty
   reprEqualUpToSeed : Ty → Ty → M S Bool
-  itemName : Ty → M S String
+  abiName : Ty → M S (Bool × String)
   nonnullOptimizationGuaranteed : Ty → M S Bool
   isGlobalBox : Ty → M S Bool
   boxedType : Ty → M S Ty
@@ -169,7 +169,7 @@ def identicalCTypes [DecidableEq Ty] (q : Queries Ty S) : Nat → Ty → Ty → 
     if left.kind != .Struct || right.kind != .Struct then return false
     if !left.reprC then return false
     if !(← q.reprEqualUpToSeed caller callee) then return false
-    if (← q.itemName caller) != (← q.itemName callee) then return false
+    if (← q.abiName caller) != (← q.abiName callee) then return false
     let leftFields ← atIndex left.variants 0 "missing C-struct fields"
     let rightFields ← atIndex right.variants 0 "missing C-struct fields"
     if leftFields.size != rightFields.size then return false

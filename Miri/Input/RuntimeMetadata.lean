@@ -45,6 +45,7 @@ def integer : MIR.IntegerKind → Result Integer
   | .isize | .usize => throw (.unsupported "pointer-sized integer primitive tag")
 def float : FloatTypeTag → Result ABI.Float
   | .f16 => pure .F16 | .f16b => pure .F16B | .f32 => pure .F32
+  | .x87f80 => pure .X87F80
   | .f64 => pure .F64 | .f128 => pure .F128 | .ppcf128 => pure .PpcF128
 
 def primitive (target : RuntimeTargetDataLayout) (source : PrimitiveLayout) : Result Primitive := do
@@ -213,6 +214,7 @@ def importTarget (source : TargetDataLayoutEvidence) : Result RuntimeTargetDataL
     f32Align := ← alignment source.f32AlignBytes,
     f64Align := ← alignment source.f64AlignBytes,
     f128Align := ← alignment source.f128AlignBytes,
+    x87F80Align := ← source.x87F80AlignBytes.mapM alignment,
     aggregateAlign := ← alignment source.aggregateAlignBytes,
     vectorAlign := vectors,
     defaultAddressSpace := ⟨← u32 source.defaultAddressSpace "default address space"⟩,

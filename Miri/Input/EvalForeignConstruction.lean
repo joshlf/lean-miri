@@ -213,19 +213,23 @@ def core (h : Common (State Os R P H D O Aff B Host)) (spans : AllocationDriver.
     startExit := EvalForeignExit.startInnerSource spans
     specialDestination := pure}
 
-/-- math.rs uses sig.rs294–331's deprecated check for every exported arm.
-Capture this call's actual ABI, preserving symbol-clash before ABI/count checks;
-no expected ABI or scalar-layout compatibility check is added to this rule. -/
+/-- The C math arms use the same exact compiler ABI compatibility checks as
+other strict shims, before reading operands or invoking host arithmetic. -/
 def math (h : Math.Hooks Provenance (State Os R P H D O Aff B Host) C (RuntimePlace Provenance))
     (foreign : ForeignItems.Core Provenance (State Os R P H D O Aff B Host)
       (RuntimePlace Provenance) (RuntimePlace Provenance) (Pointer (Option Provenance)) LoadedBody CallInstance)
     (choice : C) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy Provenance)) (dest : RuntimePlace Provenance) :
     M Os R P H D O Aff B Host ForeignItems.EmulateItemResult := do
-  let source := {h with checkCSignature := fun _ name _ => do
-    foreign.checkSymbolClash name
-    if abi.conv != .C then throw (.undefinedBehavior "C math shim calling convention mismatch")
-    if abi.cVariadic then throw (.undefinedBehavior "nonvariadic C math shim called c-variadic")}
+  let source := {h with checkCSignature := fun _ name count => do
+    let floating := if name.endsWith "f" || name == "lgammaf_r" then
+      ForeignItems.SignatureType.f32 else .f64
+    let parameters := if count == 1 then #[floating]
+      else if ["_ldexp","ldexp","scalbn"].contains name then #[floating,.i32]
+      else if name == "lgammaf_r" || name == "lgamma_r" then #[floating,.i32Pointer]
+      else #[floating,floating]
+    let _ ← ForeignItems.Core.checkSignature foreign name ⟨.C,parameters,floating⟩ abi args
+    pure ()}
   if ← Math.evalShim source choice name args dest then return .NeedsReturn
   return .NotSupported
 

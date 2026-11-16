@@ -64,8 +64,8 @@ extract_rustc_selection() {
   printf '%s\n' "$commit" > "$pin"
 }
 
-MIRI_COMMIT=7fa591d7d4dd9af8154becbc8332f8096f8323b1
-RUSTC_COMMIT=8144389c895da997dbdecaa635e41d6a50be6ffd
+MIRI_COMMIT=93c45edea8b148a6b6f05ec9384449a04217143f
+RUSTC_COMMIT=8eb778d04094d3af4b26580cab327e0413eb1e02
 APFLOAT_COMMIT=eeaacad81247af65d4043cb3e32d023a652d7951
 APFLOAT_VERSION='0.2.3+llvm-462a31f5a5ab'
 
@@ -73,8 +73,8 @@ MIRI_ARCHIVE="$ROOT/miri-$MIRI_COMMIT.tar.gz"
 RUSTC_ARCHIVE="$ROOT/rustc-$RUSTC_COMMIT.tar.gz"
 APFLOAT_ARCHIVE="$ROOT/rustc_apfloat-$APFLOAT_VERSION.crate"
 
-fetch_archive "$MIRI_ARCHIVE" "https://codeload.github.com/rust-lang/miri/tar.gz/$MIRI_COMMIT" 1360b191ff77f05a5746a5055f76fbce575dd012ad126d341d188326e6f8b074
-fetch_archive "$RUSTC_ARCHIVE" "https://codeload.github.com/rust-lang/rust/tar.gz/$RUSTC_COMMIT" bf9feb74c700a8d1d71b318d4a2874d031af5d5380ff9151eb190330596a5aa2
+fetch_archive "$MIRI_ARCHIVE" "https://codeload.github.com/rust-lang/miri/tar.gz/$MIRI_COMMIT" 2fd9f38c5db9c0c12fad24003a06cc48f00e7c6cedb8ab829d9ab6fe986cf017
+fetch_archive "$RUSTC_ARCHIVE" "https://codeload.github.com/rust-lang/rust/tar.gz/$RUSTC_COMMIT" 273274c84a955aae1929e2e9409fceae08e2bccc068f4fe2770db74e66822a37
 fetch_archive "$APFLOAT_ARCHIVE" "https://static.crates.io/crates/rustc_apfloat/rustc_apfloat-$APFLOAT_VERSION.crate" 486c2179b4796f65bfe2ee33679acf0927ac83ecf583ad6c91c3b4570911b9ad
 
 extract_full miri "$MIRI_ARCHIVE" "$ROOT/miri-source" "$MIRI_COMMIT" rust-version

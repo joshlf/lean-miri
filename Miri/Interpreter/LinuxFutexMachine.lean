@@ -184,22 +184,30 @@ def metadataFromObjectHooks [DecidableEq K] (h : ObjectHooks K U C P O B) :
       pure (result.map fun (id,offset) => ⟨id,offset⟩)
     catch _ => pure none
   resolve := fun pointer => do
-    let some provenance := pointer.provenance | throw (.invalidProgram "checked sync pointer has no provenance")
+    let some provenance := pointer.provenance | throw (MemoryErrors.access (.danglingIntegerPointer pointer.offset.bytes 0 (.dereferenceable "pointer")))
     let some (id,offset) ← PointerMachine.ptrGetAlloc h.pointers (Pointer.new provenance pointer.offset) 0
-      | throw (.invalidProgram "checked sync pointer became unresolved")
-    -- get_alloc_extra_mut materializes compiler globals before metadata lookup.
-    let _ ← AtomicMachine.mutability h.access id
+      | throw (MemoryErrors.access (.danglingIntegerPointer pointer.offset.bytes 0 (.dereferenceable "pointer")))
     pure ⟨id,offset⟩
   info := fun id => do
     let info ← match (← get).machine.memory.getAllocInfo id with
       | .ok info => pure info | .error error => throw (.callback s!"sync allocation info: {reprStr error}")
     pure ⟨info.kind == .liveData,info.mutability == .Mut,info.size⟩
   lookup := fun address => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
     let object ← machineAction (MemoryExtras.lookupSync h.extras address)
     pure (object.bind fun object => (h.payload.project object.payload).map fun ref =>
       {payload := ref,deleteOnWrite := object.deleteOnWrite,onAccess := fun _ => pure ()})
-  insert := fun address object =>
-    machineAction (MemoryExtras.insertSync h.extras address ⟨h.payload.inject object.payload,object.deleteOnWrite,#[]⟩)
+  insert := fun address size object => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
+    machineAction (MemoryExtras.insertSync h.extras address ⟨h.payload.inject object.payload,object.deleteOnWrite,#[],size⟩)
+  remove := fun address size => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
+    let object ← machineAction (MemoryExtras.removeSync h.extras address size)
+    pure (object.bind fun object => (h.payload.project object.payload).map fun ref =>
+      {payload := ref,deleteOnWrite := object.deleteOnWrite,onAccess := fun _ => pure ()})
+  checkAccess := fun pointer size => do
+    let amount ← lift (sizeAsI64 size |>.mapError fun error => .invalidProgram s!"metadata size: {reprStr error}")
+    PointerMachine.checkAccessSigned h.pointers pointer (Int64.ofInt amount) .memoryAccess
 
 def metadata [DecidableEq K] (h : Hooks K U C P O B H Y Z T E) :
     SyncObject.MetadataHooks (State K U) FutexRuntime.Ref :=

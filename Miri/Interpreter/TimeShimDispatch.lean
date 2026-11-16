@@ -2,14 +2,14 @@ import Miri.Interpreter.TimeShims
 import Miri.Interpreter.ForeignItems
 
 /-! Exact time entrypoints of Unix/macOS/Windows foreign-item dispatch. Mach
-entrypoints deliberately keep pinned deprecated lenient ABI checking. -/
+entrypoints use the pinned strict ABI checking. -/
 namespace Miri.Interpreter.TimeShimDispatch
 open Miri.ABI Miri.Memory
 abbrev M := EStateM StepError
 inductive Operation where
   | gettimeofday | localtimeR | clockGettime | nanosleep | clockNanosleep
   | filetime | preciseFiletime | performanceCounter | performanceFrequency | sleep
-  | machAbsolute | machTimebase | machWait
+  | machAbsolute | machTimebase | machWait | pause
   deriving DecidableEq, Repr
 inductive ShimType where
   | pointer | timevalPointer | timezonePointer | timeTPointer | tmPointer | timespecPointer
@@ -30,6 +30,7 @@ def parse : String → Option Operation
   | "QueryPerformanceCounter" => some .performanceCounter
   | "QueryPerformanceFrequency" => some .performanceFrequency
   | "Sleep" => some .sleep
+  | "pause" => some .pause
   | "mach_absolute_time" => some .machAbsolute
   | "mach_timebase_info" => some .machTimebase
   | "mach_wait_until" => some .machWait
@@ -44,6 +45,7 @@ def signature : Operation → Signature
   | .filetime | .preciseFiletime => ⟨true,#[.pointer],.unit⟩
   | .performanceCounter | .performanceFrequency => ⟨true,#[.pointer],.bool⟩
   | .sleep => ⟨true,#[.u32],.unit⟩
+  | .pause => ⟨false,#[],.i32⟩
   | .machAbsolute => ⟨false,#[],.u64⟩
   | .machTimebase => ⟨false,#[.pointer],.i32⟩
   | .machWait => ⟨false,#[.u64],.i32⟩
@@ -60,14 +62,6 @@ structure Hooks (S Host System TZ Timestamp : Type) where
 private def checked (h : Hooks S H Y Z T) (op : Operation) (name : String)
     (caller : FnAbi Miri.MIR.TyId) (args : Array (OpTy Provenance)) : M S (Array (OpTy Provenance)) := do
   let request := signature op
-  if mach op then
-    -- Pinned macOS uses check_shim_sig_deprecated: clash before convention,
-    -- no argument/return type checking and no argument transmutation.
-    h.checkSymbolClash name
-    if caller.conv != .C then throw (.undefinedBehavior "Mach time calling convention mismatch")
-    if caller.cVariadic then throw (.undefinedBehavior "Mach time caller signature is variadic")
-    if args.size != request.args.size then throw (.undefinedBehavior "Mach time argument count mismatch")
-    return args
   let callee ← h.expectedAbi name request
   let conv ← if request.systemAbi then h.systemConvention else pure CanonAbi.C
   if callee.conv != conv || callee.cVariadic || callee.args.size != request.args.size ||
@@ -112,6 +106,15 @@ def dispatch (h : Hooks S H Y Z T) (name : String) (abi : FnAbi Miri.MIR.TyId)
   | .performanceCounter => write (← TimeShims.queryPerformanceCounter time (← arg args 0)) dest
   | .performanceFrequency => write (← TimeShims.queryPerformanceFrequency time (← arg args 0)) dest
   | .sleep => TimeShims.sleep time (← arg args 0)
+  | .pause =>
+    let callback : Miri.Concurrency.SyncRuntime.Callback S := fun _ =>
+      throw (.invalidProgram "pause callback must never unblock")
+    let token ← Miri.Concurrency.SyncRuntime.register time.runtime (some (.user .pause)) callback
+    match (← time.runtime.threads).blockThreadWithRuntimeConstraints .Pause none token time.runtime.communicate with
+    | .error error =>
+      Miri.Concurrency.SyncRuntime.cancelCallback time.runtime token
+      throw (time.runtime.error (.blockThreadSource error))
+    | .ok threads => time.runtime.putThreads threads
   | .machAbsolute => time.writeInt (Int.ofNat (← TimeShims.machAbsoluteTime time).toNat) dest
   | .machTimebase => write (← TimeShims.machTimebaseInfo time (← arg args 0)) dest
   | .machWait => write (← TimeShims.machWaitUntil time (← arg args 0)) dest

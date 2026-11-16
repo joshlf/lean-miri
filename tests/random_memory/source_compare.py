@@ -37,7 +37,7 @@ fn main(){for (host,host_error,write_error,n) in [(false,false,false,0),(true,tr
 '''
  with tempfile.TemporaryDirectory() as tmp:
   p=Path(tmp);(p/'fixture.rs').write_text(fixture)
-  rustc=ROOT/'.rustup/toolchains/miri-exporter-8144389c895d/bin/rustc'
+  rustc=ROOT/'.rustup/toolchains/miri-exporter-8eb778d04094/bin/rustc'
   subprocess.run([str(rustc),'--edition=2021',str(p/'fixture.rs'),'-o',str(p/'fixture')],check=True)
   expected=subprocess.check_output([str(p/'fixture')],text=True).splitlines()
   env={**os.environ,'ELAN_HOME':str(ROOT/'.elan')}

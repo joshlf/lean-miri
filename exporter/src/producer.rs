@@ -241,6 +241,7 @@ pub(super) struct TargetDataLayout {
     pub f32_align_bytes: u64,
     pub f64_align_bytes: u64,
     pub f128_align_bytes: u64,
+    pub x87_f80_align_bytes: u64,
     pub aggregate_align_bytes: u64,
     pub vector_align: Vec<VectorAlign>,
     pub default_address_space: u32,

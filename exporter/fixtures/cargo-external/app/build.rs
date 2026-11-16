@@ -14,7 +14,7 @@ fn main() {
     assert!(output.status.success(), "configured RUSTC query failed");
     let version = String::from_utf8(output.stdout).expect("rustc version output is UTF-8");
     assert!(
-        version.contains("commit-hash: 8144389c895da997dbdecaa635e41d6a50be6ffd"),
+        version.contains("commit-hash: 8eb778d04094d3af4b26580cab327e0413eb1e02"),
         "build script observed a different rustc revision: {version}"
     );
 }

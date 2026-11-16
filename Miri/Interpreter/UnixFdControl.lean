@@ -60,7 +60,11 @@ def fcntl (h : Hooks S H D O E Meta) (fd cmd : OpTy Provenance)
     let context := if cmd == dupfd then "fcntl(fd, F_DUPFD, ...)" else "fcntl(fd, F_DUPFD_CLOEXEC, ...)"
     let start ← h.readI32 (← h.takeI32 context rest)
     let some fd ← getFd h number | return ← error h "EBADF"
-    let (table,number) ← lift ((← h.fd.table).insertWithMin fd start)
+    if !Files.validFdNum start then
+      h.fd.dropRef fd
+      return ← error h "EINVAL"
+    let some (table,number) := (← h.fd.table).tryInsertWithMin fd start
+      | h.fd.dropRef fd; return ← error h "EMFILE"
     h.fd.putTable table
     return ← fromI32 number
   if cmd == getfl then

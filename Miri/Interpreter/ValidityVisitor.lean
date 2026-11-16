@@ -215,7 +215,7 @@ private def checkSafe [PointerProvenance P] [DecidableEq P] (h : Hooks P S C E F
       | .ok (.integer integer) =>
         let address ← liftResult ((integer.toTargetUsize h.target.pointerSize).mapError fun e => .invalidProgram (reprStr e))
         let maximum := (2^h.target.base.pointerWidth.bits.toNat - 1 : Nat)
-        if address.toNat + size.bytes.toNat >= maximum then failure session "safe pointer too close to address-space end"
+        if address.toNat + size.bytes.toNat > maximum then failure session "safe pointer too close to address-space end"
       | .ok (.erasedPointer ..) => pure ()
       | .error error => throw (ScalarOps.scalarError error)
       pure none

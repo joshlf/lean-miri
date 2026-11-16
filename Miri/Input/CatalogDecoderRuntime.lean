@@ -764,6 +764,7 @@ private structure targetDataLayoutFields where
   f32AlignBytes : Option (Nat) := none
   f64AlignBytes : Option (Nat) := none
   f128AlignBytes : Option (Nat) := none
+  x87F80AlignBytes : Option Nat := none
   aggregateAlignBytes : Option (Nat) := none
   vectorAlign : Option (Array (Nat × Nat)) := none
   defaultAddressSpace : Option (Nat) := none
@@ -791,6 +792,7 @@ def targetDataLayout : Parser (TargetDataLayoutEvidence) := do
     | "f16_align_bytes" => return { fields with f16AlignBytes := some (← natural) }
     | "f32_align_bytes" => return { fields with f32AlignBytes := some (← natural) }
     | "f64_align_bytes" => return { fields with f64AlignBytes := some (← natural) }
+    | "x87_f80_align_bytes" => return { fields with x87F80AlignBytes := some (← natural) }
     | "f128_align_bytes" => return { fields with f128AlignBytes := some (← natural) }
     | "aggregate_align_bytes" => return { fields with aggregateAlignBytes := some (← natural) }
     | "vector_align" => return { fields with vectorAlign := some (← array (vectorAlign)) }
@@ -825,6 +827,6 @@ def targetDataLayout : Parser (TargetDataLayoutEvidence) := do
   let instructionAddressSpace ← need fields.instructionAddressSpace "instruction_address_space"
   let cEnumMinSize ← need fields.cEnumMinSize "c_enum_min_size"
   return {
-    evidencePath, llvmDataLayout, privateInventoryEvidence, alignmentEvidence, endian, pointerWidthBits, objectSizeBoundBytes, i1AlignBytes, i8AlignBytes, i16AlignBytes, i32AlignBytes, i64AlignBytes, i128AlignBytes, f16AlignBytes, f32AlignBytes, f64AlignBytes, f128AlignBytes, aggregateAlignBytes, vectorAlign, defaultAddressSpace, defaultAddressSpacePointerSpec, addressSpaceInfo, instructionAddressSpace, cEnumMinSize }
+    evidencePath, llvmDataLayout, privateInventoryEvidence, alignmentEvidence, endian, pointerWidthBits, objectSizeBoundBytes, i1AlignBytes, i8AlignBytes, i16AlignBytes, i32AlignBytes, i64AlignBytes, i128AlignBytes, f16AlignBytes, f32AlignBytes, f64AlignBytes, f128AlignBytes, aggregateAlignBytes, vectorAlign, defaultAddressSpace, defaultAddressSpacePointerSpec, addressSpaceInfo, instructionAddressSpace, cEnumMinSize, x87F80AlignBytes := fields.x87F80AlignBytes }
 
 end Miri.Input.CatalogDecoder

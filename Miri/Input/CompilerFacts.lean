@@ -100,8 +100,12 @@ private def adtShape (context : Context) (id : TypeId) : Result AdtShape := do
   let .adt value := (← node context id).shape | throw "ADT layout query on non-ADT"
   pure value
 
-def itemName (context : Context) (id : TypeId) : Result String :=
-  return (← adtFacts context id).itemName
+def abiName (context : Context) (id : TypeId) : Result (Bool × String) := do
+  let adt ← adtFacts context id
+  let some encoding := adt.cfiEncoding | throw "missing compiler ADT ABI-name evidence"
+  return match encoding with
+    | some name => (true,name)
+    | none => (false,adt.itemName)
 
 def nonnullOptimizationGuaranteed (context : Context) (id : TypeId) : Result Bool :=
   return (← adtFacts context id).nonnullOptimizationGuaranteed
@@ -165,7 +169,7 @@ def compatibilityQueries (context : Context) : LayoutCompat.Queries TypeId S := 
   eraseUnsafeBinder := fun ty => lift (requiredType context ty "unsafe_binder_erased")
   normalize := fun ty => lift (requiredType context ty "normalized")
   reprEqualUpToSeed := fun a b => lift (reprEqualUpToSeed context a b)
-  itemName := fun ty => lift (itemName context ty)
+  abiName := fun ty => lift (abiName context ty)
   nonnullOptimizationGuaranteed := fun ty => lift (nonnullOptimizationGuaranteed context ty)
   isGlobalBox := fun ty => lift (boolean context ty "is_global_box")
   boxedType := fun ty => lift (requiredType context ty "boxed_type")

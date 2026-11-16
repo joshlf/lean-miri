@@ -26,14 +26,16 @@ def hooks (p : CompilerProviders.Prepared) (base : UnixThread.Hooks S) : UnixThr
 and argument types and the source FnPtr wildcard recipe for pthread_create. -/
 def signature (queries : CompilerNamedShimAbi.Prepared) (name : String) :
     EStateM StepError S (FnAbi MIR.TyId) := do
-  unless ["pthread_create","pthread_join","pthread_detach","pthread_self","sched_yield"].contains name do
+  unless ["pthread_create","pthread_join","pthread_detach","pthread_self","sched_yield",
+    "gettid","pthread_getthreadid_np","pthread_threadid_np","pthread_setname_np","pthread_getname_np"].contains name do
     throw (.unsupported "unknown source pthread ABI request")
   CompilerNamedShimAbi.query queries name
 
 /-- Source shim signatures use C with unwind=false, separately from their
 compiler-lowered canonical target calling convention. -/
 def sourceAbi (name : String) : Except String ABI.ExternAbi := do
-  unless ["pthread_create","pthread_join","pthread_detach","pthread_self","sched_yield"].contains name do
+  unless ["pthread_create","pthread_join","pthread_detach","pthread_self","sched_yield",
+    "gettid","pthread_getthreadid_np","pthread_threadid_np","pthread_setname_np","pthread_getname_np"].contains name do
     throw "unknown source pthread ExternAbi request"
   pure (.C false)
 end Miri.Input.CompilerUnixThread

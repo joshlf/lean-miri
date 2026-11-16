@@ -22,6 +22,7 @@ private def callbackScenario : Except ThreadError String := do
     | .Eventfd => "Eventfd"
     | .VirtualSocket => "VirtualSocket"
     | .IO => "IO"
+    | .Pause => "Pause"
   pure s!"callback:pending:active={unblocked.activeThread.toNat}:target={callback.target.toNat}:previous={callback.previousActive.toNat}:token={callback.callbackToken}:reason={reason}"
 
 private def terminationScenario : Except ThreadTerminationError String := do

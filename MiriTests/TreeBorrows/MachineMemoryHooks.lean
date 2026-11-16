@@ -59,8 +59,8 @@ private def treeMemory : Except AllocError (MemoryState Provenance BorrowTree Un
 
 private def syncStore : SyncObjectStore Nat := Id.run do
   let first : SyncObjectMap Nat :=
-    (SyncObjectMap.empty.insert (Size.ofBytes 2) 20).insert (Size.ofBytes 0) 10
-  let second : SyncObjectMap Nat := SyncObjectMap.empty.insert (Size.ofBytes 0) 20
+    (SyncObjectMap.empty.insert (Size.ofBytes 2) (Size.ofBytes 1) 20).insert (Size.ofBytes 0) (Size.ofBytes 1) 10
+  let second : SyncObjectMap Nat := SyncObjectMap.empty.insert (Size.ofBytes 0) (Size.ofBytes 1) 20
   return (SyncObjectStore.empty.set allocId1 first).set allocId2 second
 
 private def context (state : TestState := ({} : TestState)) : Context TestState Nat := {
@@ -197,4 +197,7 @@ def main : IO Unit := do
   requireCheck (firstSavedState.map (·.permission) == some .Unique &&
       partialTreeFailure.context.state.events == #["diagnostic:write", "race:write"])
     "a failed later range must retain the earlier tree transition and skip sync checks"
+  requireCheck (((SyncObjectMap.empty.insert (Size.ofBytes 0) (Size.ofBytes 4) (10 : Nat)).inRange
+      (allocRange (Size.ofBytes 2) (Size.ofBytes 1))) == .ok #[(Size.ofBytes 0,10)])
+    "an access beginning inside metadata must visit that object"
   IO.println "machine-memory-hooks diagnostic>data-race>tree-borrows>sync>delete-or-free"

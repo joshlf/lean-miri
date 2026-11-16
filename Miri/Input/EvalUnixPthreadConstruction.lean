@@ -194,14 +194,12 @@ def fromSource [DecidableEq MiriMemoryKind]
       | .edeadlk => "EDEADLK"
       | .eperm => "EPERM"
       | .etimedout => "ETIMEDOUT"
+      | .clockMonotonic => "CLOCK_MONOTONIC"
       | .clockRealtime => "CLOCK_REALTIME")
     readPointer := fun op => do
       let (pointer,_) ← operandPointer access op
       pure pointer
     isNull := fun pointer => pure (pointer.provenance.isNone && pointer.offset.bytes == 0)
-    attributeRead := attributeRead p access projection choice
-    attributeWrite := attributeWrite p access place projection choice
-    attributeUninit := attributeUninit p access
     objectUninit := fun op kind => do
       let object ← objects.pthread.deref op kind
       PlaceMachine.writeMemory access (fun _ => false) .uninit object

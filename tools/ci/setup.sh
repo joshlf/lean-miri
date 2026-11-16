@@ -28,9 +28,9 @@ ci_step 'setup:lean' bash tools/setup-lean.sh
   if [[ "$lane" != replay ]]; then
     ci_step 'setup:fetch-float-oracle' cargo +stable fetch --locked --manifest-path tests/float_ops/source_oracle/Cargo.toml
     ci_step 'setup:fetch-intrinsic-oracle' cargo +stable fetch --locked --manifest-path tests/intrinsic_float/source_oracle/Cargo.toml
-    ci_step 'setup:fetch-connected-libc' cargo +miri-exporter-8144389c895d fetch --locked --manifest-path tests/connected/libc/Cargo.toml
+    ci_step 'setup:fetch-connected-libc' cargo +miri-exporter-8eb778d04094 fetch --locked --manifest-path tests/connected/libc/Cargo.toml
   fi
-  ci_step 'setup:fetch-exporter' cargo +miri-exporter-8144389c895d fetch --locked --manifest-path exporter/Cargo.toml
+  ci_step 'setup:fetch-exporter' cargo +miri-exporter-8eb778d04094 fetch --locked --manifest-path exporter/Cargo.toml
   ci_step 'setup:reference-miri-sysroot' bash tools/setup-miri-reference.sh
 }
 
@@ -51,6 +51,6 @@ fi
   {
     cargo +stable --version
     rustc +stable -vV
-    rustc +miri-exporter-8144389c895d -vV
+    rustc +miri-exporter-8eb778d04094 -vV
   }
 } > scratch/ci/environment.txt

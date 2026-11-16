@@ -135,6 +135,8 @@ pub(super) fn export<'tcx>(
     names.extend([
         "SYS_getrandom",
         "SYS_futex",
+        "SYS_futex_time64",
+        "SYS_copy_file_range",
         "SYS_eventfd2",
         "SYS_gettid",
         "SYS_accept4",
@@ -402,7 +404,12 @@ pub(super) fn export<'tcx>(
     ]);
     names
         .into_iter()
-        .filter(|name| required_on(&tcx.sess.target.os, name))
+        .filter(|name| {
+            use rustc_target::spec::Arch;
+            required_on(&tcx.sess.target.os, name)
+                && !(*name == "SYS_futex" && tcx.sess.target.arch == Arch::RiscV32)
+                && !(*name == "SYS_futex_time64" && tcx.sess.target.arch != Arch::RiscV32)
+        })
         .map(|name| {
             Ok(Record {
                 name,

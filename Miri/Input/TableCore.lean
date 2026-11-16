@@ -12,10 +12,12 @@ open JsonReader
 
 open Lean
 
-def expectedMiriCommit : String := "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
-def expectedRustcCommit : String := "8144389c895da997dbdecaa635e41d6a50be6ffd"
+def expectedMiriCommit : String := "93c45edea8b148a6b6f05ec9384449a04217143f"
+def legacyMiriCommit : String := "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
+def expectedRustcCommit : String := "8eb778d04094d3af4b26580cab327e0413eb1e02"
+def legacyRustcCommit : String := "8144389c895da997dbdecaa635e41d6a50be6ffd"
 def expectedSchema : String := "lean-miri-rustc-mir"
-def expectedSchemaVersion : Nat := 12
+def expectedSchemaVersion : Nat := 13
 def expectedCompilerAbiLayoutSchema : String := "physical_ty_and_layout_v1"
 
 def escapePathKey (key : String) : String :=
@@ -71,6 +73,7 @@ def integerTypeTag (text : String) : Except String IntegerTypeTag :=
 def floatTypeTag (text : String) : Except String FloatTypeTag :=
   match text with
   | "f16" => pure (.f16) | "f16b" => pure (.f16b) | "f32" => pure (.f32) | "f64" => pure (.f64)
+  | "x87_f80" => pure .x87f80
   | "f128" => pure (.f128) | "ppcf128" => pure (.ppcf128)
   | other => throw s!"unrecognized floatTypeTag tag `{other}`"
 
@@ -736,17 +739,19 @@ def parseDiscriminants (_path : String := "$parseDiscriminants") : Parser (Discr
 private structure adtFactsFields where
   «definition» : Option (Nat) := none
   «item_name» : Option (String) := none
+  «cfi_encoding» : Option (Option String) := none
   «nonnull_optimization_guaranteed» : Option (Bool) := none
 
 private def adtFacts  : Parser (AdtCompilerFacts) := do
-  let s ← object (adtFactsFields.mk none none none) fun s key => do
+  let s ← object ({} : adtFactsFields) fun s key => do
     match key with
     | "definition" => return { s with «definition» := some (← natural) }
     | "item_name" => return { s with «item_name» := some (← string) }
+    | "cfi_encoding" => return {s with «cfi_encoding» := some (← nullable string)}
     | "nonnull_optimization_guaranteed" => return { s with «nonnull_optimization_guaranteed» := some (← boolean) }
     | _ => skipValue; pure s
   return {
-    definitionId := (← required s.«definition» "definition"), itemName := (← required s.«item_name» "item_name"), nonnullOptimizationGuaranteed := (← required s.«nonnull_optimization_guaranteed» "nonnull_optimization_guaranteed") }
+    definitionId := (← required s.«definition» "definition"), itemName := (← required s.«item_name» "item_name"), cfiEncoding := s.«cfi_encoding», nonnullOptimizationGuaranteed := (← required s.«nonnull_optimization_guaranteed» "nonnull_optimization_guaranteed") }
 
 private structure simdShapeFields where
   «count» : Option (Nat) := none

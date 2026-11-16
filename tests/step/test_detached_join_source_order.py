@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 UPSTREAM = ROOT / "upstream/miri-source/src/concurrency/thread.rs"
 LEAN = ROOT / "Miri/Interpreter/ThreadMachine.lean"
-UPSTREAM_SHA256 = "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6"
+UPSTREAM_SHA256 = "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d"
 # Allocation initialization now captures leak backtraces; joinExclusive is
 # byte-identical to the reviewed pre-collector implementation.
 LEAN_SHA256 = "47e29678f335f844954c4ea10eae5738394dd5692f16eb801254849940709bba"

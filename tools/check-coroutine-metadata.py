@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Finite original/control comparisons and mutations of fresh coroutine evidence.
 
-Requires a built coherent schema-12 exporter/native pair. No builds or flag/budget
+Requires a built coherent schema-13 exporter/native pair and coroutine_native_queries. No builds or flag/budget
 changes are performed. Serialize heavy checks externally with the guest lock.
 """
 import argparse
@@ -25,7 +25,7 @@ spec.loader.exec_module(driver)
 
 
 def check_queries(control, output, env, settings):
-    code = run(["lake", "env", "lean", "--run", "tests/input/CoroutineNativeQueries.lean", str(control)],
+    code = run([str(settings.queries), str(control)],
         cwd=ROOT, env=env, log=output / "native-query.log", timeout=180, memory_limit=settings.memory_limit)
     assert code.returncode == 0, code
     document = load_mir_document(control)
@@ -80,9 +80,11 @@ def check_queries(control, output, env, settings):
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--exporter", type=Path, default=ROOT / "exporter/target/release/lean-miri-mir-exporter")
+    parser.add_argument("--runner", type=Path, default=ROOT / ".lake/build/bin/native_runner")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
-    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8144389c895d"
+    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8eb778d04094"
     env = dict(os.environ)
     for key in list(env):
         if key.startswith("LEAN_MIRI_REFERENCE_"):
@@ -91,10 +93,11 @@ def main():
         ELAN_HOME=str(ROOT / ".elan"),
         LD_LIBRARY_PATH=str(toolchain / "lib") + ":" + env.get("LD_LIBRARY_PATH", ""),
         LEAN_MIRI_PREPARED_ALLOC_ID_WORLD="1", LEAN_MIRI_RUN_PREPARED_MIRI="1")
-    settings = SimpleNamespace(exporter=ROOT / "exporter/target/release/lean-miri-mir-exporter",
-        runner=ROOT / ".lake/build/bin/native_runner", sysroot=ROOT / "scratch/miri-sysroot",
+    settings = SimpleNamespace(exporter=args.exporter.resolve(),
+        runner=args.runner.resolve(), queries=ROOT / ".lake/build/bin/coroutine_native_queries",
+        sysroot=ROOT / "scratch/miri-sysroot",
         export_timeout=180, timeout=180, memory_limit=12 * 1024**3, keep_inputs=True)
-    hashes = [driver.sha256(settings.exporter), driver.sha256(settings.runner)]
+    hashes = [driver.sha256(path) for path in (settings.exporter, settings.runner, settings.queries)]
     originals = {f"pass/{name}.rs@{revision}" for name in ("future-self-referential", "generators")
                  for revision in ("tree", "tree_implicit_writes")}
     records, control = [], None
@@ -111,7 +114,7 @@ def main():
             assert not record["reference_profile_differences"] and not record["lean_profile_differences"], record
             snapshot = Path(record["directory"]) / "input.json"
             document = load_mir_document(snapshot)
-            assert document["schema_version"] == 12
+            assert document["schema_version"] == 13
             coverage = document["compiler_coroutine_coverage"]
             assert coverage["coroutines"] and coverage["auxiliary_bodies"]
             owners = {document["bodies"][row["owner_body"]]["instance_id"] for row in coverage["coroutines"]}
@@ -125,7 +128,7 @@ def main():
             print("PASS strict coroutine comparison", case.id, flush=True)
     assert control is not None
     mutations = check_queries(control, args.output, env, settings)
-    assert hashes == [driver.sha256(settings.exporter), driver.sha256(settings.runner)]
+    assert hashes == [driver.sha256(path) for path in (settings.exporter, settings.runner, settings.queries)]
     (args.output / "summary.json").write_text(json.dumps({"cases": records,
         "binary_sha256": hashes, "decoder_mutations": mutations}, indent=2))
 

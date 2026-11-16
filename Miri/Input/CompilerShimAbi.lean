@@ -20,6 +20,8 @@ private def descriptor (key : String) : Except String ForeignItems.SignatureType
   | "alignment" => pure .alignment | "never" => pure .never
   | "u64" => pure .u64 | "u8" => pure .u8 | "bool" => pure .bool
   | "byteSlice" => pure .byteSlice | "functionPointer" => pure .functionPointer
+  | "unitPointerPointer" => pure .unitPointerPointer | "miriFrame" => pure .miriFrame
+  | "f32" => pure .f32 | "f64" => pure .f64 | "i32Pointer" => pure .i32Pointer
   | _ => throw "unknown compiler shim type descriptor"
 def prepare (runtime : RuntimeMetadata) : Except String Prepared := do
   let mut entries := #[]

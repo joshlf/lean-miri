@@ -1,5 +1,5 @@
 #![feature(io_error_more, io_error_inprogress, io_error_input_output_error, io_error_too_many_open_files)]
-// Built with pinned rustc 8144389c895da997dbdecaa635e41d6a50be6ffd.
+// Built with pinned rustc 8eb778d04094d3af4b26580cab327e0413eb1e02.
 // Guest streams use exactly one Write::write / Write::flush invocation.
 use std::{fs::File, io::{self, Write}, os::fd::{FromRawFd, AsRawFd}, sync::Mutex};
 #[repr(C)]

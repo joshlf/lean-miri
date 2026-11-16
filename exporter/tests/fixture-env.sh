@@ -2,7 +2,7 @@
 export RUSTUP_HOME="${RUSTUP_HOME:-$ROOT/.rustup}"
 export CARGO_HOME="${CARGO_HOME:-$ROOT/.cargo}"
 export MIRI_SYSROOT="${MIRI_SYSROOT:-$ROOT/scratch/miri-sysroot}"
-TOOLCHAIN="miri-exporter-8144389c895d"
+TOOLCHAIN="miri-exporter-8eb778d04094"
 if [[ ! -x "$CARGO_HOME/bin/rustup" ]] || \
    ! SYSROOT="$("$CARGO_HOME/bin/rustup" run "$TOOLCHAIN" rustc --print sysroot)"; then
   echo 'Pinned exporter toolchain unavailable. From the repository root, install Rustup/Cargo under .cargo/bin and run: bash tools/setup-rustc-exporter.sh (see docs/development.md).' >&2

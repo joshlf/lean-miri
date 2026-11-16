@@ -19,7 +19,7 @@ class FailClosedExportTests(unittest.TestCase):
             "EXPORTER_BIN", ROOT / "exporter/target/debug/lean-miri-mir-exporter"
         )).resolve()
         rustup = Path(os.environ.get("RUSTUP_HOME", ROOT / ".rustup"))
-        toolchain = rustup / "toolchains/miri-exporter-8144389c895d"
+        toolchain = rustup / "toolchains/miri-exporter-8eb778d04094"
         cls.environment = dict(os.environ)
         cls.environment["PATH"] = f"{toolchain / 'bin'}:{os.environ['PATH']}"
         cls.environment["LD_LIBRARY_PATH"] = f"{toolchain / 'lib'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
@@ -318,7 +318,7 @@ class FailClosedExportTests(unittest.TestCase):
 
     def test_coroutine_metadata_retains_exact_coverage_and_runtime_abi(self):
         document = self.accepted("coroutine", "root")
-        self.assertEqual(document["schema_version"], 12)
+        self.assertEqual(document["schema_version"], 13)
         coverage = document["compiler_coroutine_coverage"]
         self.assertTrue(coverage["coroutines"])
         self.assertEqual(len(coverage["body_coroutines"]), len(document["bodies"]))

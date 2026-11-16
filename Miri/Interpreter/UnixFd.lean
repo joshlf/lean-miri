@@ -45,12 +45,16 @@ def close (h : Hooks S H D O E Meta) (number : Int32) : M S Int32 := do
 
 def dup (h : Hooks S H D O E Meta) (number : Int32) : M S Int32 := do
   let some ref ← getFd h number | return ← IoError.setErrnoAndReturnNeg1I32 h.errors (.libc "EBADF")
-  let (table,number) ← lift ((← h.table).insert ref)
+  let some (table,number) := (← h.table).tryInsertWithMin ref 0
+    | h.dropRef ref; return ← IoError.setErrnoAndReturnNeg1I32 h.errors (.libc "EMFILE")
   h.putTable table
   return number
 
 def dup2 (h : Hooks S H D O E Meta) (old new : Int32) : M S Int32 := do
   let some ref ← getFd h old | return ← IoError.setErrnoAndReturnNeg1I32 h.errors (.libc "EBADF")
+  if !Files.validFdNum new then
+    h.dropRef ref
+    return ← IoError.setErrnoAndReturnNeg1I32 h.errors (.libc "EBADF")
   if old != new then
     if (← h.table).isFdNum new then
       -- Source get(new).is_some clones/drops one temporary reference.
@@ -123,7 +127,7 @@ finish closure owns all return-value work even if the description blocks. -/
 def readWrite (h : Hooks S H D O E Meta) (number : Int32) (pointer : Pointer (Option Provenance))
     (count : UInt64) (offset : Option Int) (write : Bool) (dest : MPlaceTy Provenance) : M S Unit := do
   h.checkAccess pointer (Size.ofBytes count)
-  let count := min count (min h.targetIsizeMax h.hostIsizeMax)
+  let count := min count h.targetIsizeMax
   let some ref ← getFd h number | IoError.setErrnoAndReturnNeg1 h.errors (.libc "EBADF") dest; return
   transfer h ref pointer count.toNat offset write (IoCompletionData.Finish.source (.unixScalar count.toNat dest) fun result => do
     match result with

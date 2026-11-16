@@ -102,7 +102,8 @@ example : BackendLaneCount.new 32769 = .error (.oversized 32768) := by decide
 example : (BackendLaneCount.new 32768).map BackendLaneCount.isPowerOfTwo = .ok true := by decide
 example : NumScalableVectors.fromFieldCount 2 = some ⟨2⟩ := by decide
 example : NumScalableVectors.fromFieldCount 7 = some ⟨7⟩ := by decide
-example : NumScalableVectors.fromFieldCount 8 = none := by decide
+example : NumScalableVectors.fromFieldCount 8 = some ⟨8⟩ := by decide
+example : NumScalableVectors.fromFieldCount 9 = none := by decide
 example : Reg.i8.align layout = .ok Align.ONE := by decide
 example : Reg.i64.align layout = .ok ⟨2⟩ := by decide
 example : Reg.f64.align layout = .ok Align.EIGHT := by decide
@@ -156,3 +157,7 @@ private def duplicateVectorSize : RuntimeTargetDataLayout := {
 
 example : RuntimeTargetDataLayout.validate duplicateVectorSize =
     .error (.duplicateVectorSize (Size.ofBytes 8)) := by decide +kernel
+
+example : (Reg.mk .Float (Size.ofBytes 10)).align layout = .ok ⟨4⟩ := by decide
+example : (Reg.mk .Float (Size.ofBytes 10)).align {layout with x87F80Align := none} =
+    .error (.unsupportedFloatWidth 80) := by decide

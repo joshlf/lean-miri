@@ -17,7 +17,7 @@ from mir_json import load_mir_document
 RUSTUP_HOME = Path(os.environ.get('RUSTUP_HOME', ROOT/'.rustup'))
 CARGO_HOME = Path(os.environ.get('CARGO_HOME', ROOT/'.cargo'))
 ELAN_HOME = Path(os.environ.get('ELAN_HOME', ROOT/'.elan'))
-TOOLCHAIN = RUSTUP_HOME/'toolchains/miri-exporter-8144389c895d'
+TOOLCHAIN = RUSTUP_HOME/'toolchains/miri-exporter-8eb778d04094'
 EXPORTER = Path(os.environ.get('CARGO_TARGET_DIR', ROOT/'exporter/target'))/'release/lean-miri-mir-exporter'
 LAKE = ELAN_HOME/'bin/lake'
 MIRI = Path(os.environ.get('MIRI_BINARY', ROOT/'upstream/miri-source/target/debug/miri'))

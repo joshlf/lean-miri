@@ -114,7 +114,8 @@ private def lines : List String := Id.run do
     s!"address_space={addressSizeText},{addressOffsetText},I32",
     s!"unknown_address_space={errorFlag unknownAddressSpace}",
     s!"offset_width_error={errorFlag offsetWidthError}",
-    s!"signed_non_scalar_error={errorFlag signedNonScalarError}"
+    s!"signed_non_scalar_error={errorFlag signedNonScalarError}",
+    s!"x87_info={(Float.size .X87F80).bytes},{match Float.align .X87F80 d with | .ok a => alignBytesText a.abi | .error _ => "error"},{match (Reg.mk .Float (Size.ofBytes 10)).align d with | .ok a => alignBytesText a | .error _ => "error"}"
   ]
 
 def main : IO Unit := do

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_RUSTC = "8144389c895da997dbdecaa635e41d6a50be6ffd"
-EXPECTED_MIRI = "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
+EXPECTED_RUSTC = "8eb778d04094d3af4b26580cab327e0413eb1e02"
+EXPECTED_MIRI = "93c45edea8b148a6b6f05ec9384449a04217143f"
 SOURCE_PATHS = [
     "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/cast.rs",
     "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",

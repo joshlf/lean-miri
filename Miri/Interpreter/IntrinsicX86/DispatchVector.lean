@@ -124,6 +124,10 @@ def vectorSpec : String → Option VectorInstruction
   | "avx512.permvar.qi.512" => some (.permute)
   | "avx512.permvar.qi.256" => some (.permute)
   | "avx512.permvar.qi.128" => some (.permute)
+  | "avx512.psllv.q.512" => some (.shiftVector .left)
+  | "avx512.psrlv.q.512" => some (.shiftVector .logicalRight)
+  | "avx512.vpermi2var.d.512" => some (.permute2)
+  | "avx512.vpermi2var.qi.256" => some (.permute2)
   | "avx512.vpermi2var.q.512" => some (.permute2)
   | "avx512.vpermi2var.qi.512" => some (.permute2)
   | "avx512.pshuf.b.512" => some (.shuffle)
@@ -151,7 +155,12 @@ def vectorDispatch [PointerProvenance P] (h : Hooks P S C V) (choice : C)
   else if name.startsWith "avx512.permvar.qi" then
     feature h choice full "avx512vbmi"
     unless name.endsWith "512" do feature h choice full "avx512vl"
-  else if name == "avx512.vpermi2var.qi.512" then feature h choice full "avx512vbmi"
+  else if name.startsWith "avx512.vpermi2var.qi." then
+    feature h choice full "avx512vbmi"
+    unless name.endsWith ".512" do feature h choice full "avx512vl"
+  else if ["avx512.psllv.q.512","avx512.psrlv.q.512",
+      "avx512.vpermi2var.d.512","avx512.vpermi2var.q.512"].contains name then
+    feature h choice full "avx512f"
   else if name.startsWith "avx512.vpdpbusd" then
     feature h choice full "avx512vnni"
     unless name.endsWith ".512" do feature h choice full "avx512vl"

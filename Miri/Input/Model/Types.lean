@@ -54,7 +54,7 @@ inductive IntegerTypeTag where
   deriving Repr, DecidableEq
 
 inductive FloatTypeTag where
-  | f16 | f16b | f32 | f64 | f128 | ppcf128
+  | f16 | f16b | f32 | f64 | x87f80 | f128 | ppcf128
   deriving Repr, DecidableEq
 
 inductive AdtKind where
@@ -395,6 +395,7 @@ end TypeShape
 structure AdtCompilerFacts where
   definitionId : DefinitionRef
   itemName : String
+  cfiEncoding : Option (Option String) := none
   nonnullOptimizationGuaranteed : Bool
 
 structure ProjectionField where
@@ -889,6 +890,7 @@ structure TargetDataLayoutEvidence where
   addressSpaceInfo : Array TargetAddressSpace
   instructionAddressSpace : Nat
   cEnumMinSize : String
+  x87F80AlignBytes : Option Nat := none
   deriving Repr, DecidableEq
 
 /-- Exact compiler existential-predicate identity, stable comparison rank and

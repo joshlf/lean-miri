@@ -650,22 +650,23 @@ def copyRepeatedly
   let afterClear ← match prepared with
     | .ok () updated => pure updated
     | .error reason updated => return .error reason updated
+  if sameAllocation && nonoverlapping then
+    let sourceFinish ← match sourceRange.endExclusive with
+      | .ok finish => pure finish
+      | .error reason => return .error (.memory reason) afterClear
+    let firstDestFinish ← match (allocRange destStart totalSize).endExclusive with
+      | .ok finish => pure finish
+      | .error reason => return .error (.memory reason) afterClear
+    if (sourceRange.start.bytes <= destStart.bytes && destStart.bytes < sourceFinish.bytes) ||
+        (destStart.bytes <= sourceRange.start.bytes && sourceRange.start.bytes < firstDestFinish.bytes) then
+      return .error .copyRangesOverlap afterClear
+  if repeatCount > 1 && !nonoverlapping then
+    return .error .repeatedCopyRequiresNonoverlapping afterClear
   if initialized.noBytesInit then
     let uninitResult := Allocation.writeUninit destRange pointerSize afterClear
     match uninitResult with
     | .error reason updated => return .error reason updated
     | .ok () updated => return .ok () updated
-  if sameAllocation && nonoverlapping then
-    let sourceFinish ← match sourceRange.endExclusive with
-      | .ok finish => pure finish
-      | .error reason => return .error (.memory reason) afterClear
-    let firstDestFinish ← match (allocRange destStart sourceRange.size).endExclusive with
-      | .ok finish => pure finish
-      | .error reason => return .error (.memory reason) afterClear
-    if sourceRange.start.bytes < firstDestFinish.bytes && destStart.bytes < sourceFinish.bytes then
-      return .error .copyRangesOverlap afterClear
-  if repeatCount > 1 && !nonoverlapping then
-    return .error .repeatedCopyRequiresNonoverlapping afterClear
   if sourceRange.size.bytes == 1 && repeatCount == 0 && !initialized.noBytesInit then
     return .error .singleByteZeroCountCopy afterClear
   let mut copiedBytes := #[]

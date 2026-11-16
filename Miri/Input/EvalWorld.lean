@@ -16,6 +16,7 @@ structure World (Os R Payload H D O Aff B Host : Type) where
   runtime : MachineGCRoots.Storage Os R Payload H D O Aff
   main : Option MainMachine.Data
   exit : WindowsExitMachine.Registry := {}
+  exitCalled : Bool := false
   types : RuntimeArrayTypes.World
   functions : FunctionPointers.Registry O
   vtables : VTableMachine.Registry

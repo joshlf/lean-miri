@@ -15,10 +15,7 @@ def emulate (h : LinuxForeign.Hooks S Place H D O E HM Os B I) (name : String)
     LinuxForeign.positional h name abi args dest
     return some .NeedsReturn
   if name != "__errno" && name != "gettid" then return none
-  h.signatures.foreign.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "Android errno calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "Android errno variadic signature")
-  if !args.isEmpty then throw (.undefinedBehavior "Android errno argument count mismatch")
+  let _ ← ShimSignatures.fixed h.signatures name (h.signature name) 0 abi args
   if name == "__errno" then h.signatures.foreign.writePointer (← IoError.lastErrorPlace h.errors).mplace.ptr dest
   else h.errors.writeScalar (← h.unixGettid name) dest
   return some .NeedsReturn

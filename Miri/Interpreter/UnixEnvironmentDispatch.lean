@@ -53,12 +53,6 @@ private def arg (args : Array A) (index : Nat) : M S A :=
 private def checked (h : Hooks S O E K) (operation : Operation) (legacy : Bool) (name : String)
     (caller : FnAbi Miri.MIR.TyId) (args : Array (OpTy Provenance)) : M S (Array (OpTy Provenance)) := do
   let signature := signature operation
-  if legacy then
-    h.checkSymbolClash name
-    if caller.conv != .C then throw (.undefinedBehavior "Unix environment calling convention mismatch")
-    if caller.cVariadic then throw (.undefinedBehavior "Unix environment variadic signature mismatch")
-    if args.size != signature.args.size then throw (.undefinedBehavior "Unix environment argument count mismatch")
-    return args
   let callee ← h.expectedAbi name
   if callee.conv != .C || callee.cVariadic || callee.fixedCount.toNat != signature.args.size || callee.args.size != signature.args.size then
     throw (.invalidProgram "compiler Unix environment signature mismatch")

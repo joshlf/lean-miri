@@ -16,6 +16,7 @@ structure Entry (Payload : Type) where
   deleteOnWrite : Bool
   /-- Captured provenance must be supplied, including references in callbacks. -/
   roots : Array Provenance
+  size : Size
 
 structure AllocationExtra (Payload : Type) where
   weakMemory : Option (StoreBufferAlloc (Scalar Provenance))
@@ -124,12 +125,24 @@ def insertSync (h : Hooks K User Payload) (address : SyncObject.Address)
   let machine ← get
   let extra ← liftResult (lookup h machine address.allocation)
   set (putAllocation h machine address.allocation {extra with sync :=
-    (extra.sync.filter fun item => item.1 != address.offset).push (address.offset, entry)})
+    (extra.sync.filter fun (start,old) =>
+      start.bytes.toNat + old.size.bytes.toNat <= address.offset.bytes.toNat ||
+      address.offset.bytes.toNat + entry.size.bytes.toNat <= start.bytes.toNat).push (address.offset, entry)})
+
+/-- remove_meta only removes an exactly matching range, before downcasting. -/
+def removeSync (h : Hooks K User Payload) (address : SyncObject.Address) (size : Size) :
+    M K User (Option (SyncObject.Object (Machine K User) Payload)) := do
+  let machine ← get
+  let extra ← liftResult (lookup h machine address.allocation)
+  let some (_,entry) := extra.sync.find? (fun (offset,entry) => offset == address.offset && entry.size == size)
+    | return none
+  set (putAllocation h machine address.allocation {extra with sync := extra.sync.filter (·.1 != address.offset)})
+  return some {payload := entry.payload,deleteOnWrite := entry.deleteOnWrite,onAccess := h.onAccess entry.payload}
 
 def accessHooks (h : Hooks K User Payload) : SyncObject.AccessHooks (Machine K User) Payload where
   entries := fun id => do
     let extra ← liftResult (lookup h (← get) id)
-    return extra.sync.map fun (offset,entry) => (offset,
+    return extra.sync.map fun (offset,entry) => (⟨offset,entry.size⟩,
       {payload := entry.payload, deleteOnWrite := entry.deleteOnWrite,
        onAccess := h.onAccess entry.payload})
   remove := fun id offset => do

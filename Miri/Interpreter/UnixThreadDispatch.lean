@@ -25,12 +25,9 @@ private def zero : M S (Scalar Provenance) :=
   match Scalar.fromUInt (BitVec.ofNat 128 0) (Size.ofBytes 4) with
   | .ok value => pure value
   | .error error => throw (ScalarOps.scalarError error)
-private def legacy (h : Hooks S D B I) (name : String) (abi : FnAbi TyId)
-    (args : Array (OpTy Provenance)) (count : Nat) : M S Unit := do
-  h.signatures.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "pthread calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "pthread unexpected variadic signature")
-  if args.size != count then throw (.undefinedBehavior "pthread argument count mismatch")
+private def checked (h : Hooks S D B I) (name : String) (abi : FnAbi TyId)
+    (args : Array (OpTy Provenance)) (count : Nat) : M S (Array (OpTy Provenance)) :=
+  ShimSignatures.fixedPrimitive h.signatures name (h.signature name) count abi args
 
 def emulate (h : Hooks S D B I) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy Provenance)) (dest : MPlaceTy Provenance) :
@@ -55,16 +52,16 @@ def emulate (h : Hooks S D B I) (name : String) (abi : FnAbi TyId)
   let os := h.signatures.os
   if (os == "linux" && name == "gettid") ||
       (os == "freebsd" && name == "pthread_getthreadid_np") then
-    legacy h name abi args 0
+    let args ← checked h name abi args 0
     h.writeScalar (← h.unixGettid name) dest
     return some .NeedsReturn
   if os == "macos" && name == "pthread_threadid_np" then
-    legacy h name abi args 2
+    let args ← checked h name abi args 2
     h.writeScalar (← AppleThreadId.query h.apple (← arg args 0) (← arg args 1)) dest
     return some .NeedsReturn
   unless #["linux","freebsd","solaris","illumos","macos"].contains os do return none
   if name == "pthread_setname_np" then
-    legacy h name abi args (if os == "macos" then 1 else 2)
+    let args ← checked h name abi args (if os == "macos" then 1 else 2)
     let (thread,nameValue,limit) ← if os == "macos" then do
         let thread ← UnixThread.self h.thread
         let nameValue ← h.thread.readScalar (← arg args 0)
@@ -81,7 +78,7 @@ def emulate (h : Hooks S D B I) (name : String) (abi : FnAbi TyId)
     h.writeScalar value dest
     return some .NeedsReturn
   if name == "pthread_getname_np" then
-    legacy h name abi args 3
+    let args ← checked h name abi args 3
     let value ← if os == "linux" then do
         -- Source reads length before even touching thread/name operands.
         let length ← h.thread.readScalar (← arg args 2)

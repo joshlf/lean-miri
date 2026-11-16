@@ -151,12 +151,11 @@ def isZst (layout : LayoutData) : Bool :=
 def isSsaStandalone (layout : LayoutData) : Bool :=
   match layout.backendRepr with | .Memory => layout.isZst | _ => true
 
+/-- Current rustc ignores representation bookkeeping after PassMode computation. -/
 def eqAbi (layout other : LayoutData) : Bool :=
-  layout.size == other.size && layout.isSized == other.isSized &&
+  layout.size == other.size && layout.align.abi == other.align.abi &&
   layout.backendRepr.eqUpToValidity other.backendRepr &&
-  layout.backendRepr.isBool == other.backendRepr.isBool &&
-  layout.align.abi == other.align.abi && layout.maxReprAlign == other.maxReprAlign &&
-  layout.unadjustedAbiAlign == other.unadjustedAbiAlign
+  layout.backendRepr.isBool == other.backendRepr.isBool
 
 end LayoutData
 

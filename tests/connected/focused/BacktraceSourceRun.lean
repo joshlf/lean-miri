@@ -1,7 +1,7 @@
 import Miri.Input.EvalSourceRunFinalization
 import Miri.Input.NativeMathHost
 
-/-! Canonical source run harness for the no_std Miri backtrace API witness.
+/-! Canonical source run harness for the custom-entry Miri backtrace API witness.
 The source program validates nested frames and returns zero only after resolving
 its Miri backtrace entries. Host effects outside that source path stay unavailable. -/
 open Miri Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter

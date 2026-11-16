@@ -61,10 +61,10 @@ private def count (h : Hooks S R) (ref : R) (dest : MPlaceTy Provenance) : M S U
   let count := (← h.runtime.futex ref).waiters.length
   if count >= 2^31 then throw (.invalidProgram "macOS futex waiter count i32 conversion")
   h.writeInt count dest
-private def futex (h : Hooks S R) (ptr : Pointer (Option Provenance)) (size : UInt64) (shared : Bool) : M S (Option R) := do
-  let object ← SyncObject.getOrInitMetadata h.futexMetadata ptr do
+private def futex (h : Hooks S R) (ptr : Pointer (Option Provenance)) (size : UInt64) (shared : Bool) : M S R := do
+  let object ← SyncObject.getOrInitMetadata h.futexMetadata ptr (Size.ofBytes size) do
     return {payload := ← h.newFutex size shared, deleteOnWrite := false, onAccess := fun _ => pure ()}
-  return object.map (·.payload)
+  return object.payload
 
 def waitAddress (h : Hooks S R) (address value size flags : OpTy Provenance)
     (timeout : Timeout) (dest : MPlaceTy Provenance) : M S Unit := do
@@ -88,7 +88,7 @@ def waitAddress (h : Hooks S R) (address value size flags : OpTy Provenance)
   let deadline ← clockTime.mapM fun (_,style,time) => do h.timeout style (← duration time)
   h.seqCstFence
   let valueAtAddress ← h.readAcquireBits ptr size
-  let some ref ← futex h ptr size shared | throw (.invalidProgram "acquire-read macOS futex lost allocation")
+  let ref ← futex h ptr size shared
   if (← h.runtime.futex ref).waiters.isEmpty then h.putSettings ref size shared
   else if (← h.settings ref) != (size,shared) then
     h.errnoNegOne "EINVAL" dest
@@ -110,9 +110,10 @@ def wakeAddress (h : Hooks S R) (address size flags : OpTy Provenance) (all : Bo
     h.errnoNegOne "EINVAL" dest
     return
   let shared := flags == sharedFlag
-  let some ref ← futex h ptr size shared |
+  let .ok object ← SyncObject.tryGetMetadata h.futexMetadata ptr |
     h.errnoNegOne "ENOENT" dest
     return
+  let ref := object.payload
   if (← h.runtime.futex ref).waiters.isEmpty then
     h.errnoNegOne "ENOENT" dest
     return
@@ -133,10 +134,10 @@ private def lockObject (h : Hooks S R) (value : Unfair R) : SyncObject.Object S 
 private def lockData (h : Hooks S R) (op : OpTy Provenance) : M S (Unfair R) := do
   if h.endian != .little then throw (.invalidProgram "os_unfair_lock requires little endian")
   let place ← h.derefLock op
-  let object ← SyncObject.getImmovableWithStaticInit h.lockMetadata place .ZERO 0 1 do
+  let object ← SyncObject.getOrInsert h.lockMetadata place do
     let value ← h.readLockValue place
     if value == 0 then return lockObject h (.active (← h.newMutex))
-    if value == 1 then return lockObject h .permanentlyLocked
+    if value == 0x42424242 then return lockObject h .permanentlyLocked
     throw (.undefinedBehavior "os_unfair_lock improperly initialized or overwritten")
   return object.payload
 
@@ -178,9 +179,9 @@ private def semaphoreObject (h : Hooks S R) (value : Semaphore R) : SyncObject.O
     unless (← h.runtime.semaphore value.ref).waiters.isEmpty do
       throw (.undefinedBehavior "access of os_unfair_lock while its queue is nonempty") }
 private def semaphoreData (h : Hooks S R) (immediate : RvalueImmTy Provenance) : M S (Semaphore R) := do
-  let place ← h.derefByte immediate
-  let object ← SyncObject.getImmovableWithStaticInit h.semaphoreMetadata place .ZERO 0 1
-    (throw (.undefinedBehavior "dispatch_semaphore_t not initialized with dispatch_semaphore_create"))
+  let pointer ← h.immediatePointer immediate
+  let .ok object ← SyncObject.tryGetMetadata h.semaphoreMetadata.toMetadataHooks pointer
+    | throw (.undefinedBehavior "dispatch_semaphore_t not initialized with dispatch_semaphore_create")
   return object.payload
 
 def semaphoreCreate (h : Hooks S R) (value : OpTy Provenance) (dest : MPlaceTy Provenance) : M S Unit := do
@@ -190,7 +191,7 @@ def semaphoreCreate (h : Hooks S R) (value : OpTy Provenance) (dest : MPlaceTy P
   let value := UInt64.ofNat value.toNat
   let allocation ← h.allocateRuntimeByte
   let data : Semaphore R := ⟨← h.newSemaphore value,value⟩
-  let _ ← SyncObject.initImmovable h.semaphoreMetadata allocation .ZERO 1 (semaphoreObject h data)
+  SyncObject.insert h.semaphoreMetadata allocation (semaphoreObject h data)
   h.writePointer allocation.mplace.ptr dest
 
 def semaphoreWait (h : Hooks S R) (sem timeout : OpTy Provenance) (dest : MPlaceTy Provenance) : M S Unit := do

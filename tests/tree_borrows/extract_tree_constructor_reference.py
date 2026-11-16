@@ -8,9 +8,9 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_TREE = "b58a7cfeba92ece2dab1977f65f9070fd8cd71ad"
+EXPECTED_TREE = "91cc25f2f9b88239225a2a3d32a4fd98262a6fc0"
 EXPECTED_RANGE_MAP = "56e9883b1caaf65a3f769cd5c91fbdbb81547f1b"
-EXPECTED_TREE_BORROWS_MOD = "bf38ca356df45e5f365c0ae64bfe7738a0d43e1e"
+EXPECTED_TREE_BORROWS_MOD = "086430ad06cd17bb22d77f3baa9a7ec2ae24da6f"
 
 
 def main() -> None:

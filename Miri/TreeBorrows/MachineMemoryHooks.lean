@@ -30,46 +30,41 @@ inductive AccessDiagnostic where
   | Freed
   deriving DecidableEq, Repr
 
-/-- A finite ordered representation of Miri's per-allocation `BTreeMap<Size,
-Box<dyn SyncObj>>`. Insertion keeps keys unique and ascending, so the access
-walks below have the source map's iteration order. -/
+/-- Finite full-range metadata, ordered by start offset like the pinned
+`RangeObjectMap<Box<dyn MetaObj>>`. Overlapping insertions replace old entries. -/
 structure SyncObjectMap (Obj : Type) where
-  entries : Array (Size × Obj) := #[]
+  entries : Array (AllocRange × Obj) := #[]
 
 namespace SyncObjectMap
 
 def empty : SyncObjectMap Obj := ⟨#[]⟩
 
-def insert (map : SyncObjectMap Obj) (offset : Size) (object : Obj) :
-    SyncObjectMap Obj := Id.run do
-  let mut entries := #[]
-  let mut inserted := false
-  for old in map.entries do
-    if old.1.bytes == offset.bytes then
-      if !inserted then
-        entries := entries.push (offset, object)
-        inserted := true
-    else if !inserted && offset.bytes < old.1.bytes then
-      entries := entries.push (offset, object)
-      entries := entries.push old
-      inserted := true
-    else
-      entries := entries.push old
-  if !inserted then entries := entries.push (offset, object)
-  return ⟨entries⟩
+def insert (map : SyncObjectMap Obj) (offset size : Size) (object : Obj) :
+    SyncObjectMap Obj :=
+  let range := allocRange offset size
+  let remaining := map.entries.filter fun (old,_) =>
+    !(size.bytes > 0 && old.size.bytes > 0 &&
+      offset.bytes.toNat < old.start.bytes.toNat + old.size.bytes.toNat &&
+      old.start.bytes.toNat < offset.bytes.toNat + size.bytes.toNat)
+  ⟨(remaining.push (range,object)).qsort (fun a b => a.1.start.bytes < b.1.start.bytes)⟩
 
 def remove (map : SyncObjectMap Obj) (offset : Size) : SyncObjectMap Obj :=
-  ⟨map.entries.filter fun entry => entry.1.bytes != offset.bytes⟩
+  ⟨map.entries.filter fun entry => entry.1.start.bytes != offset.bytes⟩
 
 def inRange (map : SyncObjectMap Obj) (range : AllocRange) :
     Except MemoryError (Array (Size × Obj)) := do
   let endOffset ← range.endExclusive
-  return map.entries.filter fun entry =>
-    range.start.bytes ≤ entry.1.bytes && entry.1.bytes < endOffset.bytes
+  let mut found := #[]
+  for (objectRange,object) in map.entries do
+    let objectEnd ← objectRange.endExclusive
+    if range.size.bytes > 0 && objectRange.size.bytes > 0 &&
+        range.start.bytes < objectEnd.bytes && objectRange.start.bytes < endOffset.bytes then
+      found := found.push (objectRange.start,object)
+  return found
 
 end SyncObjectMap
 
-/-- Allocation-indexed sync metadata. Miri stores one offset map inside each
+/-- Allocation-indexed sync metadata. Miri stores one range map inside each
 `AllocExtra`; this outer index lets a single `mem_copy_repeatedly` context
 carry the source and destination allocation maps independently. -/
 structure SyncObjectStore (Obj : Type) where
@@ -101,7 +96,7 @@ structure Context (State Obj : Type) where
   trackedAllocIds : Array AllocId := #[]
 
 /-- Hooks corresponding to the portions of `machine.rs` and
-`concurrency::sync::SyncObj` outside the Tree Borrows subtree. Data-race hooks
+`meta_obj::MetaObj` outside the Tree Borrows subtree. Data-race hooks
 must dispatch the configured Miri handler (`None` or vector clocks),
 including its per-allocation-handler invariant and weak-memory write effect. -/
 structure Hooks (State Obj MachineKind : Type) where
@@ -260,7 +255,10 @@ def beforeMemoryDeallocation (context : Context State Obj)
   if deallocated.status != .Deallocated then
     return ⟨updatedAllocation, current,
       .error s!"Tree Borrows deallocation failed: {reprStr deallocated.status}"⟩
-  for (offset, object) in (current.syncObjects.get allocId).entries do
+  let entries ← match findSyncRange current allocId (allocRange Size.ZERO size) with
+    | .ok entries => pure entries
+    | .error message => return ⟨updatedAllocation, current, .error message⟩
+  for (offset, object) in entries do
     let checked := hooks.syncOnAccess current.state object .Dealloc
     current := { current with state := checked.state }
     match checked.outcome with

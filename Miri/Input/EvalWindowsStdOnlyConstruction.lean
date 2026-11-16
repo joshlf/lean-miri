@@ -40,7 +40,7 @@ def fromSource
   pure {
     foreign
     frameInStd := FrameMetadata.frameInStd frames
-    windowsAbi := CompilerNamedShimAbi.query p.namedAbi
+    signature := CompilerNamedShimAbi.query p.namedAbi
     windowsValue := fun name =>
       match CompilerWindowsConstants.scalar p.namedConstants "c" name with
       | .ok value => pure value

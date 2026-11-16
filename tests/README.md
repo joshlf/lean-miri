@@ -121,6 +121,7 @@ Scripts are the authority for individual cases and build behavior.
 | `bash tools/check-structural-regressions.sh` | Context/provider/primitive rebinding, maps, zero width, thread-clock reuse, typed descriptor destruction and collection QA; proofs, `#eval` and runtime assertions. Uses adapted pinned unit inputs or no input. | Migrated self-contained cases are built/run through `MiriTests`; input-dependent cases are not included as a suite. |
 | `bash tools/check-performance-regressions.sh` | Finite equivalence/error-order/state-retention checks for indexes, ABI/backtrace caches, decoder caching, profiles and imported allocations. | Includes migrated self-contained cases and some input/memory overlap; dedicated input-driven parity cases still require this suite. |
 | `bash tools/check-connected-proofs.sh` | Build/audit `MiriTests` (including connected component proofs) and typecheck the retained SC projection and graph runner. | Component proofs are included; graph-runner typechecking is separate. |
+| `bash tools/check-upstream-sync.sh` | Nine original November upstream controls with same-TyCtxt references. `tests/upstream_sync/check.py` adds four intrinsic/pthread/TLS/CFI controls. Requires the reference exporter, sysroot and native runner. | No. |
 | `bash tools/check.sh` | Source audits, selected component tests, exporter contracts and fresh producer-to-consumer/execution checks. | This is the broad regression entry point, not an all-tests command. |
 
 The dedicated decoder mutations use `input/fixtures/strict-unit.json`, a
@@ -304,7 +305,7 @@ when changing it.
 | `flock /tmp/lean-miri-ci-guest.lock python3 tests/x86_pack/check.py --output scratch/x86-pack-new` | Fresh pinned-reference/guest comparisons for 128/256/512-bit signed and unsigned saturation boundaries and 128-bit chunk/lane order; requires a reference-feature exporter and matching native runner. Unsupported and timeouts fail the check. |
 | `python3 tests/random_memory/source_compare.py` | Extracted gen_random outer-body ordering and failure propagation; RNG/host/write leaves are fixtures. |
 | `python3 tests/producer/primitive_ranges.py` | Genuine u128/niche metadata and Lean decoder boundaries; requires built debug exporter and MIR sysroot. |
-| `cargo +miri-exporter-8144389c895d test --manifest-path exporter/Cargo.toml --locked --offline` | Rust/Python exporter tests, four fixture scripts and four producer checks; included in `check.sh`. Requires pinned toolchain, MIR sysroot and offline dependencies. |
+| `cargo +miri-exporter-8eb778d04094 test --manifest-path exporter/Cargo.toml --locked --offline` | Rust/Python exporter tests, four fixture scripts and four producer checks; included in `check.sh`. Requires pinned toolchain, MIR sysroot and offline dependencies. |
 | `python3 -m unittest discover -s exporter/tests -p 'test_*.py' -v` | Python typed-table schema loader tests, outside the main discovery root. |
 | `lake env lean MiriTests/Cast/Typed.lean` | Cast dispatcher, check order and size-mismatch cases; now included in `lake build MiriTests`. |
 | `lake env lean --run MiriTests/Native/BytesOwnership.lean` | Included in `lake exe miri_tests`: host-byte ownership, release and copy-failure cleanup using fixture hosts. “Native” here names the boundary, not an execution mode. |

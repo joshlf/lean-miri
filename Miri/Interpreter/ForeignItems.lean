@@ -15,7 +15,7 @@ inductive Init where | uninit | zero deriving DecidableEq, Repr
 inductive AllocationKind where | rust | c | miri | mmap deriving DecidableEq, Repr
 inductive SignatureType where
   | unit | usize | isize | i32 | u32 | pointer | unitPointer | alignment | never
-  | u64 | u8 | bool | byteSlice | functionPointer
+  | u64 | u8 | bool | byteSlice | functionPointer | unitPointerPointer | miriFrame | f32 | f64 | i32Pointer
   deriving DecidableEq, Repr
 structure Signature where
   conv : CanonAbi

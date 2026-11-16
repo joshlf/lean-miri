@@ -21,7 +21,7 @@ open Miri.Frontend
 namespace Client
 import_mir {json.dumps(full)} as imported
 example : imported.document.producer.rustcCommit =
-    "8144389c895da997dbdecaa635e41d6a50be6ffd" := by rfl
+    "8eb778d04094d3af4b26580cab327e0413eb1e02" := by rfl
 end Client
 open Lean Elab Command in
 run_cmd do

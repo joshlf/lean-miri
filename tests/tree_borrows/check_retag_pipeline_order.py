@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_MOD = "bf38ca356df45e5f365c0ae64bfe7738a0d43e1e"
+EXPECTED_MOD = "086430ad06cd17bb22d77f3baa9a7ec2ae24da6f"
 ORDER = (
     "policy>placeConversion>size>tag>pointerAccess>allocationResolution>"
     "creationLog>protector>kind>freeze>allocationExtra>parentAccess>"
@@ -65,15 +65,15 @@ def main() -> None:
     ])
     require_order("tb_retag_ptr_value reborrow", ptr_value, [
         "NewPermission::new(", "imm_ptr_to_mplace(val)?", "tb_retag_place(&place, new_perm)?",
-        "new_place.to_ref(this)",
+        "new_place.to_ref(ecx)",
     ])
     require_order("tb_retag_place", retag_place, [
-        "size_and_align_of_val(place)?", ".new_ptr()", "this.tb_reborrow(",
+        "size_and_align_of_val(place)?", ".new_ptr()", "ecx.tb_reborrow(",
         "map_provenance(|_| new_prov.unwrap())",
     ])
     require_order("tb_reborrow", reborrow, [
         "check_ptr_access(place.ptr(), ptr_size", "ptr_try_get_alloc_id(place.ptr(), 0)",
-        "log_creation(this, None)?", "log_creation(this, Some(",
+        "log_creation(ecx, None)?", "log_creation(ecx, Some(",
         ".protected_tags\n                .push((alloc_id, new_tag))", "get_alloc_info(alloc_id).kind",
         "get_tree_borrows_params().precise_interior_mut", "visit_freeze_sensitive(place, ptr_size",
         "get_alloc_extra(alloc_id)?", "is_not()",

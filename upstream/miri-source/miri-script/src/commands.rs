@@ -96,6 +96,7 @@ impl Command {
             | Command::Build { .. }
             | Command::Check { .. }
             | Command::Test { .. }
+            | Command::TestPriroda { .. }
             | Command::Run { .. }
             | Command::Fmt { .. }
             | Command::Doc { .. }
@@ -109,6 +110,7 @@ impl Command {
             Command::Check { features, flags } => Self::check(features, flags),
             Command::Test { bless, target, coverage, features, flags } =>
                 Self::test(bless, target, coverage, features, flags),
+            Command::TestPriroda { bless, flags } => Self::test_priroda(bless, flags),
             Command::Run { dep, native, quiet, target, edition, features, flags } =>
                 Self::run(dep, native, quiet, target, edition, features, flags),
             Command::Doc { features, flags } => Self::doc(features, flags),
@@ -175,9 +177,12 @@ impl Command {
         cmd!(sh, "cargo clean").run()?;
         // Call `cargo metadata` on the sources in case that changes the lockfile
         // (works around <https://github.com/rust-lang/rust-analyzer/issues/23392>).
+        // Need to set `CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow` otherwise lockfiles with
+        // newer packages get rejected; that's fine as everything is already pinned in the lockfile.
         let sysroot = cmd!(sh, "rustc --print sysroot").read()?;
         let sysroot = sysroot.trim();
-        cmd!(sh, "cargo metadata --format-version 1 --manifest-path {sysroot}/lib/rustlib/rustc-src/rust/compiler/rustc/Cargo.toml").ignore_stdout().run()?;
+        cmd!(sh, "cargo metadata --format-version 1 --manifest-path {sysroot}/lib/rustlib/rustc-src/rust/compiler/rustc/Cargo.toml")
+            .ignore_stdout().env("CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE", "allow").run()?;
         Ok(())
     }
 
@@ -468,13 +473,36 @@ impl Command {
         // Make sure the flags are going to the test harness, not cargo.
         flags.insert(0, "--".into());
 
-        // Then test, and let caller control flags.
-        // Only in root project as `cargo-miri` has no tests.
+        e.test("cargo-miri", &[], &flags)?;
         e.test(".", &features, &flags)?;
 
         if let Some(coverage) = &coverage {
             coverage.show_coverage_report(&e, &features)?;
         }
+
+        Ok(())
+    }
+
+    fn test_priroda(bless: bool, flags: Vec<String>) -> Result<()> {
+        let mut e = MiriEnv::new()?;
+
+        // Build cargo-miri and the local sysroot.
+        let features = ["priroda".to_owned()];
+        let quiet = false;
+        e.build_miri_sysroot(quiet, None::<&str>, &features)?;
+
+        // Forward information to test harness.
+        if bless {
+            e.sh.set_var("RUSTC_BLESS", "Gesundheit");
+        }
+
+        // `priroda` is a bin/test target of the `miri` package, so test it there.
+        let mut args = vec!["--test".to_owned(), "priroda".to_owned()];
+        // Pass flags as well. Make sure they are going to the test harness, not cargo.
+        args.push("--".to_owned());
+        args.extend(flags);
+
+        e.test(".", &features, &args)?;
 
         Ok(())
     }

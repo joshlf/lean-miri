@@ -9,18 +9,24 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 EXPORTER = ROOT / 'exporter/target/release/lean-miri-mir-exporter'
 FOCUSED = {
-    'handoff-acquire': ('atomic-handoff/acquire.rs', 'AtomicHandoff', 'expect-zero'),
-    'handoff-relaxed': ('atomic-handoff/relaxed.rs', 'AtomicHandoff', 'expect-race'),
-    'fence-positive': ('atomic-fence/positive.rs', 'AtomicFence', 'expect-zero'),
-    'fence-negative': ('atomic-fence/negative.rs', 'AtomicFence', 'expect-race'),
-    'pthread-race': ('race-negative/pthread-race-miri-start.rs', 'AtomicHandoff', 'expect-race'),
-    'backtrace': ('backtrace/source-e6209e72.rs', 'BacktraceSourceRun', None),
+    'handoff-acquire': ('tests/repro/atomic-handoff/acquire.rs', 'AtomicHandoff', 'expect-zero'),
+    'handoff-relaxed': ('tests/repro/atomic-handoff/relaxed.rs', 'AtomicHandoff', 'expect-race'),
+    'fence-positive': ('tests/repro/atomic-fence/positive.rs', 'AtomicFence', 'expect-zero'),
+    'fence-negative': ('tests/repro/atomic-fence/negative.rs', 'AtomicFence', 'expect-race'),
+    'pthread-race': ('tests/repro/race-negative/pthread-race-miri-start.rs', 'AtomicHandoff', 'expect-race'),
+    'backtrace': ('tests/connected/focused/backtrace.rs', 'BacktraceSourceRun', None),
+}
+UPSTREAM_CHECKS = {
+    'upstream-sync': ('bash', 'tools/check-upstream-sync.sh', '--skip-build'),
+    'upstream-sync-controls': ('python3', 'tests/upstream_sync/check.py'),
+    'coroutine-metadata': ('python3', 'tools/check-coroutine-metadata.py'),
+    'backtrace-pointers': ('python3', 'tools/check-function-pointer-diagnostics.py'),
 }
 
 
 def environment():
     env = os.environ.copy()
-    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8144389c895d'
+    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8eb778d04094'
     env.update(ELAN_HOME=env.get('ELAN_HOME', str(ROOT / '.elan')),
                MIRI_SYSROOT=env.get('MIRI_SYSROOT', str(ROOT / 'scratch/miri-sysroot')),
                PATH=str(toolchain / 'bin') + ':' + env.get('PATH', ''),
@@ -95,17 +101,19 @@ def reference_check(output, race):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('case', choices=[*FOCUSED, 'query-demand', 'runtime-type-closure', 'vtable-cross-crate'])
+    parser.add_argument('case', choices=[*FOCUSED, *UPSTREAM_CHECKS, 'query-demand', 'runtime-type-closure', 'vtable-cross-crate'])
     args = parser.parse_args()
     output = ROOT / 'scratch/ci-fresh' / args.case
     output.mkdir(parents=True, exist_ok=False)
     env = environment()
     lake = Path(env['ELAN_HOME']) / 'bin/lake'
     snapshot = output / 'input.json'
-    if args.case in FOCUSED:
+    if args.case in UPSTREAM_CHECKS:
+        run([*UPSTREAM_CHECKS[args.case], '--output', output / 'cases'], env)
+    elif args.case in FOCUSED:
         source, harness, expectation = FOCUSED[args.case]
         race = expectation == 'expect-race'
-        export('tests/repro/' + source, snapshot, env, roots=['miri_start'], reference=True,
+        export(source, snapshot, env, roots=['miri_start'], reference=True,
                expected=2 if race else 0, extra=['--crate-type=bin', '--crate-name=focused',
                '-Cpanic=abort', '--cfg=miri', '--extern', 'libc=' + libc()])
         reference_check(snapshot, race)

@@ -41,7 +41,7 @@ end ThreadId
 inductive BlockReason where
   | Join (thread : ThreadId)
   | Sleep | Mutex | Condvar | RwLock | Semaphore | Futex | InitOnce
-  | Readiness | Eventfd | VirtualSocket | IO
+  | Readiness | Eventfd | VirtualSocket | IO | Pause
   deriving DecidableEq, Repr
 
 /-- Deadline kind and opaque clock value. Clock arithmetic is owned by Miri's

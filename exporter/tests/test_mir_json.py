@@ -59,23 +59,25 @@ class MirJSONTests(unittest.TestCase):
 
     def test_requires_current_schema_version(self):
         for version in (4, 6, 7, 8, 9, 10, True, "11", 11.0):
-            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 11 or 12"):
+            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 11, 12 or 13"):
                 decode_mir_document(document(schema_version=version))
 
-    def test_schema_12_requires_exact_coroutine_catalog_and_preserves_version(self):
+    def test_schema_12_and_13_require_exact_coroutine_catalog_and_preserve_version(self):
         catalog = {"body_coroutines": [], "coroutines": [], "auxiliary_bodies": []}
-        current = document(schema_version=12, compiler_coroutine_coverage=catalog)
-        self.assertIs(decode_mir_document(current), current)
-        self.assertEqual(expand_document(current)["schema_version"], 12)
         with self.assertRaisesRegex(MirJSONError, "forbids"):
             decode_mir_document(document(compiler_coroutine_coverage=catalog))
-        for invalid in (None, {}, {**catalog, "unknown_witness": True},
-                        {**catalog, "body_coroutines": [False]},
-                        {**catalog, "body_coroutines": [0]}):
-            with self.subTest(catalog=invalid), self.assertRaises(MirJSONError):
-                decode_mir_document(document(schema_version=12, compiler_coroutine_coverage=invalid))
-        with self.assertRaises(MirJSONError):
-            decode_mir_document(document(schema_version=12))
+        for version in (12, 13):
+            with self.subTest(version=version):
+                current = document(schema_version=version, compiler_coroutine_coverage=catalog)
+                self.assertIs(decode_mir_document(current), current)
+                self.assertEqual(expand_document(current)["schema_version"], version)
+                for invalid in (None, {}, {**catalog, "unknown_witness": True},
+                                {**catalog, "body_coroutines": [False]},
+                                {**catalog, "body_coroutines": [0]}):
+                    with self.subTest(catalog=invalid), self.assertRaises(MirJSONError):
+                        decode_mir_document(document(schema_version=version, compiler_coroutine_coverage=invalid))
+                with self.assertRaises(MirJSONError):
+                    decode_mir_document(document(schema_version=version))
 
     def test_coroutine_auxiliary_roles_and_source_pool_round_trip(self):
         body = {"instance_id": 0, "source_def_id": 0,
@@ -120,7 +122,7 @@ class MirJSONTests(unittest.TestCase):
         self.assertIs(decode_mir_document(current), current)
         self.assertEqual(pool_entry(current, "layouts", 0), formula)
         for version in (8, 9, 10):
-            with self.assertRaisesRegex(MirJSONError, "schema_version must be 11 or 12"):
+            with self.assertRaisesRegex(MirJSONError, "schema_version must be 11, 12 or 13"):
                 decode_mir_document(document(schema_version=version, layouts=[0], layout_values=[formula], bodies=[call]))
 
     def test_filename_ids_stay_shared_and_unexpanded(self):

@@ -37,18 +37,24 @@ def Table.newRef (table : Table D) (description : D) (hostUsizeBits : Nat) :
     Except StepError (Table D × Ref D) := do
   if table.nextId + 1 >= 2^hostUsizeBits then throw (.invalidProgram "file-description ID strict_add overflow")
   return ({ table with nextId := table.nextId + 1 },⟨⟨table.nextId⟩,description⟩)
-def Table.insertWithMin (table : Table D) (ref : Ref D) (minimum : Int32) :
-    Except StepError (Table D × Int32) := do
+def validFdNum (number : Int32) : Bool := number >= 0 && number < 524288
+
+def Table.tryInsertWithMin (table : Table D) (ref : Ref D) (minimum : Int32) :
+    Option (Table D × Int32) := Id.run do
   let sorted := table.fds.qsort (fun a b => a.1 < b.1)
   let mut candidate := minimum
   for (fd,_) in sorted do
     if fd >= minimum then
-      if fd == candidate then
-        if candidate.toInt == 2^31-1 then throw (.invalidProgram "file descriptor strict_add overflow")
-        candidate := Int32.ofInt (candidate.toInt + 1)
+      if fd == candidate then candidate := Int32.ofInt (candidate.toInt + 1)
       else break
-  if table.fds.any (·.1 == candidate) then throw (.invalidProgram "duplicate file descriptor insertion")
-  return ({ table with fds := table.fds.push (candidate,ref) },candidate)
+  if !validFdNum candidate then return none
+  return some ({table with fds := table.fds.push (candidate,ref)},candidate)
+
+def Table.insertWithMin (table : Table D) (ref : Ref D) (minimum : Int32) :
+    Except StepError (Table D × Int32) :=
+  match table.tryInsertWithMin ref minimum with
+  | some value => .ok value
+  | none => .error (.resourceExhaustion "file descriptor limit reached")
 def Table.insert (table : Table D) (ref : Ref D) := table.insertWithMin ref 0
 def Table.insertNew (table : Table D) (value : D) (hostUsizeBits : Nat) : Except StepError (Table D × Int32) := do
   let (table,ref) ← table.newRef value hostUsizeBits
@@ -171,7 +177,7 @@ def hasReadinessWatched (h : Hooks S H D O E Meta) : Description H D O → Bool
 def isTty (h : Hooks S H D O E Meta) (communicate : Bool) (description : Description H D O) : M S Bool := do
   match description with
   | .stdin | .stdout | .stderr | .file .. =>
-    if communicate then h.hostIsTerminal description else pure false
+    if communicate then h.hostIsTerminal description else pure true
   | .other value => h.otherIsTerminal value communicate
   | _ => pure false
 

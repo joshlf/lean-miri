@@ -3,7 +3,7 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 export ELAN_HOME="${ELAN_HOME:-$repo_root/.elan}"
-export PATH="$ELAN_HOME/bin:$repo_root/.rustup/toolchains/miri-exporter-8144389c895d/bin:$PATH"
+export PATH="$ELAN_HOME/bin:$repo_root/.rustup/toolchains/miri-exporter-8eb778d04094/bin:$PATH"
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
 python3 tests/memory_kind/extract_reference.py "$work_dir/reference.rs"

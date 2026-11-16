@@ -42,9 +42,9 @@ def bind [DecidableEq K] (access : ValidityMachine.Access K U)
     field := fun value name => do
       let index ← fieldIndex value.layout name
       memory (← PlaceDynamic.field projection choice ⟨.memory value.mplace,value.layout⟩ index)
-    readFieldSigned := fun value => do
+    readFieldUnsigned := fun value => do
       let data ← scalar access ⟨.indirect value.mplace,value.layout⟩
-      lift (data.toInt value.layout.layout.size |>.mapError ScalarOps.scalarError)
+      lift (data.toTargetUsize access.runtime.pointerSize |>.mapError ScalarOps.scalarError)
     readFieldPointer := fun value => do
       let data ← scalar access ⟨.indirect value.mplace,value.layout⟩
       lift (data.toPointer access.runtime.base |>.mapError ScalarOps.scalarError)

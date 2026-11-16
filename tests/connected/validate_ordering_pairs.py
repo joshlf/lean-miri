@@ -63,7 +63,7 @@ def check(row):
     sidecar=Path(str(raw)+'.miri-reference.json');side=json.loads(sidecar.read_text());data=raw.read_bytes()
     need(side['reference']['outcome']=={'kind':'exit_zero'},'selected Miri reference did not naturally exit zero')
     need(side['reference']['config']['same_tcx'] is True,'reference is not same-TyCtxt')
-    need(side['miri_commit']=='7fa591d7d4dd9af8154becbc8332f8096f8323b1' and side['rustc_commit']=='8144389c895da997dbdecaa635e41d6a50be6ffd','reference source pin mismatch')
+    need(side['miri_commit']=='93c45edea8b148a6b6f05ec9384449a04217143f' and side['rustc_commit']=='8eb778d04094d3af4b26580cab327e0413eb1e02','reference source pin mismatch')
     fnv=0xcbf29ce484222325
     for byte in data:fnv=((fnv^byte)*0x100000001b3)&0xffffffffffffffff
     need(side['snapshot_byte_length']==len(data) and side['snapshot_fnv1a64']==f'{fnv:016x}','Miri sidecar/snapshot identity mismatch')

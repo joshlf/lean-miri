@@ -25,7 +25,7 @@ reference-feature exporter and the matching libc rlib described in the
 ```bash
 export CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup"
 export MIRI_SYSROOT="$PWD/scratch/miri-sysroot"
-toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d"
+toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8eb778d04094"
 export PATH="$toolchain/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$toolchain/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 mkdir -p scratch/exports
@@ -60,3 +60,8 @@ python3 tests/connected/focused/check_resolved_generic.py \
   --exporter exporter/target/release/lean-miri-mir-exporter \
   --runner .lake/build/bin/native_runner
 ```
+
+The maintained `backtrace.rs` preserves the nested-frame, name, filename,
+location and function-pointer assertions of the frozen backtrace reproducer.
+It links std and uses the canonical c_void field required by the new
+`miri_resolve_frame` signature; the original reproducer remains unchanged.

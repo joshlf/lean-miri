@@ -1,5 +1,5 @@
 //! Exact compiler-owned coroutine metadata; auxiliary bodies are never callable
-//! instance bodies. Pinned StateTransform: coroutine/{mod,drop}.rs at 8144389c895d.
+//! instance bodies. Pinned StateTransform: coroutine/{mod,drop}.rs at 8eb778d04094.
 use super::*;
 use crate::shared_json::Shared;
 

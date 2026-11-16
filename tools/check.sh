@@ -66,7 +66,7 @@ ci_step 'comparison:53-operand-run_differential' bash tests/operand/run_differen
 ci_step 'comparison:54-validity-run_differential' bash tests/validity/run_differential.sh
 ci_step 'comparison:55-memory_state-run' bash tests/memory_state/run.sh
 ci_step 'comparison:56-memory_kind-run' bash tests/memory_kind/run.sh
-ci_step 'comparison:57-exporter-cargo-tests' cargo +miri-exporter-8144389c895d test --locked --offline --manifest-path exporter/Cargo.toml
+ci_step 'comparison:57-exporter-cargo-tests' cargo +miri-exporter-8eb778d04094 test --locked --offline --manifest-path exporter/Cargo.toml
 ci_step 'comparison:58-input-run' bash tests/input/run.sh
 ci_step 'comparison:59-eval_core-run' env EVAL_CORE_SKIP_BUILD=1 bash tests/eval_core/run.sh
 ci_step 'comparison:60-frontend-run' bash tests/frontend/run.sh

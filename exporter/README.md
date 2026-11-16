@@ -9,10 +9,10 @@ for pinned versions and setup.
 ```bash
 export CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup"
 export MIRI_SYSROOT="$PWD/scratch/miri-sysroot"
-toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d"
+toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8eb778d04094"
 export PATH="$toolchain/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$toolchain/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d build --locked --manifest-path exporter/Cargo.toml
+"$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 build --locked --manifest-path exporter/Cargo.toml
 mkdir -p scratch/exports
 exporter/target/debug/lean-miri-mir-exporter --output scratch/exports/add-one.json \
   --root add_one -- exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure
@@ -51,7 +51,7 @@ exact arguments cannot be fingerprinted.
 
 ## Input contract
 
-The producer writes `lean-miri-rustc-mir` version 12. Evaluated integer scalars carry
+The producer writes `lean-miri-rustc-mir` version 13. Evaluated integer scalars carry
 `bits_unsigned` and the compiler layout's `size_bytes`, so consumers can construct
 the machine scalar before reading the type and layout tables. Zero-sized and
 pointer constants retain their separate representations. Compiler values have
@@ -92,7 +92,7 @@ Prepared-world `raw_pool` positions imply source ID `index + 1`: null slots join
 their unique serialized allocation, while opaque and dangling globals retain
 explicit exceptional rows. Dedup salt arrays carry graph IDs in salt order;
 source IDs and byte keys come from those allocations. All 32 outcomes remain
-required for function, vtable and byte keys. The reader accepts strict schema 11 and schema 12 inputs.
+required for function, vtable and byte keys. The reader accepts strict schemas 11, 12 and 13.
 
 Schema 12 requires `compiler_coroutine_coverage`, including an explicit Boolean
 marker for every executable body. A marked body owns one complete, normalized
@@ -109,9 +109,9 @@ Callable drop shims still come from the exact `instance_mir` query. The reader
 checks owner/source/role/phase links, full selected physical variant layouts and
 saved-state field types/layouts. Root tag queries retain their compiler-produced
 narrowed scalar layout. These rules follow the pinned compiler's
-[StateTransform](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/coroutine/mod.rs),
-[drop snapshots](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/coroutine/drop.rs)
-and [canonical shim construction](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/shim.rs).
+[StateTransform](https://github.com/rust-lang/rust/blob/8eb778d04094d3af4b26580cab327e0413eb1e02/compiler/rustc_mir_transform/src/coroutine/mod.rs),
+[drop snapshots](https://github.com/rust-lang/rust/blob/8eb778d04094d3af4b26580cab327e0413eb1e02/compiler/rustc_mir_transform/src/coroutine/drop.rs)
+and [canonical shim construction](https://github.com/rust-lang/rust/blob/8eb778d04094d3af4b26580cab327e0413eb1e02/compiler/rustc_mir_transform/src/shim.rs).
 This metadata coverage does not establish general coroutine execution support.
 
 Schema 11 uses exact-equality payload pools without changing compiler identity.
@@ -168,7 +168,7 @@ of those values. Type compiler facts use the owning `type_id` and optional
 This preserves a distinct region-erased query input when one exists.
 Backtrace `source_position.byte_position` is the body-specific collapsed position;
 it can differ from the global span's position for an inlined body.
-The reader accepts schemas 11 and 12. Explicit array offsets retain their count,
+The reader accepts schemas 11, 12 and 13. Explicit array offsets retain their count,
 width and per-field equality checks. The producer stores array offsets as an
 exact stride/count formula, and represents a resolved LLVM intrinsic call with
 `kind: "llvm_intrinsic"`, `function_type` and `instance_id`, without `fn_abi`.
@@ -243,7 +243,7 @@ After the toolchain and MIR-enabled sysroot setup above, run from the repository
 root with the same environment:
 
 ```bash
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d test --locked --offline --manifest-path exporter/Cargo.toml
+"$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 test --locked --offline --manifest-path exporter/Cargo.toml
 ```
 
 The LLVM no-ABI producer fixture is part of that unittest discovery. After a
@@ -311,3 +311,10 @@ EXPORTER_BIN=exporter/target/release/lean-miri-mir-exporter \
 lake env lean --run tests/input/SelectedKeyCoverageStrict.lean scratch/selected-keys.json
 lake env lean --run tests/input/AllocWorldRuntime161.lean scratch/selected-keys.json
 ```
+
+Schema 13 pins the November 2026 compiler/Miri pair and records the compiler
+`cfi_encoding` attribute explicitly (including its absence) for ADTs, plus the
+compiler target alignment for x87 scratch registers. Structural
+C ABI comparisons consume this encoding. Legacy schema 11/12 inputs retain their
+original compiler pins and are rejected when a comparison requires absent CFI
+evidence. Saved input bytes are not rewritten to claim newer compiler evidence.

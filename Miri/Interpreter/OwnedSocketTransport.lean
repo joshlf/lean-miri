@@ -54,6 +54,7 @@ def readiness (h : Readiness.Hooks (TypedSyncMachine.State K U) F)
    readiness := fun f => action (h.readiness f)
    delayed := action h.delayed
    putDelayed := fun fs => action (h.putDelayed fs)
+   beforeDelayed := fun f => action (h.beforeDelayed f)
    unblock := fun t r => action (h.unblock t r)}
 
 def virtual (h : VirtualSocket.Hooks (TypedSyncMachine.State K U) F E)
