@@ -1,5 +1,4 @@
 import duplicate_prefix.GeneralBorrowExposedConditionalReadPrimaryPath
-import duplicate_prefix.GeneralBorrowExposedConditionalReadInvariant
 namespace DuplicatePrefix.GeneralBorrowExposedConditionalReadPrimaryWitness
 open Miri.TreeBorrows Miri.TreeBorrows.Tree
 open GeneralBorrowWildcardSubtreeStack

@@ -1,5 +1,6 @@
 import duplicate_prefix.CurrentCallSpatialEntry
-import duplicate_prefix.CurrentCallResourceBoolCurrent
+import duplicate_prefix.CurrentCallResourceEntryFacets
+import duplicate_prefix.S03ReturnChildMetadata
 import duplicate_prefix.GeneralBorrowEffectfulRetagCausalOrder
 namespace DuplicatePrefix.CurrentCallSpatialEntryBoolCurrent
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures Miri.Interpreter

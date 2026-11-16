@@ -1,5 +1,5 @@
 import duplicate_prefix.GeneralBorrowFreshSharedNext
-import duplicate_prefix.GeneralBorrowFreshSharedLifetime
+import duplicate_prefix.StackPopRelease
 import duplicate_prefix.GeneralBorrowFreshSharedStagePaths
 namespace DuplicatePrefix.GeneralBorrowFreshSharedPop
 open Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree

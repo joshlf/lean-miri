@@ -1,5 +1,5 @@
-import duplicate_prefix.CurrentCallResourceRootPhysical
-import duplicate_prefix.CurrentCallResourceAccess
+import duplicate_prefix.CurrentCallResourceEntry
+import duplicate_prefix.CurrentCallRootPhysicalWindow
 
 namespace DuplicatePrefix.CurrentCallResourceFinalWrite
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures Miri.Interpreter

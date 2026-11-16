@@ -1,4 +1,4 @@
-import duplicate_prefix.GlobalAddressRangeAllocationStage
+import duplicate_prefix.GlobalAddressRangeResources
 namespace DuplicatePrefix.GlobalAddressAlignedBumpFormation
 open Miri.Concurrency Miri.ABI Miri.Memory Miri.Memory.AllocAddresses
 open GlobalAddressBumpRangeFormation (length length_nat Frontier)

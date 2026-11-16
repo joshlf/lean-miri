@@ -1,10 +1,8 @@
 import duplicate_prefix.HelperCompilerFacts
 import duplicate_prefix.CanonicalConfigFacts
 import duplicate_prefix.CopyPreconditions
-import duplicate_prefix.RootMetadataQueries
 import duplicate_prefix.ImmediateReadProof
 import duplicate_prefix.RetagReferencePlace
-import duplicate_prefix.LayoutLookupProof
 import duplicate_prefix.ReferenceMetadataFacts
 
 /-! The actual inner helper called by slice `len`: an ordinary `metadata`

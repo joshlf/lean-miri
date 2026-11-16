@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowFreshFrozenTyping
+import duplicate_prefix.GeneralBorrowFreshActiveOnClean
+import duplicate_prefix.GeneralBorrowFreshActiveWithin
 namespace DuplicatePrefix.GeneralBorrowReadFrozen
 open Miri.ABI Miri.Memory Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefix.BorrowRangeAccess DuplicatePrefix.GeneralBorrowProjection DuplicatePrefix.GeneralBorrowExposure

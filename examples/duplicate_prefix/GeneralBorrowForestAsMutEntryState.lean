@@ -1,4 +1,7 @@
-import duplicate_prefix.GeneralBorrowForestAsMutEntry
+import duplicate_prefix.GeneralBorrowForestArgumentCopy
+import duplicate_prefix.ScopedFrame
+import duplicate_prefix.AsMutFinish
+import duplicate_prefix.CallLocalRead
 import duplicate_prefix.PushThread
 
 namespace DuplicatePrefix.GeneralBorrowForestAsMutEntryState

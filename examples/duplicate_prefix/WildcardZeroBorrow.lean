@@ -1,4 +1,4 @@
-import duplicate_prefix.WildcardEmptyRetag
+import duplicate_prefix.WildcardEmptyAddress
 import duplicate_prefix.ZeroReferenceBorrow
 namespace DuplicatePrefix.WildcardZeroBorrow
 open Miri Miri.ABI Miri.Memory Miri.MIR Miri.Input Miri.Interpreter Miri.TreeBorrows

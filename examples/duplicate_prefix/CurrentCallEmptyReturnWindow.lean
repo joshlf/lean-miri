@@ -1,5 +1,4 @@
 import duplicate_prefix.CurrentCallFamilySpatialAdmission
-import duplicate_prefix.CurrentCallActualReferenceEncoding
 import duplicate_prefix.CurrentCallSpatialReturnFrame
 
 /-! One-byte Bool ownership supplies its current operational window. This is

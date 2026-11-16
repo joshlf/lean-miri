@@ -1,5 +1,5 @@
 import duplicate_prefix.RootCompilerFacts
-import duplicate_prefix.LayoutLookupProof
+import Init.Data.List.Monadic
 
 set_option maxRecDepth 1000000
 set_option maxHeartbeats 16000000

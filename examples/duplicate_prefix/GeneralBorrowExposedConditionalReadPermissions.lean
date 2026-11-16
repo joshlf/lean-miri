@@ -1,4 +1,6 @@
-import duplicate_prefix.GeneralBorrowExposedNonleafCoherentAccess
+import duplicate_prefix.GeneralBorrowExposedNonleafCoherence
+import duplicate_prefix.GeneralBorrowWildcardForestWeights
+import duplicate_prefix.GeneralBorrowExposedNonleafPrimaryPath
 namespace DuplicatePrefix.GeneralBorrowExposedConditionalReadPermissions
 open Miri.TreeBorrows Miri.TreeBorrows.Tree
 open GeneralBorrowProtectedReadCompatible (Compatible)

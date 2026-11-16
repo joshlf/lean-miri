@@ -1,4 +1,5 @@
-import duplicate_prefix.RootFalseBranch
+import duplicate_prefix.RootFalseAssignment
+import duplicate_prefix.SuccessfulTrace
 import duplicate_prefix.CopyHelperCleanup
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000

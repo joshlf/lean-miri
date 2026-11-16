@@ -1,4 +1,6 @@
-import duplicate_prefix.RootDivisionPrelude
+import duplicate_prefix.RootDivisionCheck
+import duplicate_prefix.RootDivisionAssert
+import duplicate_prefix.SuccessfulTrace
 import duplicate_prefix.CopyHelperCleanup
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000

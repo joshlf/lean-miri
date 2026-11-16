@@ -1,8 +1,5 @@
 import duplicate_prefix.GeneralBorrowFreshAnchor
 import duplicate_prefix.GeneralBorrowFreshReuseNode
-import duplicate_prefix.GeneralBorrowFreshReuseMap
-import duplicate_prefix.GeneralBorrowFreshRange
-import duplicate_prefix.GeneralBorrowTagMap
 namespace DuplicatePrefix.GeneralBorrowFreshSharedChild
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefix.GeneralBorrowFreshNode DuplicatePrefix.GeneralBorrowNodeUpdate

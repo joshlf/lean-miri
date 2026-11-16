@@ -1,7 +1,6 @@
-import duplicate_prefix.RootZeroInvocationEntry
+import duplicate_prefix.RawRootInvocation
 import duplicate_prefix.RootZeroComplete
 import duplicate_prefix.PushThread
-import duplicate_prefix.ProtectedTagsFacts
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false

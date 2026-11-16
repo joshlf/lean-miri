@@ -1,5 +1,5 @@
 import duplicate_prefix.S04ReturnProtection
-import duplicate_prefix.S04ReturnPointerBridge
+import duplicate_prefix.GeneralBorrowPositiveWildcardWindowPointerChecks
 import duplicate_prefix.S05WildcardEntryBridge
 
 namespace DuplicatePrefix.S04ReturnWildcardProtection

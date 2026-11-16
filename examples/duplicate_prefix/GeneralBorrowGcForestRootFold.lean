@@ -1,4 +1,8 @@
-import duplicate_prefix.GeneralBorrowGcFullForest
+import duplicate_prefix.GeneralBorrowGcDfsForestFormation
+import duplicate_prefix.GeneralBorrowGcPartitionGeometry
+import duplicate_prefix.GeneralRangeMapThoroughComplete
+import duplicate_prefix.GeneralBorrowGcStarComplete
+import duplicate_prefix.GeneralBorrowGcNodeMetadata
 
 namespace DuplicatePrefix.GeneralBorrowGcForestRootFold
 open Miri.ABI Miri.Memory Miri.TreeBorrows Miri.TreeBorrows.Tree

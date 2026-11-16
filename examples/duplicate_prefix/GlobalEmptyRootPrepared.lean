@@ -1,4 +1,5 @@
-import duplicate_prefix.GlobalEmptyRootArgumentScope
+import duplicate_prefix.GlobalEmptyRootArguments
+import duplicate_prefix.ConcreteEmptyRootArgumentScope
 
 namespace DuplicatePrefix.GlobalEmptyRootPrepared
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.Interpreter Miri.TreeBorrows

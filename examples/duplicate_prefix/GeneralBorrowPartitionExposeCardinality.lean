@@ -1,5 +1,5 @@
 import duplicate_prefix.GeneralBorrowLocationUpdateFrame
-import duplicate_prefix.GeneralBorrowGenericExposeCardinality
+import duplicate_prefix.GeneralBorrowExposureMarkCardinality
 namespace DuplicatePrefix.GeneralBorrowPartitionExposeCardinality
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefix.GeneralBorrowExposure DuplicatePrefix.GeneralBorrowExposureCardinality

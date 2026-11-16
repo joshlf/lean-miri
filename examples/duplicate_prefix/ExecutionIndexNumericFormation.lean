@@ -1,4 +1,4 @@
-import duplicate_prefix.ExecutionAddressSlackFormation
+import duplicate_prefix.GlobalAddressAlignedBumpFormation
 namespace DuplicatePrefix.ExecutionIndexNumericFormation
 open Miri.ABI Miri.Memory Miri.Interpreter ExecutionChoices
 set_option maxRecDepth 65536

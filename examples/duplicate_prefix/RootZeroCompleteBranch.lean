@@ -1,4 +1,4 @@
-import duplicate_prefix.RootZeroBranch
+import duplicate_prefix.RootZeroSwitch
 import duplicate_prefix.CopyHelperCleanup
 import duplicate_prefix.SuccessfulTrace
 set_option maxRecDepth 65536

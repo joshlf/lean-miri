@@ -1,6 +1,4 @@
-import duplicate_prefix.CurrentCallEmptyEntry
-import duplicate_prefix.PositiveRootInstalledFrame
-import duplicate_prefix.RootZeroCompletePrefix
+import duplicate_prefix.CurrentCallEmptyEntryBool
 
 /-! Structural facts for the actual empty-entry frame. These facts concern
 locals and control; the exact finite effect retains its own protector list. -/

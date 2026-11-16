@@ -1,4 +1,5 @@
-import duplicate_prefix.CurrentCallTypedResourceEntry
+import duplicate_prefix.CurrentCallResourceFnEntry
+import duplicate_prefix.CurrentCallResourceInstallation
 import duplicate_prefix.CurrentCallTypedSourceCopy
 
 namespace DuplicatePrefix.CurrentCallResourceSourceCopy

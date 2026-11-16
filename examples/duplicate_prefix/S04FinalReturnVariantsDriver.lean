@@ -1,8 +1,5 @@
-import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.S04FinalReturnVariantsInput
 import duplicate_prefix.S04FinalReturnRuleAccounting
-import duplicate_prefix.RootPhysicalReturnSupport
-import duplicate_prefix.RootZeroBranch
 
 namespace DuplicatePrefix.S04FinalReturnVariantsDriver
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows

@@ -1,6 +1,6 @@
 import duplicate_prefix.CurrentCallCheckpointMutableCurrent
-import duplicate_prefix.CurrentCallResourceAsMutReturn
-import duplicate_prefix.CurrentCallResourceLenCapability
+import duplicate_prefix.CurrentCallResourceAsMutCall
+import duplicate_prefix.AsMutReturnFromReleaseRuntime
 namespace DuplicatePrefix.CurrentCallCheckpointMutableBank
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures Miri.MIR Miri.Interpreter
 open Miri.TreeBorrows Miri.TreeBorrows.Tree

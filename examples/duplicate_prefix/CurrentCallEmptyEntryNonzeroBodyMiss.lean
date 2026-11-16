@@ -1,4 +1,6 @@
-import duplicate_prefix.CurrentCallEmptyEntryNonzeroBody
+import duplicate_prefix.CurrentCallEmptyEntryFrame
+import duplicate_prefix.S03EmptyPositiveBodyExact
+import duplicate_prefix.S03EmptyIntegerBody
 import duplicate_prefix.S03WildcardMissBody
 namespace DuplicatePrefix.CurrentCallEmptyEntryNonzeroBodyMiss
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.TreeBorrows Miri.Interpreter

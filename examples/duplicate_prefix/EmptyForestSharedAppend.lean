@@ -1,7 +1,6 @@
-import duplicate_prefix.EmptyForestSharedZeroBorrow
+import duplicate_prefix.RootReferenceZeroBorrow
+import duplicate_prefix.GeneralBorrowZeroSharedConstructor
 import duplicate_prefix.EmptyForestUnmaterializedRelease
-import duplicate_prefix.GeneralBorrowSifaExactReadFrame
-import duplicate_prefix.GeneralBorrowFreshMetadataChildSifa
 
 namespace DuplicatePrefix.EmptyForestSharedAppend
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree

@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowFreshSharedTwoTargetWithin
+import duplicate_prefix.GeneralBorrowFreshSharedTargetActivity
+import duplicate_prefix.GeneralBorrowFreshSharedNext
 import duplicate_prefix.GeneralBorrowFreshSharedReleaseWithin
 namespace DuplicatePrefix.GeneralBorrowFreshSharedTwoReleaseWithin
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree

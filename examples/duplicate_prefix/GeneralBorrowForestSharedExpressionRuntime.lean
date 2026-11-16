@@ -1,5 +1,5 @@
 import duplicate_prefix.GenericFunctionEntryRuntime
-import duplicate_prefix.GeneralBorrowForestEntrySharedExpression
+import duplicate_prefix.GeneralBorrowForestMixedShared
 namespace DuplicatePrefix.GeneralBorrowForestSharedExpressionRuntime
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
 open ActualReferenceContext CanonicalConfigFacts

@@ -1,4 +1,4 @@
-import duplicate_prefix.NodeLookupProof
+import Init.Data.List.Monadic
 import duplicate_prefix.RootCompilerFacts
 
 namespace DuplicatePrefix.RootMetadataQueries

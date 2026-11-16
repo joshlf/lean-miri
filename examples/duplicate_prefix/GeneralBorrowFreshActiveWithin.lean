@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowFreshActiveOn
+import duplicate_prefix.GeneralBorrowFreshReleaseLoop
+import duplicate_prefix.GeneralBorrowFreshOwnedOn
 namespace DuplicatePrefix.GeneralBorrowFreshActiveWithin
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefix.GeneralBorrowFreshMaterialization DuplicatePrefix.GeneralBorrowFreshInstallation

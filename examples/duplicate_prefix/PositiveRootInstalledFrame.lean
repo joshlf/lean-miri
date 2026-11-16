@@ -1,4 +1,7 @@
-import duplicate_prefix.PositiveRootInvocationEntry
+import duplicate_prefix.PositiveRootArgumentProperties
+import duplicate_prefix.ProtectorInsertion
+import duplicate_prefix.StackPopRelease
+import duplicate_prefix.RawRootInvocation
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 namespace DuplicatePrefix.PositiveRootInstalledFrame

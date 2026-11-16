@@ -1,4 +1,5 @@
-import duplicate_prefix.DuplicatePrefixResidualReadWriteStep
+import duplicate_prefix.DuplicatePrefixResidualWriteStep
+import duplicate_prefix.DuplicatePrefixResidualReadWriteSupport
 namespace DuplicatePrefix.DuplicatePrefixResidualReadWriteEffects
 open Miri Miri.Memory Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefixCallbackAuthorization DuplicatePrefixResidualSupportAuthorization

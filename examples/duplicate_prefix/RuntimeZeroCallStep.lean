@@ -1,10 +1,4 @@
 import duplicate_prefix.RuntimeZeroReturn
-import duplicate_prefix.RuntimeFunctionConstant
-import duplicate_prefix.CallEntryLocals
-import duplicate_prefix.GenericCallStages
-import duplicate_prefix.CallItemDispatch
-import duplicate_prefix.RuntimeZeroDispatch
-import duplicate_prefix.CopyRuntimeCallFacts
 
 /-! The actual checkLanguage MIR call terminator which enters the zero-argument
     language-runtime helper.  Operand resolution, destination evaluation,

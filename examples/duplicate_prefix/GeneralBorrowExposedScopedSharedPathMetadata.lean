@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowExposedScopedSharedLeafNext
+import duplicate_prefix.GeneralBorrowExposedScopedSharedLeafRun
+import duplicate_prefix.GeneralBorrowFreshSharedGeometry
 import duplicate_prefix.GeneralBorrowExposedScopedSharedUniqueWriteRestore
 namespace DuplicatePrefix.GeneralBorrowExposedScopedSharedPathMetadata
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree

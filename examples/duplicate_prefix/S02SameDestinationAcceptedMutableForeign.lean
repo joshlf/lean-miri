@@ -1,4 +1,4 @@
-import duplicate_prefix.S02FrozenOutside
+import duplicate_prefix.S02ConstructorCallbackForeign
 namespace DuplicatePrefix.S02SameDestinationAcceptedMutableForeign
 open Miri.TreeBorrows Miri.TreeBorrows.Tree
 set_option autoImplicit false

@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowGcFullClean
+import duplicate_prefix.GeneralBorrowGcRootInvariant
+import duplicate_prefix.GeneralBorrowGcWhileInvariant
 import duplicate_prefix.GeneralBorrowSharedGeneratorProfile
 
 namespace DuplicatePrefix.GeneralBorrowGcPermissionPolicy

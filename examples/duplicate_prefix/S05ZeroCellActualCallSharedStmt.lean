@@ -1,8 +1,7 @@
 import duplicate_prefix.S05ZeroCellActualCallToLen
-import duplicate_prefix.RootReferenceBorrow
+import duplicate_prefix.RootReferenceTrees
+import duplicate_prefix.RootReferenceFacts
 import duplicate_prefix.RootZeroInvocationState
-import duplicate_prefix.GeneralBorrowFreshAnchor
-import Init.Internal.Order.While
 
 namespace DuplicatePrefix.S05ZeroCellActualCallSharedStmt.PureTree
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures

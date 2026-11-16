@@ -1,5 +1,4 @@
 import duplicate_prefix.ActualReferenceContext
-import duplicate_prefix.LayoutLookupProof
 
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000

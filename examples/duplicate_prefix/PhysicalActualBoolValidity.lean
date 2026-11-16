@@ -1,5 +1,6 @@
 import duplicate_prefix.PhysicalBoolValidation
-import duplicate_prefix.RootBoolWrite
+import duplicate_prefix.RootEqUncached
+import duplicate_prefix.RootUsizeWrite
 import duplicate_prefix.ReferenceVisitorFields
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000

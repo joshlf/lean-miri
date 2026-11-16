@@ -1,4 +1,4 @@
-import duplicate_prefix.GenericFunctionEntrySharedParent
+import duplicate_prefix.GenericFunctionEntrySharedData
 import duplicate_prefix.GenericFunctionEntrySingletonSharedData
 namespace DuplicatePrefix.GenericFunctionEntryAllocatorChoice
 open Miri Miri.Interpreter Miri.ABI Miri.Memory Miri.TreeBorrows Miri.TreeBorrows.Tree

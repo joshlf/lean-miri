@@ -1,4 +1,6 @@
-import duplicate_prefix.EmptyRootCallEntry
+import duplicate_prefix.RootEntryTail
+import duplicate_prefix.EmptyRootArgumentScope
+import duplicate_prefix.EmptyRootArgumentProperties
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 namespace DuplicatePrefix.RawRootInvocation

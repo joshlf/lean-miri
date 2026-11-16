@@ -1,4 +1,4 @@
-import duplicate_prefix.CurrentCallActualReferenceEncoding
+import duplicate_prefix.CurrentCallFamilySatisfaction
 
 /-! Nominal family formation for already-produced current spatial roles.
 The operation producer supplies the new value and its rights. This adapter

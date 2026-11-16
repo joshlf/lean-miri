@@ -1,5 +1,4 @@
 import duplicate_prefix.GuardCompilerFacts
-import duplicate_prefix.CopyRuntimeCallFacts
 import duplicate_prefix.ProjectionMetadataFacts
 
 /-! Concrete compiler leaves used to evaluate check_language_ub's zero-argument

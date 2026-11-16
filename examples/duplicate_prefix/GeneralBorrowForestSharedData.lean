@@ -1,5 +1,4 @@
-import duplicate_prefix.GeneralBorrowForestAccessRange
-import duplicate_prefix.GeneralBorrowFreshReborrowStages
+import duplicate_prefix.GeneralBorrowForestAccessData
 import duplicate_prefix.GeneralBorrowCanonicalParentDepth
 import duplicate_prefix.GeneralBorrowSharedAllocatorInvariant
 

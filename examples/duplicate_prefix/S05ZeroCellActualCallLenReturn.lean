@@ -1,14 +1,6 @@
 import duplicate_prefix.S05ZeroCellActualCallSharedStmt
-import duplicate_prefix.ProtectedReferenceValidator
-import duplicate_prefix.LenArgumentCopy
-import duplicate_prefix.LenInstall
-import duplicate_prefix.LenEntryShape
-import duplicate_prefix.LenUncachedFrontend
-import duplicate_prefix.MetadataCallStep
 import duplicate_prefix.LenBodyFromEntry
-import duplicate_prefix.LenReturnFromRelease
-import duplicate_prefix.PushThread
-import Init.Internal.Order.While
+import duplicate_prefix.LenReturn
 
 namespace DuplicatePrefix.S05ZeroCellActualCallLenReturn.PureTree
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures

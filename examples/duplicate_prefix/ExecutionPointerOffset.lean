@@ -1,5 +1,5 @@
-import duplicate_prefix.PointerOffsetBounds
-import Miri.Interpreter.ExecutionScalar
+import duplicate_prefix.MemoryCopyBridge
+import duplicate_prefix.PointerDispatch
 
 /-! Offset arithmetic in the scalar hooks actually assembled by
 ExecutionMachine, separate from the PointerMachine adapter. -/

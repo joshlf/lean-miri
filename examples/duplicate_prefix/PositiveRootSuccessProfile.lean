@@ -1,4 +1,5 @@
-import duplicate_prefix.RootReferenceBorrow
+import duplicate_prefix.RootReferenceTrees
+import duplicate_prefix.RootReferenceFacts
 import duplicate_prefix.AddOutput
 import duplicate_prefix.CopyHelperCleanup
 namespace DuplicatePrefix.PositiveRootSuccessProfile

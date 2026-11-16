@@ -1,9 +1,7 @@
-import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.WildcardNonliveRootCallEquality
 import duplicate_prefix.NonliveEmptyRootSafety
 import duplicate_prefix.DuplicatePrefixCompletedCallResult
 import duplicate_prefix.DuplicatePrefixEmptyReferenceInput
-import duplicate_prefix.WildcardEmptyTargetClassification
 namespace DuplicatePrefix.WildcardNonliveRootSafety
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.DataStructures Miri.TreeBorrows Miri.Interpreter Miri.Concurrency
 set_option autoImplicit false

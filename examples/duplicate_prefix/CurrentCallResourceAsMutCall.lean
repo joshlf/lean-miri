@@ -1,9 +1,7 @@
-import duplicate_prefix.CurrentCallResourceAsMut
-import duplicate_prefix.CurrentCallResourceLenRoots
-import duplicate_prefix.GenericLenAcceptedPrelude
-import duplicate_prefix.CurrentCallMutableReference
+import duplicate_prefix.CurrentCallResourceLenCapability
+import duplicate_prefix.CurrentCallResourceLenFacts
+import duplicate_prefix.GeneralBorrowRawDefaultExpression
 import duplicate_prefix.CurrentCallAsMutArgumentCopy
-import duplicate_prefix.CurrentCallResourceFnEntry
 
 namespace DuplicatePrefix.CurrentCallResourceAsMutCall
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures Miri.MIR Miri.Interpreter

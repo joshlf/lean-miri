@@ -1,4 +1,6 @@
-import duplicate_prefix.RootReferenceBorrow
+import duplicate_prefix.RootReferenceTrees
+import duplicate_prefix.RootReferenceFacts
+import duplicate_prefix.CopyHelperSteps
 import duplicate_prefix.RootReferenceZeroWrite
 import duplicate_prefix.EmptyBorrowHelpers
 namespace DuplicatePrefix.RootReferenceZeroBorrow

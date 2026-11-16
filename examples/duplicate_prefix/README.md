@@ -152,6 +152,11 @@ when the postchildren skip predicate permits it. Local kernel proofs establish
 same-state normal return and preserve excluded protected errors.
 Compiler/export correctness and fidelity to Rust remain trust boundaries.
 
+The two scoped-copy ownership families derive the same actual Read/Write
+completion facts. `ScopedCopyAccess.Completed` passes those facts to one shared
+copy-helper execution and return proof. The ownership adapters discharge them
+internally; no completion or safety certificate is added to `OrdinaryInput`.
+
 The fixed inputs use the current schema-12 exporter. `Prepared` and
 `S05PriorCellPrepared` reflect typed import documents and preparation products;
 source coherence and each used compiler-query result are checked in the kernel.

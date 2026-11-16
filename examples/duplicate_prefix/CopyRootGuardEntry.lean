@@ -1,5 +1,4 @@
 import duplicate_prefix.CopyRootEntry
-import duplicate_prefix.CopyHelperEntryBody
 import duplicate_prefix.LanguageZeroStep
 import duplicate_prefix.LanguageZeroInstalled
 namespace DuplicatePrefix.CopyRootGuardEntry

@@ -1,4 +1,4 @@
-import duplicate_prefix.GeneralBorrowExposedConditionalReadAccess
+import duplicate_prefix.GeneralBorrowExposedConditionalReadPrimaryWitness
 namespace DuplicatePrefix.GeneralBorrowExposedConditionalWritePermissions
 open Miri.TreeBorrows Miri.TreeBorrows.Tree
 set_option maxRecDepth 65536

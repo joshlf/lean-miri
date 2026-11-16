@@ -1,6 +1,7 @@
 import duplicate_prefix.CurrentCallAdmission
-import duplicate_prefix.GeneralBorrowRawWildcardWindowTypedFnEntry
-import duplicate_prefix.ActualReferenceMetadata
+import duplicate_prefix.GeneralBorrowWildcardWindowPointerChecks
+import duplicate_prefix.GeneralBorrowExposedWildcardStoredRead
+import duplicate_prefix.GeneralBorrowWildcardRootConstructorPositive
 import duplicate_prefix.CandidateCurrentWindowPointerChecks
 
 /-! Actual positive mutable-u8 FnEntry retag from the proposed current-call

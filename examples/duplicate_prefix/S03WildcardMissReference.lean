@@ -1,5 +1,4 @@
 import duplicate_prefix.S03WildcardMissRetag
-import duplicate_prefix.WildcardEmptyRetag
 import duplicate_prefix.ActualEmptyReference
 namespace DuplicatePrefix.S03WildcardMissReference
 open Miri Miri.ABI Miri.Memory Miri.MIR Miri.Input Miri.Interpreter Miri.TreeBorrows

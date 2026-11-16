@@ -1,5 +1,7 @@
 import duplicate_prefix.GeneralBorrowForestFunctionEntryToShared
-import duplicate_prefix.GeneralBorrowForestEntrySharedExpression
+import duplicate_prefix.RootReferenceTrees
+import duplicate_prefix.RootReferenceFacts
+import duplicate_prefix.GeneralBorrowForestMixedShared
 namespace DuplicatePrefix.GeneralBorrowForestSharedPreLenFrame
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
 open GeneralBorrowForestFunctionEntryToShared

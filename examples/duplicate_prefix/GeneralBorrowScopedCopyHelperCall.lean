@@ -3,8 +3,6 @@ import duplicate_prefix.GeneralBorrowScopedCopyHelperExecution
 import duplicate_prefix.CopyHelperReturnDriver
 namespace DuplicatePrefix.GeneralBorrowScopedCopyHelperCall
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
-open GeneralBorrowExposedKnownRootState (Scope)
-variable [area : GeneralBorrowExposedKnownRootState.Scope]
 set_option maxRecDepth 65536
 set_option maxHeartbeats 4000000
 set_option backward.isDefEq.respectTransparency false
@@ -45,7 +43,7 @@ theorem returns_to_caller
     (live : machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
-    (borrow : GeneralBorrowScopedCopyInput.Input allocation.extra tracker.global.protectedTags tag offset sliceLen n)
+    (borrow : ScopedCopyAccess.Completed allocation.extra tracker.global.protectedTags tag offset n)
 
     (bounded : n ≤ (PreparedContracts.actualConfig options () (remaining+1) span).projection.maxSizeOfVal.bytes)
     (sourceLive : (frame.locals[1]'(by omega)).value = .live (.immediate (.scalar (Scalar.fromPointer

@@ -1,7 +1,5 @@
-import duplicate_prefix.AllocationBacktrace
-import duplicate_prefix.RootPhysicalReturnSupport
 import duplicate_prefix.RootPhysicalReturnPlan
-import duplicate_prefix.RootZeroBranch
+import duplicate_prefix.RootZeroSwitch
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false

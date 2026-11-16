@@ -1,8 +1,6 @@
-import duplicate_prefix.AllocationBacktrace
-import duplicate_prefix.S02SameDestinationAcceptedCopyDirectMemoryCore
+import duplicate_prefix.S02SameDestinationAcceptedCopyPhysical
+import duplicate_prefix.S02SameDestinationAcceptedCopyDirectAllocation
 import duplicate_prefix.CurrentCallBoolProtection
-import duplicate_prefix.CopyHelperSteps
-import duplicate_prefix.CopyHelperIntrinsic
 
 /-! Adjacent initialized prefix copying with current direct provenance metadata
 and synchronization entries outside each accessed window. Access completion is

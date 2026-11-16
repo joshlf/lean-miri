@@ -42,28 +42,29 @@ instance-definition lookups. Extras lemmas preserve arbitrary diagnostic
 backtraces independently of weak-memory and synchronization conditions. The
 public ordinary-input and result requirements are unchanged.
 
-The example retains only the dependency closures of the public safety/witness,
-independent contract results and component/regression roots. Single-use
-classification and continuation wrappers are composed at their use sites. The
-ordinary-input domain, public result definitions and retained top-level theorem
-statements are unchanged. Every remaining example module is reachable from
-`Check`. Both checkers run the shared `tools/duplicate-prefix-axiom-audit.lean`
-once after compiling their selected roots; `Check` contains no aggregate audit.
-The audit body and its approved axioms are unchanged.
+The example retains the dependency closures of the public safety/witness,
+independent contract results and component/regression roots. Unreferenced legacy
+proof namespaces and unused copy-client postcondition wrappers are removed;
+their remaining dependencies are imported directly. The two scoped-copy ownership
+families derive actual Read/Write completion internally and share one six-module
+MIR execution/return proof. No completion or safety certificate is added to
+`OrdinaryInput`. Every remaining example module is reachable from `Check`.
+Both checkers run the shared `tools/duplicate-prefix-axiom-audit.lean` once after
+compiling their selected roots; the audit body and approved axioms are unchanged.
 
-On 2026-11-16 (Asia/Tokyo), the complete frozen `Check` closure passed: 3,090
-modules, including 3,089 exact source/dependency/artifact-bound reuses from a
-successful independent check. The transitive audit checked 148,056 imported
-theorems and 48,123 owned declarations, including private/generated declarations,
+On 2026-11-16 (Asia/Tokyo), the complete frozen `Check` closure passed: 2,919
+modules, including 451 exact source/dependency/artifact-bound reuses from a
+successful independent check. The transitive audit checked 146,409 imported
+theorems and 46,496 owned declarations, including private/generated declarations,
 accepting only `propext`, `Quot.sound` and `Classical.choice`. Fixed Rust/MIR
 hashes, library sources, compiler artifacts and snapshot/current-source bindings
 were verified before the successful manifest was written. The shared audit
-source is also bound by the successful manifest. Sequential `Alignment` checking
-passes. Controlled Lean fixtures accept permitted proofs and reject imported
-theorems and private owned definitions depending on unapproved axioms; the
-sequential default-root and selected-root paths each run the aggregate audit once
-and reject the same fixtures. The default sequential 3,090-module compilation
-was not rerun.
+source is also bound by the successful manifest.
+
+Eight public declarations were compared as Lean expressions against the preceding
+revision: the four top-level safety theorem types, `OrdinaryInput`'s constructor
+type, both public Result definitions and the nonemptiness witness type. All are
+identical. The default sequential 2,919-module compilation was not rerun.
 
 `tools/check-quick.sh` passes all 135 Python tests, source lint, fixed-fixture
 integrity and coverage-link checks. `WildcardPostorderDisabled.lean` and

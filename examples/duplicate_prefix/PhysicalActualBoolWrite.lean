@@ -1,6 +1,4 @@
-import duplicate_prefix.AllocationBacktrace
-import duplicate_prefix.PhysicalValidatedBoolWrite
-import duplicate_prefix.ActualScalarCopy
+import duplicate_prefix.PhysicalActualBoolValidity
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000
 set_option backward.isDefEq.respectTransparency false

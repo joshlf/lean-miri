@@ -1,4 +1,4 @@
-import duplicate_prefix.GeneralBorrowPartialSharedRange
+import duplicate_prefix.GeneralBorrowPartitionState
 
 namespace DuplicatePrefix.GeneralBorrowPartialSharedClean
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree

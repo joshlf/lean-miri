@@ -1,6 +1,7 @@
+import duplicate_prefix.GeneralBorrowScopedInactiveWritableCopyInput
 import duplicate_prefix.AllocationBacktrace
 import duplicate_prefix.CopyRootGuardBody
-import duplicate_prefix.GeneralBorrowScopedInactiveWritableCopyRootComplete
+import duplicate_prefix.GeneralBorrowScopedCopyRootComplete
 
 namespace DuplicatePrefix.GeneralBorrowScopedInactiveWritableCopyRootGuardBody
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
@@ -132,13 +133,17 @@ theorem complete
   have destination : after.returnPlace.toRuntimePlace =
       LocalPlaces.localRuntimePlace frames.size root 18 CopyHelperUnit.layout := by rw [returnPlace];rfl
   obtain ⟨result,finalMachine,trace,lookup,bytes,len,tree,snapshot,memory,tracked,race,ghost,shallow,unchecked,noGc,fixed,
-      addresses,types,backend,extras,active⟩ := GeneralBorrowScopedInactiveWritableCopyRootComplete.of_guard_prefix
+      addresses,types,backend,extras,active⟩ := GeneralBorrowScopedCopyRootComplete.of_guard_prefix
     options limits remaining span input.source input.debug input.fuel input.validationFuel frames root after guardMachine
     body identity callee location size input.tracker data.id data.tag data.base data.offset data.sliceLen n data.kind data.allocation
     data.positive data.sliceBounds data.copyBounds data.storage data.maskValid data.maskLen data.initialized data.valid data.storageFits data.mutable
     (preserved.race.trans input.noRace) (preserved.backend.trans input.backend) (preserved.tracker.trans input.tracked)
     (by rw [preserved.extras];exact data.extras) (by rw [preserved.memory];exact data.live)
-    (by rw [preserved.addresses];exact data.cached) data.borrow data.bounded
+    (by rw [preserved.addresses];exact data.cached)
+    (by
+      have accesses := GeneralBorrowScopedInactiveWritableCopyInput.accesses data.allocation.extra
+        input.tracker.global.protectedTags data.tag data.offset data.sliceLen n data.borrow
+      exact ⟨accesses.1,accesses.2.1⟩) data.bounded
     (by simp only [cell1]; exact congrArg (fun value => LocalValue.live (.immediate (.scalar value))) data.source) (by simp only [cell2]; exact congrArg (fun value => LocalValue.live (.immediate (.scalar value))) data.destination) (by rw [cell3])
     (by rw [cell1]) (by rw [cell2]) (by rw [cell3])
     (by rw [cell4]) (by rw [cell4]) (by rw [cell5]) (by rw [cell5])

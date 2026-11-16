@@ -1,6 +1,6 @@
 import duplicate_prefix.CurrentCallResourceSharedStage
 import duplicate_prefix.CurrentCallSharedReadResources
-import duplicate_prefix.CurrentCallResourceBoolFacets
+import duplicate_prefix.S03ReturnChildMetadata
 
 namespace DuplicatePrefix.CurrentCallResourceSharedResources
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.DataStructures Miri.Interpreter

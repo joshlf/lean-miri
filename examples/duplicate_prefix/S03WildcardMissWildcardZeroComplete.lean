@@ -1,11 +1,6 @@
-import duplicate_prefix.AllocationBacktrace
-import duplicate_prefix.S03WildcardMissWildcardInit
-import duplicate_prefix.S03WildcardMissFrame
-import duplicate_prefix.S03IntegerZeroFrame
 import duplicate_prefix.S03WildcardMissWildcardInit
 import duplicate_prefix.S03ReturnWildcardMetadata
 import duplicate_prefix.S03ZeroCountBodyWildcard
-import duplicate_prefix.SuccessfulTraceTerminal
 
 namespace DuplicatePrefix.S03WildcardMissWildcardZeroComplete
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows

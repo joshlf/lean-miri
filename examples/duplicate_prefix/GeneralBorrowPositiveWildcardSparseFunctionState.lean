@@ -1,6 +1,5 @@
-import duplicate_prefix.GeneralBorrowPositiveWildcardSparseFunctionInvocation
+import duplicate_prefix.GeneralBorrowPositiveWildcardSparseFunctionScope
 import duplicate_prefix.GenericFunctionEntryState
-import duplicate_prefix.ProtectorInsertion
 namespace DuplicatePrefix.GeneralBorrowPositiveWildcardSparseFunctionState
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
 open TypedBorrowSteps ReferenceBorrowDriver

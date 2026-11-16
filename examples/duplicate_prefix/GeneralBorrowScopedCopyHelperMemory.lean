@@ -1,11 +1,9 @@
 import duplicate_prefix.AllocationBacktrace
-import duplicate_prefix.GeneralBorrowScopedCopyClientMemory
+import duplicate_prefix.ScopedCopyAccess
 import duplicate_prefix.CopyHelperSteps
 import duplicate_prefix.CopyHelperIntrinsic
 namespace DuplicatePrefix.GeneralBorrowScopedCopyHelperMemory
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
-open GeneralBorrowExposedKnownRootState (Scope)
-variable [area : GeneralBorrowExposedKnownRootState.Scope]
 set_option maxRecDepth 65536
 set_option maxHeartbeats 8000000
 set_option backward.isDefEq.respectTransparency false
@@ -41,7 +39,7 @@ theorem actual_initialized_copy_step
     (live : machine.memory.live.find? (fun row => row.1 == id) = some (id, ⟨kind, allocation⟩))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id, base⟩)
-    (borrow : GeneralBorrowScopedCopyInput.Input allocation.extra tracker.global.protectedTags tag offset sliceLen n)
+    (borrow : ScopedCopyAccess.Completed allocation.extra tracker.global.protectedTags tag offset n)
     (bounded : n ≤ (PreparedContracts.actualConfig options () remaining span).projection.maxSizeOfVal.bytes)
     (valid14 : (14 : MIR.LocalId) < frame.locals.size)
     (valid15 : (15 : MIR.LocalId) < frame.locals.size)
@@ -81,11 +79,12 @@ theorem actual_initialized_copy_step
   obtain ⟨context, accessEq, arithmeticEq, alignment⟩ := fields.canonicalCopy
   have width : context.pointers.arithmetic = ⟨Size.ofBytes 8⟩ :=
     arithmeticEq.symm.trans (CanonicalConfigFacts.actual_arithmetic options () remaining span)
-  have copy := GeneralBorrowScopedCopyClientMemory.copy context state tracker id tag base offset sliceLen n kind allocation
-    width positive sliceBounds copyBounds storage maskValid maskLen initialized valid storageFits mutable noClocks noBackend
-    tracked extras live cached borrow
+  have fullBounds : offset.toNat+n.toNat+n.toNat ≤ allocation.byteSize.bytes.toNat := by omega
+  have copy := GenericCopyMemoryCore.interval context state tracker id tag base offset n kind allocation
+    width positive fullBounds storage maskValid maskLen initialized valid storageFits mutable noClocks noBackend
+    tracked extras live cached borrow.1 borrow.2
   dsimp only at copy
-  obtain ⟨result, copied, sizeEq, lenEq, treeEq, bytesEq,owned,well,capacity⟩ := copy
+  obtain ⟨result, copied, sizeEq, lenEq, treeEq, bytesEq⟩ := copy
   refine ⟨result, ?_,sizeEq,lenEq,treeEq,bytesEq⟩
   obtain ⟨other,otherArithmetic,otherResolve,reduction⟩ := CopyHelperIntrinsic.actual_generic_copy options limits remaining span debugOff
     frames frame machine (Pointer.new (.concrete id tag) (Size.ofBytes (base+offset)))

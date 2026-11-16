@@ -1,5 +1,5 @@
 import duplicate_prefix.S05PriorCellPrepared
-import duplicate_prefix.LayoutLookupProof
+import Init.Data.List.Monadic
 namespace DuplicatePrefix.PriorCellMetadata
 open Lean Miri Miri.ABI Miri.Input Miri.Interpreter Miri.Memory
 set_option maxRecDepth 65536

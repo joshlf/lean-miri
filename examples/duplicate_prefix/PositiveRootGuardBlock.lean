@@ -1,4 +1,6 @@
-import duplicate_prefix.RootGuardBlock
+import duplicate_prefix.RootGuardStatements
+import duplicate_prefix.RootGuardSwitch
+import duplicate_prefix.SuccessfulTrace
 import duplicate_prefix.CopyHelperCleanup
 set_option maxRecDepth 65536
 set_option maxHeartbeats 16000000

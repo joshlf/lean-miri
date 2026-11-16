@@ -1,8 +1,4 @@
 import duplicate_prefix.CurrentCallEmptyEntryNormalWrite
-import duplicate_prefix.GeneralBorrowCompatibleScopedNormalMetadata
-import duplicate_prefix.GeneralBorrowWriteActivationUnique
-import duplicate_prefix.GeneralBorrowFreshActiveWithinAccess
-import duplicate_prefix.GeneralRangeMapCoverage
 
 /-! The actual Boolchild local Write activates its reserved permission. Exact
 selected-column framing retains that state through the production root scan. -/

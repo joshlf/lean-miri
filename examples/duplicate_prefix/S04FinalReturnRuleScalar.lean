@@ -1,5 +1,4 @@
-import duplicate_prefix.S04FinalReturn
-import duplicate_prefix.PhysicalBoolReturn
+import duplicate_prefix.S04FinalReturnInput
 
 namespace DuplicatePrefix.S04FinalReturnRuleScalar
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.Interpreter

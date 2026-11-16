@@ -1,4 +1,5 @@
-import duplicate_prefix.GlobalAddressReuseRangeSeed
+import duplicate_prefix.GlobalAddressReuseFreeHoles
+import duplicate_prefix.GlobalAddressGcRangeResources
 namespace DuplicatePrefix.GlobalAddressReusePairwise
 open Miri Miri.Concurrency Miri.ABI Miri.Memory Miri.Memory.AllocAddresses
 open GlobalAddressReuseContents

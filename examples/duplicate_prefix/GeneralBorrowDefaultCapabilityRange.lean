@@ -1,6 +1,5 @@
 import duplicate_prefix.GeneralBorrowNormalCapabilityShape
 import duplicate_prefix.GeneralBorrowDefaultMaterializedCapability
-import duplicate_prefix.GeneralBorrowSharedConstructorReadFrame
 namespace DuplicatePrefix.GeneralBorrowDefaultCapabilityRange
 open Miri.ABI Miri.Memory Miri.DataStructures Miri.TreeBorrows Miri.TreeBorrows.Tree
 open DuplicatePrefix.GeneralBorrowNodeUpdate DuplicatePrefix.GeneralBorrowProjection

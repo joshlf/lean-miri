@@ -1,4 +1,5 @@
-import duplicate_prefix.GeneralBorrowGeneratedGcComplete
+import duplicate_prefix.GeneralBorrowGeneratedGcProfile
+import duplicate_prefix.GeneralBorrowGcStarShape
 import duplicate_prefix.GeneralBorrowStarEntryData
 
 namespace DuplicatePrefix.GeneralBorrowReusableStar

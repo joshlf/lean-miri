@@ -1,5 +1,7 @@
-import duplicate_prefix.PositiveRootInvocationEntry
+import duplicate_prefix.PositiveRootArgumentProperties
 import duplicate_prefix.ProtectorInsertion
+import duplicate_prefix.StackPopRelease
+import duplicate_prefix.RawRootInvocation
 namespace DuplicatePrefix.PositiveRootInvocationState
 open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter Miri.TreeBorrows
 open TypedBorrowSteps ReferenceBorrowDriver
