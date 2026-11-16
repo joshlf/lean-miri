@@ -41,9 +41,14 @@ def resolveDropGlue (prepared : Prepared) (id : Nat) : Except String CallInstanc
   pure callee.id
 
 def requiresCallerLocation (prepared : Prepared) (callee : CallInstance) : Except String Bool := do
-  let some (_,track) := prepared.callerLocation.find? (·.1 == callee)
-    | throw "source caller-location attributes are absent"
-  pure track
+  let node ← CompilerInstance.source prepared.program.input.instances callee
+  match node.instanceKind with
+  | .Item _ | .Virtual .. | .Shim (.VTable _) =>
+    let some (_,track) := prepared.callerLocation.find? (·.1 == callee)
+      | throw "source caller-location attributes are absent"
+    pure track
+  | .Shim (.ClosureOnce _ _ track) => pure track
+  | _ => pure false
 def parentTrait (prepared : Prepared) (method : MIR.DefId) : Except String MIR.DefId := do
   let candidates := prepared.program.input.sourceTraits.declarations.filter (·.ownVtableMethods.contains method)
   unless candidates.size == 1 do throw "method owner trait declaration is absent or ambiguous"

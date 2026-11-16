@@ -38,7 +38,7 @@ private def target : Miri.ABI.RuntimeTargetDataLayout := Id.run do
   let size : Miri.ABI.Size := ⟨8⟩
   let ptr : Miri.ABI.PointerSpec := ⟨size, .ONE, size, false⟩
   return ⟨⟨.little, .w64⟩, .ONE, .ONE, .ONE, .ONE, .ONE, .ONE,
-    .ONE, .ONE, .ONE, .ONE, .ONE, #[], .ZERO, ptr, #[], .ZERO, .I32⟩
+    .ONE, .ONE, .ONE, .ONE, .ONE, #[], .ZERO, ptr, #[], .ZERO, .I32, none⟩
 
 private def symbols (allocators : Array (String × Catalog.AllocatorTarget))
     (candidates : Array Catalog.ForeignCandidate := #[]) : Catalog.ForeignSymbols := {

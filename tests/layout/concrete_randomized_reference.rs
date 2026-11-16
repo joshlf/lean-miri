@@ -97,7 +97,7 @@ fn main() {
                                 )
                             })
                             .unwrap_or_else(|| "none".to_owned());
-                        println!("a {seed} {pattern} {mode} {pack} {requested} {} {} {} {} {} {sized} {:?} {:?} {niche}",layout.size.bytes(),layout.align.abi.bytes(),layout.unadjusted_abi_align.bytes(),layout.max_repr_align.map(|a|a.bytes()).unwrap_or(0),layout.randomization_seed.as_u64(),offsets.iter().map(|s|s.bytes()).collect::<Vec<_>>(),in_memory_order.raw);
+                        println!("a {seed} {pattern} {mode} {pack} {requested} {} {} {} {} {} {sized} {:?} {:?} {niche}",layout.size.bytes(),layout.align.bytes(),layout.unadjusted_abi_align.bytes(),layout.max_repr_align.map(|a|a.bytes()).unwrap_or(0),layout.randomization_seed.as_u64(),offsets.iter().map(|s|s.bytes()).collect::<Vec<_>>(),in_memory_order.raw);
                     }
                 }
             }

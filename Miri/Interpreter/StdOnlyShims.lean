@@ -1,3 +1,4 @@
+import Miri.Interpreter.ShimSignatures
 import Miri.Interpreter.FrameMetadata
 import Miri.Interpreter.ForeignItems
 
@@ -33,19 +34,16 @@ structure Hooks (P S D MD B I : Type) where
   writeScalar : Scalar P → MD → M S Unit
   allocateStringDedup : String → M S (Pointer (Option P))
   /-- Exact compiler shim_sig!(extern system ...) ABI for the named source arm. -/
-  windowsAbi : String → M S (FnAbi TyId)
+  signature : String → M S (FnAbi TyId)
   yieldActiveThread : M S Unit
   setLastError : String → M S Unit
 
 private def invalid (message : String) : M S A := throw (.invalidProgram message)
 private def arg (args : Array A) (index : Nat) : M S A :=
   match args[index]? with | some value => pure value | none => invalid "std shim checked argument missing"
-private def deprecated (h : Hooks P S D MD B I) (name : String) (abi : FnAbi TyId)
-    (args : Array (OpTy P)) (count : Nat) : M S Unit := do
-  h.foreign.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "std shim calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "std shim called with variadic signature")
-  if args.size != count then throw (.undefinedBehavior "std shim argument count mismatch")
+private def checked (h : Hooks P S D MD B I) (name : String) (abi : FnAbi TyId)
+    (args : Array (OpTy P)) (count : Nat) : M S (Array (OpTy P)) :=
+  ShimSignatures.fixedCore ⟨h.foreign⟩ name (h.signature name) count abi args
 
 private def unixNames : Array String := #["pthread_attr_getguardsize","pthread_attr_init",
   "pthread_attr_destroy","pthread_attr_setstacksize","pthread_attr_getstack","signal",
@@ -64,7 +62,7 @@ def unix (h : Hooks P S D MD B I) (name : String) (abi : FnAbi TyId)
     else if #["pthread_attr_getstack","sigaction"].contains name then 3
     else if #["getpwuid_r","__posix_getpwuid_r"].contains name then 5
     else if name == "gnu_get_libc_version" then 0 else 2
-  deprecated h name abi args count
+  let args ← checked h name abi args count
   if name == "pthread_attr_getguardsize" then
     let place ← h.dereference (← arg args 1) (← h.layout "usize")
     h.writeUnsigned h.pageSize place
@@ -111,7 +109,7 @@ construction independent of those capabilities. -/
 structure WindowsHooks (P S D MD B I : Type) where
   foreign : ForeignItems.Core P S D MD (Pointer (Option P)) B I
   frameInStd : M S Bool
-  windowsAbi : String → M S (FnAbi TyId)
+  signature : String → M S (FnAbi TyId)
   windowsValue : String → M S (Scalar P)
   writeScalar : Scalar P → MD → M S Unit
   writeUnsigned : UInt64 → MD → M S Unit
@@ -122,7 +120,7 @@ def windowsCore (h : WindowsHooks P S D MD B I) (name : String) (abi : FnAbi TyI
     (args : Array (OpTy P)) (dest : MD) : M S EmulateItemResult := do
   if !windowsNames.contains name then return .NotSupported
   if !(← h.frameInStd) then return .NotSupported
-  let callee ← h.windowsAbi name
+  let callee ← h.signature name
   if callee.cVariadic then invalid "std system shim compiler signature is variadic"
   ForeignItems.Core.checkAbi h.foreign abi callee
   h.foreign.checkSymbolClash name
@@ -146,7 +144,7 @@ def windowsCore (h : WindowsHooks P S D MD B I) (name : String) (abi : FnAbi TyI
 
 def windows (h : Hooks P S D MD B I) (name : String) (abi : FnAbi TyId)
     (args : Array (OpTy P)) (dest : MD) : M S EmulateItemResult :=
-  windowsCore ⟨h.foreign,h.frameInStd,h.windowsAbi,h.windowsValue,
+  windowsCore ⟨h.foreign,h.frameInStd,h.signature,h.windowsValue,
     h.writeScalar,h.writeUnsigned,h.yieldActiveThread,h.setLastError⟩ name abi args dest
 
 /-- Recognized but unavailable std arms fall through to the existing platform

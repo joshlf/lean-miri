@@ -161,6 +161,7 @@ deriving instance ToExpr for Input.TypeShape
 deriving instance ToExpr for Input.DiscriminantValue
 deriving instance ToExpr for Input.DiscriminantInfo
 deriving instance ToExpr for Input.SourceSimd
+deriving instance ToExpr for Input.SourceCoroutineTraitField
 deriving instance ToExpr for Input.SourceCoroutineLayout
 deriving instance ToExpr for Input.SourceTypeLayout
 deriving instance ToExpr for Input.TypeNode

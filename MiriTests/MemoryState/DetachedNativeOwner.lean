@@ -12,7 +12,7 @@ private def tag : BorTag := ⟨1, by decide⟩
 private def extraFor (id : AllocId) : AllocationExtra Unit := {
   weakMemory := none
   sync := if id == targetId || id == resolverRemovedId then
-    #[⟨Size.ZERO, {payload := (), deleteOnWrite := id == resolverRemovedId, roots := #[]}⟩]
+    #[⟨Size.ZERO, {payload := (), deleteOnWrite := id == resolverRemovedId, roots := #[], size := Size.ofBytes 1}⟩]
     else #[] }
 
 private structure UserState where

@@ -14,7 +14,6 @@ private structure PolicyFields where
   boxNoAlias : Option Bool := none
   llvmWritable : Option Bool := none
   optimize : Option Bool := none
-  incremental : Option Bool := none
   panicUnwinds : Option Bool := none
   panicInDropUnwinds : Option Bool := none
 
@@ -30,7 +29,6 @@ private def policy : Parser SourceAbiPolicy := do
     | "box_noalias" => return {p with boxNoAlias := some (← boolean)}
     | "llvm_writable" => return {p with llvmWritable := some (← boolean)}
     | "optimize" => return {p with optimize := some (← boolean)}
-    | "incremental" => return {p with incremental := some (← boolean)}
     | "panic_unwinds" => return {p with panicUnwinds := some (← boolean)}
     | "panic_in_drop_unwinds" => return {p with panicInDropUnwinds := some (← boolean)}
     | _ => skipValue; return p
@@ -44,7 +42,6 @@ private def policy : Parser SourceAbiPolicy := do
     softFloat := ← required p.softFloat "soft_float"
     maxReliableAlignment := alignment, boxNoAlias := ← required p.boxNoAlias "box_noalias"
     llvmWritable := ← required p.llvmWritable "llvm_writable", optimize := ← required p.optimize "optimize"
-    incremental := ← required p.incremental "incremental"
     panicUnwinds := ← required p.panicUnwinds "panic_unwinds"
     panicInDropUnwinds := ← required p.panicInDropUnwinds "panic_in_drop_unwinds" }
 
@@ -58,7 +55,6 @@ private structure DefinitionFields where
   neverUnwind : Option Bool := none
   dropGlue : Option Bool := none
   noWritable : Option Bool := none
-  parameterUses : Option (Array UInt8) := none
 
 private def definition : Parser SourceAbiDefinition := do
   let d ← object ({} : DefinitionFields) fun d key => do
@@ -72,12 +68,6 @@ private def definition : Parser SourceAbiDefinition := do
     | "never_unwind" => return {d with neverUnwind := some (← boolean)}
     | "drop_glue" => return {d with dropGlue := some (← boolean)}
     | "no_writable" => return {d with noWritable := some (← boolean)}
-    | "parameter_uses" =>
-      let uses ← array do
-        let bits ← natural
-        unless bits < 16 do fail "source_abi.parameter_uses: unknown usage bits"
-        return UInt8.ofNat bits
-      return {d with parameterUses := some uses}
     | _ => skipValue; return d
   return {
     instanceId := ← required d.instanceId "instance_id"
@@ -88,8 +78,7 @@ private def definition : Parser SourceAbiDefinition := do
     foreign := ← required d.foreign "foreign"
     neverUnwind := ← required d.neverUnwind "never_unwind"
     dropGlue := ← required d.dropGlue "drop_glue"
-    noWritable := ← required d.noWritable "no_writable"
-    parameterUses := ← required d.parameterUses "parameter_uses" }
+    noWritable := ← required d.noWritable "no_writable" }
 
 def parse : Parser SourceAbiMaterial := do
   let (policy, definitions) ← object (none, none) fun (p, d) key => do

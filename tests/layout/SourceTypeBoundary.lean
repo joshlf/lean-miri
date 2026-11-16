@@ -2,7 +2,7 @@ import Miri.Input.TableCore
 
 open Miri.Input
 
-private def declaration : String := r#"{"normalized_type":0,"closure_upvars":[],"variant_discriminants":[],"simd":null,"coroutine":null,"special_float":null,"scalable_vectors":null,"variances":[],"has_destructor":false,"is_dyn_metadata":false,"type_id_hash":null,"is_unsafe_cell":false,"is_unsafe_pinned":false,"is_manually_drop":false,"is_maybe_uninit":false,"is_phantom_data":false,"is_box":false,"is_global_allocator":false,"is_c_void":false,"is_maybe_dangling":false,"nonnull_optimization_guaranteed":false,"definition":null,"item_name":null,"capture_names":null}"#
+private def declaration : String := r#"{"normalized_type":0,"closure_upvars":[],"variant_discriminants":[],"simd":null,"coroutine":null,"special_float":null,"is_x87_f80":false,"scalable_vectors":null,"variances":[],"has_destructor":false,"is_dyn_metadata":false,"type_id_hash":null,"is_unsafe_cell":false,"is_unsafe_pinned":false,"is_manually_drop":false,"is_maybe_uninit":false,"is_phantom_data":false,"is_box":false,"is_global_allocator":false,"is_c_void":false,"is_maybe_dangling":false,"nonnull_optimization_guaranteed":false,"definition":null,"item_name":null,"cfi_encoding":null,"capture_names":null}"#
 
 private def decode (source : String) :=
   JsonReader.run DecoderValues.parseTypeNode

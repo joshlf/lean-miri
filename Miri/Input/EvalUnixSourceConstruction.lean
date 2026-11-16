@@ -430,7 +430,7 @@ def stdOnlyFromRuntime {MirBody : Type} [DecidableEq MiriMemoryKind]
       let place ← GlobalByteMachine.string functions access
         (CompilerGlobalBytes.strLayout p.runtime globalBytes) value
       pure place.mplace.ptr
-    windowsAbi := fun name => CompilerNamedShimAbi.query p.namedAbi name
+    signature := fun name => CompilerNamedShimAbi.query p.namedAbi name
     yieldActiveThread := do
       modify fun state => {state with machine := {state.machine with
         threads := Miri.Concurrency.ThreadManager.yield state.machine.threads}}

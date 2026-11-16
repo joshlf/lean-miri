@@ -2,9 +2,9 @@ import Miri.Interpreter.PlaceTypes
 import Miri.Interpreter.Step
 import Miri.Memory.Pointer
 
-/-! Metadata wrappers from pinned concurrency/sync.rs:18–62,302–446.
-Registry payloads are typed by the caller: mismatched dynamic types must return
-none, causing replacement just as dyn SyncObj::downcast_ref does in source. -/
+/-! Allocation-local metadata from upstream 93c45ede meta_obj.rs. Dynamic
+payload types belong to the caller; a failed downcast is absence. Objects cover
+the full storage range, including accesses that start inside that range. -/
 namespace Miri.Concurrency.SyncObject
 open Miri.ABI Miri.Memory Miri.Interpreter
 abbrev M := EStateM StepError
@@ -20,88 +20,72 @@ structure Info where
   liveData : Bool
   mutable : Bool
   size : Size
-structure Hooks (S T : Type) where
-  tryResolve : Pointer (Option Provenance) → M S (Option Address)
-  resolve : Pointer (Option Provenance) → M S Address
-  info : AllocId → M S Info
-  lookup : Address → M S (Option (Object S T))
-  insert : Address → Object S T → M S Unit
-  checkAccess : Pointer (Option Provenance) → Size → M S Unit
-  offset : MPlaceTy Provenance → Size → M S (MPlaceTy Provenance)
-  compareExchangeByteRelaxed : MPlaceTy Provenance → UInt8 → UInt8 → M S (UInt8 × Bool)
-  writeZeros : Pointer (Option Provenance) → Size → M S Unit
-  writeByte : MPlaceTy Provenance → UInt8 → M S Unit
-
 structure MetadataHooks (S T : Type) where
   tryResolve : Pointer (Option Provenance) → M S (Option Address)
   resolve : Pointer (Option Provenance) → M S Address
   info : AllocId → M S Info
   lookup : Address → M S (Option (Object S T))
-  insert : Address → Object S T → M S Unit
+  insert : Address → Size → Object S T → M S Unit
+  remove : Address → Size → M S (Option (Object S T))
+  checkAccess : Pointer (Option Provenance) → Size → M S Unit
+structure Hooks (S T : Type) extends MetadataHooks S T where
+  writeBytes : Pointer (Option Provenance) → Size → UInt8 → M S Unit
 
-def getOrInitMetadata (h : MetadataHooks S T) (pointer : Pointer (Option Provenance)) (new : M S (Object S T)) :
-    M S (Option (Object S T)) := do
-  let some address ← h.tryResolve pointer | return none
+inductive GetMetaError where | noMem | noObj deriving DecidableEq, Repr
+
+def tryGetMetadata (h : MetadataHooks S T) (pointer : Pointer (Option Provenance)) :
+    M S (Except GetMetaError (Object S T)) := do
+  let some address ← h.tryResolve pointer | return .error .noMem
   let info ← h.info address.allocation
-  if !info.liveData || !info.mutable || address.offset.bytes >= info.size.bytes then return none
+  if !info.liveData || address.offset.bytes >= info.size.bytes then return .error .noMem
+  match ← h.lookup address with
+  | some value => return .ok value
+  | none => return .error .noObj
+
+/-- Nonopaque metadata, used by address wait queues. An existing object is
+looked up before checking the full range, as get_or_insert_meta does upstream. -/
+def getOrInitMetadata (h : MetadataHooks S T) (pointer : Pointer (Option Provenance))
+    (size : Size) (new : M S (Object S T)) : M S (Object S T) := do
   let address ← h.resolve pointer
-  if (← h.lookup address).isNone then h.insert address (← new)
-  let some value ← h.lookup address | throw (.invalidProgram "inserted synchronization object missing")
-  return some value
-
-def getOrInit (h : Hooks S T) (pointer : Pointer (Option Provenance)) (new : M S (Object S T)) :
-    M S (Option (Object S T)) :=
-  getOrInitMetadata ⟨h.tryResolve,h.resolve,h.info,h.lookup,h.insert⟩ pointer new
-
-def getImmovableWithStaticInit (h : Hooks S T) (obj : MPlaceTy Provenance)
-    (initOffset : Size) (uninitValue initValue : UInt8) (new : M S (Object S T)) :
-    M S (Object S T) := do
-  if initValue == uninitValue then throw (.invalidProgram "synchronization init and uninit flags equal")
-  h.checkAccess obj.mplace.ptr obj.layout.layout.size
-  if initOffset.bytes >= obj.layout.layout.size.bytes then
-    throw (.invalidProgram "synchronization init flag outside object")
-  let field ← h.offset obj initOffset
-  let address ← h.resolve field.mplace.ptr
-  if (← h.lookup address).isSome then
-    let some value ← h.lookup address | throw (.invalidProgram "synchronization object disappeared")
-    return value
-  let metadata ← new
-  let (old,success) ← h.compareExchangeByteRelaxed field uninitValue initValue
-  if !success && old != initValue then
-    throw (.invalidProgram "new metadata must ensure synchronization CAS succeeds or already initialized")
-  if !metadata.deleteOnWrite then throw (.invalidProgram "immovable synchronization metadata must delete on write")
-  h.insert address metadata
-  let some value ← h.lookup address | throw (.invalidProgram "inserted synchronization object missing")
+  if let some value ← h.lookup address then return value
+  let value ← new
+  if size == Size.ZERO then throw (.invalidProgram "metadata object has zero-sized storage")
+  h.checkAccess pointer size
+  h.insert address size value
   return value
 
-def initImmovable (h : Hooks S T) (obj : MPlaceTy Provenance) (initOffset : Size)
-    (initValue : UInt8) (metadata : Object S T) : M S (Option (Object S T)) := do
-  h.checkAccess obj.mplace.ptr obj.layout.layout.size
-  if initOffset.bytes >= obj.layout.layout.size.bytes then
-    throw (.invalidProgram "synchronization init flag outside object")
-  let field ← h.offset obj initOffset
-  h.writeZeros obj.mplace.ptr obj.layout.layout.size
-  h.writeByte field initValue
-  let address ← h.resolve field.mplace.ptr
-  if !metadata.deleteOnWrite then throw (.invalidProgram "immovable synchronization metadata must delete on write")
-  h.insert address metadata
-  let some value ← h.lookup address | throw (.invalidProgram "inserted synchronization object missing")
-  return some value
+/-- Opaque storage is filled with the source cookie before its new metadata is
+installed. This write runs the ordinary race/borrow/old-metadata access hooks. -/
+def insert (h : Hooks S T) (place : MPlaceTy Provenance) (value : Object S T) : M S Unit := do
+  let size := place.layout.layout.size
+  if size == Size.ZERO then throw (.invalidProgram "metadata object has zero-sized storage")
+  if value.deleteOnWrite then h.writeBytes place.mplace.ptr size 0x42
+  else h.checkAccess place.mplace.ptr size
+  let address ← h.resolve place.mplace.ptr
+  h.insert address size value
+
+def getOrInsert (h : Hooks S T) (place : MPlaceTy Provenance)
+    (new : M S (Object S T)) : M S (Object S T) := do
+  let address ← h.resolve place.mplace.ptr
+  if let some value ← h.lookup address then return value
+  let value ← new
+  insert h place value
+  return value
+
 structure AccessHooks (S T : Type) where
-  /-- Complete live registry; access traverses ascending byte offsets, as BTreeMap. -/
-  entries : AllocId → M S (Array (Size × Object S T))
+  entries : AllocId → M S (Array (AllocRange × Object S T))
   remove : AllocId → Size → M S Unit
 
 def onMemoryAccess (h : AccessHooks S T) (allocation : AllocId)
     (start size : Size) (kind : AccessKind) : M S Unit := do
-  let entries := (← h.entries allocation).qsort (fun left right => left.1.bytes < right.1.bytes)
+  let entries := (← h.entries allocation).qsort (fun left right => left.1.start.bytes < right.1.start.bytes)
   let mut deletions := #[]
-  for (offset,obj) in entries do
-    if kind == .deallocation ||
-        (start.bytes.toNat <= offset.bytes.toNat && offset.bytes.toNat < start.bytes.toNat + size.bytes.toNat) then
+  for (range,obj) in entries do
+    if kind == .deallocation || (size != Size.ZERO &&
+        start.bytes.toNat < range.start.bytes.toNat + range.size.bytes.toNat &&
+        range.start.bytes.toNat < start.bytes.toNat + size.bytes.toNat) then
       obj.onAccess kind
-      if kind == .write && obj.deleteOnWrite then deletions := deletions.push offset
-  -- Source collects deletions first: if any on_access fails, no registry
-  -- entries are removed, including earlier candidates in the range.
+      if kind == .write && obj.deleteOnWrite then deletions := deletions.push range.start
+  -- All callbacks run before any removals. Failure preserves every entry.
   for offset in deletions do h.remove allocation offset
 end Miri.Concurrency.SyncObject

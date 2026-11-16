@@ -22,9 +22,11 @@ spec.loader.exec_module(driver)
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--exporter", type=Path, default=ROOT / "exporter/target/release/lean-miri-mir-exporter")
+    parser.add_argument("--runner", type=Path, default=ROOT / ".lake/build/bin/native_runner")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
-    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8144389c895d"
+    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8eb778d04094"
     env = dict(os.environ)
     for key in list(env):
         if key.startswith("LEAN_MIRI_REFERENCE_"):
@@ -32,13 +34,13 @@ def main():
     env.update(PATH=str(toolchain / "bin") + ":" + env["PATH"],
         LD_LIBRARY_PATH=str(toolchain / "lib") + ":" + env.get("LD_LIBRARY_PATH", ""),
         LEAN_MIRI_PREPARED_ALLOC_ID_WORLD="1", LEAN_MIRI_RUN_PREPARED_MIRI="1")
-    settings = SimpleNamespace(exporter=ROOT / "exporter/target/release/lean-miri-mir-exporter",
-        runner=ROOT / ".lake/build/bin/native_runner", sysroot=ROOT / "scratch/miri-sysroot",
+    settings = SimpleNamespace(exporter=args.exporter.resolve(),
+        runner=args.runner.resolve(), sysroot=ROOT / "scratch/miri-sysroot",
         export_timeout=180, timeout=180, memory_limit=12 * 1024**3, keep_inputs=True)
     hashes = [driver.sha256(settings.exporter), driver.sha256(settings.runner)]
     records = []
     for sources, path, address, category in [
-        (ROOT / "upstream/miri-source/tests", "fail/shims/backtrace/bad-backtrace-ptr.rs", 0, "null_pointer"),
+        (ROOT / "tests/upstream_ui/fixtures/function_pointers", "fail/null-backtrace-pointer.rs", 0, "null_pointer"),
         (ROOT / "tests/upstream_ui/fixtures/function_pointers", "fail/nonzero-backtrace-pointer.rs", 1, "no_provenance"),
         (ROOT / "tests/upstream_ui/fixtures/function_pointers", "pass/backtrace-pointer.rs", None, None),
     ]:

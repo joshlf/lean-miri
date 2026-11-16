@@ -250,7 +250,7 @@ impl<'tcx> Collector<'_, 'tcx> {
         })
     }
 
-    fn arguments(&mut self, input: ty::GenericArgsRef<'tcx>) -> Result<Vec<Argument>, String> {
+    fn arguments(&mut self, input: ty::GenericArgs<'tcx>) -> Result<Vec<Argument>, String> {
         input
             .iter()
             .map(|argument| self.argument(argument))

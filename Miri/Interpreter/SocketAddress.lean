@@ -13,13 +13,15 @@ inductive Kind where | stack | socketAddress | machine deriving DecidableEq, Rep
 structure Hooks (S E Iterator : Type) where
   errors : IoError.Hooks S E
   gnu : Bool
+  os : String
   readPointer : OpTy Provenance → M S (Pointer (Option Provenance))
   isLiteralNull : Pointer (Option Provenance) → Bool
   readCString : Pointer (Option Provenance) → M S ByteArray
   readScalar : MPlaceTy Provenance → M S (Scalar Provenance)
   readSigned : MPlaceTy Provenance → Size → M S Int
   readU32 : MPlaceTy Provenance → M S UInt32
-  readSocklen : OpTy Provenance → M S UInt64
+  readSocklen : OpTy Provenance → M S (Option UInt64)
+  checkAccess : Pointer (Option Provenance) → Size → M S Unit
   layout : String → M S LocalLayout
   u128Layout : M S LocalLayout
   pointerLayout : M S LocalLayout
@@ -58,7 +60,9 @@ private def networkBytes (value count : Nat) : ByteArray :=
   ⟨(List.range count).toArray.map fun i => UInt8.ofNat (value / 256^(count-1-i) % 256)⟩
 
 def read (h : Hooks S E I) (address length : OpTy Provenance) (name : String) : M S (Except (IoError.Error E) Address) := do
-  let length ← h.readSocklen length
+  let some length ← h.readSocklen length | return .error (.libc "EINVAL")
+  let pointer ← h.readPointer address
+  h.checkAccess pointer (Size.ofBytes length)
   let generic ← h.layout "sockaddr"
   if length < generic.layout.size.bytes then return .error (.libc "EINVAL")
   let address ← h.derefAs address generic
@@ -68,14 +72,14 @@ def read (h : Hooks S E I) (address length : OpTy Provenance) (name : String) : 
   if family == (← h.libcI32 "AF_INET").toInt then
     let layout ← h.layout "sockaddr_in"
     if length != layout.layout.size.bytes then return .error (.libc "EINVAL")
-    let address ← h.transmute address layout
+    let address := h.ptrToPlace (h.pointer address) layout
     let port ← bytes h (← h.field address "sin_port") 2
     let bits ← bytes h (← h.field (← h.field address "sin_addr") "s_addr") 4
     return .ok (.v4 (UInt32.ofNat bits) (UInt16.ofNat port))
   else if family == (← h.libcI32 "AF_INET6").toInt then
     let layout ← h.layout "sockaddr_in6"
     if length != layout.layout.size.bytes then return .error (.libc "EINVAL")
-    let address ← h.offsetZero address layout
+    let address := h.ptrToPlace (h.pointer address) layout
     let port ← bytes h (← h.field address "sin6_port") 2
     let field ← h.transmute (← h.field (← h.field address "sin6_addr") "s6_addr") (← h.u128Layout)
     let bits ← bytes h field 16
@@ -97,17 +101,24 @@ def write (h : Hooks S E I) (address : Address) (output length : Pointer (Option
   let lengthPlace := h.ptrToPlace length socklen
   let bufferLength ← h.readSigned lengthPlace socklen.layout.size
   if bufferLength < 0 || bufferLength > 18446744073709551615 then throw (.invalidProgram "socklen does not fit u64")
+  h.checkAccess output (Size.ofBytes (UInt64.ofNat bufferLength.toNat))
   let buffer ← match address with
     | .v4 bits port => do
       let buffer ← h.allocate (← h.layout "sockaddr_in") .stack
-      h.writeZeros (h.pointer buffer) buffer.layout.layout.size
+      let reserved ← h.field buffer "sin_zero"
+      h.writeZeros (h.pointer reserved) reserved.layout.layout.size
+      if h.os == "freebsd" || h.os == "macos" then
+        h.writeInt buffer.layout.layout.size.bytes.toNat (← h.field buffer "sin_len")
       family h (← h.field buffer "sin_family") "AF_INET"
       h.writeBytes (h.pointer (← h.field buffer "sin_port")) (networkBytes port.toNat 2)
       h.writeBytes (h.pointer (← h.field (← h.field buffer "sin_addr") "s_addr")) (networkBytes bits.toNat 4)
       pure buffer
     | .v6 bits port flow scope => do
       let buffer ← h.allocate (← h.layout "sockaddr_in6") .stack
-      h.writeZeros (h.pointer buffer) buffer.layout.layout.size
+      if h.os == "freebsd" || h.os == "macos" then
+        h.writeInt buffer.layout.layout.size.bytes.toNat (← h.field buffer "sin6_len")
+      else if h.os == "solaris" || h.os == "illumos" then
+        h.writeInt 0 (← h.field buffer "__sin6_src_id")
       family h (← h.field buffer "sin6_family") "AF_INET6"
       h.writeBytes (h.pointer (← h.field buffer "sin6_port")) (networkBytes port.toNat 2)
       h.writeInt flow.toNat (← h.field buffer "sin6_flowinfo")

@@ -13,7 +13,7 @@ from mir_json import load_mir_inspection_document
 class CargoRootTests(unittest.TestCase):
     def test_selected_library_roots_reach_external_instances_and_shims(self):
         exporter = Path(os.environ.get("EXPORTER_BIN", ROOT / "exporter/target/debug/lean-miri-mir-exporter")).resolve()
-        toolchain = Path(os.environ.get("RUSTUP_HOME", ROOT / ".rustup")) / "toolchains/miri-exporter-8144389c895d"
+        toolchain = Path(os.environ.get("RUSTUP_HOME", ROOT / ".rustup")) / "toolchains/miri-exporter-8eb778d04094"
         environment = dict(os.environ)
         environment["PATH"] = f"{toolchain / 'bin'}:{os.environ['PATH']}"
         environment["LD_LIBRARY_PATH"] = f"{toolchain / 'lib'}:{os.environ.get('LD_LIBRARY_PATH', '')}"

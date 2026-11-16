@@ -81,7 +81,7 @@ fn main() {
             "case{} {} {} {:?} {:?}",
             case,
             layout.size.bytes(),
-            layout.align.abi.bytes(),
+            layout.align.bytes(),
             offsets.iter().map(|s| s.bytes()).collect::<Vec<_>>(),
             in_memory_order.raw
         );

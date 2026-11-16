@@ -17,7 +17,7 @@ structure Evidence (S : Type) where
   eraseUnsafeBinder : TypeId → Miri.Interpreter.LayoutCompat.M S TypeId
   normalize : TypeId → Miri.Interpreter.LayoutCompat.M S TypeId
   reprEqualUpToSeed : TypeId → TypeId → Miri.Interpreter.LayoutCompat.M S Bool
-  itemName : TypeId → Miri.Interpreter.LayoutCompat.M S String
+  abiName : TypeId → Miri.Interpreter.LayoutCompat.M S (Bool × String)
   nonnullOptimizationGuaranteed : TypeId → Miri.Interpreter.LayoutCompat.M S Bool
   isGlobalBox : TypeId → Miri.Interpreter.LayoutCompat.M S Bool
   boxedType : TypeId → Miri.Interpreter.LayoutCompat.M S TypeId
@@ -74,7 +74,7 @@ def queries (runtime : RuntimeMetadata) (evidence : Evidence S) :
   layoutOf := fun id => lift (runtime.lookup id)
   unitLayout := lift (unitLayout runtime)
   eraseUnsafeBinder := evidence.eraseUnsafeBinder, normalize := evidence.normalize
-  reprEqualUpToSeed := evidence.reprEqualUpToSeed, itemName := evidence.itemName
+  reprEqualUpToSeed := evidence.reprEqualUpToSeed, abiName := evidence.abiName
   nonnullOptimizationGuaranteed := evidence.nonnullOptimizationGuaranteed
   isGlobalBox := evidence.isGlobalBox, boxedType := evidence.boxedType
   pointerMetadataType := evidence.pointerMetadataType }

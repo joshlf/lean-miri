@@ -5,7 +5,7 @@ This is a port of `transition::{child_read, foreign_read, child_write,
 foreign_write, perform_access}` in the pinned Miri source:
 `upstream/miri-source/src/borrow_tracker/tree_borrows/perms.rs`.
 The corresponding upstream revision is
-`7fa591d7d4dd9af8154becbc8332f8096f8323b1` (blob
+`93c45edea8b148a6b6f05ec9384449a04217143f` (blob
 `0dd4712b85c7d660eb0a4395223335b2b766062b`).
 
 This module models only one permission at one location. It does not model a

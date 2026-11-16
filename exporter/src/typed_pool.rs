@@ -135,7 +135,7 @@ mod tests {
         assert!(!requests.insert(9));
         assert_eq!(requests.get_index(1), Some(&2));
         assert_eq!(requests.suffix(2), &[7]);
-        assert!(requests.contains(&9));
+        assert_eq!(requests.get_index(0), Some(&9));
         assert_eq!(requests.into_iter().collect::<Vec<_>>(), vec![9, 2, 7]);
     }
 

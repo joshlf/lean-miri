@@ -301,7 +301,6 @@ fn candidate<'tcx>(
     // before Instance::mono and tcx.symbol_name. Do not query non-candidates:
     // they may be generic/unreachable and are not semantically inspected.
     let explicit_symbol = attrs.symbol_name.is_some()
-        || attrs.flags.contains(F::NO_MANGLE)
         || attrs.flags.contains(F::RUSTC_STD_INTERNAL_SYMBOL);
     if !explicit_symbol {
         return Ok(None);

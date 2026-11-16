@@ -36,6 +36,7 @@ inductive Float where
   | F16B
   | F32
   | F64
+  | X87F80
   | F128
   | PpcF128
   deriving DecidableEq, Repr, Inhabited
@@ -71,6 +72,7 @@ structure RuntimeTargetDataLayout where
   addressSpaceInfo : Array (AddressSpace × PointerSpec)
   instructionAddressSpace : AddressSpace
   cEnumMinSize : Integer
+  x87F80Align : Option Align := none
   deriving DecidableEq, Repr
 
 inductive RuntimeLayoutError where
@@ -123,6 +125,7 @@ def RuntimeTargetDataLayout.default : RuntimeTargetDataLayout := {
   f32Align := ⟨2⟩
   f64Align := Align.EIGHT
   f128Align := ⟨4⟩
+  x87F80Align := some ⟨4⟩
   aggregateAlign := Align.ONE
   vectorAlign := #[(Size.ofBytes 8, Align.EIGHT), (Size.ofBytes 16, ⟨4⟩)]
   defaultAddressSpace := AddressSpace.ZERO
@@ -168,6 +171,7 @@ def validate (layout : RuntimeTargetDataLayout) : Except RuntimeLayoutError Unit
   validateAlign "f32" layout.f32Align
   validateAlign "f64" layout.f64Align
   validateAlign "f128" layout.f128Align
+  if let some align := layout.x87F80Align then validateAlign "x87_f80" align
   validateAlign "aggregate" layout.aggregateAlign
   validateAlign "default pointer" layout.defaultAddressSpacePointerSpec.pointerAlign
   let mut vectorSizes : Array Size := #[]
@@ -412,6 +416,7 @@ def size : Float → Size
   | .F16 | .F16B => Size.ofBytes 2
   | .F32 => Size.ofBytes 4
   | .F64 => Size.ofBytes 8
+  | .X87F80 => Size.ofBytes 10
   | .F128 | .PpcF128 => Size.ofBytes 16
 
 def align {α : Type} [HasRuntimeDataLayout α] (float : Float) (cx : α) :
@@ -421,12 +426,14 @@ def align {α : Type} [HasRuntimeDataLayout α] (float : Float) (cx : α) :
     | .F16 | .F16B => layout.f16Align
     | .F32 => layout.f32Align
     | .F64 => layout.f64Align
+    | .X87F80 => Align.ONE
     | .F128 | .PpcF128 => layout.f128Align
   let label := match float with
     | .F16 => "f16"
     | .F16B => "f16b"
     | .F32 => "f32"
     | .F64 => "f64"
+    | .X87F80 => "x87_f80"
     | .F128 => "f128"
     | .PpcF128 => "ppcf128"
   RuntimeTargetDataLayout.validateAlign label align
@@ -437,6 +444,7 @@ def tyStr : Float → String
   | .F16B => "f16b"
   | .F32 => "f32"
   | .F64 => "f64"
+  | .X87F80 => "x87_f80"
   | .F128 => "f128"
   | .PpcF128 => "ppcf128"
 
@@ -557,6 +565,10 @@ def align {α : Type} [HasRuntimeDataLayout α] (reg : Reg) (cx : α) :
         let _ ← (RuntimeTargetDataLayout.validateAlign "float register" layout.f64Align).mapError
           RegLayoutError.runtime
         return layout.f64Align
+      else if bits == 80 then
+        let some align := layout.x87F80Align | throw (.unsupportedFloatWidth bits)
+        let _ ← (RuntimeTargetDataLayout.validateAlign "x87_f80 register" align).mapError RegLayoutError.runtime
+        return align
       else if bits == 128 then
         let _ ← (RuntimeTargetDataLayout.validateAlign "float register" layout.f128Align).mapError
           RegLayoutError.runtime
@@ -698,7 +710,7 @@ namespace NumScalableVectors
 def forNonTuple : NumScalableVectors := ⟨1⟩
 
 def fromFieldCount (count : Nat) : Option NumScalableVectors :=
-  if 2 ≤ count && count < 8 then some ⟨UInt8.ofNat count⟩ else none
+  if 2 ≤ count && count ≤ 8 then some ⟨UInt8.ofNat count⟩ else none
 
 end NumScalableVectors
 

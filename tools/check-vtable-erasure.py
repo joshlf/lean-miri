@@ -161,7 +161,7 @@ def main():
         parser.error('output must be a new file under scratch/')
     output.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
-    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8144389c895d'
+    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8eb778d04094'
     sysroot = Path(env.get('MIRI_SYSROOT', ROOT / 'scratch/miri-sysroot'))
     elan = Path(env.get('ELAN_HOME', ROOT / '.elan'))
     env['ELAN_HOME'] = str(elan)

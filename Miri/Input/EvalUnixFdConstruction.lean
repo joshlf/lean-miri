@@ -208,6 +208,7 @@ def readinessFromFiles
       return ((← Files.readiness fileSemantics reference.value).getD {})
     delayed := noReadinessBase "delayed"
     putDelayed := fun _ => noReadinessBase "putDelayed"
+    beforeDelayed := fun _ => noReadinessBase "virtual socket delayed callback"
     unblock := route.unblock}
 
 private def scalarFromOperand

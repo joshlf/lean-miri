@@ -96,6 +96,7 @@ struct TargetDataLayout {
     f32_align: Align,
     f64_align: Align,
     f128_align: Align,
+    x87_f80_align: Align,
     aggregate_align: Align,
     vector_align: Vec<(Size, Align)>,
     default_address_space: AddressSpace,
@@ -112,7 +113,7 @@ impl HasDataLayout for TargetDataLayout { fn data_layout(&self) -> &TargetDataLa
 enum Integer { I8, I16, I32, I64, I128 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-enum Float { F16, F16B, F32, F64, F128, PpcF128 }
+enum Float { F16, F16B, F32, F64, X87F80, F128, PpcF128 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum IntegerType { Pointer(bool), Fixed(Integer, bool) }
@@ -176,13 +177,13 @@ fn main() {
     println!("integer_sizes={},{},{},{},{}", Integer::I8.size().bytes(), Integer::I16.size().bytes(), Integer::I32.size().bytes(), Integer::I64.size().bytes(), Integer::I128.size().bytes());
     println!("integer_names={},{}", Integer::I64.int_ty_str(), Integer::I128.uint_ty_str());
     println!("integer_attr_pointer={:?}", Integer::from_attr(&layout, IntegerType::Pointer(false)));
-    println!("integer_align_i64={}", Integer::I64.align(&layout).abi.bytes());
+    println!("integer_align_i64={}", Integer::I64.align(&layout).bytes());
     println!("integer_fit={:?},{:?},{:?}", Integer::fit_signed(-129), Integer::fit_signed(2147483648), Integer::fit_unsigned(1_u128 << 64));
     println!("integer_for_align={:?}", Integer::for_align(&layout, Align::from_bytes(4).unwrap()));
     println!("integer_approx_align={:?}", Integer::approximate_align(&layout, Align::EIGHT));
     println!("integer_from_size={:?},{:?}", Integer::from_size(Size::from_bytes(16)), Integer::from_size(Size::from_bytes(3)));
-    println!("float_info={},{},{}", Float::PpcF128.size().bytes(), Float::F16B.ty_str(), Float::F64.align(&layout).abi.bytes());
-    println!("pointer_info={},{},{:?}", Primitive::Pointer(AddressSpace::ZERO).size(&layout).bytes(), Primitive::Pointer(AddressSpace::ZERO).default_align(&layout).abi.bytes(), RegKind::from_primitive(Primitive::Pointer(AddressSpace::ZERO)));
+    println!("float_info={},{},{}", Float::PpcF128.size().bytes(), Float::F16B.ty_str(), Float::F64.align(&layout).bytes());
+    println!("pointer_info={},{},{:?}", Primitive::Pointer(AddressSpace::ZERO).size(&layout).bytes(), Primitive::Pointer(AddressSpace::ZERO).default_align(&layout).bytes(), RegKind::from_primitive(Primitive::Pointer(AddressSpace::ZERO)));
     let bool_scalar = Scalar::Initialized { value: Primitive::Int(Integer::I8, false), valid_range: WrappingRange { start: 0, end: 1 } };
     let full_scalar = Scalar::Initialized { value: Primitive::Int(Integer::I8, false), valid_range: WrappingRange { start: 0, end: 255 } };
     let union_scalar = Scalar::Union { value: Primitive::Int(Integer::I8, false) };
@@ -196,12 +197,12 @@ fn main() {
     println!("scalable_fields={:?},{:?},{:?}", NumScalableVectors::from_field_count(2), NumScalableVectors::from_field_count(7), NumScalableVectors::from_field_count(8));
     println!("vector_align={}", layout.rust_vector_align(Size::from_bytes(3)).bytes());
     println!("register_align={},{},{},{},{}",
-        Reg { kind: RegKind::Integer, size: Size::from_bytes(1) }.align(&layout).bytes(),
-        Reg { kind: RegKind::Integer, size: Size::from_bytes(8) }.align(&layout).bytes(),
-        Reg { kind: RegKind::Float, size: Size::from_bytes(8) }.align(&layout).bytes(),
-        Reg { kind: RegKind::PpcF128, size: Size::from_bytes(16) }.align(&layout).bytes(),
-        Reg { kind: RegKind::Vector { hint_vector_elem: Primitive::Int(Integer::I8, true) }, size: Size::from_bytes(3) }.align(&layout).bytes());
-    println!("register_width_error={}", std::panic::catch_unwind(|| Reg { kind: RegKind::Integer, size: Size::from_bytes(17) }.align(&layout)).is_err());
+        Reg { kind: RegKind::Integer, size: Size::from_bytes(1) }.scratch_align(&layout).bytes(),
+        Reg { kind: RegKind::Integer, size: Size::from_bytes(8) }.scratch_align(&layout).bytes(),
+        Reg { kind: RegKind::Float, size: Size::from_bytes(8) }.scratch_align(&layout).bytes(),
+        Reg { kind: RegKind::PpcF128, size: Size::from_bytes(16) }.scratch_align(&layout).bytes(),
+        Reg { kind: RegKind::Vector { hint_vector_elem: Primitive::Int(Integer::I8, true) }, size: Size::from_bytes(3) }.scratch_align(&layout).bytes());
+    println!("register_width_error={}", std::panic::catch_unwind(|| Reg { kind: RegKind::Integer, size: Size::from_bytes(17) }.scratch_align(&layout)).is_err());
     println!("vector_align_zero={}", layout.rust_vector_align(Size::from_bytes(0)).bytes());
     println!("vector_align_overflow={}", std::panic::catch_unwind(|| layout.rust_vector_align(Size::from_bytes((1_u64 << 63) + 1))).is_err());
     let mut address_spaces = TargetDataLayout::default();
@@ -211,4 +212,7 @@ fn main() {
     println!("unknown_address_space={}", std::panic::catch_unwind(|| address_spaces.pointer_size_in(AddressSpace(3))).is_err());
     println!("offset_width_error={}", std::panic::catch_unwind(|| address_spaces.ptr_sized_integer_in(AddressSpace(2))).is_err());
     println!("signed_non_scalar_error={}", std::panic::catch_unwind(|| BackendRepr::Memory { sized: true }.is_signed()).is_err());
+    println!("x87_info={},{},{}", Float::X87F80.size().bytes(), Float::X87F80.align(&layout).bytes(),
+        Reg { kind: RegKind::Float, size: Size::from_bytes(10) }.scratch_align(&layout).bytes());
+
 }

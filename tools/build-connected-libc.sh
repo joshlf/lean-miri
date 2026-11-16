@@ -9,7 +9,7 @@ export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="--sysroot $MIRI_SYSROOT 
 mkdir -p "$CARGO_TARGET_DIR"
 record="$CARGO_TARGET_DIR/libc-rlib.path"
 rm -f "$record"
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d build --locked --offline \
+"$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 build --locked --offline \
   --manifest-path tests/connected/libc/Cargo.toml --target x86_64-unknown-linux-gnu \
   --message-format=json-render-diagnostics | tee "$CARGO_TARGET_DIR/build.jsonl"
 python3 tools/cargo_artifacts.py "$CARGO_TARGET_DIR/build.jsonl" libc "$record"

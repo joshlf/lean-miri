@@ -12,7 +12,7 @@ class FreshTests(unittest.TestCase):
     def test_each_guest_and_metadata_check_is_an_independent_suite(self):
         suites = ci.suites('fresh')
         names = [suite.name for suite in suites]
-        expected = ['query-demand', 'runtime-type-closure', 'vtable-cross-crate', *fresh.FOCUSED]
+        expected = ['query-demand', 'runtime-type-closure', 'vtable-cross-crate', *fresh.FOCUSED, *fresh.UPSTREAM_CHECKS]
         self.assertEqual(names, ['build', 'fresh-prepare', *expected])
         for suite in suites[2:]:
             self.assertEqual(suite.command, ('python3', 'tools/ci/fresh_tests.py', suite.name))

@@ -1,5 +1,6 @@
 import Miri.Input.Decoder
 import Miri.Input.CompilerInstanceAbi
+import Miri.Input.CompilerRuntimeQueries
 
 open Lean Miri.Input
 
@@ -79,6 +80,14 @@ def main (args : List String) : IO Unit := do
   let originalProgram ← must (lowerProgram decoded.document)
   rejects (SourceAbiRuntime.ofInstance ⟨runtime, originalProgram, none⟩ llvmId #[])
     "LLVM intrinsic source ABI demand silently succeeded"
+  let runtimeQueries ← must (CompilerRuntimeQueries.prepare originalProgram)
+  check (!(← must (CompilerRuntimeQueries.requiresCallerLocation runtimeQueries llvmId)))
+    "LLVM intrinsic requested caller-location attributes"
+  let withoutOrdinaryAttributes := {runtimeQueries with callerLocation := #[]}
+  check (!(← must (CompilerRuntimeQueries.requiresCallerLocation withoutOrdinaryAttributes llvmId)))
+    "LLVM caller-location classification depends on an ordinary ABI row"
+  rejects (CompilerRuntimeQueries.requiresCallerLocation withoutOrdinaryAttributes item)
+    "ordinary Item silently acquired missing caller-location attributes"
   let originalCalls ← must (CallResolution.prepareWithRuntime runtime originalProgram)
   check (originalCalls.entries.all (·.outcome.isOk)) "valid LLVM direct preparation failed"
   let wrongItemDocument := {decoded.document with bodies := decoded.document.bodies.map fun body =>

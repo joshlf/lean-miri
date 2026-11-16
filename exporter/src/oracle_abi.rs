@@ -1,6 +1,6 @@
 use super::{ExportContext, checked_instance_mir, pool_layout};
 use rustc_middle::mir::{Operand, TerminatorKind};
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::{self, TyCtxt, TypeVisitableExt};
 use serde::Serialize;
 use std::collections::HashSet;
 
@@ -30,10 +30,17 @@ struct PointerRow {
 }
 
 #[derive(Serialize)]
+struct ExcludedPointer {
+    type_id: u64,
+    reason: &'static str,
+}
+
+#[derive(Serialize)]
 pub(super) struct Material {
     abi_layouts: Vec<pool_layout::Layout>,
     instances: Vec<InstanceRow>,
     pointers: Vec<PointerRow>,
+    excluded_pointers: Vec<ExcludedPointer>,
 }
 
 pub(super) fn collect<'tcx>(tcx: TyCtxt<'tcx>, context: &ExportContext<'tcx>) -> Result<Material, String> {
@@ -41,6 +48,7 @@ pub(super) fn collect<'tcx>(tcx: TyCtxt<'tcx>, context: &ExportContext<'tcx>) ->
     let empty = ty::List::empty();
     let mut instances = Vec::new();
     let mut pointers = Vec::new();
+    let mut excluded_pointers = Vec::new();
     let mut seen_instances = HashSet::new();
     let mut seen_pointers = HashSet::new();
     for &instance in context.pending_instances.iter().chain(&context.source_abi_demands) {
@@ -50,6 +58,14 @@ pub(super) fn collect<'tcx>(tcx: TyCtxt<'tcx>, context: &ExportContext<'tcx>) ->
     }
     for &ty in context.type_ids.keys() {
         if matches!(ty.kind(), ty::FnPtr(..)) && ty.fn_sig(tcx).skip_binder().abi() != rustc_abi::ExternAbi::LlvmIntrinsic {
+            // Metadata signatures can still refer to enclosing binders. Such
+            // types cannot be query operands in normalized concrete MIR.
+            if ty.has_escaping_bound_vars() {
+                excluded_pointers.push(ExcludedPointer {
+                    type_id: context.type_ids[&ty], reason: "escaping_bound_variables",
+                });
+                continue;
+            }
             seen_pointers.insert((ty, empty));
             pointers.push((ty, empty));
         }
@@ -72,6 +88,9 @@ pub(super) fn collect<'tcx>(tcx: TyCtxt<'tcx>, context: &ExportContext<'tcx>) ->
             };
             let function_ty = Operand::ty(function, &body, tcx);
             if !matches!(function_ty.kind(), ty::FnDef(..) | ty::FnPtr(..)) { continue; }
+            if function_ty.has_escaping_bound_vars() {
+                return Err("ABI oracle actual MIR call has escaping bound variables".into());
+            }
             let signature = tcx.try_normalize_erasing_regions(env, ty::Unnormalized::new_wip(function_ty.fn_sig(tcx)))
                 .map_err(|error| format!("ABI oracle call signature normalization failed: {error:?}"))?;
             let signature = signature.skip_binder();
@@ -90,10 +109,11 @@ pub(super) fn collect<'tcx>(tcx: TyCtxt<'tcx>, context: &ExportContext<'tcx>) ->
             }
         }
     }
-    let mut result = Material { abi_layouts: Vec::new(), instances: Vec::new(), pointers: Vec::new() };
+    excluded_pointers.sort_by_key(|row| row.type_id);
+    let mut result = Material { abi_layouts: Vec::new(), instances: Vec::new(), pointers: Vec::new(), excluded_pointers };
     for (instance, extra) in instances {
         let instance_id = *context.instance_ids.get(&instance).ok_or("ABI oracle callee outside production instance graph")?;
-        let abi = tcx.fn_abi_of_instance(env.as_query_input((instance, extra)))
+        let abi = tcx.fn_abi_of_instance_no_deduced_attrs(env.as_query_input((instance, extra)))
             .map_err(|error| format!("ABI oracle instance query failed: {instance:?}: {error:?}"))?;
         let abi = serialize(tcx, context, &mut result.abi_layouts, abi)?;
         let extra_argument_types = type_ids(context, extra)?;

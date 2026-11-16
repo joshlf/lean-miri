@@ -11,7 +11,7 @@ private def check (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 def main (args : List String) : IO Unit := do
-  let some path := args.head? | throw (IO.userError "fresh schema-12 coroutine input required")
+  let some path := args.head? | throw (IO.userError "fresh schema-14 coroutine input required")
   let input ← must (decodeJson (← IO.FS.readFile path))
   let some coverage := input.document.coroutineCoverage | throw (IO.userError "missing coroutine coverage")
   check (!coverage.coroutines.isEmpty) "fixture has no coroutine body"

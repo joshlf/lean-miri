@@ -52,7 +52,7 @@ inductive IntegerTypeTag where
   deriving Repr, DecidableEq
 
 inductive FloatTypeTag where
-  | f16 | f16b | f32 | f64 | f128 | ppcf128
+  | f16 | f16b | f32 | f64 | x87f80 | f128 | ppcf128
   deriving Repr, DecidableEq
 
 inductive AdtKind where
@@ -377,6 +377,11 @@ structure SourceSimd where
   count : Nat
   element : TypeId
 
+structure SourceCoroutineTraitField where
+  typeId : TypeId
+  ignoreForTraits : Bool
+  deriving Repr, DecidableEq
+
 structure SourceCoroutineLayout where
   locals : Array TypeId
   savedTypes : Array TypeId
@@ -384,6 +389,9 @@ structure SourceCoroutineLayout where
   variants : Array (Array Nat)
   conflicts : Array (Array Nat)
   seed : Nat
+  movability : Miri.MIR.Movability
+  /-- Pre-cleanup witness fields; the post-cleanup savedTypes layout is insufficient. -/
+  traitFields : Array SourceCoroutineTraitField
 
 structure SourceTypeLayout where
   normalizedType : TypeId
@@ -392,6 +400,7 @@ structure SourceTypeLayout where
   simd : Option SourceSimd := none
   coroutine : Option SourceCoroutineLayout := none
   specialFloat : Option FloatTypeTag := none
+  isX87F80 : Bool := false
   scalableVectors : Option Nat := none
   variances : Array MIR.Variance := #[]
   hasDestructor : Bool := false
@@ -409,6 +418,7 @@ structure SourceTypeLayout where
   nonnullOptimizationGuaranteed : Bool := false
   definition : Option DefinitionRef := none
   itemName : Option String := none
+  cfiEncoding : Option String := none
   captureNames : Option (Array (Option String)) := none
 
 structure TypeNode where
@@ -786,6 +796,7 @@ structure TargetDataLayoutEvidence where
   addressSpaceInfo : Array TargetAddressSpace
   instructionAddressSpace : Nat
   cEnumMinSize : String
+  x87F80AlignBytes : Option Nat := none
   deriving Repr, DecidableEq
 
 /-- Exact compiler existential-predicate identity, stable comparison rank and

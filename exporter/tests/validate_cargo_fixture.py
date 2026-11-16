@@ -48,7 +48,7 @@ def local_displays(instance):
 assert "u32" in local_displays(wrap), "external generic wrapper MIR was not monomorphized"
 assert "u32" in local_displays(identity), "transitive generic callee MIR was not monomorphized"
 assert app["invocation"]["target_crate"] is True
-assert app["producer"]["rustc_commit"] == "8144389c895da997dbdecaa635e41d6a50be6ffd"
+assert app["producer"]["rustc_commit"] == "8eb778d04094d3af4b26580cab327e0413eb1e02"
 assert list(root.rglob("*.rmeta")), "Cargo metadata output missing; wrapper must continue codegen/metadata emission"
 assert list(root.rglob("*.rlib")), "Cargo codegen artifact missing; wrapper must continue beyond analysis"
 if os.environ.get("MIRI_SYSROOT"):

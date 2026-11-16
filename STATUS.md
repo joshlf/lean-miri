@@ -13,13 +13,20 @@ the ability to verify arbitrary Rust are not claimed.
 
 ## Exported input coverage
 
-This implementation and the validation below use the original main base
-`c8daa215` with rustc `8144389c895da997dbdecaa635e41d6a50be6ffd` and Miri
-`7fa591d7d4dd9af8154becbc8332f8096f8323b1`. Integration with upstream main
-`08879436` and its updated compiler/Miri pins remains unresolved; these results
-do not establish compatibility with that revision.
+Upstream main `08879436` has been integrated with rustc
+`8eb778d04094d3af4b26580cab327e0413eb1e02` and Miri
+`93c45edea8b148a6b6f05ec9384449a04217143f`. The new source provider passes the
+finite comparisons below. The latest coroutine-material correction passes all
+six fresh execution comparisons and their negative controls; its final full
+proof and performance reruns are in progress. The prior proof/performance counts
+below belong to the preceding frozen artifacts until those reruns finish.
+The isolated upstream baseline
+passes all 268
+empty-function proof modules and the 78,057-declaration axiom audit, and its
+fresh standard-library startup export executes with exit code zero. Historical
+results explicitly naming `c8daa215` retain their original scope.
 
-Schema 13 exports concrete instance/promoted MIR from selected roots, evaluated
+Schema 14 exports concrete instance/promoted MIR from selected roots, evaluated
 constants, concrete type structure and finite declaration material. Executables
 default to their entry function; libraries require explicit roots. Repeated
 `--root` options select multiple definitions. Generic roots contribute
@@ -40,8 +47,9 @@ rustc MIR transformation, normalization and constant evaluation remain trusted.
 Additional trusted finite facts include target/declaration attributes, inferred
 variance, type identity and bound-variable flags, compiler coroutine state
 material, predicate normalization/erasure/order, actual cast
-resolution, concrete vtable/drop/method bindings and optimized defining-body
-parameter-use summaries. Lean derives final layout and ABI values, including ABI
+resolution and concrete vtable/drop/method bindings. ABI follows Miri's
+`fn_abi_of_instance_no_deduced_attrs` policy; codegen-only parameter-use summaries
+are not input trust. Lean derives final layout and ABI values, including ABI
 parameter attributes, from those inputs. The trait-header inventory and outer-head
 filter must retain every relevant implementation. See the
 [exporter contract](exporter/README.md#compiler-trust-boundary) for the boundary.
@@ -54,16 +62,17 @@ identities for reached function/vtable constructors and the source-ID frontier;
 this finite identity history remains trusted. General preservation of pointer
 meaning, runtime constructor containment and agreement with Rust are unproved.
 
-Fresh schema-13 ordinary-std startup and dynamic-upcast/provenance guests complete
-with `finalized_exit code=0`; the upcast/provenance guest also matches its
-same-TyCtxt reference. Finite std compiler comparisons agree for 8,915 layouts,
-151,555 Boolean type queries and 3,705 ABI requests. The selected vtable corpus
-agrees for 63 vtable rows and 35 upcast-slot comparisons. These include source
+Fresh schema-14 ordinary-std startup and dynamic-upcast/provenance guests complete
+with `finalized_exit code=0`; both also match their same-TyCtxt references.
+Finite std compiler comparisons agree for 10,931 layouts, 196,758 Boolean type
+queries and 4,589 ABI requests. The selected vtable corpus agrees for 64 vtable
+rows and 36 upcast-slot comparisons. These include source
 pattern, associated-type, higher-ranked-lifetime, PhantomData and enum/ABI cases;
 they are not a general algorithm-equivalence or all-choice safety proof.
 
-The new-input empty-function proof and final-artifact identical-source comparison
-also pass, with their separate guarantees below. Historical fixture successes
+The schema-14 empty-function proof passes against the committed input.
+The final-artifact identical-source comparison below also uses the updated
+compiler/Miri pins. Historical fixture successes
 remain evidence for their own formats and revisions. General instance/material
 containment, compiler-query equivalence and Rust/interpreter correspondence remain
 open.
@@ -91,11 +100,12 @@ The proof covers the diagnostic-off profile; collection-enabled UI executions
 are separate finite comparisons. The Rust source, target theorem and caller-domain
 premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
 all 268 proof modules and the 77,958-declaration transitive axiom audit.
-Separately, the schema-13 fixture passes the canonical checker on its actual
-input path: all 268 modules, the final `target`/`noUB` types, and 78,127 imported
-declarations including private/generated declarations. Only `propext`,
-`Classical.choice` and `Quot.sound` occur. Input, example, library-source and
-compiled-library hashes remained unchanged during the successful check.
+Separately, the schema-14 fixture passes the canonical checker on its actual
+input path with the current compiler/Miri pins: all 268 modules, the final
+`target`/`noUB` types, and 78,237 imported declarations including private/generated
+declarations. Only `propext`, `Classical.choice` and `Quot.sound` occur.
+Input, example and library-source hashes remained unchanged during the successful
+check; the compiled proof artifacts are recorded separately.
 The `EmptyFunctionQueries` executable separately passes actual layout/ABI/trait
 provider assertions; it supplies no theorem premise or safety verdict.
 
@@ -154,6 +164,70 @@ reusable, but exploration has no complete capture or established completion boun
 budget of OPEN exploration does not resolve the proofs above.
 
 ## Validation gaps within scope
+
+### November 2026 upstream synchronization
+
+The active source baseline is Miri `93c45edea8b148a6b6f05ec9384449a04217143f`
+with rustc `8eb778d04094d3af4b26580cab327e0413eb1e02`. Archives, selected
+compiler sources, source hashes, AST obligations and active build/comparison
+scripts use that pair. Earlier results elsewhere in this file describe their
+original revisions; rebased source links do not renew those results.
+
+Fresh exports use schema 14, with explicit ADT CFI encoding and target x87
+scratch alignment. Earlier formats require regeneration. Historical archives
+retain their original pins; they are not current execution inputs. Queries
+requiring uncaptured compiler evidence remain Unsupported.
+
+At upstream revision `08879436`, the source delta changed full-range synchronization metadata and pthread
+attributes, native-before-pthread TLS destruction, strict shim signatures and
+C ABI equality, delayed socket-close callbacks, socket buffer checks, repeated
+copy/union initialization checks, SSE4.2 string boundaries, AVX512 dispatch,
+generic math intrinsics and raw x87 values. Finite checks are available through
+`tools/check-upstream-sync.sh`, `tests/upstream_sync/check.py`, the registered
+metadata-range checks and the ordinary component/proof check commands. Their
+Linux x86_64 results at that revision included 9 original upstream comparisons, 4 local
+intrinsic/pthread/TLS/CFI controls, and 3 backtrace pointer controls, all with
+same-TyCtxt references and matching runtime profiles. The coroutine suite passes
+6 original/control profile comparisons, native-FnSig/runtime-FnAbi separation
+checks and all 3 malformed-metadata rejection cases. The provider assertions
+in `CoroutineNativeQueries.lean` exceeded the existing 180-second guard under
+`lean --run`; the suite now compiles that unchanged assertion body as
+`coroutine_native_queries`, retaining the guard and negative checks. This does
+not establish JIT query performance. SC seeds 0..11 and all 4 schedule-validator
+negative controls pass; only 3 finite atomic orders were observed. The unchanged `empty_function` inputs
+and all 268 frozen proof roots/dependencies pass their original check, including
+its final UB-freedom theorem for the explicit caller/profile domain. The imported
+library axiom audit passes for 75,490 declarations with only `propext`,
+`Quot.sound` and `Classical.choice`. These checks do not establish a general
+Rust-to-Lean simulation or safety outside that example domain.
+
+That upstream revision passed all 66 stages of `tools/check.sh`, the 128-test
+quick/audit suite, structural regressions and connected proof checks. The pinned
+reference Miri's 37 library unit tests also pass. The structural schema control
+uses 14 as the unknown version, retains schema-11/12 controls, and separately
+rejects schema 13 without its new alignment evidence. Native stdio protocol and
+Rust unit checks use the new rustc pin. Vendor diagnostic files retain upstream's
+original trailing blank lines; local source/fixture changes pass whitespace checks.
+The fresh CI lane registers the upstream, local control, coroutine and pointer
+comparisons independently. Its maintained backtrace guest links std for the
+new canonical MiriFrame signature and preserves the frozen reproducer's nested
+frame, name, filename, location and function-pointer assertions; the original
+reproducer remains unchanged.
+
+Those recorded upstream results do not validate the schema-14 provider. Current
+fresh comparisons and proof results are listed in Exported input coverage and
+Performance and optimization assurance above and below.
+
+New upstream facilities outside the existing acceptance scope remain incomplete:
+UDP socket operations, the real-host `copy_file_range` capability and direct
+Linux shim, the 32-bit glibc `__futimens64` path, and Windows host file-length/append
+behavior. Descriptor allocation is bounded by the source FD limit;
+EMFILE translation/cleanup across every peripheral multi-FD factory still needs
+coverage. Existing Unsupported/resource failures in these paths are not counted
+as successful guest execution. Cross-target ABI recipes require target-specific
+comparisons; Linux x86_64 evidence does not establish those targets.
+The full upstream UI inventory, every permitted schedule and all-prefix safety
+remain separate from the finite checks performed for this synchronization.
 
 ### Hosted regressions and coverage
 
@@ -568,7 +642,7 @@ validate schema 13, other standard-library closures or all permitted choices.
 
 ### Compiler query closure and prepared allocation identity
 
-Schema 13 removes pre-enumerated layout/ABI/relation result matrices. The
+Schema 14 removes pre-enumerated layout/ABI/relation result matrices. The
 remaining closure obligation is that every instance and piece of material needed
 by a permitted runtime path is present or constructible from the finite input.
 Direct calls alone do not establish this: function-pointer constants, dynamic
@@ -732,31 +806,31 @@ fixed input hashes. Rust/MIR bytes, SHA records, claims and budgets are unchange
 ### Performance and optimization assurance
 
 The final-artifact comparison uses `tests/repro/startup/empty-main.rs`, main
-`c8daa215` and this schema-13 implementation, with identical `--root main`,
+`08879436` and this schema-14 implementation, with identical `--root main`,
 `--crate-name=empty_main`, `--edition=2021`, pinned prepared sysroot and diagnostic
 seed zero. Three alternating pairs run sequentially on CPU 0 with one Lean
 thread, profiling and oracle output disabled, and no concurrent builds/checks.
-All six trials finish with `finalized_exit code=0` and choice cursor 1371.
+All six trials finish with `finalized_exit code=0` and choice cursor 1608.
 
-| Metric | main | Schema 13 |
+| Metric | main | Schema 14 |
 | --- | --- | --- |
-| Export-to-result wall median, seconds (min–max) | 10.588 (10.234–11.758) | 7.367 (7.327–7.397) |
-| Total process CPU median, seconds | 10.461 | 7.315 |
-| Export wall median, seconds | 3.522 | 2.001 |
-| Lean runner wall median, seconds | 7.066 | 5.354 |
-| Exported bytes | 94,349,941 | 70,221,875 |
-| Maximum exporter child RSS, bytes | 469,012,480 | 376,320,000 |
-| Maximum runner child RSS, bytes | 592,764,928 | 515,133,440 |
+| Export-to-result wall median, seconds (min–max) | 14.801 (14.712–15.173) | 9.504 (9.481–9.626) |
+| Total process CPU median, seconds | 14.648 | 9.374 |
+| Export wall median, seconds | 5.327 | 2.711 |
+| Lean runner wall median, seconds | 9.385 | 6.775 |
+| Exported bytes | 116,485,200 | 85,115,048 |
+| Maximum exporter child RSS, bytes | 525,144,064 | 407,805,952 |
+| Maximum runner child RSS, bytes | 708,620,288 | 579,293,184 |
 
-The observed median reductions are 30.43% wall time, 30.07% CPU time and 25.57%
+The observed median reductions are 35.79% wall time, 36.00% CPU time and 26.93%
 serialized size for this input. Source and per-variant input hashes are stable.
-Same-CPU steal is recorded (2–21 ticks per phase); no cgroup throttling is
+Same-CPU steal is recorded (6–34 ticks per phase); no cgroup throttling is
 observed. These three-pair shared-host samples do not establish a general
-speedup. Tested exporter/runner SHA-256 prefixes are `ec8547b4e94a`/`4195bb157795`
-for main and `54a23b8c76b5`/`a286ef3f8584` for schema 13.
+speedup. Tested exporter/runner SHA-256 prefixes are `23a044e868d3`/`ac924c216cd5`
+for main and `a89ae9ff308d`/`c897e42b3fe3` for schema 14.
 `tools/measure-pipeline.py` freezes artifacts and records raw trials, counters,
 hashes and outcome gates. Build time and input hashing are outside the measured
-export-to-result interval. Current-upstream-pin performance is unmeasured.
+export-to-result interval.
 
 Remaining performance work includes residual equality and validation work,
 and preparation outside typed input decoding and the optimized call-resolution

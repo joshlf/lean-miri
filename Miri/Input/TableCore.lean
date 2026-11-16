@@ -12,10 +12,10 @@ open JsonReader
 
 open Lean
 
-def expectedMiriCommit : String := "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
-def expectedRustcCommit : String := "8144389c895da997dbdecaa635e41d6a50be6ffd"
+def expectedMiriCommit : String := "93c45edea8b148a6b6f05ec9384449a04217143f"
+def expectedRustcCommit : String := "8eb778d04094d3af4b26580cab327e0413eb1e02"
 def expectedSchema : String := "lean-miri-rustc-mir"
-def expectedSchemaVersion : Nat := 13
+def expectedSchemaVersion : Nat := 14
 
 def escapePathKey (key : String) : String :=
   key.toList.foldl (fun out char => out ++ match char with
@@ -70,6 +70,7 @@ def integerTypeTag (text : String) : Except String IntegerTypeTag :=
 def floatTypeTag (text : String) : Except String FloatTypeTag :=
   match text with
   | "f16" => pure (.f16) | "f16b" => pure (.f16b) | "f32" => pure (.f32) | "f64" => pure (.f64)
+  | "x87_f80" => pure .x87f80
   | "f128" => pure (.f128) | "ppcf128" => pure (.ppcf128)
   | other => throw s!"unrecognized floatTypeTag tag `{other}`"
 
@@ -933,18 +934,50 @@ private def parseSourceSimd : Parser SourceSimd := do
     | _ => skipValue; pure s
   return ⟨← required count "count",← required element "element"⟩
 
+private structure SourceCoroutineFields where
+  locals : Option (Array Nat) := none
+  saved : Option (Array Nat) := none
+  prefixTypes : Option (Array Nat) := none
+  variants : Option (Array (Array Nat)) := none
+  conflicts : Option (Array (Array Nat)) := none
+  seed : Option Nat := none
+  movability : Option Miri.MIR.Movability := none
+  traitFields : Option (Array SourceCoroutineTraitField) := none
+
 private def parseSourceCoroutine : Parser SourceCoroutineLayout := do
-  let (locals,saved,prefixTypes,variants,conflicts,seed) ← object (none,none,none,none,none,none) fun s key => do
+  let fields ← object ({} : SourceCoroutineFields) fun fields key => do
     match key with
-    | "locals" => return (some (← array natural),s.2.1,s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
-    | "saved_types" => return (s.1,some (← array natural),s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
-    | "prefix" => return (s.1,s.2.1,some (← array natural),s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
-    | "variants" => return (s.1,s.2.1,s.2.2.1,some (← array (array natural)),s.2.2.2.2.1,s.2.2.2.2.2)
-    | "conflicts" => return (s.1,s.2.1,s.2.2.1,s.2.2.2.1,some (← array (array natural)),s.2.2.2.2.2)
-    | "seed" => return (s.1,s.2.1,s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,some (← natural))
-    | _ => skipValue; pure s
-  return ⟨← required locals "locals",← required saved "saved_types",← required prefixTypes "prefix",
-    ← required variants "variants",← required conflicts "conflicts",← required seed "seed"⟩
+    | "locals" => return {fields with locals := some (← array natural)}
+    | "saved_types" => return {fields with saved := some (← array natural)}
+    | "prefix" => return {fields with prefixTypes := some (← array natural)}
+    | "variants" => return {fields with variants := some (← array (array natural))}
+    | "conflicts" => return {fields with conflicts := some (← array (array natural))}
+    | "seed" => return {fields with seed := some (← natural)}
+    | "movability" =>
+      let value ← match ← string with
+        | "static" => pure Miri.MIR.Movability.Static
+        | "movable" => pure Miri.MIR.Movability.Movable
+        | _ => fail "unknown coroutine movability"
+      return {fields with movability := some value}
+    | "trait_fields" =>
+      let values ← array do
+        let (typeId,ignore) ← object (none,none) fun values key => do
+          match key with
+          | "type" => return (some (← natural),values.2)
+          | "ignore_for_traits" => return (values.1,some (← boolean))
+          | _ => skipValue; pure values
+        pure (⟨← required typeId "type",← required ignore "ignore_for_traits"⟩ : SourceCoroutineTraitField)
+      return {fields with traitFields := some values}
+    | _ => skipValue; pure fields
+  return {
+    locals := ← required fields.locals "locals"
+    savedTypes := ← required fields.saved "saved_types"
+    «prefix» := ← required fields.prefixTypes "prefix"
+    variants := ← required fields.variants "variants"
+    conflicts := ← required fields.conflicts "conflicts"
+    seed := ← required fields.seed "seed"
+    movability := ← required fields.movability "movability"
+    traitFields := ← required fields.traitFields "trait_fields" }
 
 private def parseSourceTypeLayout : Parser SourceTypeLayout := do
   let (source,seen) ← object (({normalizedType := 0} : SourceTypeLayout),(#[] : Array String)) fun state key => do
@@ -963,6 +996,8 @@ private def parseSourceTypeLayout : Parser SourceTypeLayout := do
       | "simd" => pure {s with simd := ← nullable parseSourceSimd}
       | "coroutine" => pure {s with coroutine := ← nullable parseSourceCoroutine}
       | "special_float" => pure {s with specialFloat := ← nullable (do JsonReader.liftExcept (floatTypeTag (← string)))}
+      | "is_x87_f80" => pure {s with isX87F80 := ← boolean}
+      | "cfi_encoding" => pure {s with cfiEncoding := ← nullable string}
       | "scalable_vectors" => pure {s with scalableVectors := ← nullable natural}
       | "variances" =>
         let values ← array do
@@ -996,7 +1031,7 @@ private def parseSourceTypeLayout : Parser SourceTypeLayout := do
     pure (next,seen.push key)
   for key in #["normalized_type","closure_upvars","variant_discriminants",
       "simd","coroutine","special_float","scalable_vectors","variances",
-      "has_destructor","is_dyn_metadata","type_id_hash","is_unsafe_cell","is_unsafe_pinned",
+      "is_x87_f80","cfi_encoding","has_destructor","is_dyn_metadata","type_id_hash","is_unsafe_cell","is_unsafe_pinned",
       "is_manually_drop","is_maybe_uninit","is_phantom_data","is_box","is_global_allocator","is_c_void",
       "is_maybe_dangling","nonnull_optimization_guaranteed","definition","item_name","capture_names"] do
     unless seen.contains key do fail s!"missing source declaration field `{key}`"

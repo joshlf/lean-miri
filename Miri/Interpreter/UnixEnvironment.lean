@@ -54,6 +54,11 @@ def getcwd (h : Hooks S O E K) (buf size : OpTy Provenance) : M S (Pointer (Opti
   requireUnix h
   let buf ← h.readPointer buf
   let size ← h.readUsize size
+  if ← h.env.isNull buf then
+    throw (.unsupported "getcwd with a null pointer for `buf` is not supported")
+  if size == 0 then
+    IoError.setLastError h.errors (.libc "EINVAL")
+    return h.env.nullPointer
   if ← h.isolationReject "`getcwd`" then
     denied h
     return h.env.nullPointer

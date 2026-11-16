@@ -35,7 +35,7 @@ def main():
     cases = json.loads((ROOT / "tests/reference_programs/cases.json").read_text())
     lock = json.loads((ROOT / "upstream/source-lock.json").read_text())
     sysroot = ROOT / "scratch/miri-sysroot"
-    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8144389c895d"
+    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8eb778d04094"
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = str(toolchain / "lib") + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
     env["MIRI_SYSROOT"] = str(sysroot)

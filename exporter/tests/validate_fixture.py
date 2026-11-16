@@ -9,12 +9,12 @@ from mir_json import load_mir_inspection_document as load_mir_document, pool_ent
 
 doc = load_mir_document(sys.argv[1])
 assert doc["schema"] == "lean-miri-rustc-mir"
-assert doc["schema_version"] == 13
+assert doc["schema_version"] == 14
 assert doc["compiler_coroutine_coverage"]["body_coroutines"] == [False] * len(doc["bodies"])
 assert doc["compiler_coroutine_coverage"]["coroutines"] == []
 assert doc["compiler_coroutine_coverage"]["auxiliary_bodies"] == []
-assert doc["producer"]["rustc_commit"] == "8144389c895da997dbdecaa635e41d6a50be6ffd"
-assert doc["producer"]["miri_commit"] == "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
+assert doc["producer"]["rustc_commit"] == "8eb778d04094d3af4b26580cab327e0413eb1e02"
+assert doc["producer"]["miri_commit"] == "93c45edea8b148a6b6f05ec9384449a04217143f"
 assert "completeness" not in doc
 assert all(isinstance(name, str) for name in doc["files"])
 assert len(doc["files"]) == len(set(doc["files"])), "duplicate filename spellings"

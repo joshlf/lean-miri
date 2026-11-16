@@ -100,6 +100,23 @@ where
       let some field := selected | throw "virtual receiver has no pointer field"
       descend fuel field
 
+def isX87F80 (runtime : RuntimeMetadata) (layout : TyAndLayout TypeId) : Except String Bool :=
+  peel (runtime.source.types.size + 1) layout
+where
+  peel (fuel : Nat) (layout : TyAndLayout TypeId) : Except String Bool := do
+    let .succ fuel := fuel | throw "transparent source layout cycle in x87 ABI classification"
+    let node ← runtime.node layout.ty |>.mapError toString
+    let .adt data := node.shape | return false
+    unless data.representation.transparent do return node.sourceLayout.isX87F80
+    let mut selected := none
+    for index in [:layout.layout.fields.count] do
+      let field ← runtime.field layout index |>.mapError toString
+      unless field.layout.is1zst do
+        if selected.isSome then return node.sourceLayout.isX87F80
+        selected := some field
+    let some field := selected | return node.sourceLayout.isX87F80
+    peel fuel field
+
 def queries (context : CompilerFacts.Context) (policy : SourceAbiPolicy) : SourceAbi.Queries := {
   typeCount := context.runtime.source.types.size
   lookup := fun ty => context.runtime.lookup ty |>.mapError toString
@@ -112,8 +129,7 @@ def queries (context : CompilerFacts.Context) (policy : SourceAbiPolicy) : Sourc
       | .adt data => data.representation.flagsBits &&& 32 != 0
       | _ => false
   thinSelf := thinSelf context.runtime
-  isFreeze := fun ty => CompilerFacts.boolean context ty "is_freeze"
-  needsDrop := fun ty => CompilerFacts.boolean context ty "needs_drop" }
+  isX87F80 := isX87F80 context.runtime }
 
 def ofSignature (context : CompilerFacts.Context) (signature : FunctionSignature)
     (extra : Array TypeId := #[]) : Except String (FnAbi TypeId) := do

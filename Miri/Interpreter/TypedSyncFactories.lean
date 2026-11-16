@@ -15,25 +15,11 @@ private def storage (v : Views U) : M K U TypedSyncRuntime.Storage := return v.s
 private def setStorage (v : Views U) (data : TypedSyncRuntime.Storage) : M K U Unit :=
   modifyPayload fun u => v.putStorage u data
 
-def sanity (v : Views U) (kind : PthreadObjects.Kind) : M K U Bool := do
-  let data ← storage v
-  pure (match kind with
-    | .mutex => data.pthreadMutexSanity | .rwlock => data.pthreadRwlockSanity
-    | .condvar => data.pthreadCondvarSanity | .semaphore => data.pthreadSemaphoreSanity)
-def putSanity (v : Views U) (kind : PthreadObjects.Kind) (value : Bool) : M K U Unit := do
-  let data ← storage v
-  setStorage v (match kind with
-    | .mutex => {data with pthreadMutexSanity := value}
-    | .rwlock => {data with pthreadRwlockSanity := value}
-    | .condvar => {data with pthreadCondvarSanity := value}
-    | .semaphore => {data with pthreadSemaphoreSanity := value})
-
 structure PthreadMemory (S : Type) where
   os : String
   deref : OpTy Provenance → PthreadObjects.Kind → EStateM StepError S TypedSyncRuntime.Dest
   initializer : String → EStateM StepError S TypedSyncRuntime.Dest
   readBytes : TypedSyncRuntime.Dest → Size → EStateM StepError S ByteArray
-  readInitByte : TypedSyncRuntime.Dest → Size → EStateM StepError S UInt8
 
 def pthread (v : Views U) (e : TypedSyncMachine.Effects (State K U))
     (metadata : SyncObject.MetadataHooks (State K U) TypedSyncMetadata.Payload)
@@ -45,9 +31,6 @@ def pthread (v : Views U) (e : TypedSyncMachine.Effects (State K U))
   deref := memory.deref
   initializer := memory.initializer
   readBytes := memory.readBytes
-  readInitByte := memory.readInitByte
-  sanity := sanity v
-  putSanity := putSanity v
   newMutex := TypedSyncMachine.newObject v (.mutex {})
   newRwlock := TypedSyncMachine.newObject v (.rwlock {})
   newCondvar := TypedSyncMachine.newObject v (.condvar {})

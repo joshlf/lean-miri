@@ -78,9 +78,9 @@ fn export_failure<T>(context: &str, details: impl std::fmt::Display) -> Result<T
     Err(format!("{context}: {details}"))
 }
 
-const EXPECTED_RUSTC_COMMIT: &str = "8144389c895da997dbdecaa635e41d6a50be6ffd";
-const MIRI_COMMIT: &str = "7fa591d7d4dd9af8154becbc8332f8096f8323b1";
-const ROOT_SCHEMA_VERSION: u64 = 13;
+const EXPECTED_RUSTC_COMMIT: &str = "8eb778d04094d3af4b26580cab327e0413eb1e02";
+const MIRI_COMMIT: &str = "93c45edea8b148a6b6f05ec9384449a04217143f";
+const ROOT_SCHEMA_VERSION: u64 = 14;
 
 struct Options {
     output: PathBuf,
@@ -1135,6 +1135,7 @@ fn runtime_target_data_layout_json(tcx: TyCtxt<'_>) -> Result<producer::TargetDa
         f32_align_bytes: dl.f32_align.bytes(),
         f64_align_bytes: dl.f64_align.bytes(),
         f128_align_bytes: dl.f128_align.bytes(),
+        x87_f80_align_bytes: dl.x87_f80_align.bytes(),
         aggregate_align_bytes: dl.aggregate_align.bytes(),
         vector_align: dl
             .vector_align
@@ -2168,7 +2169,7 @@ fn run_cargo(args: &[String]) -> Result<(), String> {
     let invocation_time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|error| format!("cannot identify Cargo export invocation: {error}"))?;
-    let export_base = target_base.join("lean-miri-exporter-8144389c895d");
+    let export_base = target_base.join("lean-miri-exporter-8eb778d04094");
     fs::create_dir_all(&export_base)
         .map_err(|error| format!("cannot create Cargo export directory: {error}"))?;
     let export_target_dir = export_base.join(format!(
@@ -2961,17 +2962,44 @@ fn type_json_inner<'tcx>(
         special_float: adt.and_then(|def| {
             if tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::F16B) {
                 Some("f16b")
+            } else if tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::X87F80Raw) {
+                Some("x87_f80")
             } else if tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::PpcF128) {
                 Some("ppcf128")
             } else {
                 None
             }
         }),
+        is_x87_f80: adt.is_some_and(|def| tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::X87F80)),
+        cfi_encoding: adt.and_then(|def| rustc_attr_ir::find_attr!(tcx, def.did(), CfiEncoding { encoding } => encoding.as_str().to_owned())),
         coroutine: if let ty::Coroutine(def, args) = *input.kind() {
             let info = tcx
                 .coroutine_layout(def, args)
                 .map_err(|error| format!("coroutine source layout unavailable: {error:?}"))?;
             Some(SourceCoroutineLayout {
+                movability: match tcx.coroutine_movability(def) {
+                    rustc_hir::Movability::Static => "static",
+                    rustc_hir::Movability::Movable => "movable",
+                },
+                // Auto traits use the pre-cleanup witness, not the fields left
+                // in the optimized runtime state layout below.
+                trait_fields: tcx
+                    .mir_coroutine_witnesses(def)
+                    .as_ref()
+                    .map(|witness| {
+                        witness.field_tys.iter().map(|field| {
+                            let field_type = tcx.try_normalize_erasing_regions(
+                                ty::TypingEnv::fully_monomorphized(),
+                                ty::EarlyBinder::bind(tcx, field.ty).instantiate(tcx, args),
+                            ).map_err(|error| format!("coroutine trait field normalization failed: {error:?}"))?;
+                            Ok(SourceCoroutineTraitField {
+                                r#type: type_json(context, tcx, field_type)?,
+                                ignore_for_traits: field.ignore_for_traits,
+                            })
+                        }).collect::<Result<Vec<_>, String>>()
+                    })
+                    .transpose()?
+                    .unwrap_or_default(),
                 saved_types: info
                     .field_tys
                     .iter()
@@ -3389,14 +3417,14 @@ fn repr_options_json(repr: &rustc_abi::ReprOptions) -> pool_type::Representation
 fn generic_args_json<'tcx>(
     context: &mut ExportContext<'tcx>,
     tcx: TyCtxt<'tcx>,
-    args: ty::GenericArgsRef<'tcx>,
+    args: ty::GenericArgs<'tcx>,
 ) -> Result<Vec<pool_values::GenericArgument>, String> {
     generic_args_json_inner(context, tcx, args)
 }
 fn generic_args_json_inner<'tcx>(
     context: &mut ExportContext<'tcx>,
     tcx: TyCtxt<'tcx>,
-    args: ty::GenericArgsRef<'tcx>,
+    args: ty::GenericArgs<'tcx>,
 ) -> Result<Vec<pool_values::GenericArgument>, String> {
     args.iter()
         .map(|arg| {
@@ -4195,12 +4223,12 @@ fn collect_unsize_vtable_demands<'tcx>(
             // nonzero-sized field actually carries the unsizing conversion.
             for field in &source_def.non_enum_variant().fields {
                 let source_field = tcx
-                    .try_normalize_erasing_regions(env, field.ty(tcx, source_args))
+                    .try_normalize_erasing_regions(env, field.ty(tcx, *source_args))
                     .map_err(|error| {
                         format!("unsize source field normalization failed: {error:?}")
                     })?;
                 let target_field = tcx
-                    .try_normalize_erasing_regions(env, field.ty(tcx, target_args))
+                    .try_normalize_erasing_regions(env, field.ty(tcx, *target_args))
                     .map_err(|error| {
                         format!("unsize target field normalization failed: {error:?}")
                     })?;
@@ -4731,7 +4759,7 @@ fn instance_kind_json<'tcx>(
                     def_id: def_json(context, def),
                     clone_type: type_json(context, tcx, t)?,
                 },
-                S::FnPtrAsPtr(def, t) => H::FnPointerAsPointer {
+                S::FnAddrAsPtr(def, t) => H::FnPointerAsPointer {
                     def_id: def_json(context, def),
                     function_type: type_json(context, tcx, t)?,
                 },
@@ -5087,7 +5115,7 @@ fn allocation_ref<'tcx>(
                 .collect::<Result<Vec<_>, String>>()?;
             let layout = tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty));
             let (size_bytes, align_bytes) = match layout {
-                Ok(layout) => (Some(layout.size.bytes()), Some(layout.align.abi.bytes())),
+                Ok(layout) => (Some(layout.size.bytes()), Some(layout.align.bytes())),
                 Err(error) => export_failure("vtable layout", format!("{error:?}"))?,
             };
             A::Vtable {
@@ -5535,7 +5563,7 @@ fn backtrace_spans_json<'tcx>(
 
 // interpret/discriminant.rs and Ty::{discriminant_ty,discriminant_for_variant}.
 fn intrinsic_fallback_is_spec(tcx: TyCtxt<'_>, def: rustc_hir::def_id::DefId) -> bool {
-    tcx.get_attrs_by_path(
+    tcx.tool_attrs(
         def,
         &[
             rustc_span::sym::miri,
@@ -5576,7 +5604,7 @@ mod instance_demand_tests {
                 krate: rustc_hir::def_id::LOCAL_CRATE,
                 index: rustc_hir::def_id::DefIndex::from_u32(0),
             }),
-            args: ty::List::empty(),
+            args: ty::GenericArgs::empty(),
         }
     }
 

@@ -75,9 +75,9 @@ def body_tls(declaration):
 def write(name, doc):
     if isinstance(doc, dict) and doc.get("schema") == "lean-miri-rustc-mir":
         version = doc["schema_version"]
-        doc["schema_version"] = 13
+        doc["schema_version"] = 14
         doc = pool_document(doc)
-        if version != 13:
+        if version != 14:
             doc["schema_version"] = version
     (OUT / f"{name}.json").write_text(json.dumps(doc, separators=(",", ":")) + "\n")
 

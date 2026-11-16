@@ -106,3 +106,6 @@ example : WrappingRange.smallestRangeContaining [u128 10, u128 11, u128 30, u128
     (Size.ofBytes 2) = .ok (some ⟨u128 10, u128 39⟩) := by decide
 example : WrappingRange.containsRange ⟨u128 254, u128 2⟩ ⟨u128 255, u128 1⟩
     (Size.ofBytes 1) = .ok true := by decide
+
+example : Miri.ABI.Float.X87F80.size.bytes = 10 := by decide
+example : Miri.ABI.Float.X87F80.align RuntimeTargetDataLayout.default = .ok (.new Align.ONE) := by decide

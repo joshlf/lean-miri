@@ -167,6 +167,7 @@ def writeBytes [PointerProvenance P] (h : IntrinsicHooks P S C V) (choice : C)
   let count ← usize h choice count
   let some size := IntegerOps.computeSizeInBytes layout.layout.size count h.maxSizeOfVal
     | ub "overflow computing total size of write_bytes"
+  h.checkAlign choice dest layout.layout.align.abi
   h.writeBytes choice dest byte size
 
 private def bytesCompare : List UInt8 → List UInt8 → Ordering
@@ -287,7 +288,12 @@ private def writeFloat (h : IntrinsicHooks P S C V) (choice : C) (value : FloatB
 Only the machine's choice of fusion/equal operand/NaN remains effectful. -/
 def floatIntrinsic [PointerProvenance P] (h : IntrinsicHooks P S C V) (choice : C)
     (name : String) (args : Array (OpTy P)) (dest : V) : RvalueM S Bool := do
-  let some (base, format) := floatName name | return false
+  let parsed ← if ["floor","ceil","trunc","round","round_ties_even"].contains name then do
+      let operand ← arg args 0
+      let format ← h.floatOps.formatOf choice operand.layout.ty
+      pure (some (if name == "round_ties_even" then "round_ties_even_" else name,format))
+    else pure (floatName name)
+  let some (base, format) := parsed | return false
   match base with
   | "floor" | "ceil" | "trunc" | "round" | "round_ties_even_" =>
     let value ← floatValue h choice (← arg args 0) format
@@ -419,6 +425,24 @@ def eval [PointerProvenance P] (h : IntrinsicHooks P S C V) (choice : C) (name :
           liftResult (Memory.Scalar.fromUInt bound left.layout.layout.size |>.mapError ScalarOps.scalarError)
       writeScalar h choice value dest
   | "copy" => copy h choice (← arg args 0) (← arg args 1) (← arg args 2) false
+  | "unchecked_funnel_shl" | "unchecked_funnel_shr" =>
+    arity args 3
+    let left ← h.readImmediate choice (← arg args 0)
+    let right ← h.readImmediate choice (← arg args 1)
+    let shift ← h.readImmediate choice (← arg args 2)
+    let size := left.layout.layout.size
+    let left ← liftResult ((← liftResult (left.imm.toScalar.mapError ScalarOps.immediateError)).toBits size |>.mapError ScalarOps.scalarError)
+    let right ← liftResult ((← liftResult (right.imm.toScalar.mapError ScalarOps.immediateError)).toBits size |>.mapError ScalarOps.scalarError)
+    let amount ← liftResult ((← liftResult (shift.imm.toScalar.mapError ScalarOps.immediateError)).toBits shift.layout.layout.size |>.mapError ScalarOps.scalarError)
+    let width ← liftResult (size.bitsNat |>.mapError fun e => .invalidProgram (toString e))
+    if amount.toNat >= width then ub "overflowing scalar funnel shift"
+    let shift := amount.toNat
+    let inverse := width-shift
+    let bits := if name == "unchecked_funnel_shl" then
+        Nat.lor (left.toNat * 2^shift) (right.toNat / 2^inverse)
+      else Nat.lor (left.toNat * 2^inverse) (right.toNat / 2^shift)
+    let (result,_) ← liftResult (ScalarInt.truncateFromUInt (BitVec.ofNat 128 bits) size |>.mapError ScalarOps.scalarIntError)
+    writeScalar h choice (.fromScalarInt result) dest
   | "write_bytes" | "volatile_set_memory" =>
     if name == "volatile_set_memory" then coreArity args 3
     writeBytes h choice (← arg args 0) (← arg args 1) (← arg args 2)

@@ -19,7 +19,7 @@ class FailClosedExportTests(unittest.TestCase):
             "EXPORTER_BIN", ROOT / "exporter/target/debug/lean-miri-mir-exporter"
         )).resolve()
         rustup = Path(os.environ.get("RUSTUP_HOME", ROOT / ".rustup"))
-        toolchain = rustup / "toolchains/miri-exporter-8144389c895d"
+        toolchain = rustup / "toolchains/miri-exporter-8eb778d04094"
         cls.environment = dict(os.environ)
         cls.environment["PATH"] = f"{toolchain / 'bin'}:{os.environ['PATH']}"
         cls.environment["LD_LIBRARY_PATH"] = f"{toolchain / 'lib'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
@@ -49,7 +49,7 @@ class FailClosedExportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         document = load_mir_document(self.output)
         self.assertNotIn("completeness", document)
-        self.assertEqual(document["schema_version"], 13)
+        self.assertEqual(document["schema_version"], 14)
         for name in ("layouts", "layout_values", "fn_abis", "abi_arguments", "boolean_queries",
                      "discriminants", "compiler_instance_abis", "compiler_function_facts",
                      "compiler_covariance_queries", "compiler_vtable_queries", "compiler_cast_queries"):
@@ -87,6 +87,31 @@ class FailClosedExportTests(unittest.TestCase):
 
         check(document)
         return document
+
+    def test_x87_wrapper_and_raw_type_have_distinct_source_material(self):
+        document = self.accepted("x87_source", root="root")
+        wrappers = [node for node in document["types"] if node["source_layout"]["is_x87_f80"]]
+        raw = [node for node in document["types"] if node["source_layout"]["special_float"] == "x87_f80"]
+        self.assertEqual(len(wrappers), 1)
+        self.assertEqual(len(raw), 1)
+        self.assertIsNone(wrappers[0]["source_layout"]["special_float"])
+        self.assertFalse(raw[0]["source_layout"]["is_x87_f80"])
+        self.assertEqual(wrappers[0]["shape"]["variants"][0]["fields"][0]["type"], raw[0]["type_id"])
+        self.assertEqual(document["runtime_target_data_layout"]["x87_f80_align_bytes"], 16)
+
+    def test_aarch64_scalable_vector_material_preserves_eight_parts(self):
+        result = subprocess.run(
+            [str(self.exporter), "--output", str(self.output), "--root", "root", "--",
+             str(ROOT / "exporter/fixtures/fail_closed/scalable_source.rs"),
+             "--target=aarch64-unknown-linux-gnu", "-Ctarget-feature=+sve",
+             "--crate-type=lib", "--crate-name=scalable_source"],
+            cwd=ROOT, env=self.environment, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = load_mir_document(self.output)
+        parts = {node["display"]: node["source_layout"]["scalable_vectors"]
+                 for node in document["types"] if node["source_layout"]["scalable_vectors"] is not None}
+        self.assertEqual(parts, {"Vector8": 8, "Vector": 1})
 
     def test_llvm_intrinsics_keep_exact_identity_without_abi_results(self):
         document = self.accepted("llvm_no_abi")
@@ -316,7 +341,7 @@ class FailClosedExportTests(unittest.TestCase):
 
     def test_coroutine_metadata_retains_exact_coverage_and_runtime_abi(self):
         document = self.accepted("coroutine", "root")
-        self.assertEqual(document["schema_version"], 13)
+        self.assertEqual(document["schema_version"], 14)
         coverage = document["compiler_coroutine_coverage"]
         self.assertTrue(coverage["coroutines"])
         self.assertEqual(len(coverage["body_coroutines"]), len(document["bodies"]))

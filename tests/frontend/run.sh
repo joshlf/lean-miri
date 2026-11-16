@@ -7,12 +7,12 @@ export CARGO_HOME="${CARGO_HOME:-$repo_root/.cargo}"
 # Fixture exports use the same pinned Miri std metadata as reference runs.
 export MIRI_SYSROOT="${MIRI_SYSROOT:-$repo_root/scratch/miri-sysroot}"
 export RUSTUP_HOME="${RUSTUP_HOME:-$repo_root/.rustup}"
-toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d"
+toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8eb778d04094"
 export PATH="$ELAN_HOME/bin:$toolchain/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$toolchain/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$repo_root/exporter/target}"
 if [[ -z "${EXPORTER_BIN:-}" ]]; then
-  "$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d build --offline --manifest-path exporter/Cargo.toml
+  "$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 build --offline --manifest-path exporter/Cargo.toml
 fi
 exporter_bin="${EXPORTER_BIN:-$CARGO_TARGET_DIR/debug/lean-miri-mir-exporter}"
 if [[ "${FRONTEND_SKIP_LAKE_BUILD:-0}" != 1 ]]; then

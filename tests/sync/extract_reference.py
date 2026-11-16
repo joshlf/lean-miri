@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_SHA1 = "3e848a071e2a67792eada4625b1751eec119b21d"
+EXPECTED_SHA1 = "f384675c0553af70c5a9f62a6cb405e8c3534a7f"
 
 
 def item(source: str, marker: str, include_derive: bool = False) -> str:

@@ -24,7 +24,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8144389c895d"
+    toolchain = ROOT / ".rustup/toolchains/miri-exporter-8eb778d04094"
     env = dict(os.environ)
     env["PATH"] = str(toolchain / "bin") + ":" + env["PATH"]
     env["LD_LIBRARY_PATH"] = str(toolchain / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")

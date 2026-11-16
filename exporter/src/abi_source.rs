@@ -20,7 +20,6 @@ pub(super) struct Policy {
     box_noalias: bool,
     llvm_writable: bool,
     optimize: bool,
-    incremental: bool,
     panic_unwinds: bool,
     panic_in_drop_unwinds: bool,
 }
@@ -36,7 +35,6 @@ pub(super) struct Definition {
     never_unwind: bool,
     drop_glue: bool,
     no_writable: bool,
-    parameter_uses: Vec<u8>,
 }
 
 #[derive(Default)]
@@ -269,13 +267,6 @@ pub(super) fn discover<'tcx>(
             | ty::InstanceKind::Shim(ty::ShimKind::DropGlue(id, _)) => Some(id),
             _ => None,
         };
-        // Defining-crate metadata preserves optimized generic-body usage. The
-        // instantiated MIR can change those uses and cannot reconstruct it.
-        let parameter_uses = if let ty::InstanceKind::Item(id) = instance.def {
-            tcx.deduced_param_attrs(id).iter().map(|attrs| attrs.usage.bits()).collect()
-        } else {
-            Vec::new()
-        };
         state.definitions.push(Definition {
             instance_id: context.instance_ids[&instance],
             signature: fn_sig_json_inner(context, tcx, signature)?,
@@ -288,7 +279,6 @@ pub(super) fn discover<'tcx>(
                 tcx.codegen_fn_attrs(id).flags.contains(CodegenFnAttrFlags::NEVER_UNWIND)),
             drop_glue: definition.is_some_and(|id| tcx.is_lang_item(id, rustc_attr_ir::lang_items::LangItem::DropGlue)),
             no_writable: definition.is_some_and(|id| rustc_attr_ir::find_attr!(tcx, id, RustcNoWritable)),
-            parameter_uses,
         });
     }
     Ok(())
@@ -311,7 +301,6 @@ pub(super) fn finish(tcx: TyCtxt<'_>, state: State) -> Material {
             box_noalias: tcx.sess.opts.unstable_opts.box_noalias,
             llvm_writable: tcx.sess.opts.unstable_opts.llvm_writable,
             optimize: tcx.sess.opts.optimize != rustc_session::config::OptLevel::No,
-            incremental: tcx.sess.opts.incremental.is_some(),
             panic_unwinds: tcx.sess.panic_strategy().unwinds(),
             panic_in_drop_unwinds: tcx.sess.opts.unstable_opts.panic_in_drop.unwinds(),
         },

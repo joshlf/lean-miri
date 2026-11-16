@@ -168,6 +168,7 @@ def tryBegin (h : Hooks S) (ref : Ref) (pending dest : Dest) : M S Bool := do
 def executeUser (h : Hooks S) (user : User) (kind : UnblockKind) : M S Unit := do
   match user with
   | .sleep => unless kind == .TimedOut do invalid "sleep callback must time out"
+  | .pause => invalid "pause callback must never unblock"
   | .pthreadSemaphore timed dest =>
     match kind with
     | .Ready => h.writeScalar 0 dest

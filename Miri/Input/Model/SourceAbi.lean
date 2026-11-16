@@ -12,7 +12,6 @@ structure SourceAbiPolicy where
   boxNoAlias : Bool
   llvmWritable : Bool
   optimize : Bool
-  incremental : Bool
   panicUnwinds : Bool
   panicInDropUnwinds : Bool
 
@@ -26,9 +25,7 @@ structure SourceAbiDefinition where
   neverUnwind : Bool
   dropGlue : Bool
   noWritable : Bool
-  /-- Optimized defining-body use summaries; concrete instance MIR can have
-  different uses after substitution, so it is not a substitute for this input. -/
-  parameterUses : Array UInt8
+
 
 structure SourceAbiMaterial where
   policy : SourceAbiPolicy

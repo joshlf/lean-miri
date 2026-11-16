@@ -41,13 +41,7 @@ def main (args : List String) : IO Unit := do
   let wrongReturn ← must (setField row "signature" wrongReturn)
   reject (← must (setField source "definitions" (.arr (definitions.set! selected.instanceId wrongReturn))))
     "dangling source signature type accepted"
-  let invalidUsage ← must (setField row "parameter_uses" (.arr #[toJson (16 : Nat)]))
-  reject (← must (setField source "definitions" (.arr (definitions.set! selected.instanceId invalidUsage))))
-    "unknown optimized-body usage bit accepted"
   let policy ← must (source.getObjVal? "policy")
-  let policyFields ← must policy.getObj?
-  let missingIncremental := Json.mkObj (policyFields.toList.filter (·.1 != "incremental"))
-  reject (← must (setField source "policy" missingIncremental)) "missing incremental ABI policy accepted"
   let invalidAlignment ← must (setField policy "max_reliable_alignment" (toJson (3 : Nat)))
   reject (← must (setField source "policy" invalidAlignment)) "non-power-of-two ABI alignment accepted"
   let program ← must (lowerProgram document)
@@ -56,19 +50,16 @@ def main (args : List String) : IO Unit := do
   let context : CompilerFacts.Context := ⟨runtime, program, none⟩
   let layout ← must (runtime.lookup selected.signature.output |>.mapError toString)
   let layout := {layout with layout := {layout.layout with size := Miri.ABI.Size.ofBytes 32, backendRepr := .Memory (sized := true)}}
-  let queries := {SourceAbiRuntime.queries context material.policy with
-    lookup := fun _ => pure layout
-    needsDrop := fun _ => throw "control: unexpected needsDrop"
-    isFreeze := fun _ => throw "control: unexpected isFreeze"}
+  let queries := {SourceAbiRuntime.queries context material.policy with lookup := fun _ => pure layout}
   let signature := {selected.signature with inputs := #[layout.ty], output := layout.ty, abi := .Rust}
-  let definition := {selected with signature, parameterUses := #[1, 1], virtualCall := false, callerLocation := none}
-  let compute (optimize incremental : Bool) := SourceAbi.compute
-    {material.policy with optimize, incremental} runtime.target queries signature #[] (some definition) true
-  check ((compute false false).isOk) "unoptimized ABI requested deduced-attribute queries"
-  check ((compute true true).isOk) "incremental ABI requested deduced-attribute queries"
-  check (!(compute true false).isOk) "optimized nonincremental ABI skipped deduced-attribute queries"
+  let definition := {selected with signature, virtualCall := false, callerLocation := none}
+  for optimize in #[false, true] do
+    let abi ← must (SourceAbi.compute {material.policy with optimize} runtime.target queries signature #[] (some definition) true)
+    for argument in abi.args.push abi.ret do
+      let .Indirect attrs _ _ := argument.mode | throw (IO.userError "large aggregate did not use indirect ABI")
+      check (attrs.regular == 670) "Miri ABI acquired codegen body-deduced attributes"
   let incomplete := {material with definitions := material.definitions.set! selected.instanceId none}
   let incompleteRuntime := {runtime with source := {document with sourceAbi := some incomplete}}
   check (!(SourceAbiRuntime.ofInstance ⟨incompleteRuntime, program, none⟩ selected.instanceId #[]).isOk)
     "missing concrete ABI source silently fell back to an answer table"
-  IO.println "source ABI boundary: required material, dense identities, type references, usage bits and policy checked; missing source fails at demand"
+  IO.println "source ABI boundary: required material, dense identities, type references, policy and no-body-deduced attributes checked; missing source fails at demand"

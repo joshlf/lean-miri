@@ -38,10 +38,10 @@ private def arg (args : Array A) (index : Nat) : M S A :=
   match args[index]? with
   | some value => pure value
   | none => throw (.invalidProgram "checked futex argument missing")
-private def futexRef (h : Hooks S R) (pointer : Pointer (Option Provenance)) : M S (Option R) := do
-  let object ← SyncObject.getOrInitMetadata h.metadata pointer do
+private def futexRef (h : Hooks S R) (pointer : Pointer (Option Provenance)) : M S R := do
+  let object ← SyncObject.getOrInitMetadata h.metadata pointer (Size.ofBytes 4) do
     return {payload := ← h.newFutex,deleteOnWrite := false,onAccess := fun _ => pure ()}
-  return object.map (·.payload)
+  return object.payload
 
 def syscall (h : Hooks S R) (args : ShimSignatures.Varargs Provenance)
     (dest : MPlaceTy Provenance) : M S Unit := do
@@ -82,12 +82,9 @@ def syscall (h : Hooks S R) (args : ShimSignatures.Varargs Provenance)
     h.seqCstFence
     let actual ← h.readAcquire address
     if value != actual then h.errnoNegOne "EAGAIN" dest; return
-    let some ref ← futexRef h pointer
-      | throw (.invalidProgram "atomic-acquire-readable futex has no mutable sync byte")
+    let ref ← futexRef h pointer
     h.wait ref bitset deadline dest
   else if op == wake || op == wakeBitset then
-    -- EFAULT precedes optional argument checks and source fence.
-    let some ref ← futexRef h pointer | h.errnoNegOne "EFAULT" dest; return
     let bitset ← if op == wakeBitset then do
         let extra ← h.takeArgs #[.timespecPointer,.u32Pointer,.u32] rest
         let timeout ← h.readPointer (← arg extra 0)
@@ -99,6 +96,10 @@ def syscall (h : Hooks S R) (args : ShimSignatures.Varargs Provenance)
     if bitset == 0 then h.errnoNegOne "EINVAL" dest; return
     h.seqCstFence
     if value.toNat >= 2^h.hostUsizeBits then throw (.invalidProgram "futex wake count usize conversion")
+    let ref ← match ← SyncObject.tryGetMetadata h.metadata pointer with
+      | .ok object => pure object.payload
+      | .error .noMem => h.errnoNegOne "EFAULT" dest; return
+      | .error .noObj => h.writeInt 0 dest; return
     let woken ← h.wake ref bitset value.toNat
     -- Source usize→isize conversion is HOST-width, then target scalar formation.
     if woken >= 2^(h.hostUsizeBits-1) then throw (.invalidProgram "futex wake count host isize conversion")

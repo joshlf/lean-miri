@@ -56,7 +56,7 @@ prove termination when fresh concrete instantiations keep appearing.
 
 ## Source input
 
-The producer and reader use `lean-miri-rustc-mir` schema 13. Earlier versions
+The producer and reader use `lean-miri-rustc-mir` schema 14. Earlier versions
 require fresh export. The execution document contains no layout, FnAbi or
 covariance answer tables. Table IDs are dense and local to one document;
 allocation source IDs retain a separate raw identity.
@@ -65,7 +65,7 @@ allocation source IDs retain a separate raw identity.
 | --- | --- |
 | `bodies`, `instances`, `body_roots` | Concrete MIR, compiler instance identities, call/cast references and selected executable roots |
 | `types` | Concrete type structure, substituted ADT fields and variants, repr, discriminants, normalization references, lang-item flags and declaration attributes |
-| `runtime_target_data_layout`, `source_abi` | Target geometry and ABI policy, normalized callable signatures, function attributes and parameter-use summaries |
+| `runtime_target_data_layout`, `source_abi` | Target geometry and ABI policy, normalized callable signatures, function attributes |
 | `source_trait_material` | Relevant trait/impl declarations, generic type patterns, clauses, ADT tails and associated-type bounds |
 | `source_vtables` | Instantiated object-trait method/supertrait graph and concrete drop/method instance bindings |
 | `source_cast_targets` | Resolution witnesses for actual function-pointer and closure casts |
@@ -76,7 +76,10 @@ allocation source IDs retain a separate raw identity.
 Concrete ADT field types and repr drive Lean layout calculation. Generic type
 patterns are retained where trait selection, potentially-unsized tails or
 associated-type bounds need them. This does not introduce generic function MIR
-or a runtime function-body substitution phase. Layout, ABI and trait algorithms
+or a runtime function-body substitution phase. Coroutine auto traits use the
+pre-cleanup witness fields and ignore flags; the optimized state layout can
+retain a different field set. Coroutine `Unpin` follows declared movability.
+Layout, ABI and trait algorithms
 consume the decoded typed records; runtime-created arrays and pointer types use
 the same query implementation.
 
@@ -95,9 +98,9 @@ The input trusts rustc's MIR selection, monomorphization, normalization and
 constant evaluation. Declaration and target facts also remain compiler input:
 repr and inferred variance, lang-item/type identity, bound-variable flags,
 normalized signatures and compiler coroutine state material,
-predicate normalization/erasure/order and concrete cast resolution. ABI
-parameter-use bits come from the defining crate's optimized generic body;
-instantiated MIR can change those uses and cannot reconstruct that summary.
+predicate normalization/erasure/order and concrete cast resolution. ABI follows
+Miri's `fn_abi_of_instance_no_deduced_attrs` policy; codegen-only parameter-use
+summaries are not exported.
 Lean computes final layout and ABI values from these inputs, including final
 parameter attributes, rather than receiving the compiler's final answer rows.
 
@@ -172,13 +175,13 @@ python3 tools/check-source-queries.py \
 Run Rust units and exporter fixture suites with the pinned environment:
 
 ```bash
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d test --locked --offline \
+"$CARGO_HOME/bin/cargo" +miri-exporter-8eb778d04094 test --locked --offline \
   --manifest-path exporter/Cargo.toml
 ```
 
 Lean integration and theorem checks are separate. `tools/check-empty-function.sh`
 checks concrete providers for its fixture and then the kernel theorem/axiom
 closure. [STATUS.md](../STATUS.md) records current validation gaps; historical
-fixture and CI successes do not establish schema-13 execution. Whole-pipeline
+fixture and CI successes do not establish schema-14 execution. Whole-pipeline
 performance comparisons use identical Rust inputs and fixed artifacts via
 `tools/measure-pipeline.py`, as described in [PROFILING](../tools/PROFILING.md).

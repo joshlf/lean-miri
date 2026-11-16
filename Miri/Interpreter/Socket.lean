@@ -36,7 +36,7 @@ structure Hooks (S F E I : Type) where
   newTcp : Family → Bool → M S (Except (IoError.HostError E) F)
   insert : F → M S Int32
   writeInt : Int → MPlaceTy Provenance → M S Unit
-  readLengthPlace : MPlaceTy Provenance → M S Nat
+  readLengthPlace : MPlaceTy Provenance → M S (Option Nat)
 private def onError (action : M S A) (cleanup : M S Unit) : M S A := fun state =>
   match action state with
   | .ok value state => .ok value state
@@ -163,7 +163,8 @@ def setOption (h : Hooks S F E I) (number level option value length : OpTy Prove
   let level ← h.readI32 level
   let option ← h.readI32 option
   let value ← h.address.readPointer value
-  let length ← h.address.readSocklen length
+  let some length ← h.address.readSocklen length | return ← fail h "EINVAL"
+  h.address.checkAccess value (Size.ofBytes length)
   match ← fd h number with
   | .error error => IoError.setErrnoAndReturnNeg1I32 h.address.errors error
   | .ok socket => finishUnit h (← h.operations.setOption socket level option value length)
@@ -184,6 +185,8 @@ def getOption (h : Hooks S F E I) (number level option value length : OpTy Prove
         pure (some (place,← h.readLengthPlace place))
     ) (h.dropFd socket)
     let some (lengthPlace,length) := input | h.dropFd socket; return ← fail h "EFAULT"
+    let some length := length | h.dropFd socket; return ← fail h "EINVAL"
+    onError (h.address.checkAccess value (Size.ofBytes (UInt64.ofNat length))) (h.dropFd socket)
     match ← h.operations.getOption socket level option with
     | .error error => IoError.setErrnoAndReturnNeg1I32 h.address.errors error
     | .ok buffer =>

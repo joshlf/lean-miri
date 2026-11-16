@@ -1,9 +1,9 @@
 {
   "schema": "lean-miri-rustc-mir",
-  "schema_version": 13,
+  "schema_version": 14,
   "producer": {
-    "miri_commit": "7fa591d7d4dd9af8154becbc8332f8096f8323b1",
-    "rustc_commit": "8144389c895da997dbdecaa635e41d6a50be6ffd",
+    "miri_commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
+    "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
     "rustc_version": "pinned",
     "target_triple": "x86_64-unknown-linux-gnu",
     "input_settings": {
@@ -57,7 +57,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -91,7 +93,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -125,7 +129,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -159,7 +165,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -193,7 +201,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -227,7 +237,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -261,7 +273,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -295,7 +309,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -329,7 +345,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -363,7 +381,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -397,7 +417,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -430,7 +452,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -464,7 +488,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -498,7 +524,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -535,7 +563,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -572,7 +602,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -609,7 +641,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -646,7 +680,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -679,7 +715,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     },
     {
@@ -719,7 +757,9 @@
         "capture_names": null,
         "has_destructor": false,
         "is_dyn_metadata": false,
-        "type_id_hash": null
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
       }
     }
   ],
@@ -997,7 +1037,8 @@
       }
     ],
     "instruction_address_space": 0,
-    "c_enum_min_size": "I32"
+    "c_enum_min_size": "I32",
+    "x87_f80_align_bytes": 16
   },
   "source_vtables": {
     "no_trait_vptr": false,
@@ -1006,8 +1047,8 @@
   },
   "invocation": {
     "kind": "direct_rustc_driver",
-    "rustc_commit": "8144389c895da997dbdecaa635e41d6a50be6ffd",
-    "rustc_executable": "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8144389c895d/bin/rustc",
+    "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
+    "rustc_executable": "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8eb778d04094/bin/rustc",
     "working_directory": "/workspace/lean-miri",
     "rustc_args": [
       "examples/empty_function/empty_function.rs",
@@ -1023,7 +1064,7 @@
       "-Zmir-enable-passes=-ReferencePropagation,-GVN",
       "-Zdeduplicate-diagnostics=no",
       "--sysroot",
-      "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8144389c895d"
+      "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8eb778d04094"
     ],
     "rustc_args_fingerprint_fnv1a64": "e9063eaba2647835",
     "root_paths": [
@@ -1042,7 +1083,6 @@
       "box_noalias": true,
       "llvm_writable": false,
       "optimize": false,
-      "incremental": false,
       "panic_unwinds": true,
       "panic_in_drop_unwinds": true
     },

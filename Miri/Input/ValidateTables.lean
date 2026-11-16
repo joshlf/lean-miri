@@ -342,6 +342,8 @@ private def sourceLayout (b : ReferenceBounds) (path : String) (shape : TypeShap
     unless vectors > 0 && vectors ≤ 8 && source.simd.isSome do
       throw (path ++ ": invalid scalable vector count")
   if let some coroutine := source.coroutine then
+    for field in coroutine.traitFields do
+      checkId b.types field.typeId (path ++ ".coroutine.trait_fields") "type"
     for id in coroutine.locals ++ coroutine.savedTypes ++ coroutine.prefix do checkId b.types id (path ++ ".coroutine") "type"
     unless coroutine.seed < 2^64 do throw (path ++ ": coroutine seed overflows u64")
     unless coroutine.savedTypes.size == coroutine.locals.size do throw (path ++ ": saved type count mismatch")

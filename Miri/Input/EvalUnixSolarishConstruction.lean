@@ -135,6 +135,7 @@ def fromSource [DecidableEq MiriMemoryKind]
     pointerPlace access operand ⟨layout.ty,layout.layout⟩
   pure {
     foreign
+    signature := CompilerNamedShimAbi.query p.namedAbi
     errors := environment.env.errors
     epoll
     event

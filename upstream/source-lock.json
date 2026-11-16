@@ -8,18 +8,18 @@
       "rustc_apfloat": "upstream/.pins/rustc_apfloat.commit"
     },
     "procedure": "upstream/fetch-sources.sh",
-    "procedure_sha256": "55b652daac6d47405052386a60a48ea2580699be015e7d2af79e5b6601ccc035",
+    "procedure_sha256": "a330a953ddca236662d91aec75b2bbad85a83038be2f28207548a204651ea958",
     "rustc_selected_archive_paths": {
-      "count": 539,
+      "count": 546,
       "path": "upstream/rustc-selected-files.txt",
-      "sha256": "6195d9651c4b0c256583737ddbdc0142d38698d5183ab09e3ac083b6a6594e00"
+      "sha256": "32657308509bf52a1db766c8680e6288afa21a2436cc7b5ed2f6e6ed89521584"
     }
   },
   "coverage_expected_rust_modules": {
     "upstream/crates/aes-0.9.3/src": 27,
-    "upstream/miri-source/src": 133,
+    "upstream/miri-source/src": 135,
     "upstream/rustc-apfloat-source/src": 3,
-    "upstream/rustc-source/compiler/rustc_abi/src": 12,
+    "upstream/rustc-source/compiler/rustc_abi/src": 13,
     "upstream/rustc-source/compiler/rustc_ast/src/ast.rs": 1,
     "upstream/rustc-source/compiler/rustc_ast/src/expand/allocator.rs": 1,
     "upstream/rustc-source/compiler/rustc_ast_ir/src/lib.rs": 1,
@@ -31,11 +31,11 @@
     "upstream/rustc-source/compiler/rustc_hir/src/def.rs": 1,
     "upstream/rustc-source/compiler/rustc_hir/src/hir.rs": 1,
     "upstream/rustc-source/compiler/rustc_middle/src/middle/codegen_fn_attrs.rs": 1,
-    "upstream/rustc-source/compiler/rustc_middle/src/mir": 23,
+    "upstream/rustc-source/compiler/rustc_middle/src/mir": 22,
     "upstream/rustc-source/compiler/rustc_middle/src/ty": 50,
     "upstream/rustc-source/compiler/rustc_target/src/asm/mod.rs": 1,
     "upstream/rustc-source/compiler/rustc_target/src/callconv": 26,
-    "upstream/rustc-source/compiler/rustc_target/src/spec": 389,
+    "upstream/rustc-source/compiler/rustc_target/src/spec": 390,
     "upstream/rustc-source/compiler/rustc_type_ir/src/binder.rs": 1,
     "upstream/rustc-source/compiler/rustc_type_ir/src/const_kind.rs": 1,
     "upstream/rustc-source/compiler/rustc_type_ir/src/inherent.rs": 1,
@@ -220,13 +220,6 @@
         "optional": true,
         "scope": "miri-target:cfg(unix):dependencies",
         "version": "5.1.0"
-      },
-      {
-        "default_features": false,
-        "name": "libffi-sys",
-        "optional": true,
-        "scope": "miri-target:cfg(unix):dependencies",
-        "version": "=4.1.0"
       },
       {
         "name": "libloading",
@@ -459,12 +452,14 @@
     ],
     "native-lib": [
       "dep:libffi",
-      "dep:libffi-sys",
       "dep:libloading",
       "dep:capstone",
       "dep:ipc-channel",
       "dep:nix",
       "dep:serde"
+    ],
+    "priroda": [
+      "dep:emmy_dap_types"
     ],
     "stack-cache": [],
     "tracing": [
@@ -660,9 +655,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "72337a3e6bcedf28a24e08ec65ecea206dece188",
+      "git_blob": "e77ef724cf4db7fdb3477e78e9a9d3cb4eab8817",
       "path": "upstream/miri-source/src/alloc_addresses/mod.rs",
-      "sha256": "4c8706a7792a0a2bce592739a3e03911b8d669550d957492c6bb87b0582765d6"
+      "sha256": "9ea9a58f5b403ce89f45d9c9c67f20885b58ac1be9c54493ae0184a4cf1e243e"
     },
     {
       "component": "miri",
@@ -690,15 +685,15 @@
     },
     {
       "component": "miri",
-      "git_blob": "0166b65ec497328b90690cd5f7a3e51e442820c3",
+      "git_blob": "e3e2eef146ccc5a433ea16ade77a0546edad1e0f",
       "path": "upstream/miri-source/src/bin/miri.rs",
-      "sha256": "08e6c68022a58e46f0a1f4d86aa79950b60db0b89469606c9ad508d794154439"
+      "sha256": "215a13d43af27c0ef80cf47dd45c87cfdf5d7f328991af4ec16e732d27d0dc25"
     },
     {
       "component": "miri",
-      "git_blob": "65660956220eac0d8270b273ac1074454f1c6f75",
+      "git_blob": "89736bdadf6bf2e71953d5ab5cb1f0fbeb332046",
       "path": "upstream/miri-source/src/borrow_tracker/mod.rs",
-      "sha256": "a06b4fe54f6b4d428fbbc305bd046a8130b70c353fe241ce55855f331dd314a3"
+      "sha256": "c4a3eac9d7ae2f1b5c956c07ca78c43dcade2b676c0ba5b21fd70e4fb1ec5f16"
     },
     {
       "component": "miri",
@@ -714,9 +709,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "9a49b6ca1db145088fb33062cf429f9c962b31a8",
+      "git_blob": "85ebebf77f86313f262eab8c3d930b9a2da1e341",
       "path": "upstream/miri-source/src/borrow_tracker/stacked_borrows/mod.rs",
-      "sha256": "2af067a600339c3c9ad25116ea0744344fc4969b9db2bd3c3dd87bdcaa1ec893"
+      "sha256": "38dea1b0abf90637b49518d64184def9c11ad147435f6308a07dd75590b00e55"
     },
     {
       "component": "miri",
@@ -744,9 +739,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "bf38ca356df45e5f365c0ae64bfe7738a0d43e1e",
+      "git_blob": "086430ad06cd17bb22d77f3baa9a7ec2ae24da6f",
       "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/mod.rs",
-      "sha256": "7041222ec9833c82fed6e1faa66c7516e1225bad1dc2b0f795615384be4fb15f"
+      "sha256": "7bb6e72d19c401d57349afa2702837fc8cddb70d993024747bd0687ba9c37363"
     },
     {
       "component": "miri",
@@ -756,9 +751,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "b58a7cfeba92ece2dab1977f65f9070fd8cd71ad",
+      "git_blob": "91cc25f2f9b88239225a2a3d32a4fd98262a6fc0",
       "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree.rs",
-      "sha256": "55b5a5d27ea4f0b1b8d43314f74cb31dae93eada7a78f3dc90f799f7141367a2"
+      "sha256": "27ac88754576616e9d11e07e43b4e73d4d46021328ee6f70eec5972bd4d7f581"
     },
     {
       "component": "miri",
@@ -768,9 +763,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "ab3a19ad9e17c7fc3d61d06c93273c7c5a8f7d3e",
+      "git_blob": "2bdb0caba6906f3b420b56107a8be8e7ad71bac6",
       "path": "upstream/miri-source/src/borrow_tracker/tree_borrows/tree_visitor.rs",
-      "sha256": "3aad8463a0a7a3b20d61f411b240a7ee258aeb158b70d3ad2a3ad1398395c622"
+      "sha256": "ad0b8db9a7521484dcc450655dc0a9e2e0afeee0e71c804fd90a8fd88cac1b3b"
     },
     {
       "component": "miri",
@@ -792,15 +787,15 @@
     },
     {
       "component": "miri",
-      "git_blob": "6eb96a152061fe6a26f53cff094564046df1865e",
+      "git_blob": "3d85db9563c35d41eefa02e083174e36f11277d1",
       "path": "upstream/miri-source/src/concurrency/blocking_io.rs",
-      "sha256": "5ea900b3022db1ada549770804e3ad05d37f1227d017cff64b617471fd5dabb0"
+      "sha256": "f57181bbb7f87ad8ba0abb36e8816238ed9469b5993bfd74f983e8bfdaf55ca0"
     },
     {
       "component": "miri",
-      "git_blob": "acf45c84bcc6d0f491ef5306ef6662390b96d11a",
+      "git_blob": "6feb2c81aaed8ed5b456242f1fa2fd7dee8742a8",
       "path": "upstream/miri-source/src/concurrency/data_race.rs",
-      "sha256": "68a585d9d3d96d87b857142ed82ffe5006e7c6c1b0492a7b60534348d1d83baa"
+      "sha256": "11e1ec6a655a09169577b6f4e84e8b7fb05b5dd0d53a9ee8d0ea92ae3eba9b5c"
     },
     {
       "component": "miri",
@@ -810,33 +805,33 @@
     },
     {
       "component": "miri",
-      "git_blob": "be010bb0458fba5ca04e009604c509e361b5d798",
+      "git_blob": "f6195ca918e43f26eae806e96a183d601181583a",
       "path": "upstream/miri-source/src/concurrency/init_once.rs",
-      "sha256": "d6999c065b58b1e2dc357af3dbfeb3108c0ca2b57d207ede052ebfa2386d4e96"
+      "sha256": "3987ba94f35e90b35c6def0226ddd5c9c68abb06a01dc1df04caeca8bbda667c"
     },
     {
       "component": "miri",
-      "git_blob": "5c059e36b973182c9aeb17bf1356cd664ac7bb37",
+      "git_blob": "d2f9ec70cd9fff046da8908c6f03d3371826fe74",
       "path": "upstream/miri-source/src/concurrency/mod.rs",
-      "sha256": "75888609c615da6cb43c4335cb672f9d8c7325fdd319ae8c92b2c768634537af"
+      "sha256": "4e0bcf436ce4b6bc882e2adc34ebad0dc4cd02c30aa9d951a1eeb73136b909e5"
     },
     {
       "component": "miri",
-      "git_blob": "6364710fb89051cc0a451424aedfc5c70d6884e6",
+      "git_blob": "0b5f563b10f296dfa362bcb8af5b764c3d6a4e0a",
       "path": "upstream/miri-source/src/concurrency/scheduler.rs",
-      "sha256": "de8d43ad437dce996cb45200ac4a8dc05c88d46cb0f8a07969fb924dea6a9d73"
+      "sha256": "7e5e7aaa7658b8eece8485b6e890fd3ad490d0778435be73de9639cca15b2ecf"
     },
     {
       "component": "miri",
-      "git_blob": "14bdcb37c32f9e3026ac1d600db2846727f4371c",
+      "git_blob": "bde822ccd9ffc377ddf260b39763a2358d274c78",
       "path": "upstream/miri-source/src/concurrency/sync.rs",
-      "sha256": "cdaf0a7742368acc4343860b3a6a8c3dbb04613158b5600b5aec183fdec50b43"
+      "sha256": "19ff5f7f755cb9cbbed59caae483bab8b40e2b40caa5a10d7555eebe3ef7d39e"
     },
     {
       "component": "miri",
-      "git_blob": "3966ea360b516dac9320c1aae297d3eb3779548d",
+      "git_blob": "53e3a10abef5020e5f7aa9a555f9b09e9551cfb1",
       "path": "upstream/miri-source/src/concurrency/thread.rs",
-      "sha256": "6df8d025689d9fea1ee60a7db0ca493667725b8947d80df12c7754165487a6a6"
+      "sha256": "053a7f1591c492ecb2dabe76fb251f0834b153be150a8fd30de5a6882175ef7d"
     },
     {
       "component": "miri",
@@ -846,9 +841,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "4838144d1d8625379f28ead9864bcfea72a16cc0",
+      "git_blob": "8bcbf843c56046b87fa7ed28f761ed2360527ca5",
       "path": "upstream/miri-source/src/concurrency/weak_memory.rs",
-      "sha256": "dce36b34e8efe44a44d67c111697fb2e00313cb3a252f865385942e03f24d554"
+      "sha256": "363184a4a6b82a81ac0c2745a00512d27253fc7bf7fba6c350d05f643e1ac67c"
     },
     {
       "component": "miri",
@@ -870,243 +865,249 @@
     },
     {
       "component": "miri",
-      "git_blob": "4c9cf3dc6351b776da3a44dc5017e262470948e1",
+      "git_blob": "92267709e267b753352c1d6d4d8ac03ac6f0f067",
       "path": "upstream/miri-source/src/data_structures/range_object_map.rs",
-      "sha256": "d66a91e561807156fbbe7f94da1d88b0726c4c147db980aec513eca7600e07f4"
+      "sha256": "54840f593d54b1daa8fbfdd803570e7f2c723c46ae4a12f9818923a6e5d3a60c"
     },
     {
       "component": "miri",
-      "git_blob": "8c65a7a3a8cf6cb5067bb74504917ca3eb234e4a",
+      "git_blob": "0a1cc7a6ed47be9d846a7e98294f90ee0d0eda5a",
       "path": "upstream/miri-source/src/diagnostics.rs",
-      "sha256": "8b2a67e0041a8382bbd47d48ddd679d17d62a4770ddfed188446204d64aa4ae3"
+      "sha256": "f3ceac943af771d380dfc780bddcf7f3a7398519412af19dba8ecf1bfa636dfa"
     },
     {
       "component": "miri",
-      "git_blob": "5ba03ff1bad7f23d6960b36d1a562ea3f7408eec",
+      "git_blob": "f35860b8f231666fc79c349ac7588872fbae7330",
       "path": "upstream/miri-source/src/eval.rs",
-      "sha256": "a0992faa0b16830b94335afb3d11802bb7d7618efeded7b199bbc831ef78995d"
+      "sha256": "b12c99aa585301f70b093037c00faa535633509271639b7258cc43bffaa72692"
     },
     {
       "component": "miri",
-      "git_blob": "7db3f4aad641d686fe5554063ff1f3ea79a82347",
+      "git_blob": "0e2d30efc8b15d2457eb629a2c0cfc0bc05f8305",
       "path": "upstream/miri-source/src/helpers.rs",
-      "sha256": "604221176f76e261ae26e5ffd500dc8ba79e2b34749c10e1959c10485c8ee70d"
+      "sha256": "e0e953364b4050a4d87be1300cb0770479125d5768640c76009f02c7332f2705"
     },
     {
       "component": "miri",
-      "git_blob": "a8e0cf6e464ac27211a0fc24e96f32993dc73a22",
+      "git_blob": "a7150f9379e6b5fa9f07fbe08dea2daf1cfc9c9b",
       "path": "upstream/miri-source/src/intrinsics/aarch64.rs",
-      "sha256": "c352213a2f789fb47233bca197a85b757b92264f857187376d1871941e2be8ae"
+      "sha256": "b86dfca2cd7cc9cbcb9a3be2b9cf41085943d84f241c9851e7cad4d1ac2dad4e"
     },
     {
       "component": "miri",
-      "git_blob": "7acdb57ddb3f1d6c96b36d3c54f2420c22386e57",
+      "git_blob": "2b1c1bce415e4d8fcc627278be3f3780e21326ac",
       "path": "upstream/miri-source/src/intrinsics/loongarch.rs",
-      "sha256": "bc9177a451c88aec572faba69667a04630e4efa2e904a4154be3298f005c12f1"
+      "sha256": "980e1c8295a5b266073067a89c62f0628eef971b6ad20a44e5de6062ed4ce115"
     },
     {
       "component": "miri",
-      "git_blob": "d60959ea73835b82599644faf6dce69275254bdf",
+      "git_blob": "9945f1a9ed57f0e398a4b36d2c54e83ca4d2dd9c",
       "path": "upstream/miri-source/src/intrinsics/math.rs",
-      "sha256": "1557b5773e469512e31b6e8d04ac96f8533c58774166e4ec0e90119e2bd66f6c"
+      "sha256": "518adb54fa7d105d6a829e54539cde6f8d1bcff22007a43555e520eca592eef1"
     },
     {
       "component": "miri",
-      "git_blob": "aa93632b78470328bc6bef5f71dc49a5fd37815a",
+      "git_blob": "5b5104731ac0bbf15fa44bd43f5a3ea833e2c7d8",
       "path": "upstream/miri-source/src/intrinsics/mod.rs",
-      "sha256": "16978e1cc79b224daa0a94f49ca16e6bd335b56e3dda00e4048497d181ac095a"
+      "sha256": "130847b0cce1433c367d38373a1fc74f6fa987a09f152ef9764862a86a8de01d"
     },
     {
       "component": "miri",
-      "git_blob": "1f2fd9a8a64df09639838d170e3c311c8ce15010",
+      "git_blob": "8689d800dd46fc389fe0805459db41719336a907",
       "path": "upstream/miri-source/src/intrinsics/simd.rs",
-      "sha256": "c0a9d40ed09ed4b7ef9fa9560f5e2f69001fc5f4c51cd12871e80330cd81eb0e"
+      "sha256": "71f50ede9438efa76dfa7e4982543de6d1792e73d328d07566eb9dafaa31d9f8"
     },
     {
       "component": "miri",
-      "git_blob": "d36261ca5b87a85abf4fa3907b94a948e371e7f5",
+      "git_blob": "bf6ba6f78900e841b874fce285615e4f32f97b16",
       "path": "upstream/miri-source/src/intrinsics/x86/aesni.rs",
-      "sha256": "5e0c81d63f5f4d5c2bd95f5661906187805c63b9b2b824b50b6316fad9ed97af"
+      "sha256": "c76780e6b227b7f41e2f087a8cb1653c20f69a05f5cc1507e49558ba9f61af04"
     },
     {
       "component": "miri",
-      "git_blob": "89aa2e8ae0664ff906e5f3e6194026f156583b7a",
+      "git_blob": "ee0a4abca468ff50dd11f4b0bcdb64a18e865bb7",
       "path": "upstream/miri-source/src/intrinsics/x86/avx.rs",
-      "sha256": "3f6b5bd7e1501daa4ec4eb0d1295f429008eec9f8d7cbff0a6ffb84b98a14f57"
+      "sha256": "d630c62877f98b4762f7b6a3edf3d9bbd3806fe98067b848fd14d2f96d11f92b"
     },
     {
       "component": "miri",
-      "git_blob": "6b49b61138839a5263dbfeb9f746db85886bedfa",
+      "git_blob": "fe83e95f4c15531f9cdf2b5e5a217201ee572637",
       "path": "upstream/miri-source/src/intrinsics/x86/avx2.rs",
-      "sha256": "1e2683f2647bf6d105419f07bc94df58174fad66f790fd64d900fcc13e1531cd"
+      "sha256": "96a38e957a0e00023acf888981559f0e5f26e4687d9f12d1be892664f6abc476"
     },
     {
       "component": "miri",
-      "git_blob": "077ae76a8f63a379c89e5a3476e02343de77954f",
+      "git_blob": "06e6990aca6ff718278d4597f7863b37be55c07d",
       "path": "upstream/miri-source/src/intrinsics/x86/avx512.rs",
-      "sha256": "846021a32bfe563d5e29be426a16af2edbaf0f78a4b9030211416dc88ee6665d"
+      "sha256": "9f27a298a4659aa9934197fa949554f83b04301f071e40aeddecffc013f99c8a"
     },
     {
       "component": "miri",
-      "git_blob": "c793637927d55aa3b4e1d8ec3b1d4ce6119d4412",
+      "git_blob": "04b3e48e3ba44084c839608c4fdf8194215eca91",
       "path": "upstream/miri-source/src/intrinsics/x86/bmi.rs",
-      "sha256": "6b966e4065f6114d96b0804643fde8cf689f21227a074459b36ca2b733deee58"
+      "sha256": "dd03e7b834530f02f7b33ebad73b178654efea7e915763ccf9293bc0fe334edf"
     },
     {
       "component": "miri",
-      "git_blob": "5ec91c3251529d6c8c1f9bf45f9dd54278753057",
+      "git_blob": "b60e58e5bdec6730da8621337d5011f560259841",
       "path": "upstream/miri-source/src/intrinsics/x86/gfni.rs",
-      "sha256": "424e53c4d9e52cfaff396e926edec63672782c8ddcbedcdda12822e5d492b366"
+      "sha256": "e494ac0db174338ee8d6cc9acfe2cc4bcebbb6d34dc1d130f07e4a9a74ae15f5"
     },
     {
       "component": "miri",
-      "git_blob": "0c82a70bf96ef5ec76027596ce68ea017f2dc726",
+      "git_blob": "3d99eed671f58ac6e72f849cdadebb1917002d84",
       "path": "upstream/miri-source/src/intrinsics/x86/mod.rs",
-      "sha256": "9ea5640e4b2122c2f03117fa7bc047f13a690b8b66934528df10b32bf5f72480"
+      "sha256": "4e0706262acc061f00cceda041c9a9eaebce2e48fdb3625920d4ed95bbbb7c90"
     },
     {
       "component": "miri",
-      "git_blob": "c34ee81ee72f6b62e150fc31ef5ff561268d8195",
+      "git_blob": "2fe6b88994a7e71ba5bfe591133b19ea65e18a32",
       "path": "upstream/miri-source/src/intrinsics/x86/sha.rs",
-      "sha256": "2c65a74a6ae78f99de670054bf22a80c1c71c236135c8d6b5fc29cdd11374c5f"
+      "sha256": "b91016be86f1f4e13181dea14bbfc2e90bc983a06220c925e3f311fcdcef0796"
     },
     {
       "component": "miri",
-      "git_blob": "29d8f7ef53e480e91df649c6a37c362af86427d8",
+      "git_blob": "09e36dd218204f406a17ef8b962388850bcb8b00",
       "path": "upstream/miri-source/src/intrinsics/x86/sse.rs",
-      "sha256": "ef4eed835095ecc9117bfefc9d95a8aa6c2857bb9a7f81d9962e45de8cf15aad"
+      "sha256": "fa39945620db249ebc4e12b72823c864d670a79a9205a6420a8559319b0dbd6b"
     },
     {
       "component": "miri",
-      "git_blob": "e3dcdf6c248c4de5521a7f4b38db1d4251add9d6",
+      "git_blob": "bfd92bfd74c9f061f4ac7138553253c042446baa",
       "path": "upstream/miri-source/src/intrinsics/x86/sse2.rs",
-      "sha256": "c3d365b06b0d634f96ffc6818601455d58085d38e2faf133f2e8a4bf79e1b5ad"
+      "sha256": "f07d65bbec8d646e2c3cd2f18a9b9ccee69cf6691a57d93debe32f449934a3a8"
     },
     {
       "component": "miri",
-      "git_blob": "0bafad9710a4c0615d7e8052dd19600930243061",
+      "git_blob": "e8e15b0c82f03c64f9b281660a966a4918d78ec0",
       "path": "upstream/miri-source/src/intrinsics/x86/sse3.rs",
-      "sha256": "86748cd4298ad05ede19b9d9b92a2d122577bcbbf9b3f315f619a97c1c740e95"
+      "sha256": "207ede4442316ec1a5274b0e96e423e5144ee1c38f0888249f25230bf06ee347"
     },
     {
       "component": "miri",
-      "git_blob": "602c1229efdb32cd25ea0ad1191b3605d5fd731d",
+      "git_blob": "df60ac4f2e92019f0bbb3617a9b32a392d943079",
       "path": "upstream/miri-source/src/intrinsics/x86/sse41.rs",
-      "sha256": "fe5c070754b12cebd802386634ccc8fc756de2b6a66baaac90e5c6cfe38ebb00"
+      "sha256": "d077bd396aa997c5ccdaff1b56ebcc4441f9333796fe5e1898153cb2c1b992ec"
     },
     {
       "component": "miri",
-      "git_blob": "27057d1449d89e5f79168268ac16be42ea0bbfb4",
+      "git_blob": "51704b207f32f08070900e5db9e8e5d257054f77",
       "path": "upstream/miri-source/src/intrinsics/x86/sse42.rs",
-      "sha256": "7f8355d9373571256c379de17ed22d4ce2fc21dea3c180fe5fb5e847a0c6c566"
+      "sha256": "6aebb144850e8dda007c8222f09446ff23cc5587d033a72aaa84154f9d99a4f4"
     },
     {
       "component": "miri",
-      "git_blob": "0007868ed3cf22f5daf032f5562b27f999f731f9",
+      "git_blob": "b176afaa6462d1c1f20b337aca0854c9c106734b",
       "path": "upstream/miri-source/src/intrinsics/x86/ssse3.rs",
-      "sha256": "9a1c072c7dc2566f2f296042134682e5e7a534902707f763ddf59083d3acb0de"
+      "sha256": "3cff6a272a7dff9832adfbf865c4f0be564ab2bd9c726c3d42cd7abf6ab0fe0f"
     },
     {
       "component": "miri",
-      "git_blob": "507f93e144277cd2c1cba6f4c3fba06b26cb7689",
+      "git_blob": "19c0c1cf53116efdaf020bd259437d8cc68b12e1",
       "path": "upstream/miri-source/src/lib.rs",
-      "sha256": "9d5016857ef1264310f3283a0ac5bdd9bb1f86e92781d813b362908bac33691b"
+      "sha256": "5218d5bc71e866d03722563279fe4e6042a918388728b43bbc7e9d86034c8aa9"
     },
     {
       "component": "miri",
-      "git_blob": "b1f816c92e6f99e47a73c774dcf043d89bb0d909",
+      "git_blob": "f82134332a85b1ff6561646d4192f55b0894582b",
       "path": "upstream/miri-source/src/machine.rs",
-      "sha256": "74a73ede337dadc6ac4d81538f5e22bce29c326881099b03027d01d6e758ebd4"
+      "sha256": "9bffc3677cd3822d5904891d645bb1044177f01fc64e762f7dcd19a5362402f4"
     },
     {
       "component": "miri",
-      "git_blob": "bbee903252602681870acd042a097c919a7be9b2",
+      "git_blob": "1964c74a56565e50ca3f4532aed1b34b06708e00",
       "path": "upstream/miri-source/src/math.rs",
-      "sha256": "44e555bbc85f2bd6bb2ec6d747d83eae1b97fd68208225af6d510f403da7c582"
+      "sha256": "657e1dcd2d8d1cc29b0fe93eef519bc41037e1610acbb318bece37f764cb60b8"
     },
     {
       "component": "miri",
-      "git_blob": "f8afa78bc5bd1abacedd004ab85543335bbcea4b",
+      "git_blob": "4d961efcbb5bee1fb40949d482efe402d97ab45a",
+      "path": "upstream/miri-source/src/meta_obj.rs",
+      "sha256": "4dfe03a0fe5af9e107e69410b5f6079ca7cb00264780165105c109107bb73d03"
+    },
+    {
+      "component": "miri",
+      "git_blob": "2125c8bfbf98f336661267c7604112d0d9596a9e",
       "path": "upstream/miri-source/src/operator.rs",
-      "sha256": "d7dd1447a5c0886c845dbacfc713181ea168f6567cf424835065407660c46be2"
+      "sha256": "a555d16da959fa8c660ccf61742cc16158a44dea2d7745470d80f18690fb5dac"
     },
     {
       "component": "miri",
-      "git_blob": "d1022bacd583dca193a7fa37d992d2f81f8ff049",
+      "git_blob": "c2e4188c904b8197085ee00a615e8e66817e1cea",
       "path": "upstream/miri-source/src/provenance_gc.rs",
-      "sha256": "06b8dd221a54bcea80c72215cf5da54f06ad33d8d4b3e757791c600a7d50c032"
+      "sha256": "fc1ce54de16bf2509a6626273de5efbf27e0fbdfbd782c58ace74aeb25f39976"
     },
     {
       "component": "miri",
-      "git_blob": "a16f80fc6646969f2d6cd2b8d178208f259efa14",
+      "git_blob": "5976d70ce0e24b64d32823e24b82712286fe00eb",
       "path": "upstream/miri-source/src/shims/alloc.rs",
-      "sha256": "eef3a46c1873f3e80313db2c5c0cb634ccc0888de2ff259e2ce8eced5c627108"
+      "sha256": "842fc86c629c38a00ef997a17d30d82ed53439705ae45ab08f46bf3f2772b69d"
     },
     {
       "component": "miri",
-      "git_blob": "774f7f1e8f953522106297a0d58209412b2425bd",
+      "git_blob": "0dea1e812909d39cdef98ea1612c68f8d66e03a6",
       "path": "upstream/miri-source/src/shims/backtrace.rs",
-      "sha256": "2f986d09e60db60a37920b3a2c8fcc3b659f5b1053e718349030e01d1c72d08b"
+      "sha256": "4b616c327aaeb69f3cfa932380df2db4ef0cc6c0b5e639b927011b6a9c1dbee4"
     },
     {
       "component": "miri",
-      "git_blob": "955adb2cf3b122824480b799c542ac7c34ce343e",
+      "git_blob": "5e91c18d980148f4269afdd307d75bcdee04488e",
       "path": "upstream/miri-source/src/shims/cpu_affinity.rs",
-      "sha256": "1c1c63f589bc6c19d71d4e8b74642d4050e61d96035b7c18934c20d9ade4cbc7"
+      "sha256": "da3a92d2658c3f252e047ccb11c9c590319fa2101bfe7b9d46965ef4f5d61d71"
     },
     {
       "component": "miri",
-      "git_blob": "cfc94abb68989f079828ab201538f683b9e3d6ed",
+      "git_blob": "b85685d844adaf05a50e69074ec11bad126eead7",
       "path": "upstream/miri-source/src/shims/env.rs",
-      "sha256": "d0d079209c60fbbd52c5c9dc226401c75dbf41c2ed300e5f0c23ad2504e20953"
+      "sha256": "7c7bc9168d5d25db7c13696cffd648fd37cb5197999cc7cac6c9323bc10f08de"
     },
     {
       "component": "miri",
-      "git_blob": "5e7a391aa84519199b3bc452855982ee6c4e3b65",
+      "git_blob": "bae539e440f8437dd5308f8545d0fd38ac675763",
       "path": "upstream/miri-source/src/shims/extern_static.rs",
-      "sha256": "932b392b7790d341ee2e51c1afcf95526325c8102498fd9271808ce3b2182956"
+      "sha256": "77b245ced9038b07995e6eb869d9720956be35c3f231c90ffd716df33a5a0acc"
     },
     {
       "component": "miri",
-      "git_blob": "29d0d28f804f776103d69a526e012309521d42ae",
+      "git_blob": "4bf610143f670a57d5046207f48fa5cd149c08fd",
       "path": "upstream/miri-source/src/shims/files.rs",
-      "sha256": "db9adfaf2da389bfc7331f46ff03450e2ae6788e23590428295de7fa1fe55098"
+      "sha256": "faccfc5ebacf76c40a7263f17eb015a90370e431131474be7c36fc751b7339c6"
     },
     {
       "component": "miri",
-      "git_blob": "95e8e5d04a752e6fb37d7866a013fab0a011d67c",
+      "git_blob": "f40ebcce3aa86be7621a6b1dd8fe6e07e6cfc8be",
       "path": "upstream/miri-source/src/shims/foreign_items.rs",
-      "sha256": "e23037a35d226e62460d316a165d2e148801663392557f9ff4e17957e47f2482"
+      "sha256": "e30066bb0995baf2b87f7b313b8530f4d04af6d383b4d99186d92f58b4ae8c6d"
     },
     {
       "component": "miri",
-      "git_blob": "ab59871112dd48065952f8a0ae3a732b17f0fcfb",
+      "git_blob": "b4f83e3733b841c51dc312b1c98ec92eae1580e8",
       "path": "upstream/miri-source/src/shims/global_ctor.rs",
-      "sha256": "170a9f107b2763a46998c28fca14d075ff94e04e3841f6fa54cd99bd681d857e"
+      "sha256": "d473f55823b45a4b40024101cd510e7ce8619446ebaee08b97e2e389ac9fe9c5"
     },
     {
       "component": "miri",
-      "git_blob": "4d1ffb1d9b15f338ae6511ea9f290ea3680e3206",
+      "git_blob": "15ce2c6ee29c6318484f7478ba8216d46d530cb0",
       "path": "upstream/miri-source/src/shims/io_error.rs",
-      "sha256": "9908fa6f56dc57146dfaad078f2cce0e93937c76ed2eb0519fe8ecd1ff562b1a"
+      "sha256": "79a9595dedb5eb1047a6ab1e769486ad46a13bd903d2be4c27d052fae42ca852"
     },
     {
       "component": "miri",
-      "git_blob": "1a3228425af9a1b14f948bf4bf6e2b4a179cbfe1",
+      "git_blob": "c72aeda67668adc28ebfb1a13ab1edf320b96673",
       "path": "upstream/miri-source/src/shims/math.rs",
-      "sha256": "c2de6e58fc5129f87122835479b0fc0c8a15cf95bd8a5aa8d4239193402c85af"
+      "sha256": "43648b1d43d15b48ec0bdd4243e39fbeb8fbc9ec0cfea543ea5ae6d6dfdf9093"
     },
     {
       "component": "miri",
-      "git_blob": "85e836c87b5e310c2e7f4eb2a8559f902e226987",
+      "git_blob": "4a378c6876f1d3003ac38913f6bf83ac62abb7e4",
       "path": "upstream/miri-source/src/shims/mod.rs",
-      "sha256": "52047c73778973076de9ce0ba2fd729f7b1c008dc272dc9668a393ae002a6086"
+      "sha256": "4fcc6b64fbb42d733da0541c630e9ecd7c346f5d6aea48a70cd28830c1ce0908"
     },
     {
       "component": "miri",
-      "git_blob": "157ac022f7a14c0e1c96b149498c1d1eb71080e6",
+      "git_blob": "b671092ccaf3278af89c071373ada78fabb9fb3a",
       "path": "upstream/miri-source/src/shims/native_lib/mod.rs",
-      "sha256": "6431a4e7307f096534989a87d19a5458016094fcec027d413b42ff7078d664a3"
+      "sha256": "1e889363d22a86870ba3bc56af10ecf2a8b53165474d6b31d4493177631e1f9b"
     },
     {
       "component": "miri",
@@ -1140,45 +1141,45 @@
     },
     {
       "component": "miri",
-      "git_blob": "7de1e7ed4081a968dc360336c0be6c21de3fa0cd",
+      "git_blob": "e12acb341f4d682dc91da3a8f713898bfae08f02",
       "path": "upstream/miri-source/src/shims/os_str.rs",
-      "sha256": "d68b95f6754728d8eb9277293fa6cafa8bfbf948bdf73c8a62400e4314cc80a8"
+      "sha256": "d9a40cd72f8cbe5930c7d97903ed0a5f3e0e81ce71550b125f23ac8b35b89c6a"
     },
     {
       "component": "miri",
-      "git_blob": "50e32cffaee3f1e6713b638776229e686c6b5e6f",
+      "git_blob": "953be2f65fb8a3d04098dc5678f6dbccd8b98090",
       "path": "upstream/miri-source/src/shims/panic.rs",
-      "sha256": "00c9f15a3aa8ca0abbb10891046c45310ae3de00350f0ea318b84507df32d6e0"
+      "sha256": "f675a763951f32a5fd9d1977a5ba0bfc5f453fd0677978e1153fad61b617d7b0"
     },
     {
       "component": "miri",
-      "git_blob": "af73eafb20c5e8f75d37cc0a5d5c4360fc0f0d5b",
+      "git_blob": "691c3f676284ec0ee5eb146cc8d7036c28a61a84",
       "path": "upstream/miri-source/src/shims/readiness.rs",
-      "sha256": "eba25a296d049ca58393b589cd787da165ad9149d1fb44ba66cabca0e9b7750a"
+      "sha256": "ecd836cda8e22fbc7c06e402bca313f4f99557755688e3ae81f127f017318444"
     },
     {
       "component": "miri",
-      "git_blob": "359f98861ffe9762721d8c6f0b516f026251b5b0",
+      "git_blob": "e5c3b58b25268eb729c0aad3368e7a5d331defa0",
       "path": "upstream/miri-source/src/shims/sig.rs",
-      "sha256": "dec0df35f7cc638e69747071965a272ba90e6012a0a247c8c9a7f2f1d97606df"
+      "sha256": "8e119e3e2b9e4ec759947d3910a703c1c2af27e4cf61b59e494d3d0bf064a5c8"
     },
     {
       "component": "miri",
-      "git_blob": "f86780eb87b7a2cfd7d0ebcd8aec30e61d9d38a8",
+      "git_blob": "9099356f74e976654c1d8a27f22f22f1ebb36ce8",
       "path": "upstream/miri-source/src/shims/time.rs",
-      "sha256": "1b145492a8d3d7609c306903e06174a8699c302cee859d8dccb9a28d48171cb2"
+      "sha256": "8a3bc24c15da46fc5aeea96cb254c4f48db7460b61356538f485c33269f54d91"
     },
     {
       "component": "miri",
-      "git_blob": "bd670831c53724f2f875d11e1fc150a026d97044",
+      "git_blob": "e69103b85200b94eddae89bb9d8311f61e211991",
       "path": "upstream/miri-source/src/shims/tls.rs",
-      "sha256": "7df7a0191286e0756df8167561b425780fff7c16f0aaa2c3163ec2e448aa1232"
+      "sha256": "ced608c689c3c87cda3d257129f117c76bb6edd1511825d1c8c80fe0def3dcb8"
     },
     {
       "component": "miri",
-      "git_blob": "6af9bcb74692fd98080cadb8569a6b2bd1c7f179",
+      "git_blob": "52d66c5b329b8b107c7eda22eb4cab4ca1ebc8ba",
       "path": "upstream/miri-source/src/shims/unix/android/foreign_items.rs",
-      "sha256": "5d58ccc75a98da8453aaed8162972a1fac692c60532fbdb8faabcfc49feb8f9f"
+      "sha256": "21a64b14e672441928fc07d14809114290e025d137ecd67eaac634961c61ae8b"
     },
     {
       "component": "miri",
@@ -1188,27 +1189,27 @@
     },
     {
       "component": "miri",
-      "git_blob": "1d8e5e95c40d419c2b868858f8386318958b4edf",
+      "git_blob": "7e06d138caa2e39cf83228bfcf4714a99559fcb7",
       "path": "upstream/miri-source/src/shims/unix/env.rs",
-      "sha256": "5ac7a5b7948f383015f7d341479296e657fa07d1915d2dfd38c966d7cf25434b"
+      "sha256": "487f16c28100307e264c2ed976bfa801aa887b944bfae3de54862d1b32e7d042"
     },
     {
       "component": "miri",
-      "git_blob": "263f6ffc091b8b5955705205f5cd5a1c0df45b77",
+      "git_blob": "79bbd73eb5fb8aa8ddb4f89dba1f9ca31f3ef638",
       "path": "upstream/miri-source/src/shims/unix/fd.rs",
-      "sha256": "6b369d4b28a06aa1d0fd6fdb4c965b57bab15cc8c1a2ada2d78a6c5fb36ea03e"
+      "sha256": "cfe61d95b65360581d8a58a79c2662c01b7d218c14b87846a2afd2bc408f3571"
     },
     {
       "component": "miri",
-      "git_blob": "ed7018768532146ae83d38e0461a8a499e77c3b0",
+      "git_blob": "e359253a009a047f86b95749fc7b1b4e3495d01e",
       "path": "upstream/miri-source/src/shims/unix/foreign_items.rs",
-      "sha256": "98a5e6b627658908784f55f13e8cb777211fdf99ac9d0927d3fe2de255406b6c"
+      "sha256": "d0323cfd7860735ec7fac4dbf391503cdea2966ed2f4ab515a801d4965919a85"
     },
     {
       "component": "miri",
-      "git_blob": "b2a101a0938b233064a9afc00f1e0b3f3844b21b",
+      "git_blob": "1ca4570477049fdff95aeaaf606f35f418857d40",
       "path": "upstream/miri-source/src/shims/unix/freebsd/foreign_items.rs",
-      "sha256": "08428ffa9a1cbd89a32ae60822a2eefc8b55ac1b845a350e8162f6e0a306aa40"
+      "sha256": "1124542128f69414cf1febbac31b3baae91465069f8e8cce9fad2f9bd2ceaf00"
     },
     {
       "component": "miri",
@@ -1218,27 +1219,27 @@
     },
     {
       "component": "miri",
-      "git_blob": "f1a9572129c99c430c9659a3073ef5518797c14d",
+      "git_blob": "fb7db1538d2db6ac15a9f986df859ad010006275",
       "path": "upstream/miri-source/src/shims/unix/freebsd/sync.rs",
-      "sha256": "afbf0acc6c52bf7534fa64082388ed69d9c2d34253053b9832ed959b3ef40ee8"
+      "sha256": "1b7b43438bdd6e45671f751a2f2e660c480003b453dc0677d58e12e441cf1c57"
     },
     {
       "component": "miri",
-      "git_blob": "84520943cf585d658843407e258f5071abc216a1",
+      "git_blob": "383c505684e99eb385bebfed2307c4f52e0f5cfd",
       "path": "upstream/miri-source/src/shims/unix/fs.rs",
-      "sha256": "bff9cf9dbe9870b680e8ccc297068c4fc9482385c3e2e1531324790ecd3ede77"
+      "sha256": "5fd89b2d5650caeedb6459d0a51a4740688a8138563d9e7ff2fffed0c0a7726b"
     },
     {
       "component": "miri",
-      "git_blob": "24c83bf097b8c03ee305e88b40a9ecedb3937266",
+      "git_blob": "b30b2f298ee7f2f5609e6dec921133f7371c7466",
       "path": "upstream/miri-source/src/shims/unix/linux/foreign_items.rs",
-      "sha256": "f66a00e98ce784653085309bd58959a5a1750ece310fd34f1c8c5fa79a7daa49"
+      "sha256": "fa9090d56e37f7adcabe211e322cb22c6da84365a09c5aefcab4597673971a32"
     },
     {
       "component": "miri",
-      "git_blob": "47732f811f1a3315beb4232e81583981e9cf48ae",
+      "git_blob": "176811b3223db9894c8f85124ab254a59c24c121",
       "path": "upstream/miri-source/src/shims/unix/linux/mem.rs",
-      "sha256": "f151b5846a846a55d6553014916e56d20d4a31a5f88d5d83fbe34172676582c8"
+      "sha256": "bf0ba14205fb0e5f22c252865c654fe7ff038dc5f4f86a021ee9b769ec854138"
     },
     {
       "component": "miri",
@@ -1248,15 +1249,15 @@
     },
     {
       "component": "miri",
-      "git_blob": "482e7972a73649276ff8ee692edaf932add1ed3b",
+      "git_blob": "ae5803101539d683b23d7d500a93e2bba7570d47",
       "path": "upstream/miri-source/src/shims/unix/linux_like/epoll.rs",
-      "sha256": "f0af3dcf8aced81f7ba14728d0049771dac7cfafdcd26be1cd50d5e37e497605"
+      "sha256": "771586ad2cd7deebe515d9f63669303778469699513d2cf481438b1fc7abdc36"
     },
     {
       "component": "miri",
-      "git_blob": "476f15472243794c24de9b85bb20ab8d70b21e3d",
+      "git_blob": "0474c0de215f9d445c4e36f4669aee77aea98974",
       "path": "upstream/miri-source/src/shims/unix/linux_like/eventfd.rs",
-      "sha256": "56f871bd28308bccbcd28ee23828f4aaa8f0b3c2e1d19a6aae236059f3592990"
+      "sha256": "ed3645c64a8b2f1fb23731efc28685d41eb2eecc4408ef1bbd0a6add9536356d"
     },
     {
       "component": "miri",
@@ -1266,15 +1267,15 @@
     },
     {
       "component": "miri",
-      "git_blob": "81fe0471487297e0b65d578c64b17d4e43fdba26",
+      "git_blob": "1afee120fa6295e2a342a2ef841b3310b8c4afdc",
       "path": "upstream/miri-source/src/shims/unix/linux_like/sync.rs",
-      "sha256": "437c64e70dd423b16f22a2b07e254e89cfd653670ddc7dc28f9713ab0e48f30b"
+      "sha256": "d529d972ee2fadda5897e909cded0c578b3057066aa240ad43df01e698a69187"
     },
     {
       "component": "miri",
-      "git_blob": "7e3295c8468a995d407a77e4e04cc0d4a265ee9e",
+      "git_blob": "5535a129a78114d5271ef7137df6221a58fc221c",
       "path": "upstream/miri-source/src/shims/unix/linux_like/syscall.rs",
-      "sha256": "7c0972de7782529ec9320d554f99ac21b47b7060e048cfd1cbe8800b90c31ac4"
+      "sha256": "99aa3e849163f517344a3415a7a7064f952b0bfd919926354f130dea1ad54801"
     },
     {
       "component": "miri",
@@ -1284,9 +1285,9 @@
     },
     {
       "component": "miri",
-      "git_blob": "369c914ecbb4b13d4b47a9ceb687f94d63b8ecc3",
+      "git_blob": "875abab202c6b9302f153374e09676c424ab32a5",
       "path": "upstream/miri-source/src/shims/unix/macos/foreign_items.rs",
-      "sha256": "b420ea1445cd4f3943192a6e9a010568b3319540cc7cca5dba4b2adff636a0d3"
+      "sha256": "a71bd378a166bf0d4e1975d669118242af5953c6bc3a0e4cb903e8cc98ed1803"
     },
     {
       "component": "miri",
@@ -1296,21 +1297,21 @@
     },
     {
       "component": "miri",
-      "git_blob": "e6ff15437dc73c24f7785c4217d698ce49b1b9db",
+      "git_blob": "08ac18e42032672264650dd6dd089fa9437de359",
       "path": "upstream/miri-source/src/shims/unix/macos/sync.rs",
-      "sha256": "c5c8d524d6d512192fa89bad14a4a0f0bc5129972f94e972dddccc994e1db98f"
+      "sha256": "5093c7bc8c3a3ddc3403685e6f329364fd80310fa421469d2149b5a82c2015d6"
     },
     {
       "component": "miri",
-      "git_blob": "50be3c7ae15e6664c7ee21a17942913d6d7f3d13",
+      "git_blob": "dde2e74206ae1578689cd357707059d7bd445ef6",
       "path": "upstream/miri-source/src/shims/unix/mem.rs",
-      "sha256": "65763b3d77a1147e3d77b54ecd5256007d487fae1a10a22d3290430426854819"
+      "sha256": "ca88c0c2551af1b1e57f8e52d86d0db2bb6eb3c4a73f7726177d76f577164950"
     },
     {
       "component": "miri",
-      "git_blob": "8a3ae89ae1dee5e655b4d15c92f49192217c79f6",
+      "git_blob": "e03cbecd341545c7597902680f92d43d7b6e0fa1",
       "path": "upstream/miri-source/src/shims/unix/mod.rs",
-      "sha256": "a9e10cde265fd5928b5394e68d3eb736323b3cb21114c079fd71dab1224723bf"
+      "sha256": "ecc7eb6f70f18eb0465ef09834e95271f60d6d0d670f9a6c9036889fc39cda29"
     },
     {
       "component": "miri",
@@ -1326,27 +1327,27 @@
     },
     {
       "component": "miri",
-      "git_blob": "4a1dd30f6fc9920c3a4ea9524a2290dedff19067",
+      "git_blob": "21b11e8ea81782ba14a62d03b356ee997b7e8c47",
       "path": "upstream/miri-source/src/shims/unix/poll.rs",
-      "sha256": "2fa2b87d15a771ace478f3eefaa42858b727aaac02a968e39d0f40040c4d39f6"
+      "sha256": "93ffa8306b7b9370640d5ce79cd22104d668daf3e2e6cca43d717d0cc0a8deb6"
     },
     {
       "component": "miri",
-      "git_blob": "a32ae29541493a763a085db3914a0e9f93143323",
+      "git_blob": "671d9a1ab3c85f7aa5eed88cc107c5c619aa397e",
       "path": "upstream/miri-source/src/shims/unix/socket.rs",
-      "sha256": "d0ae513911b4b07fc1f96bb8ae34cad4e9a000b5e5081818a69cff8599e076b0"
+      "sha256": "6aa1e531353d44b176f344a1af45a6602afe433ba063f17e19d526a6448ae9d5"
     },
     {
       "component": "miri",
-      "git_blob": "efe270a205b13d8057ef51505b9172b7743170d8",
+      "git_blob": "2652f7887af97fe9097f557df9e1411e273fa44b",
       "path": "upstream/miri-source/src/shims/unix/socket_address.rs",
-      "sha256": "c2729bb9cfe5447f38e05c82f8c837b1baf7a83430d2646a4b858da46980441a"
+      "sha256": "b4369c06b12f85ae8dbdd0375521563b7d1d967e5dd24b1436d3ba89580c6664"
     },
     {
       "component": "miri",
-      "git_blob": "35c9144235b6ce5abf31d99fcb9337c0185fb3e8",
+      "git_blob": "3628ec259af69e49c1d900b2060aae6e6dcb323d",
       "path": "upstream/miri-source/src/shims/unix/solarish/foreign_items.rs",
-      "sha256": "e177bf3f7b16066404a136d6b348c3b5ae806c904a187a950b83bc18f1cca957"
+      "sha256": "aba64550f2293a27c45b9598a2162c56820251b6d260a5c612baa64ebba76545"
     },
     {
       "component": "miri",
@@ -1356,57 +1357,63 @@
     },
     {
       "component": "miri",
-      "git_blob": "98f4fb5e9dc793b38dd2dfc27de68a7e9c6a8817",
+      "git_blob": "3475d714aac21c3391542ad42f5893210ac63c02",
       "path": "upstream/miri-source/src/shims/unix/sync.rs",
-      "sha256": "ea34020495700fa5c854b8738e9701cc6835ffb1e03389dd9fe8a5407efa1c2e"
+      "sha256": "8c89633c4415d832826c5f065f30eebf3e3ae9c8e93637e375e28fa21651d422"
     },
     {
       "component": "miri",
-      "git_blob": "3cd462d31db4a00a42f20c1a557887aa91ad5f10",
+      "git_blob": "352b861b540d7a26528ed5dd852df93ceca92e92",
       "path": "upstream/miri-source/src/shims/unix/tcp_socket.rs",
-      "sha256": "5534c14a7b67a283149d3983e2ae210ccdade3f94eca8eeaf09f54641e770dbb"
+      "sha256": "1cf0333e410319b985a12b836268058c7b77999aa6451fff06323bdd7a8a758b"
     },
     {
       "component": "miri",
-      "git_blob": "6564849bb7675858af1d4686da6b92915874084e",
+      "git_blob": "be1c354d1096edccbe3c18a1957f80811c404f75",
       "path": "upstream/miri-source/src/shims/unix/thread.rs",
-      "sha256": "d096374c2352938c2c9ce5390ce69ad0d899a47deb6287118a97082361ee67e3"
+      "sha256": "0a1c32ed53153cda6ede4f8491a80f769f8e4b184e0db974951d0a21832b67b4"
     },
     {
       "component": "miri",
-      "git_blob": "23b24917f7367bdc3f91f4300b0ec0585d4807f3",
+      "git_blob": "13a1e3a38f1df5eacb1385938f091c9b0081e92c",
+      "path": "upstream/miri-source/src/shims/unix/udp_socket.rs",
+      "sha256": "1467f0d15808d0d0014eb3b202a54aed531102fb72db3d409807026ff584453e"
+    },
+    {
+      "component": "miri",
+      "git_blob": "7ccab41a29a27e33d85113a2b0e59600056cf6dc",
       "path": "upstream/miri-source/src/shims/unix/virtual_socket.rs",
-      "sha256": "53c932d0531b2f41f6c976b2e78da1080ae98efa50932b8427c43a42076b86bb"
+      "sha256": "be7799bd67c7aeda4472489e0712848ddae37371bf0caa2c4489f6583e77d25d"
     },
     {
       "component": "miri",
-      "git_blob": "820a78725eedc034992dda5a82a762cecbd2a2ed",
+      "git_blob": "5e249c3ace67e8d879637c3c383f71193ac61322",
       "path": "upstream/miri-source/src/shims/unwind.rs",
-      "sha256": "4acdd880f901c371bf02635b866d4cdc7035730975b17a01b2d07eb7d8e6e488"
+      "sha256": "0b7b8c5b7e9d04aac36be01f88072be767d534ad67c659265d23aefba9d90152"
     },
     {
       "component": "miri",
-      "git_blob": "f8c9bed395e7fe39b2d88dec81affc1c9a8f993a",
+      "git_blob": "3b7c4963880f8d879a97f004aeac57deb37af98a",
       "path": "upstream/miri-source/src/shims/windows/env.rs",
-      "sha256": "328632c11a0198f0ba98075f29963643d5143f86bd3815eb963dbe3d6c7dbb58"
+      "sha256": "bf15a3b3a162850cbc1af55a4c62dc15f929ca5157fc21ba9e09e12358c4bc4b"
     },
     {
       "component": "miri",
-      "git_blob": "13eb21380229487a0e17585bbd9317691098a2ac",
+      "git_blob": "7e5f545bffbfbdc295e7916f330b97a40e143fc9",
       "path": "upstream/miri-source/src/shims/windows/foreign_items.rs",
-      "sha256": "6e07813055481f5d715be5843ee6c3a5630e09a75d2713360b5f007f90f811d2"
+      "sha256": "72abf1f065dd0485420504141c65b51be49879636f5eccb541532c1d2b25ee38"
     },
     {
       "component": "miri",
-      "git_blob": "1aea20cb72b9ad1397b9b81f27f2ac4cc87998d6",
+      "git_blob": "30fa01b8ae63ae73bd797ddb5611a4caff2a006d",
       "path": "upstream/miri-source/src/shims/windows/fs.rs",
-      "sha256": "c0e726c16d53775c2d4fb0e0320d4a9bc7271c4a36015a6543eb3b6bbf6f2a49"
+      "sha256": "08994aee8542d2273b536971593d2d4d3da06ed5ded5384dbe58329700962b28"
     },
     {
       "component": "miri",
-      "git_blob": "4655b2dac2bf3cd5872c80c8a7198b942b2c1447",
+      "git_blob": "82d3ad06376d2c70b2091512a2b02da5b1834b5b",
       "path": "upstream/miri-source/src/shims/windows/handle.rs",
-      "sha256": "3e0f7dce0bb80e74aa65809159554a235c6e19e95776037b5806cdc20ea94d02"
+      "sha256": "89f8a95e3dd6b529f4e839ec14294d9a7cfa285da593acade4bac3c3b8bad062"
     },
     {
       "component": "miri",
@@ -1416,15 +1423,15 @@
     },
     {
       "component": "miri",
-      "git_blob": "1b75d6647c831c662e3a6a666fba698d21ff2032",
+      "git_blob": "55addb2468df8b323c2492867366b036e97d849a",
       "path": "upstream/miri-source/src/shims/windows/sync.rs",
-      "sha256": "3f1bceb70ea5f83d87ff8601dea8aca73a12992390e999b821a12cf8f730430e"
+      "sha256": "faa2ba81ab88561e4ac471c612caac23302af1d5e95f270a1b884304615f48f0"
     },
     {
       "component": "miri",
-      "git_blob": "a155ec65a51fd32ea91f7b5ceebd3169cd73ba04",
+      "git_blob": "3307ca4f2f434efa3b8c29f0bd196aca2f3aed57",
       "path": "upstream/miri-source/src/shims/windows/thread.rs",
-      "sha256": "b0c83d6113cde8f606d84fc6a8040a9062623a1e4cf524b46909ddd449afaf48"
+      "sha256": "246546baca7c575be6e6b750056de0ba31b4f216ba7f3d7be1e84c63f4d6e30d"
     },
     {
       "component": "miri",
@@ -1458,9 +1465,9 @@
     },
     {
       "component": "rustc_abi",
-      "git_blob": "5c6715c43caa797701349e71f3b4d71c9d462d1d",
+      "git_blob": "dda7a45f9c2b7119c37b0308e9fbf62118b8db06",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/callconv/reg.rs",
-      "sha256": "57c26608b68555d63ec74e4f6bbe2019ecb101406ad054285aa5ec5e25a77688"
+      "sha256": "2ad24d1d84d5bc771cbc8b50b89e62287d503e0cc1ae62b0d163e220efc69baf"
     },
     {
       "component": "rustc_abi",
@@ -1470,9 +1477,9 @@
     },
     {
       "component": "rustc_abi",
-      "git_blob": "79cee81d0fa2d3f3e8f95c84e8c753007b89d629",
+      "git_blob": "ba7a1636e356c9c0f83617f4c42d8d7cf4f8354e",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/extern_abi.rs",
-      "sha256": "e9264f4771556614e60d0b543e214126f4dec79441f12e917999747888f5271a"
+      "sha256": "298708af56c116260ff8b3d5cc63592c22ef03aa62d6c39fa5b51ebeff081259"
     },
     {
       "component": "rustc_abi",
@@ -1482,33 +1489,39 @@
     },
     {
       "component": "rustc_abi",
-      "git_blob": "f2e3f8431c10572b799b3dddcd7cf4b23a566299",
+      "git_blob": "dd8652a05faab355b22aa7cdd6e09f33916335df",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/layout.rs",
-      "sha256": "8ede3de7c80443f48368f61729d7f15fb93a71891972ed77565297a0902ff036"
+      "sha256": "df60b0bbca2a2761ae10854c13285cbee6a3bef15fba54b438900efdb609f2e8"
     },
     {
       "component": "rustc_abi",
-      "git_blob": "66119ac2f0b5ab393fb9fbcc045a739f3f5ca0ba",
+      "git_blob": "bc301869f5ce97127d386c2d7861a006c217dddd",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/layout/coroutine.rs",
-      "sha256": "7c1cd79db977320288cdbf7b65e031d3871f20bcb93069b12ce949d711ff7398"
+      "sha256": "73959599466d97010d7c5643c0bb0b9ade0279110ba4f5162598da94d336e1ca"
     },
     {
       "component": "rustc_abi",
-      "git_blob": "da7260fe6160ecbe1ab75af1e90978ecd3595d0c",
+      "git_blob": "0ab7de05f80f2ae99ed5cc29e9871f40d0534959",
+      "path": "upstream/rustc-source/compiler/rustc_abi/src/layout/enum_layout.rs",
+      "sha256": "ce45b9d3a506c73088c8f9aa3bba76fb7ee9e515eba80c75ec1866cb5fa3129f"
+    },
+    {
+      "component": "rustc_abi",
+      "git_blob": "f16daccc3c526ec5fcccd325ffac0830335fc201",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/layout/simple.rs",
-      "sha256": "c3e4f23a685cbcd7fa01d0709d5508e667cc2ae606f08aa15dd7f00320ab4d83"
+      "sha256": "de634c68ca6430c3cb77735da7c9b1a1ed40bbeaa71b2527895b9a88649a0e26"
     },
     {
       "component": "rustc_abi",
-      "git_blob": "58d20b9bd3532ab696da70f81abd64cfb8af12c5",
+      "git_blob": "4a8dabbf724dff00ad05ed3a890774f06b05fe30",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/layout/ty.rs",
-      "sha256": "15fe815fbad13d845f322995b9de0b1fb17e91d363a1d8752250c3dfd03db4d9"
+      "sha256": "6aa16783a3820c32d469ca104ed082838b4486ea40615b75870bfb735faccb97"
     },
     {
       "component": "rustc_abi",
-      "git_blob": "ff62f04fff0524734bb0d03b6c51409d5ea49400",
+      "git_blob": "6d02f91ff73964a46767cb38925f79c738f7a094",
       "path": "upstream/rustc-source/compiler/rustc_abi/src/lib.rs",
-      "sha256": "cb17753001ba161ed2bdc0617a9bf679b23cf04982aaee7f73d492782cb7ec94"
+      "sha256": "ff7aa380c91c2349f0783804169021af1a597d208ef7ad4cec3897894d47e954"
     },
     {
       "component": "rustc_abi",
@@ -1524,9 +1537,9 @@
     },
     {
       "component": "rustc_ast_syntax",
-      "git_blob": "c86d6366e07537f3ff8d548fb6e6514239cf54d9",
+      "git_blob": "968566feab637a3d69838c1f1ec9c4aa3623af94",
       "path": "upstream/rustc-source/compiler/rustc_ast/src/ast.rs",
-      "sha256": "567a016b10c664da04302b136b3159917a8a8155576744f5ea0602eab3238875"
+      "sha256": "09609e4e241bc21662722f6423437b53fc2fabe9f711621806b94c9cde0f84f5"
     },
     {
       "component": "rustc_ast_allocator",
@@ -1542,15 +1555,15 @@
     },
     {
       "component": "rustc_attr_ir_data",
-      "git_blob": "6ae4eb1d4b388ce91cef23217850adc8b8518b11",
+      "git_blob": "e32a31ea7e45895613cd25f0e221255979723d84",
       "path": "upstream/rustc-source/compiler/rustc_attr_ir/src/data_structures.rs",
-      "sha256": "9d64ae4d8b11033d60a99942c9b639b77b59fade351121a906c55d7331ec323f"
+      "sha256": "9bf7eed05996dac7db1e3c62750711dc5e57b29051fe9864bdd5d710552a3855"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "b5c3eceab9b4bf1fef1975f75d68f3de5671259b",
+      "git_blob": "5984448fcabdb76747693e7927d5f245752e90e0",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/call.rs",
-      "sha256": "5a0599ddfacf984856704f319ec1eb0438de172d499150c94e6575d9e88a85cd"
+      "sha256": "abe51d1de6e173b5102b647baab94cd9788098d490d957969b5ace70a0c1647c"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1566,9 +1579,9 @@
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "4307019c6cf2799863e103fdb88732e64c6f1a49",
+      "git_blob": "aeac556aad82b0a0c2a02c1818d5db4abb3f2d7d",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/eval_context.rs",
-      "sha256": "31983f3d5d9949d130186cefe403b1381b50b4c6979da23ae4a87f273b1be0ba"
+      "sha256": "d12e13d853446f8277e4e7405d516aa02fde4593b40e4e7a4b525c804a1ce9b8"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1578,21 +1591,21 @@
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "d66f4cf900eca73b83c63e3791b918641eb13abf",
+      "git_blob": "a5f02b4a5d157aaba0da771f8876b21512066394",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics.rs",
-      "sha256": "0cae829671b6b10a4737733cf289661678cef011d1ea6ac8b291d7643e6f3350"
+      "sha256": "4e3fe4686bb0dcc58aa6695f76fe183550272109fc473f40425522a0c7813d79"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "30fbbcca8f6dadf11bff8ea513de91b5f16af11a",
+      "git_blob": "d5c19dff867e0e6c0b50f0092f614f34c05c460f",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics/atomic.rs",
-      "sha256": "1d2010a139ff9c6b5dd6347a41ffc9d79d12be06b9d9cb1e7ae4d42504c27051"
+      "sha256": "aa47a1d5ad263a20d90b87c9eaa52bf4195ff4a2ff34fd6ac5adc973be9264ba"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "476ba405f19caf628825c82d10484ef879004666",
+      "git_blob": "9250aed30276e48f0293d1bc82f5009438a3e64c",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/intrinsics/simd.rs",
-      "sha256": "5cba3bde5e27d34755b928b95b54065a33843494d6e36e97b806e4ddef680be6"
+      "sha256": "904905b3099d0234278890c27dfef25175db3436d78544e4e89cd9b32011dd26"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1602,9 +1615,9 @@
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "ab3a30d812c75d9ee502433ac8df6bfff0231f8e",
+      "git_blob": "ed8e8d299fe9a782241abbf295f7793132afcaa2",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/memory.rs",
-      "sha256": "823b86ed7145c494c3598df9fd312cb515e05b0129c4fe5cc1b9d70b0bf455b8"
+      "sha256": "c7f7e660f829dbe07b6d2905bf292fc5138cffcf8e3e3f44e30b2c085e7d1e2c"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1626,9 +1639,9 @@
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "ed73a76da8bf0f1927b30e2ce01e6fa0f94681c4",
+      "git_blob": "00c3e96203545acfb8703ae3ed5abec0d91d59d7",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/place.rs",
-      "sha256": "dde144f4392c1c6210125bd34cb5c10a1b97010de544e00496d976e56f535fdc"
+      "sha256": "4ea546755ee59cd03781ca1a57b957be607693065bcec82b980809e3ead8da16"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1638,33 +1651,33 @@
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "1bc6d43aa6dfbb6cbb0ee234dacf628354a2a8d8",
+      "git_blob": "19a1dfe3e567bf3f951acb1215624c706fc9db23",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/stack.rs",
-      "sha256": "f7145bfe88cc3229b7186a476428b9fb442a2a2520c3839de089edf3fbd0d600"
+      "sha256": "41e4325244d66409f5f0a732ba63c78155ed939cc60f668388f3c51e58d76118"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "a3e972f3b1ac1917ca986eb28773715789e35bc8",
+      "git_blob": "901f1f0655378de28d4543b882018e83b06913a0",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/step.rs",
-      "sha256": "670ae45119b9dd184b4ae0cbe7f4ccb079440dac4ab8e5515c2821264fff204c"
+      "sha256": "56054ec7f3291d3662bf28964be8dee5fb63714ea32f1869ee65c3e99a830451"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "836037d4d22a7c17ed300725a46e980cef06c01f",
+      "git_blob": "bada9f7cae182a5841c290ff42f680f644f17139",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/traits.rs",
-      "sha256": "149df3c55567b4579bc02f23acb2c4c4c4a7adca536b3068b4633f9685ff8476"
+      "sha256": "92b8021df9fe6c187fdc72be71be09c73e507a9622154652eb6669f17e4f1292"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "416207371e51c0e957e0785f865d67f8cbc1a7d7",
+      "git_blob": "2a5b0ce5650d426b87f27bc3f8f6ea1fe964a575",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/util.rs",
-      "sha256": "c5169c8faa0d497cb7b4794566eb25df50192efc2fd88ea66b1d6301f07715ac"
+      "sha256": "c801b18641abfc884149d177a4fe1bf530c46515e40f3148ce1eb1dca6294a2c"
     },
     {
       "component": "rustc_const_eval_interpret",
-      "git_blob": "edfd8b9488e7466f235313c8ff621b5778a1eda5",
+      "git_blob": "43a05b617cfb9603c441e302969ab7767508b9fd",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/interpret/validity.rs",
-      "sha256": "7c038fb90de6b06a67124f8ab603d32bb73b68eb0cce9ad2d8766c9c171c5676"
+      "sha256": "dc21437da9edd4d65069b48b9621ec1d5f7baeac51c40194aed30900d5533cbc"
     },
     {
       "component": "rustc_const_eval_interpret",
@@ -1674,15 +1687,15 @@
     },
     {
       "component": "rustc_const_eval_api",
-      "git_blob": "981813f13c97fcbe78dc6bd00d934b90e91c05c1",
+      "git_blob": "091f0f71cc50d752127b9a081ba8008907e37e37",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/lib.rs",
-      "sha256": "2a151c3d86404e5510df3f8e20c9e47ea69bfd970c9b200f466312f3c3da883e"
+      "sha256": "fdade73dff40602d19340ade7162828bfb2a0f1fc90e27be226a679ae20c8926"
     },
     {
       "component": "rustc",
-      "git_blob": "0fab4b288d18f062702c1abc7f1d80c5c81d8ff1",
+      "git_blob": "24352f6da0af3143599fb608e60c1e8ccee1009d",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/util/alignment.rs",
-      "sha256": "d1d26b631531d46c98082d397f6cc4363fcb195879c0ba04b70d5c44fa2a2558"
+      "sha256": "f930c293212b4a49ceeeb7403aec3f9f963fcc41c4f4cdc315ee2103e5c67fab"
     },
     {
       "component": "rustc",
@@ -1704,15 +1717,15 @@
     },
     {
       "component": "rustc",
-      "git_blob": "e7fcdef588d2e3ee026a0353b39cd66d4d472f5a",
+      "git_blob": "288a4df727c3d5884edfdb062875fc9477264b88",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/util/mod.rs",
-      "sha256": "29b8e49c3789cdce819ffeb64ba23a146e00fb40753e0e3c6dfe609cc546b891"
+      "sha256": "c764ee67457c16dd18a7503fe74dd6c982160b4fbba9c0c18c44841c87cdde47"
     },
     {
       "component": "rustc",
-      "git_blob": "d0cd1f57479c0599e640de613de724d48bbcddc9",
+      "git_blob": "ec56b053144c460ff8285cffd13af30cb3b9806c",
       "path": "upstream/rustc-source/compiler/rustc_const_eval/src/util/type_name.rs",
-      "sha256": "7c95d6fd587eafcd17f19ef9124452ed8d5faf0aca8961cb7fa43d2cb76a9189"
+      "sha256": "9606b37379db3ee2d100cc6027431897fa54665829faeeb4f066ba04c2bf78a1"
     },
     {
       "component": "rustc_data_structures_sorted_map",
@@ -1728,27 +1741,27 @@
     },
     {
       "component": "rustc",
-      "git_blob": "4b27781086b02bb65a27493b514ab46db4078db4",
+      "git_blob": "779b049063b8feb1d0215d0d35023e3471370bf8",
       "path": "upstream/rustc-source/compiler/rustc_hir/src/hir.rs",
-      "sha256": "6a8cf7543c393ae59ca6d8cb1250d97be8762cef5f28805b9c3788dc149514d8"
+      "sha256": "c98a18ede0de321d2489fe066d328697428ca8a3530888a438e47d8d92d7e42b"
     },
     {
       "component": "rustc_middle_codegen_attrs",
-      "git_blob": "fc5345b0b0b928d00e2877d4846f8506eccb6525",
+      "git_blob": "b10ce28446c7608e2fbd245ca1017bd6b868457d",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/middle/codegen_fn_attrs.rs",
-      "sha256": "18a284a9451527262e19375f4059be313869e112d2cfc888dcb526bd69d70379"
+      "sha256": "3bf664a6681ef8c0991dae37da128c2b3ce67560fb81d0ffe893f046d741acab"
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "41e21749f392015447d62233274b631eb2f3e932",
+      "git_blob": "ab843950a71d43c68752f517ca11ed96f2489be8",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/basic_blocks.rs",
-      "sha256": "a1461276f35c6998ad5adcee4f2a639d8f565eee58f1a080f0cd552b1781dfed"
+      "sha256": "312376d2bba8f204f24f6520eb94578db744a946414ab25efccf8ac828c0cd45"
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "95fbe87a4519aac5d6313ad498e49d0cb85d1ed3",
+      "git_blob": "37623cc2da36940d0602b152049b506e61f1e318",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/consts.rs",
-      "sha256": "c9eb8ec4e643eb70e4b8aa3905e7cf86a1badea4d3336d8ea01b77657f97685f"
+      "sha256": "84d90e9c4ffada75ede8d0f965311902867e3ea8fe475f31c2a1da6ad2e0d5fb"
     },
     {
       "component": "rustc_middle_mir",
@@ -1764,21 +1777,15 @@
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "bce7beb521da4160ad9ddb80cda0dd4a5a02fc46",
-      "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/generic_graphviz.rs",
-      "sha256": "f22123dc731f9480e1e110e625469786f08189c4010673a7404f625ffbd25b8a"
-    },
-    {
-      "component": "rustc_middle_mir",
       "git_blob": "1cd34c35bb313ce6fdbed927cb1e3d278628e6e0",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/graphviz.rs",
       "sha256": "1727a4d36fdf3d143a342cbc0422178248fa2f3bcad8d0c75b74d9d8c34437ce"
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "87dddb7b74c3592b6435005f10f74dd89c52ec33",
+      "git_blob": "d0e35ad80bfb0a255bdf32d4308df45d8aeff8cb",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/interpret/allocation.rs",
-      "sha256": "9feacb2c6d874507fcb5556923a6fe0b0560df7bd7e7b3cfa3c79247de91f3ae"
+      "sha256": "157df71c1420d1cf4fb7ee86a40a813906a04354b52ccd2f0914a0bce9dab2c7"
     },
     {
       "component": "rustc_middle_mir",
@@ -1806,9 +1813,9 @@
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "10aa9532bea0b320974f0bbe9b4e1b43d8228295",
+      "git_blob": "f7bfc78fa825a7e92af890bfea38b67353fb0e8b",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/interpret/mod.rs",
-      "sha256": "bc5621a5c08c82cf62d1c0528669d05dd8835f7489687b50256c53895e29298a"
+      "sha256": "8a268f7d2f3f8d737a0ac34032fd19025093c19a694b1291e4590251109df240"
     },
     {
       "component": "rustc_middle_mir",
@@ -1830,9 +1837,9 @@
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "29ca694b6431b1bbdc1d1849e416b199049e9e36",
+      "git_blob": "786563805832f18a7e58b7bcfc09df0b9976ab72",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/mod.rs",
-      "sha256": "e2b62bac03bbdcfbff6accb0b43e7f7d5b0d86c150050b001c4480fcb9edfe7d"
+      "sha256": "b1c5a758e39107d195db12a44f8248868b3dae2f0c786f493c20042ae2cff982"
     },
     {
       "component": "rustc_middle_mir",
@@ -1848,21 +1855,21 @@
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "22366f70fbe4e4ec4bb5ee748ece591f1ac32bbb",
+      "git_blob": "a53f51fc9512afba69a9cdfeee5b9b72428b8fc8",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/statement.rs",
-      "sha256": "80abd79436585c76ce7e7ea25c68bd9b0d98a24b5816fb3cb2141f08f5298142"
+      "sha256": "26807fee09ef3e984c5f7e6cc23523546385af1321b6462b506f7a8bad18bebd"
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "487c2c43da7d54a1957a2ea7a445ad6afa586fad",
+      "git_blob": "7db6a7390d539f100332d9f38a49be2c6c7d7348",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/syntax.rs",
-      "sha256": "b2f38c58405cfb5999cbdf50770e151910c796a7f20c82456d37a3f39481f4e1"
+      "sha256": "9524753adde68df0bdccbfaf43390ad5cb0aaf9401f6f6c9dc1f273a27fa936e"
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "c4e6a3089ae9b8952b357fb0e170a549b25d6cf1",
+      "git_blob": "0151a8272811dc416547ed3c5badbb7cd86e5b07",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/terminator.rs",
-      "sha256": "822584d64d90308084d507aba8a83c2fc313e9ca70e1dbd60476034c8ef062b9"
+      "sha256": "b153806e4ed2a1f9ab912495884fb830e5c0ab57fcd9a39765a51e5fd5c0165c"
     },
     {
       "component": "rustc_middle_mir",
@@ -1872,9 +1879,9 @@
     },
     {
       "component": "rustc_middle_mir",
-      "git_blob": "2bbe41bdad09fa6aa1345ef846f30fe6caecd3ce",
+      "git_blob": "20e9f70691b5a2b43a369e673dcbd2ebcd98e334",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/mir/visit.rs",
-      "sha256": "46ccb3b578d76a07c1a41b0a0e0a6424f8d1ddb3b311569ddfbf44e137112a7f"
+      "sha256": "2657a2dbbb145bdba5f100be9b949a075642eaa97102c991350c9eb8c52ca3f3"
     },
     {
       "component": "rustc_middle_ty",
@@ -1890,15 +1897,15 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "5b57f802c0c4f4c0dd4872179cfb313bba336a83",
+      "git_blob": "e93059f5216c2499eb4a9c67bd9e98661c6a00a5",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/adt.rs",
-      "sha256": "97549d846f97533dbf5ae77dd6aabac9d2c27a258b2a6de985258a21c8915a79"
+      "sha256": "5d046aba4c7395e777dcce1570f72998a0c5d06d06186af4a0c11a5ed9a51437"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "e52d74f4c23fe68b71994983d24c6c097d14b558",
+      "git_blob": "05635c9e2ce263384501c5f3ade7a34b7b6c8937",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/assoc.rs",
-      "sha256": "1f4255a3ad1874107d7e484f1508ccddd879a2e5b07ce95caccf8cd070d7ed34"
+      "sha256": "4ae3154a5aae6e30a5d8950fa26088a8694593feb34f9eae25b786e8e57df7a2"
     },
     {
       "component": "rustc_middle_ty",
@@ -1914,9 +1921,9 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "81462e214b20f4b16a2a33c7fc6a63f7f909be23",
+      "git_blob": "a8d78ca01bcaaac3b1a9a7d3c57f05a59c2e45d3",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/codec.rs",
-      "sha256": "fc02ca3ba4510f12a4bbb3df30691e6cdb445ef78de9ddd4e3db69e55c8880f9"
+      "sha256": "710365af0e2b74fef24e4daaca45fab6899251f785598e085a8d61c76a20ce3c"
     },
     {
       "component": "rustc_middle_ty",
@@ -1938,9 +1945,9 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "b089871b671a0ca6adc6031a6a886f72d850dc50",
+      "git_blob": "0728db816ee35786c308d1fc92f7bd5ebe4e97a5",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/consts/kind.rs",
-      "sha256": "8d365a93687c9c26ed501ea79ff8760300669cb86b4460ad7405d8fa690ee568"
+      "sha256": "d952ff4aa84496d36680b17660c05b883277ffdaf7a1013bdf780ac5cc2b709d"
     },
     {
       "component": "rustc_middle_ty",
@@ -1956,15 +1963,15 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "913f56eba36f5643d234a552e8f27a0edf1f2197",
+      "git_blob": "007d12b5e8fa81f89f16f4deec29eb7346c26770",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/context.rs",
-      "sha256": "a67d7e20aa0b73208109b623dc1c76d123799be61e01b066b8f51791a33a4d17"
+      "sha256": "dbc94f6636c94ba90fd8ad49d13d564dcfcb5ead1ea22fdecae03b0e592ed6ec"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "e849f3076a9f34b6e8af3b8f3bf339ad0142c103",
+      "git_blob": "a3566aa9efd1861be14a33cf37d30c12a4d93dd5",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/context/impl_interner.rs",
-      "sha256": "0692b78505bfab8f74a12d76bf88e62fedbb72d8d4056715833a556c36dd331c"
+      "sha256": "1a610dedb7e844969476a9edf22e5616d76d825a7e642be72af383dbaeb2bdc0"
     },
     {
       "component": "rustc_middle_ty",
@@ -1974,9 +1981,9 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "df1daac366c53bf2cc104c7094fffb1d9f885a09",
+      "git_blob": "b3159384b951d3b624baa596aff232bc12a9294a",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/diagnostics.rs",
-      "sha256": "e86aa7d9f83eb0cdc16688e9c4a023614a8c349de8277a0cb52a0b524a414743"
+      "sha256": "17bf4305f3621d20410063d6643d0f6810481c67decc9c590a834ba7f63e4698"
     },
     {
       "component": "rustc_middle_ty",
@@ -2004,21 +2011,21 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "3d560a9f188150f3ba7bb19d6b917eda81659d41",
+      "git_blob": "398633cb3311c5c44c4f1551247f3dca17f71bcb",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/fold.rs",
-      "sha256": "fa6f252e7054431852524a1800d175e8e6fa95d287f6181331a18026a4ce45eb"
+      "sha256": "7fa591677d41c9a6ccfc0a7d69e59e30f9ca2a7beac2aa04694bb9520e42bbbb"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "23d716113674e90336fb372e41496744c89801e8",
+      "git_blob": "bd4df2d5bc47885bdf3905530024cd3695cb9948",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/generic_args.rs",
-      "sha256": "83f30406c92c7e2d92f8c2b439e37679fc9d5a33519bf3591e02932ec0250279"
+      "sha256": "47d9b3ec1748c66b6df33df84fe58fb848150de77fe14b5fff8f4d45fd17955f"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "edddd7043077c56899dd560dfdfabca94fd8fe9a",
+      "git_blob": "83989e470e48313b215d0b4932fb97c16aa43208",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/generics.rs",
-      "sha256": "6dfb472402a945e3d635968f91588e8bdc157aa68aa989e21fd273668177a23a"
+      "sha256": "50af849cd9489f758d8dbe3e9b49f71c1603280652eb38fb09831ee667980c8a"
     },
     {
       "component": "rustc_middle_ty",
@@ -2028,21 +2035,21 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "6b0234c971830b9287203ec1b206e7b0dd8ed36d",
+      "git_blob": "d392e05b57ab9117c11731b7965d1a0918c4cf8c",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/inhabitedness/inhabited_predicate.rs",
-      "sha256": "e28b336b16b65211ff5daa66a23e49a29edf2eb86345acefcb689892d58fa0a4"
+      "sha256": "6d6be13e684e9cff5acf1ecb2a88418ed21193f45b3a01dfbd1573e939ac772f"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "180a62eaf15a5300333e7eb306d0c8470b13050b",
+      "git_blob": "a06bc1662bcf5155d41d59fa7d56581cec87d989",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/inhabitedness/mod.rs",
-      "sha256": "6698e92b550f3f0db3a7190b98f099dd27aeef6038d412fd83552292198ed09c"
+      "sha256": "e92b75d08243e7e0b535f1f5f63b0accb83fd4932a1f61d4805a38b99b8733be"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "1a00293f8ffc6c114d566ebdea2df0e372528c35",
+      "git_blob": "ceb1d2a55823e6a50ec5588de88d2505d979418d",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/instance.rs",
-      "sha256": "8088daed4e592943728a3408474e6f1a82754de3ad1acd7694b966fddf17f2b8"
+      "sha256": "34d2121bcc1190733a59848b0740954afaf07f7be54aa519bd13e87746570753"
     },
     {
       "component": "rustc_middle_ty",
@@ -2052,9 +2059,9 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "998fcf77f7b1f2e62cb4eddf1207ae85c490d33b",
+      "git_blob": "80bfbb5b551e0fd0610e6a4e989483257149179c",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/layout.rs",
-      "sha256": "c5b8b4e3d25843f524468e7631142a13b849e5fa1c03e947671c39f94e66237f"
+      "sha256": "c2dd3910865b3aecedd282c1f8c83afa3c6504347b8ae3df51655402cd0a9911"
     },
     {
       "component": "rustc_middle_ty",
@@ -2064,27 +2071,27 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "a4d22ea9923f24d5156a55598022801ffc434129",
+      "git_blob": "8de81ccd1e2fb62bc54e000e1c3eb2533a10ff65",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/mod.rs",
-      "sha256": "4a8defa250be26c9acb0da5c64cd250ce1cec129ff245094b56d5ace59a793e3"
+      "sha256": "3be9c99d7f701a865fbfb455db084d209fdda6662aee56910f43dba012dd117a"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "c7837eeec307b25330e6ae12ae71c2b4982f9dce",
+      "git_blob": "ebd9b1099b6cb042a3970fdcf42f53bc8abbff61",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/normalize_erasing_regions.rs",
-      "sha256": "dfcc8833120ec6cd6cd9aad4a59ba6f8d51472e12e5b6e3809bae1e4c95a3ac9"
+      "sha256": "e62dcdc715da2fbc337d42619a64c044234eca60d46e6c9d11310a188742a273"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "a58e517e05f61cc56bddbdc2e8cd7cf37d1dbefd",
+      "git_blob": "6cf8abc4822606eaec5e1cf4c99a8133faddf19f",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/offload_meta.rs",
-      "sha256": "9a9b5cf9c0aac7fede58c54f98b989529eef287ec9a1f76d628b11ed6ba9ceba"
+      "sha256": "4c968a609396d012b87cdba303478ca454ac3262474e4faf96ac20f9fdac490a"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "7333d17e259e00f8a68b3e7bdcb9ae3e15330047",
+      "git_blob": "1edcbdd9e14fc5c2a9d888d86d43b068d1f277d9",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/opaque_types.rs",
-      "sha256": "f65c0e8f99df2c983d48494df86b4ee4cfa94a1c1d23605f16815c6581dd3df6"
+      "sha256": "6220db4509ef521e2e83a302a04df4efc1209740b8169bd08767be82c33c46a3"
     },
     {
       "component": "rustc_middle_ty",
@@ -2100,15 +2107,15 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "451a75e52d2d91fbacf929f77c12f7325e9ed983",
+      "git_blob": "7c62c5a5c4f178e73995152cb39866308ac51462",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/print/mod.rs",
-      "sha256": "4d9020914a40f7f4a4f801b47010e780914bd2399b960044ba2c6e83bbba0909"
+      "sha256": "739c0a5bead87f8792b8ef5aa780465a25d4ea20373b8d952adc82437c1909ac"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "e6e29fe7eac706b987d1b386137a53e5c7c8705b",
+      "git_blob": "9666120a3ee3a43b4e56f61c74f53418ecb42594",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/print/pretty.rs",
-      "sha256": "f7958678517362ba96db4afd1c35fad21a20e1ff5b436a18f90e760dfcd063d5"
+      "sha256": "7289bca05f05088255955ce851dc044bc868f14b58dbcb28ae02719ae563657f"
     },
     {
       "component": "rustc_middle_ty",
@@ -2118,27 +2125,27 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "477e5133cc358b0e0ffae84462ee4d693fff7cfe",
+      "git_blob": "2e37c47ffdc3048fd2f6b9ec937c89cdc88ad448",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/relate.rs",
-      "sha256": "9bbf1a363657e2c1c6784ada114234054e6502b874a2b0d898573b3c213a17b8"
+      "sha256": "1d2e130afd5abfc28c14212c71928206cb236e61e70ff017b00b7b85827b1d05"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "c5b50163fbbb11801d7f8e1b0abf7abc99898a37",
+      "git_blob": "d700c362cfa8d0f46ac52acebebce1fc5d401066",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/significant_drop_order.rs",
-      "sha256": "21462e358dbac69c4694f28c7adce3ba7619fd901d3e2b8145bb5df05205b453"
+      "sha256": "fd43642ba14a3059ef9d42aa52516dfcd819fac78bf018bcf7f231f0b6049ba7"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "300c70e04ede6db9ea2a75ac2d5cdadc93d9716d",
+      "git_blob": "810d6908829d6e100e0beb76e0158b0d3e99f5f8",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/structural_impls.rs",
-      "sha256": "2bac6a97bc8670297081a013cc744b22dbf93cf3455a60e1596ef1d9d5e279db"
+      "sha256": "e803cc41ec7bfa149194de32a96a421c04c951de74c062da23660446e4190e63"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "09a18c858db171df41b1aba1d2697172956890a5",
+      "git_blob": "2a417812dd22ea183306db6e097cfaea9dd40192",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/sty.rs",
-      "sha256": "c1868c2849bf56446d8eda2612c111f634a4e9ff1307476fc46ecf9839dd36fb"
+      "sha256": "3abc2d8aa2bd5a8eaf6f57cc101676fbb57385cf88f1ead9080620fa2a2030ff"
     },
     {
       "component": "rustc_middle_ty",
@@ -2148,21 +2155,21 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "509ff98741731241158bde249a49c6402c68d5e4",
+      "git_blob": "d2c724ffc06da44ac97f80090a4874dfd3aaf980",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/typeck_results.rs",
-      "sha256": "3a286ea9035d74e38d513a8ffd76998d73bbc342b69635b2fcb7b784c3e2e75c"
+      "sha256": "80fa917f244c9ccf180ab9474ac42f5664b80dd29d4fecbcdaf3633e77c4f73f"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "c2479e0c62bcaf7bd90ab548dcb94d6ac0d8b2d1",
+      "git_blob": "a75c7f718a39b3dead63e16f49c967398d46d0f5",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/typetree.rs",
-      "sha256": "ef4d934198704272677cf2406fc26eed1604a54851f08c1bfb04307e93760512"
+      "sha256": "4d407003d65fd66e64d4b9537f081a5a30f0ffdd56b2330456086aecfa8c1efa"
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "83589adb1691bc2832e8a9a7a672a169e2252569",
+      "git_blob": "8e6850ca0f07a6bf0ac61f71f756fc90741798d4",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/util.rs",
-      "sha256": "ca7e0446e7b4ec233ea4210ff4c3ff62d5682c16de7ed1599a4109561f0d855c"
+      "sha256": "17fda76bf74b1d8aa445dc56d0c413e9c171292b78c6fadd7131898e1b319b8d"
     },
     {
       "component": "rustc_middle_ty",
@@ -2172,21 +2179,21 @@
     },
     {
       "component": "rustc_middle_ty",
-      "git_blob": "fb56bda7d4562bb782e45dbd5690fa01be9745c8",
+      "git_blob": "f3c4940e60b829cb972c8a3c225eb060cc5408c7",
       "path": "upstream/rustc-source/compiler/rustc_middle/src/ty/vtable.rs",
-      "sha256": "4d9d2f89cd70e9f1f4fa5a8c7f7fb584e6a89652bbca4f69ce711bab211368cc"
+      "sha256": "6db8ba8b767f41a5fa323a182702b6e32e28cf4749aa4acdca29aa0f12cbf8f8"
     },
     {
       "component": "rustc_target_asm",
-      "git_blob": "6f9751e8074908f0eb329d24d57ab0fb166ca18b",
+      "git_blob": "0d1ca5f85416abbfc69faa38d8a233a4ca57bcb6",
       "path": "upstream/rustc-source/compiler/rustc_target/src/asm/mod.rs",
-      "sha256": "ae373a8a19d701bf175b288aabde2f8b91ccaa5f3473f43547fcb54783fb80cc"
+      "sha256": "914801350dd47dcc6fc274b16e3a5e8385589612f34e1ced962c8ae01cb2a422"
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "9e78de4b229b9d366a4526ba205842ffd043c0ee",
+      "git_blob": "be7420b3ac32bc89714740002e9c97e1f894c45f",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/aarch64.rs",
-      "sha256": "5cdbc34ba8b46194610d881253ec06af1283d620c422bc8b0b9cea237c88f5be"
+      "sha256": "a1a9480e8c746548d9faa097c95bcec43376d81dc2b561d76f9b066c95050f1b"
     },
     {
       "component": "rustc_target_callconv",
@@ -2220,9 +2227,9 @@
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "1e0f1f769c3b088ef9e11ec7b01f4a74b9bdfd8a",
+      "git_blob": "15fba1e5a60b42c94d0436b20daf0cda6e3f626d",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/hexagon.rs",
-      "sha256": "9f73da47d49c90f0f014970dd2c6ffc4c8984018f00653cb4bd3d06ee21acdd5"
+      "sha256": "3fe388407c9df3df10e605eee418adf0d4d36e038de32b60b09ff552636940a8"
     },
     {
       "component": "rustc_target_callconv",
@@ -2238,21 +2245,21 @@
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "3cce9095bd8477ebfc7469076032b8383480ff49",
+      "git_blob": "28ea8bd23163c1d34807d26488f2fe71bec349bd",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/mips.rs",
-      "sha256": "aa8b1d3a112f785472c7d4738f6416e9412afde7049e94ef0db5b4d20d47af2b"
+      "sha256": "83821d9c20dcdfc69b5ecef5d3b81ce67511c15619afc1288e3fe2df13ff03d1"
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "196d68389ac72f732b3429f697cb161a1f6142fb",
+      "git_blob": "1ef640353223254f92e6a7fdc9a48bc6a0cafe9b",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/mips64.rs",
-      "sha256": "9798320144e3bfceca1ce5be07b41628d909dfba0fac6a11f25078def0d8cc15"
+      "sha256": "b6c6c75236844bc725e0eb721f8bdfd8a6375792d7c7619a963d9cf1be8ff30f"
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "bb9dd849620601b63ec7a83dcb624b03fad0a84e",
+      "git_blob": "52a38f55b1fb3fddc3ab78961e6c21228a8dbbb7",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/mod.rs",
-      "sha256": "33bf5c63819d302eec20eb85cf033b26ab26e7cb997da46f851a85720e3e95c8"
+      "sha256": "cef77cab4f3767f567b241a66ab5ad9742971dbf6b674f482c9c9b7c7a8d0c04"
     },
     {
       "component": "rustc_target_callconv",
@@ -2268,9 +2275,9 @@
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "1748cbf24c28da2b125a92d6aa4ccb0c05883990",
+      "git_blob": "6ccc40719c5bbc6e60d5075e5df3b68be20d4d2b",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/powerpc.rs",
-      "sha256": "4ec49e02a4e1c8a8886bd51a255feab6263aa6ebb05f44e203f393bd30072191"
+      "sha256": "b61e8ae417218e33eac1043159daed6044a0598afea18227de7a676ecf619932"
     },
     {
       "component": "rustc_target_callconv",
@@ -2298,9 +2305,9 @@
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "bfe7f0cca3cc7813ce151ab8da1c8abcfa6b482b",
+      "git_blob": "0ef57cf54e4499550747f44c4081dd20932b28bf",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/sparc64.rs",
-      "sha256": "8eb46e49ae84bd90af8310256eb2f95c40a223c963e867cdbd8addf6dc702bc9"
+      "sha256": "6c8e8a2ef23fc7a2bdf127bb6a08ef4c1e062538a612befdfc9562268d58abe8"
     },
     {
       "component": "rustc_target_callconv",
@@ -2310,21 +2317,21 @@
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "fdfcbec18eb954e9f4929cdcdae77565c0d01111",
+      "git_blob": "e458458fbf256de0f3a348c653425d1a364b39e0",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/x86.rs",
-      "sha256": "5d8234162b0b9cd4a50a3ea8a9d3218ef5103f3bfdcc0e25768ccf2af0d7fda6"
+      "sha256": "337be13fabf19203083de73ff827472bbb4afb6eaee35f6d880b39ad7568cd3d"
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "98f3a626155a8b7d0cf28c9d47dfc333b9731b31",
+      "git_blob": "26ee1c5d8f7b340e7a1a7ced980b999291510c2a",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/x86_64.rs",
-      "sha256": "ac0fe0ea6d55d78143cc24222bb4dee552c77008467ca7d4b9d8d8557a200b5c"
+      "sha256": "6196d0b6e9dff949fbcddff6ebe0bcef08bd436e6b9a30a4858c6d5179ea3401"
     },
     {
       "component": "rustc_target_callconv",
-      "git_blob": "9303711b7f6addd214ad6ca6007eb61c441810d8",
+      "git_blob": "cddb6cd5d9b038ec9e642debe69c010442a4689e",
       "path": "upstream/rustc-source/compiler/rustc_target/src/callconv/x86_win32.rs",
-      "sha256": "6bb9352c16ffe8bbd129f1339b12e3fb44389f0d44048a0f618c9593ce14c4a0"
+      "sha256": "172277b28d65b0d2f03a379d2cae751712625689c9db3017face134d6264311e"
     },
     {
       "component": "rustc_target_callconv",
@@ -2382,9 +2389,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "8d541cb78deac546dd08e39aacf6c13fef9132b9",
+      "git_blob": "46cbe65b667fd5d2ca9650f7ad10fe686d3c6839",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/base/bpf.rs",
-      "sha256": "891c7d745772f1978662583ead311a841c47a529075a68238ce20959f784d2e7"
+      "sha256": "1fdceb5ac984ae2674d6df87cfae4db0cb43e2e53ad03517a223291de1cf13a6"
     },
     {
       "component": "rustc_target_spec",
@@ -2646,15 +2653,15 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "03dbbcb5b481d6b1b46bf1646db1a7e8afc6a72c",
+      "git_blob": "87d878a86944e065c7467757482a314b011f72cf",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/json.rs",
-      "sha256": "5ad7d818cb9581ef3df5e21d7bc2546b00479d1f5039f29ed3fc4e1ee6885442"
+      "sha256": "20f5d64c1025dbad29d051617039ea38afc1cbd5353bdf75a92ee8d4baf0970e"
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "6c7f5a7772323d427679ac934df5e22129d7c21e",
+      "git_blob": "476970b10ea3ad13c8f16f0487e58418fd7efe57",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/mod.rs",
-      "sha256": "1bfb8b7c039b988e658349e7a838c38aaceefd2a40790cf780aac94736c849f7"
+      "sha256": "ba65053c9a915c9ac8d8efc1b46caf9ee452f5330a72d613ff7d38c4a091c217"
     },
     {
       "component": "rustc_target_spec",
@@ -2760,9 +2767,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "3b158c13521ea78129bf88102b63c932b4b1cc94",
+      "git_blob": "d1810b6fa486091ab60943f22b771300143a9a1e",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_linux_android.rs",
-      "sha256": "e21058cfb3658c77b7737a7c8e248f448d3955805cae136e866b9e961722d6d4"
+      "sha256": "132aaab22e0a2f09be3aab38e5e9708a99b7f140d8c874ccbb33444c48d29359"
     },
     {
       "component": "rustc_target_spec",
@@ -2778,27 +2785,27 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "ce17280b153d602c3b3fa8c9c0cc07834f665f14",
+      "git_blob": "db3cf83ddc9996ca2aac0de46e329327b35ef4e8",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_pc_windows_gnullvm.rs",
-      "sha256": "98b93f17656c7e1cd3f33da7454b12f93ddb74c66c0ab774809baa5a53bef529"
+      "sha256": "ecec26bd3dab199e8b817c99e8ff5b0c7702f0b4fcc770cb124031dffabc0812"
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "0d06bec21f4a4b2757efd73048e7fece2b485962",
+      "git_blob": "e9f7f51a7a35ba53b10eef882739999b01652fcd",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_pc_windows_msvc.rs",
-      "sha256": "5ab8353193a8d861a22b63ea786cd76208ecb21feb543bab3c5b5bf494a23b79"
+      "sha256": "1099633c5c368b67498892ccd163184c571cea79706738abe8d9be6ebf8dc5cd"
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "8ae72393b7cbf2d96845c5863bf8d2ff72303a8a",
+      "git_blob": "2ece098734e71231a55d3dd6427edf5e36b703e2",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_freebsd.rs",
-      "sha256": "d521591d2961be425b49564632d1e6f87faadaf448adf1093144b4cd8ab9318b"
+      "sha256": "f54c15644fbd73e0b06442097e69a797ffba2de7b8f83f7d8a5d22538db05d55"
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "8dede888055f7baf37125a2c4b122b5c875b7264",
+      "git_blob": "19f996976e16c70547724db33189e3bc3d25b83b",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_fuchsia.rs",
-      "sha256": "1fb505fc9437be26ea9eb0aed9bbfd85412e8f6824995b6511552d659e32bb11"
+      "sha256": "e64aa8fba074d6f749273d06f8961cf261460feabaf73fa650ed2dd73c187a9e"
     },
     {
       "component": "rustc_target_spec",
@@ -2832,9 +2839,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "a4a5ee6f2c9cabf5539a9cc6f5066e654b097bde",
+      "git_blob": "f7e1cbfac2635469cdeafd235b67b5a54352f1fe",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_linux_gnu.rs",
-      "sha256": "7f6bd4b280bee873dbb899e53e7c5724807708e13dcd74edb631bc7c460b25ca"
+      "sha256": "b53c2776e2945b9d65025ee21e648ece25713288737f291f3f379b456a573218"
     },
     {
       "component": "rustc_target_spec",
@@ -2844,9 +2851,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "93319d23bf0776d99a1ed5992c6fad027805b01c",
+      "git_blob": "6ba5112342c3eacf60ebb02f83fbb95bfa566b29",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_linux_musl.rs",
-      "sha256": "bb7c152575c18255629965cf3ca57e7d89b7faa2120a5b38948f1cf429a41b1a"
+      "sha256": "4dc921d7cc332ba7d761fa38504ae4d02a4aac91b8f8b960fafbb69d20c1fc6f"
     },
     {
       "component": "rustc_target_spec",
@@ -2910,9 +2917,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "e5e40cb38b911e2ac8d4b2ccbfe2b4a3840d9cfd",
+      "git_blob": "14a2f007f1e8c87e7ec20595c4e074fcbae9839d",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_openbsd.rs",
-      "sha256": "77a05c242f93cbace3ead1173d3dcb3a6a295ff8f0e76f063d3f646085b859c3"
+      "sha256": "c842b0243a7da6a0c4a5a0e65ed856ffd307fdc444cbe12f122742aa068e7a11"
     },
     {
       "component": "rustc_target_spec",
@@ -2946,9 +2953,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "e2c1888e4084ea0a3eaab1209f1a4827ccfa9f56",
+      "git_blob": "8f50e363f089b9a048a23fb20422ac91273a59a9",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/aarch64_unknown_uefi.rs",
-      "sha256": "9bf7f359c887fdaad50d28fe49cecb696661af9d2034cb0ff6a8ba0222f22eef"
+      "sha256": "9d44810d339bf59b19baba55444a150afd84548ee16bdef14af4933d30fc0f01"
     },
     {
       "component": "rustc_target_spec",
@@ -2976,9 +2983,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "9bb36b8147c0b60660d3faa845f7dcc38ac1fc74",
+      "git_blob": "b48dbe6f07670577685d186785a3d2d0128930f8",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/amdgcn_amd_amdhsa.rs",
-      "sha256": "66fd221d53b33788bf60921b361c57849deaf78b3c2d68ce92abcbde6c9ca76c"
+      "sha256": "d17e3a16d133732f931dde2b9d61e8acb18c2f4cf1b58554188ef3c88dc60a8c"
     },
     {
       "component": "rustc_target_spec",
@@ -4278,6 +4285,12 @@
     },
     {
       "component": "rustc_target_spec",
+      "git_blob": "6bedf1e4fc0f5f0062fa2b58f6add8ef50c2a0f0",
+      "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/wasm32_none_component.rs",
+      "sha256": "87aa0e50e6cd7430d92991cdd64deaaaaab4a5e94a50e27c3ddab48bba3d4cd9"
+    },
+    {
+      "component": "rustc_target_spec",
       "git_blob": "a084e71a0c71feafd42c55857bdba69df909b41f",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/wasm32_unknown_emscripten.rs",
       "sha256": "08f6ee98c0ce6d61ef341d7ffa2fe29b1bd5ac99ca0b42045352fdb2d12020e3"
@@ -4590,9 +4603,9 @@
     },
     {
       "component": "rustc_target_spec",
-      "git_blob": "333e20bd0ac1917e9dd4e1ebf4763ba966a59272",
+      "git_blob": "cce444c71ee1e5d18fae8877d0cf2e15adbdb28f",
       "path": "upstream/rustc-source/compiler/rustc_target/src/spec/targets/x86_64_unknown_uefi.rs",
-      "sha256": "1da86d0c653edd0dc332e13973054ba8f9aabfd706748a2f90b1c1772b254927"
+      "sha256": "d75a1cc14d7a9fc94a5261ecbdea794246449126bc66e3e49ec6729acfefa067"
     },
     {
       "component": "rustc_target_spec",
@@ -4674,27 +4687,27 @@
     },
     {
       "component": "rustc",
-      "git_blob": "d9b5ec7356e3e47d4e7f716aa3fcf157d04972af",
+      "git_blob": "857f436ca82c66b3890f76ab1bfd79a8215b1ed8",
       "path": "upstream/rustc-source/compiler/rustc_type_ir/src/binder.rs",
-      "sha256": "944788200ff781acc1b0b0cf733005bb2fa67beb5b8cb18124bf1c7f745f1944"
+      "sha256": "c06ee6f0b43ff6311d60af5d13d22f224fecb316d70ce8013fe4c9514f73dede"
     },
     {
       "component": "rustc",
-      "git_blob": "c0cd3160b98baa0fb8038712e0490f5619b231b3",
+      "git_blob": "c28121df6f3ad019fe1c6d98417f09ab251f9e87",
       "path": "upstream/rustc-source/compiler/rustc_type_ir/src/const_kind.rs",
-      "sha256": "8573e78c890bc07752cd87b8b0c4fbeef25cab8ff116cf32c8bd7fc0d68e3ef1"
+      "sha256": "23a423593f1ba666a8ae2778bf949f16f21754131cb13ab7539202a805ad9dea"
     },
     {
       "component": "rustc",
-      "git_blob": "4fd92194c5d811a673bd92caa47409bdecb63c3a",
+      "git_blob": "a43ff4c1a2141c9270e89f7cab68ce186ac3d513",
       "path": "upstream/rustc-source/compiler/rustc_type_ir/src/inherent.rs",
-      "sha256": "6714f34fd0528ee3c334c3a468d81de826f3dec2b8ee5d06991dc6a34d326819"
+      "sha256": "446a369a29a2a6816a4fac211d6cdeac4cacbc58ed135c434856db79599c30a9"
     },
     {
       "component": "rustc",
-      "git_blob": "5c14a5072910af51411d91abb069598342d005b3",
+      "git_blob": "4b5712f09d234347b5c711d170d0a0c5cdd8e8b7",
       "path": "upstream/rustc-source/compiler/rustc_type_ir/src/region_kind.rs",
-      "sha256": "eebe66480a56971d9eb1f9f1e77303e6846df4f51431d98f97df2c2a7fa73443"
+      "sha256": "143509bd6aa7768eb48e400a3e12f7c66d58d585f16cbaa76110de233e83eef5"
     },
     {
       "component": "rustc",
@@ -4710,9 +4723,9 @@
     },
     {
       "component": "rustc",
-      "git_blob": "35f8897afd4c46a57726736fe4f5e4d6bacbeade",
+      "git_blob": "70efba8361b24b9584dc259e3040d053fabc4c78",
       "path": "upstream/rustc-source/compiler/rustc_type_ir/src/ty_kind.rs",
-      "sha256": "6ca068ac98641176e99ba3357effbb1b79d5274680e597cf80a520b5423911e1"
+      "sha256": "8973a42d1f7f600090e57a78a8aa5ad5e5a219741dc9d78f318c6083246c69f4"
     }
   ],
   "pins": {
@@ -4727,28 +4740,27 @@
       "repository": "https://github.com/RustCrypto/block-ciphers"
     },
     "miri": {
-      "archive_path": "upstream/miri-7fa591d7d4dd9af8154becbc8332f8096f8323b1.tar.gz",
-      "archive_sha256": "1360b191ff77f05a5746a5055f76fbce575dd012ad126d341d188326e6f8b074",
-      "archive_url": "https://codeload.github.com/rust-lang/miri/tar.gz/7fa591d7d4dd9af8154becbc8332f8096f8323b1",
-      "commit": "7fa591d7d4dd9af8154becbc8332f8096f8323b1",
-      "commit_date_utc": "2026-10-20T07:13:07Z",
-      "commit_url": "https://github.com/rust-lang/miri/commit/7fa591d7d4dd9af8154becbc8332f8096f8323b1",
+      "archive_path": "upstream/miri-93c45edea8b148a6b6f05ec9384449a04217143f.tar.gz",
+      "archive_sha256": "2fd9f38c5db9c0c12fad24003a06cc48f00e7c6cedb8ab829d9ab6fe986cf017",
+      "archive_url": "https://codeload.github.com/rust-lang/miri/tar.gz/93c45edea8b148a6b6f05ec9384449a04217143f",
+      "commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
+      "commit_date_utc": "2026-11-13T06:59:33Z",
+      "commit_url": "https://github.com/rust-lang/miri/commit/93c45edea8b148a6b6f05ec9384449a04217143f",
       "pinned_via": "Miri master HEAD resolved; rust-version in this commit pins the Rust compiler revision below",
       "repository": "https://github.com/rust-lang/miri",
-      "tree": "b62ddf90865101df6769e49a140e975738532d8f"
+      "tree": "dccaf1f1de860800df99602dea2df6e84161a468"
     },
     "rustc": {
-      "archive_path": "upstream/rustc-8144389c895da997dbdecaa635e41d6a50be6ffd.tar.gz",
-      "archive_sha256": "bf9feb74c700a8d1d71b318d4a2874d031af5d5380ff9151eb190330596a5aa2",
-      "archive_url": "https://codeload.github.com/rust-lang/rust/tar.gz/8144389c895da997dbdecaa635e41d6a50be6ffd",
-      "commit": "8144389c895da997dbdecaa635e41d6a50be6ffd",
-      "commit_date_utc": "2026-10-20T00:26:42Z",
-      "commit_url": "https://github.com/rust-lang/rust/commit/8144389c895da997dbdecaa635e41d6a50be6ffd",
+      "archive_path": "upstream/rustc-8eb778d04094d3af4b26580cab327e0413eb1e02.tar.gz",
+      "archive_sha256": "273274c84a955aae1929e2e9409fceae08e2bccc068f4fe2770db74e66822a37",
+      "archive_url": "https://codeload.github.com/rust-lang/rust/tar.gz/8eb778d04094d3af4b26580cab327e0413eb1e02",
+      "commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
+      "commit_date_utc": "2026-11-12T15:39:11Z",
+      "commit_url": "https://github.com/rust-lang/rust/commit/8eb778d04094d3af4b26580cab327e0413eb1e02",
       "extracted_paths_manifest": "upstream/rustc-selected-files.txt",
-      "extracted_paths_manifest_sha256": "4f1ed2c3268d9eb9ffb298137edd4a13fb5743adc6a76e8ff3e73bc8632b1418",
+      "extracted_paths_manifest_sha256": "32657308509bf52a1db766c8680e6288afa21a2436cc7b5ed2f6e6ed89521584",
       "pinned_via": "upstream/miri-source/rust-version",
-      "repository": "https://github.com/rust-lang/rust",
-      "tree": "a03f4a237580440310cbf8f227a9e35be5d4867f"
+      "repository": "https://github.com/rust-lang/rust"
     },
     "rustc_apfloat": {
       "archive_path": "upstream/rustc_apfloat-0.2.3+llvm-462a31f5a5ab.crate",
@@ -4811,21 +4823,21 @@
     },
     {
       "component": "miri",
-      "git_blob": "5037ac5b2c21748debeda3541cdf598d70cf5e9e",
+      "git_blob": "33dd66eea38be3945f923e8ec8dde7c9c270348a",
       "path": "upstream/miri-source/Cargo.lock",
-      "sha256": "0a1f7cae07b9d0474ddf231a9da9f7139e40e1ee1fcb2058f24f2d5f3d2ba2cf"
+      "sha256": "b91d41cf7102a7bdfb8ba0e24ed4e3e006dac27464087955b6acc4829f5ad905"
     },
     {
       "component": "miri",
-      "git_blob": "34a7a8789e4de5b6cf05ee38978a9153bd9fb763",
+      "git_blob": "bf46b52cb66d667be55cc8b3508447ec870f3e2b",
       "path": "upstream/miri-source/Cargo.toml",
-      "sha256": "77063f400712ab38fa9094b6b4a77827561bed9bb6d7eecfcb1b764d0ad4af6c"
+      "sha256": "f65d6407469b41c488d741dcc8801b902121502207f57644a83a82ea7c75d550"
     },
     {
       "component": "miri",
-      "git_blob": "60438fb681c3b95d7163a689a5e2cb0d54cc1ef3",
+      "git_blob": "ab4dee01fc03483b7310243dde105fe4e0e519ee",
       "path": "upstream/miri-source/rust-version",
-      "sha256": "264a4b122908bb735f405491139bdf8bff9c470f98e27457645dfc4a1813850d"
+      "sha256": "cf1b92dfcf4b3dc068cae98f7619fb5b04a5df694b1857806332121e4153beb1"
     },
     {
       "component": "rustc_apfloat",
@@ -4848,9 +4860,9 @@
     {
       "**HASH**": null,
       "component": "rustc",
-      "git_blob": "634e81eaf80b4ae1d2bb3673133f7ae049b7bf9f",
+      "git_blob": "458aacc2c6c5351a1c9dc7c9f4f0f64b6c20c4a7",
       "path": "upstream/rustc-source/Cargo.lock",
-      "sha256": "ba8a4170f1791a3862a1aa6fe3271b9bf24fd728d5e28f9af4be8310d55d9a98"
+      "sha256": "920969274faa3f50f84e8f68dee6416a755dcc0496df3b44d29dd0fc043269dc"
     }
   ]
 }

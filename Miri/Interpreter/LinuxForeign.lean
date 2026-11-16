@@ -27,10 +27,8 @@ private def arg (args : Array A) (i : Nat) : M S A :=
   match args[i]? with | some value => pure value | none => throw (.invalidProgram "checked Linux operand missing")
 private def legacy (h : Hooks S Place H D O E HM Os B I) (name : String)
     (abi : FnAbi Miri.MIR.TyId) (args : Array (OpTy Provenance)) (count : Nat) : M S Unit := do
-  h.signatures.foreign.checkSymbolClash name
-  if abi.conv != .C then throw (.undefinedBehavior "Linux legacy calling convention mismatch")
-  if abi.cVariadic then throw (.undefinedBehavior "Linux legacy variadic signature")
-  if args.size != count then throw (.undefinedBehavior "Linux legacy argument count mismatch")
+  let _ ← ShimSignatures.fixed h.signatures name (h.signature name) count abi args
+  pure ()
 
 def positional (h : Hooks S Place H D O E HM Os B I) (name : String) (abi : FnAbi Miri.MIR.TyId)
     (args : Array (OpTy Provenance)) (dest : MPlaceTy Provenance) : M S Unit := do

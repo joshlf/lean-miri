@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 EXPECTED_BLOB = "723dfd29651525198b7590553f1ef5e72b952eba"
-EXPECTED_DATA_RACE_BLOB = "acf45c84bcc6d0f491ef5306ef6662390b96d11a"
+EXPECTED_DATA_RACE_BLOB = "6feb2c81aaed8ed5b456242f1fa2fd7dee8742a8"
 
 VECTOR_ONLY_NA_READ_TYPE = """#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NaReadType {

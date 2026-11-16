@@ -31,7 +31,7 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
   let some definition := owner.definitionId | throw (IO.userError "missing fixture definition")
   let ownerInstance := {sourceInstance with instanceKind := .Item definition}
   let some sourceType := original.types[0]? | throw (IO.userError "missing fixture type")
-  let material : SourceCoroutineLayout := ⟨#[], #[], #[], #[#[], #[], #[]], #[], 0⟩
+  let material : SourceCoroutineLayout := ⟨#[], #[], #[], #[#[], #[], #[]], #[], 0, .Movable, #[]⟩
   let ty := {sourceType with
     shape := .coroutine definition ownerInstance.genericArgs
     sourceLayout := {normalizedType := 0, coroutine := some material}}
@@ -47,6 +47,9 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
     {owner with mir := {owner.mir with phase := .Analysis .PostCleanup}}⟩
   let coverage : CoroutineCoverage := ⟨#[true], #[row], #[sync, proxy]⟩
   let _ ← must (CoroutineCoverageCodec.validate document coverage)
+  let wrongType := {ty with sourceLayout := {ty.sourceLayout with coroutine := some {material with movability := .Static}}}
+  let wrongMovability := {document with types := document.types.set! 0 wrongType}
+  invalidCoverage wrongMovability coverage "source movability differs from body kind"
   let asyncRow := {row with dropSync := none, dropProxyAsync := none, dropAsync := some 0}
   let asyncBody := {proxy with role := .async}
   let _ ← must (CoroutineCoverageCodec.validate document {coverage with coroutines := #[asyncRow], auxiliaryBodies := #[asyncBody]})
@@ -83,7 +86,7 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
   -- Physical layouts now come from source material; there is no selected-layout
   -- or field-query row to forge. Check the computed tag and state through the
   -- same provider used during execution, then reject disagreeing source material.
-  let multiMaterial : SourceCoroutineLayout := ⟨#[1], #[1], #[], #[#[], #[], #[], #[0]], #[#[]], 43⟩
+  let multiMaterial : SourceCoroutineLayout := ⟨#[1], #[1], #[], #[#[], #[], #[], #[0]], #[#[]], 43, .Movable, #[⟨1,false⟩]⟩
   let multiType := {ty with sourceLayout := {ty.sourceLayout with coroutine := some multiMaterial}}
   let multiDocument := {document with types := document.types.set! 0 multiType}
   let multiRow := {row with layout := ⟨#[⟨1, source, false, none⟩],
@@ -121,19 +124,19 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
       multiCoverage "source layout differs from saved-local evidence"
   IO.println "PASS constructed coroutine ownership/type/index/conflict/phase/role/residual negatives"
 
-/-- Finite schema-13 decoder controls and constructed source-layout witnesses;
+/-- Finite schema-14 decoder controls and constructed source-layout witnesses;
 these checks do not execute a Rust coroutine or establish guest safety. -/
 def main : IO Unit := do
   let input ← IO.FS.readFile "tests/input/fixtures/strict-unit.json"
   let decoded ← must (decodeJson input)
-  check decoded.document.coroutineCoverage.isSome "schema 13 lost typed coroutine coverage"
+  check decoded.document.coroutineCoverage.isSome "schema 14 lost typed coroutine coverage"
   let count := decoded.document.bodies.size
   let markers := "[" ++ String.intercalate "," (List.replicate count "false") ++ "]"
   let catalog := object [("body_coroutines", markers), ("coroutines", "[]"), ("auxiliary_bodies", "[]")]
   let valid ← must (setField input "compiler_coroutine_coverage" catalog)
   let newDecoded ← must (decodeJson valid)
-  check newDecoded.document.coroutineCoverage.isSome "schema 13 failed to retain typed coverage"
-  for version in ["11", "12", "14"] do
+  check newDecoded.document.coroutineCoverage.isSome "schema 14 failed to retain typed coverage"
+  for version in ["11", "12", "13", "15"] do
     rejected (← must (setField valid "schema_version" version)) "unsupported schema version"
   let fields ← must ((← must (JsonFixtures.parse valid)).object)
   let missingCoverage := object ((fields.filterMap fun (name, value) =>
@@ -181,4 +184,4 @@ def main : IO Unit := do
   let badCatalog ← must (setField catalog "coroutines" ("[" ++ badWitness ++ "]"))
   rejected (← must (setField valid "compiler_coroutine_coverage" badCatalog)) "dangling source-info pool reference"
   componentChecks decoded.document
-  IO.println "PASS strict schema-13 coroutine coverage, computed layouts and malformed/missing/unknown guards"
+  IO.println "PASS strict schema-14 coroutine coverage, computed layouts and malformed/missing/unknown guards"

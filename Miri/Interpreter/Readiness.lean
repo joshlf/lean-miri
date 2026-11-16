@@ -55,6 +55,7 @@ structure Hooks (S F : Type) where
   readiness : F → M S Bits
   delayed : M S (Array F)
   putDelayed : Array F → M S Unit
+  beforeDelayed : F → M S Unit
   /-- Must enable/swap the full target thread view, execute its typed callback,
   and restore only on success. No callback token acknowledgment is accepted. -/
   unblock : ThreadId → BlockReason → M S Unit
@@ -242,6 +243,7 @@ def processDelayed (budget : Nat) (h : Hooks S F) : M S Unit := do
   | budget + 1 =>
     let some fd := queue[queue.size - 1]? | throw (.invalidProgram "delayed readiness stack missing element")
     h.putDelayed (queue.extract 0 (queue.size - 1))
+    onError (h.beforeDelayed fd) (h.dropFd fd)
     updateFd budget h fd {}
     processDelayed budget h
 
@@ -261,8 +263,7 @@ private def collectReady (remaining : Nat) (h : Hooks S F) (watcher : Nat)
     Files.withDrop (acquire h (← h.getWatched fd).clock) (h.dropFd fd)
     collectReady remaining h watcher (result.push interest) (if interest.edgeTriggered then readd else readd.push key)
 
-def getReadyInterests (budget max : Nat) (h : Hooks S F) (watcher : Nat) : M S (Array Interest) := do
-  processDelayed budget h
+def getReadyInterests (_budget max : Nat) (h : Hooks S F) (watcher : Nat) : M S (Array Interest) := do
   if h.debugAssertions then
     let state ← h.getWatcher watcher
     for (_,interest) in state.interests.qsort (fun a b => keyLt a.1 b.1) do

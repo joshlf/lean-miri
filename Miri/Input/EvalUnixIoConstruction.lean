@@ -437,7 +437,7 @@ def vectoredFromFieldsWithLifecycle
     startArray := fun _ => unresolved "startArray"
     index := fun _ _ => unresolved "index"
     field := fun _ _ => unresolved "field"
-    readFieldSigned := fun _ => unresolved "readFieldSigned"
+    readFieldUnsigned := fun _ => unresolved "readFieldUnsigned"
     readFieldPointer := fun _ => unresolved "readFieldPointer"
     allocateStack := fun _ => unresolved "allocateStack"
     deallocateStack := fun _ => unresolved "deallocateStack"

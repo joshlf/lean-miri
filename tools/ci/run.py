@@ -27,11 +27,11 @@ class Suite:
 def suites(lane):
     if lane == 'fresh':
         # A failing guest must not prevent the other independent checks.
-        from fresh_tests import FOCUSED
+        from fresh_tests import FOCUSED, UPSTREAM_CHECKS
         return [Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
                 Suite('fresh-prepare', ('bash', 'tools/ci/fresh.sh', 'prepare'), 7200),
                 *[Suite(name, ('python3', 'tools/ci/fresh_tests.py', name))
-                  for name in ('query-demand', 'runtime-type-closure', 'vtable-cross-crate', *FOCUSED)]]
+                  for name in ('query-demand', 'runtime-type-closure', 'vtable-cross-crate', *FOCUSED, *UPSTREAM_CHECKS)]]
     if lane == 'regression':
         # check.sh already contains quick's audit/Python/inventory checks.
         # Only the two fixture hash manifests are unique to check-quick.sh.
@@ -54,7 +54,7 @@ def suites(lane):
         raise ValueError(lane)
     result = [
         Suite('build', ('bash', 'tools/ci/build.sh'), 7200),
-        Suite('exporter-build', ('cargo', '+miri-exporter-8144389c895d', 'build', '--locked', '--offline',
+        Suite('exporter-build', ('cargo', '+miri-exporter-8eb778d04094', 'build', '--locked', '--offline',
                                  '--manifest-path', 'exporter/Cargo.toml')),
         Suite('decoder', ('bash', 'tools/check-decoder.sh')),
         Suite('structural', ('bash', 'tools/check-structural-regressions.sh')),
@@ -70,6 +70,10 @@ def suites(lane):
         Suite('producer-decoder', ('python3', 'tests/producer/primitive_ranges.py')),
         Suite('native-math', ('lake', 'exe', 'native_math_boundary_qa')),
         Suite('fresh-prepare', ('bash', 'tools/ci/fresh.sh', 'prepare')),
+        Suite('source-abi', ('python3', 'tests/abi/check_source_queries.py',
+                             '--runner', '.lake/build/bin/native_runner',
+                             '--exporter', REFERENCE_EXPORTER,
+                             '--output', 'scratch/ci-fresh/source-abi')),
         Suite('powi-zero', ('python3', 'tools/check-powi-zero.py', 'scratch/ci-fresh/powi-zero.json',
                             '--exporter', REFERENCE_EXPORTER)),
         Suite('math-host', ('python3', 'tools/check-math-nohost.py', 'scratch/ci-fresh/math-host',

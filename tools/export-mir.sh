@@ -5,7 +5,7 @@ export RUSTUP_HOME="${RUSTUP_HOME:-$ROOT/.rustup}"
 export CARGO_HOME="${CARGO_HOME:-$ROOT/.cargo}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/exporter/target}"
 export MIRI_SYSROOT="${MIRI_SYSROOT:-$ROOT/scratch/miri-sysroot}"
-TOOLCHAIN="miri-exporter-8144389c895d"
+TOOLCHAIN="miri-exporter-8eb778d04094"
 export PATH="$RUSTUP_HOME/toolchains/$TOOLCHAIN/bin:$CARGO_HOME/bin:$PATH"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
   export LD_LIBRARY_PATH="$RUSTUP_HOME/toolchains/$TOOLCHAIN/lib:$LD_LIBRARY_PATH"

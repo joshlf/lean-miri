@@ -16,6 +16,8 @@ pub(super) struct SourceLayout {
     pub simd: Option<Simd>,
     pub scalable_vectors: Option<u64>,
     pub special_float: Option<&'static str>,
+    pub is_x87_f80: bool,
+    pub cfi_encoding: Option<String>,
     pub coroutine: Option<SourceCoroutineLayout>,
     pub variances: Vec<crate::pool_body::Variance>,
     pub is_unsafe_cell: bool,
@@ -37,12 +39,19 @@ pub(super) struct SourceLayout {
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct SourceCoroutineLayout {
+    pub movability: &'static str,
+    pub trait_fields: Vec<SourceCoroutineTraitField>,
     pub saved_types: Vec<u64>,
     pub locals: Vec<u64>,
     pub prefix: Vec<u64>,
     pub variants: Vec<Vec<usize>>,
     pub conflicts: Vec<Vec<usize>>,
     pub seed: u64,
+}
+#[derive(Clone, Debug, Serialize)]
+pub(super) struct SourceCoroutineTraitField {
+    pub r#type: u64,
+    pub ignore_for_traits: bool,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

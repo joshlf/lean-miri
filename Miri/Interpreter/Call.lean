@@ -218,20 +218,16 @@ def passArgument (h : Hooks) (choice : C) (caller : FnArg P) (callerAbi calleeAb
   h.copyAllowTransmute choice copied dest
   if let .InPlace place := caller then h.protectArgument choice place
 
-/-- Source stack.rs `allocate_varargs`: static callee ABI checks precede
-allocation and copy; no in-place protection is performed for varargs. -/
-def allocateVarargs (h : Hooks) (choice : C) (args : Array (FnArg P × ArgABI))
-    (calleeAbis : Array ArgABI) : M (Array (MPlaceTy P)) := do
+/-- Source stack.rs `allocate_varargs`: extra arguments have no static callee
+ABI and receive no protected argument retags. -/
+def allocateVarargs (h : Hooks) (choice : C) (args : Array (FnArg P × ArgABI)) :
+    M (Array (MPlaceTy P)) := do
   let mut varargs := #[]
-  for idx in [:args.size] do
-    let (arg, callerAbi) ← at? args idx "missing variadic caller argument"
-    let calleeAbi ← at? calleeAbis idx "missing variadic callee ABI"
-    require (← h.checkArgumentCompat choice callerAbi calleeAbi) "variadic ABI compatibility assertion"
+  for (arg, _) in args do
     let op := arg.copyFnArg
     let place ← h.allocateStack choice op.layout
     h.copyToMemory choice op place
     varargs := varargs.push place
-  require (args.size == calleeAbis.size) "excess variadic callee ABI"
   return varargs
 
 /-- Source `init_stack_frame`, including all four argument initialization arms. -/
@@ -243,11 +239,7 @@ def initStackFrame (h : Hooks) (choice : C) (fnInstance : CallInstance) (loadedB
   if requiresLocation != withCallerLocation then
     throw (.undefinedBehavior "caller/callee #[track_caller] mismatch")
   let callerLocation ← if withCallerLocation then pure (some (← h.callerLocation)) else pure none
-  let extra ← if h.abiVariadic callerFnAbi then do
-    require (h.abiFixedCount callerFnAbi ≤ args.size) "variadic fixed count outside caller arguments"
-    pure ((args.extract (h.abiFixedCount callerFnAbi) args.size).map fun arg => arg.layout.ty)
-    else pure #[]
-  let calleeFnAbi ← h.fnAbiOfInstance choice fnInstance extra
+  let calleeFnAbi ← h.fnAbiOfInstance choice fnInstance #[]
   unless h.sameConvention callerFnAbi calleeFnAbi do
     throw (.undefinedBehavior "caller/callee calling convention mismatch")
   unless h.abiVariadic callerFnAbi == h.abiVariadic calleeFnAbi do
@@ -304,10 +296,10 @@ def initStackFrame (h : Hooks) (choice : C) (fnInstance : CallInstance) (loadedB
         for idx in [callerIndex:args.size] do
           remaining := remaining.push ((← at? args idx "missing vararg"),
             (← at? callerAbis idx "missing vararg ABI"))
+        require (calleeIndex == calleeAbis.size) "excess variadic callee ABI"
         let varargs ← h.withRetagMode choice .None
-          (allocateVarargs h choice remaining (calleeAbis.extract calleeIndex calleeAbis.size))
+          (allocateVarargs h choice remaining)
         callerIndex := args.size
-        calleeIndex := calleeAbis.size
         let frame ← h.getFrame
         h.setFrame { frame with vaList := varargs.map fun p => ⟨p.mplace, localMemoryLayout p.layout⟩ }
         let key ← h.vaListPtr choice varargs

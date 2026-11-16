@@ -183,6 +183,11 @@ where
     let node ← typeNode runtime self
     if declaration.role == .sized then return ← isSized runtime self
     if declaration.role == .metaSized then return ← isMetaSized runtime self
+    -- Coroutine movability overrides structural Unpin, including !Unpin captures.
+    if declaration.role == .unpin then
+      if let .coroutine .. := node.shape then
+        let some source := node.sourceLayout.coroutine | throw "coroutine source constituents are absent"
+        return source.movability == .Movable
     if declaration.role != .other then
       match node.shape with
       | .bool | .char | .int _ | .uint _ | .float _ | .str | .never
@@ -236,7 +241,10 @@ where
       | .closure .. | .coroutineClosure .. => pure node.sourceLayout.closureUpvars
       | .unsafeBinder child _ => pure #[child]
       | .foreign _ => return false
-      | .coroutine .. => throw "coroutine auto-trait source constituents are unavailable"
+      | .coroutine .. => do
+        let some source := node.sourceLayout.coroutine | throw "coroutine source constituents are absent"
+        pure (source.prefix ++ source.traitFields.filterMap fun field =>
+          if field.ignoreForTraits then none else some field.typeId)
       | .alias .. => throw "unnormalized alias in concrete trait query"
       | _ => pure #[]
     for child in children do

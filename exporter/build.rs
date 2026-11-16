@@ -1,6 +1,6 @@
 use std::process::Command;
 
-const PINNED_COMMIT: &str = "8144389c895da997dbdecaa635e41d6a50be6ffd";
+const PINNED_COMMIT: &str = "8eb778d04094d3af4b26580cab327e0413eb1e02";
 
 fn output(command: &mut Command, description: &str) -> String {
     let result = command
@@ -29,7 +29,7 @@ fn main() {
         .unwrap_or_else(|| panic!("build rustc did not report commit-hash: {version}"));
     assert_eq!(
         commit, PINNED_COMMIT,
-        "exporter must be built by the exact pinned rustc; from the repository root run bash tools/setup-rustc-exporter.sh, then cargo +miri-exporter-8144389c895d test --locked --manifest-path exporter/Cargo.toml (see docs/development.md)"
+        "exporter must be built by the exact pinned rustc; from the repository root run bash tools/setup-rustc-exporter.sh, then cargo +miri-exporter-8eb778d04094 test --locked --manifest-path exporter/Cargo.toml (see docs/development.md)"
     );
     let sysroot = output(
         Command::new(&rustc).arg("--print").arg("sysroot"),

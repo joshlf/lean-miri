@@ -123,7 +123,11 @@ pub(super) fn discover<'tcx>(
     state.allocations = context.allocation_ids.len();
     let sites = context.vtable_upcast_demands.len();
     let targets = context.vtable_demands.len();
-    let first_site = if targets == state.upcast_targets { state.upcast_sites } else { 0 };
+    let first_site = if targets == state.upcast_targets {
+        state.upcast_sites
+    } else {
+        0
+    };
     for site in first_site..sites {
         let (source, target) = *context.vtable_upcast_demands.get_index(site).unwrap();
         if !state.predicate_keys.contains_key(&source) {
@@ -131,7 +135,11 @@ pub(super) fn discover<'tcx>(
                 .predicate_keys
                 .insert(source, predicate_key(tcx, source)?);
         }
-        let first_target = if site < state.upcast_sites { state.upcast_targets } else { 0 };
+        let first_target = if site < state.upcast_sites {
+            state.upcast_targets
+        } else {
+            0
+        };
         for index in first_target..targets {
             let (concrete, actual) = *context.vtable_demands.get_index(index).unwrap();
             if !state.predicate_keys.contains_key(&actual) {

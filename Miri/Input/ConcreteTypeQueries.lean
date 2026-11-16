@@ -134,7 +134,9 @@ where
         pure #[element]
       | .slice element | .patternType element _ | .unsafeBinder element _ => pure #[element]
       | .closure .. | .coroutineClosure .. => pure value.sourceLayout.closureUpvars
-      | .coroutine .. => throw "coroutine drop source components are unavailable"
+      -- The ordinary query is non-exhaustive: rustc conservatively requires
+      -- coroutine drop glue even when every stored field is drop-free.
+      | .coroutine .. => return true
       | .alias .. => throw "unnormalized alias in needs_drop"
       | _ => pure #[]
     for field in fields do if ← go fuel active field then return true
@@ -229,6 +231,7 @@ def boolean (runtime : RuntimeMetadata) (id : TypeId) (query : String) : Except 
   match query with
   | "is_unsafe_cell" => return source.isUnsafeCell
   | "is_c_void" => return source.isCVoid
+  | "is_x87_f80_raw" => return source.specialFloat == some .x87f80
   | "is_simd" => return match value.shape with | .adt data => data.representation.simd | _ => false
   | "is_box" => return source.isBox
   | "is_global_box" =>

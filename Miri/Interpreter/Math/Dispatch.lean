@@ -56,9 +56,12 @@ private def parseFormat (name : String) : Option FloatFormat :=
 unimplemented arm; sqrtf128 uses the fully portable integer algorithm. -/
 def evalIntrinsic [PointerProvenance P] (h : Hooks P S C V) (choice : C)
     (name : String) (generics : Array TyId) (args : Array (OpTy P)) (dest : V) : M S Bool := do
-  if ["sqrtf16","sqrtf32","sqrtf64","sqrtf128"].contains name then
+  if name == "sqrt" || ["sqrtf16","sqrtf32","sqrtf64","sqrtf128"].contains name then
     arity args 1
-    let some format := parseFormat name | invalid "sqrt format assertion"
+    let format ← if name == "sqrt" then h.genericFloat choice generics
+      else match parseFormat name with
+        | some format => pure format
+        | none => invalid "sqrt format assertion"
     let value ← readFloat h choice (← arg args 0) format
     let result ← engine (sqrt value)
     let result ← FloatOps.adjustNaN h.floatOps choice result [value]
@@ -70,8 +73,11 @@ def evalIntrinsic [PointerProvenance P] (h : Hooks P S C V) (choice : C)
     if format == .binary128 then throw (.unsupported "source host math f128 is unimplemented")
     let value ← readFloat h choice (← arg args 0) format
     writeFloat h choice (← runUnary h choice name op value) dest
-  else if ["powf16","powf32","powf64","powf128","powif16","powif32","powif64","powif128"].contains name then
-    let some format := parseFormat name | invalid "pow format assertion"
+  else if name == "powf" || name == "powi" || ["powf16","powf32","powf64","powf128","powif16","powif32","powif64","powif128"].contains name then
+    let format ← if name == "powf" || name == "powi" then h.genericFloat choice generics
+      else match parseFormat name with
+        | some format => pure format
+        | none => invalid "pow format assertion"
     if format == .binary128 then throw (.unsupported "source host pow f128 is unimplemented")
     arity args 2
     let value ← readFloat h choice (← arg args 0) format

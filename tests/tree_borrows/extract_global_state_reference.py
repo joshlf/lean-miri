@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_BORROW_TRACKER = "65660956220eac0d8270b273ac1074454f1c6f75"
+EXPECTED_BORROW_TRACKER = "89736bdadf6bf2e71953d5ab5cb1f0fbeb332046"
 
 
 def git_blob_sha1(contents: bytes) -> str:

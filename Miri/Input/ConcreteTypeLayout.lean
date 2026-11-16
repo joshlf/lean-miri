@@ -15,7 +15,7 @@ private def integer (target : RuntimeTargetDataLayout) : MIR.IntegerKind → Exc
 
 private def float : FloatTypeTag → ABI.Float
   | .f16 => .F16 | .f16b => .F16B | .f32 => .F32 | .f64 => .F64
-  | .f128 => .F128 | .ppcf128 => .PpcF128
+  | .x87f80 => .X87F80 | .f128 => .F128 | .ppcf128 => .PpcF128
 
 private def typeNode (document : ImportDocument) (id : TypeId) : Except String TypeNode := do
   let some node := document.types[id]? | throw s!"missing concrete type {id}"
@@ -206,10 +206,22 @@ where
         | .alias .. => throw "layout requested for an unnormalized concrete alias"
       let result ← match node.sourceLayout.specialFloat with
         | none => pure result
+        | some .x87f80 => scalar (.Float .X87F80)
         | some kind => do
           let value ← fullScalar target (.Float (float kind))
           let align ← value.defaultAlign target |>.mapError reprStr
           pure {result with align, backendRepr := .Scalar value}
+      let result ← if node.sourceLayout.isX87F80 then do
+          unless result.size == ABI.Float.X87F80.size do throw "x87_f80 wrapper field size invariant"
+          let some align := target.x87F80Align | throw "target x87_f80 alignment is absent"
+          let size ← result.size.alignTo align |>.mapError reprStr
+          pure {result with
+            align := .new align
+            unadjustedAbiAlign := align
+            size := size
+            backendRepr := .Memory (sized := true)
+            largestNiche := none}
+        else pure result
       modify (·.insert id result)
       pure result
 end Miri.Input.ConcreteTypeLayout

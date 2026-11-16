@@ -6,7 +6,7 @@ open Miri.ABI Miri.Memory Miri.Concurrency PthreadObjects
 abbrev M := EStateM StepError
 inductive Constant where
   | mutexNormal | mutexDefault | mutexErrorCheck | mutexRecursive
-  | einval | ebusy | edeadlk | eperm | etimedout | clockRealtime
+  | einval | ebusy | edeadlk | eperm | etimedout | clockRealtime | clockMonotonic
   deriving DecidableEq, Repr
 inductive Attribute where | mutex | condvar deriving DecidableEq, Repr
 structure Hooks (S R Duration : Type) where
@@ -14,9 +14,6 @@ structure Hooks (S R Duration : Type) where
   constant : Constant → M S Int32
   readPointer : OpTy Provenance → M S (Pointer (Option Provenance))
   isNull : Pointer (Option Provenance) → M S Bool
-  attributeRead : OpTy Provenance → Attribute → Size → M S Int32
-  attributeWrite : OpTy Provenance → Attribute → Size → Int32 → M S Unit
-  attributeUninit : OpTy Provenance → Attribute → M S Unit
   objectUninit : OpTy Provenance → PthreadObjects.Kind → M S Unit
   parseClock : Int32 → M S (Option Clock)
   readTimespec : OpTy Provenance → M S (Option Duration)
@@ -27,17 +24,6 @@ structure Hooks (S R Duration : Type) where
 private def rt (h : Hooks S R T) := h.objects.runtime
 private def zero (h : Hooks S R T) (dest : MPlaceTy Provenance) : M S Unit :=
   (rt h).writeScalar 0 dest
-private def attrOffset (h : Hooks S R T) (attr : Attribute) : M S Size := do
-  let os := h.objects.os
-  let supported := if attr == .mutex then
-      #["linux","illumos","solaris","macos","freebsd","android","netbsd"].contains os
-    else #["linux","illumos","solaris","freebsd","android"].contains os
-  if !supported then throw (.unsupported "pthread attribute layout unsupported on this target")
-  return Size.ZERO
-private def attrRead (h : Hooks S R T) (op : OpTy Provenance) (kind : Attribute) : M S Int32 := do
-  h.attributeRead op kind (← attrOffset h kind)
-private def attrWrite (h : Hooks S R T) (op : OpTy Provenance) (kind : Attribute) (value : Int32) : M S Unit := do
-  h.attributeWrite op kind (← attrOffset h kind) value
 private def mutexData (h : Hooks S R T) (op : OpTy Provenance) : M S (R × MutexKind) := do
   let .mutex ref kind ← PthreadObjects.get h.objects .mutex op
     | throw (.invalidProgram "pthread mutex metadata dynamic type mismatch")
@@ -55,16 +41,14 @@ private def semData (h : Hooks S R T) (op : OpTy Provenance) : M S R := do
     | throw (.invalidProgram "pthread semaphore metadata dynamic type mismatch")
   return ref
 
-def unchangedKind : Int32 := 0x8000000
-
 def translateKind (h : Hooks S R T) (kind : Int32) : M S MutexKind := do
   if kind == (← h.constant .mutexNormal) then return .Normal
   if kind == (← h.constant .mutexErrorCheck) then return .ErrorCheck
   if kind == (← h.constant .mutexRecursive) then return .Recursive
-  if kind == (← h.constant .mutexDefault) || kind == unchangedKind then return .Default
+  if kind == (← h.constant .mutexDefault) then return .Default
   throw (.unsupported "unsupported pthread mutex type")
 def mutexattrInit (h : Hooks S R T) (attr : OpTy Provenance) : M S Unit :=
-  attrWrite h attr .mutex unchangedKind
+  PthreadObjects.create h.objects attr (.mutexAttr none)
 private def supportedKind (h : Hooks S R T) (kind : Int32) : M S Bool := do
   if kind == (← h.constant .mutexNormal) then return true
   if kind == (← h.constant .mutexDefault) then return true
@@ -72,18 +56,21 @@ private def supportedKind (h : Hooks S R T) (kind : Int32) : M S Bool := do
   return kind == (← h.constant .mutexRecursive)
 def mutexattrSettype (h : Hooks S R T) (attr : OpTy Provenance) (kind : Int32) : M S Int32 := do
   if ← supportedKind h kind then
-    if kind == unchangedKind then throw (.invalidProgram "libc mutex type equals internal unchanged marker")
-    attrWrite h attr .mutex kind
+    let kind ← translateKind h kind
+    let _ ← PthreadObjects.get h.objects .mutexAttr attr
+    PthreadObjects.put h.objects attr (.mutexAttr (some kind))
     return 0
   h.constant .einval
 
 def mutexattrDestroy (h : Hooks S R T) (attr : OpTy Provenance) : M S Unit := do
-  let _ ← attrRead h attr .mutex
-  h.attributeUninit attr .mutex
+  PthreadObjects.remove h.objects .mutexAttr attr
 
 def mutexInit (h : Hooks S R T) (op attr : OpTy Provenance) : M S Unit := do
   let pointer ← h.readPointer attr
-  let kind ← if ← h.isNull pointer then pure MutexKind.Default else translateKind h (← attrRead h attr .mutex)
+  let kind ← if ← h.isNull pointer then pure MutexKind.Default else do
+    let .mutexAttr kind ← PthreadObjects.get h.objects .mutexAttr attr
+      | throw (.invalidProgram "pthread mutex attribute metadata dynamic type mismatch")
+    pure (kind.getD .Default)
   -- Source dereferences the object before constructing the new reference.
   let object ← h.objects.deref op .mutex
   let ref ← h.objects.newMutex
@@ -159,22 +146,26 @@ def rwlockDestroy (h : Hooks S R T) (op : OpTy Provenance) : M S Unit := do
   h.objectUninit op .rwlock
 
 def condattrInit (h : Hooks S R T) (attr : OpTy Provenance) : M S Unit := do
-  if h.objects.os != "macos" then attrWrite h attr .condvar (← h.constant .clockRealtime)
+  PthreadObjects.create h.objects attr (.condAttr .realTime)
 def condattrSetclock (h : Hooks S R T) (attr : OpTy Provenance) (clock : Int32) : M S Int32 := do
-  if (← h.parseClock clock).isNone then return ← h.constant .einval
-  attrWrite h attr .condvar clock
+  let some clock ← h.parseClock clock | return ← h.constant .einval
+  let _ ← PthreadObjects.get h.objects .condAttr attr
+  PthreadObjects.put h.objects attr (.condAttr clock)
   return 0
 def condattrGetclock (h : Hooks S R T) (attr dest : OpTy Provenance) : M S Unit := do
-  h.writeClockId dest (← attrRead h attr .condvar)
+  let .condAttr clock ← PthreadObjects.get h.objects .condAttr attr
+    | throw (.invalidProgram "pthread condvar attribute metadata dynamic type mismatch")
+  let clock ← if clock == .realTime then h.constant .clockRealtime else h.constant .clockMonotonic
+  h.writeClockId dest clock
 def condattrDestroy (h : Hooks S R T) (attr : OpTy Provenance) : M S Unit := do
-  if h.objects.os != "macos" then
-    let _ ← attrRead h attr .condvar
-  h.attributeUninit attr .condvar
+  PthreadObjects.remove h.objects .condAttr attr
 
 def condInit (h : Hooks S R T) (op attr : OpTy Provenance) : M S Unit := do
   let pointer ← h.readPointer attr
-  let clock ← if (← h.isNull pointer) || h.objects.os == "macos" then h.constant .clockRealtime else attrRead h attr .condvar
-  let some clock ← h.parseClock clock | throw (.undefinedBehavior "pthread_cond_init invalid attributes unsupported clock")
+  let clock ← if ← h.isNull pointer then pure Clock.realTime else do
+    let .condAttr clock ← PthreadObjects.get h.objects .condAttr attr
+      | throw (.invalidProgram "pthread condvar attribute metadata dynamic type mismatch")
+    pure clock
   let object ← h.objects.deref op .condvar
   let ref ← h.objects.newCondvar
   PthreadObjects.createAt h.objects object (.condvar ref clock)

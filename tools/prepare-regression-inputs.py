@@ -30,7 +30,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
     rustup = Path(environment.get("RUSTUP_HOME", ROOT / ".rustup"))
-    toolchain = rustup / "toolchains/miri-exporter-8144389c895d"
+    toolchain = rustup / "toolchains/miri-exporter-8eb778d04094"
     environment["PATH"] = str(toolchain / "bin") + ":" + environment["PATH"]
     environment["LD_LIBRARY_PATH"] = str(toolchain / "lib") + ":" + environment.get("LD_LIBRARY_PATH", "")
     environment["MIRI_SYSROOT"] = environment.get("MIRI_SYSROOT", str(ROOT / "scratch/miri-sysroot"))

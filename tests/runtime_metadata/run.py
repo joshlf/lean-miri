@@ -16,7 +16,7 @@ elan = Path(env.setdefault("ELAN_HOME", str(ROOT / ".elan")))
 rustup = Path(env.setdefault("RUSTUP_HOME", str(ROOT / ".rustup")))
 env.setdefault("CARGO_HOME", str(ROOT / ".cargo"))
 env.setdefault("MIRI_SYSROOT", str(ROOT / "scratch/miri-sysroot"))
-toolchain = rustup / "toolchains/miri-exporter-8144389c895d"
+toolchain = rustup / "toolchains/miri-exporter-8eb778d04094"
 env["PATH"] = str(toolchain / "bin") + ":" + env.get("PATH", "")
 env["LD_LIBRARY_PATH"] = str(toolchain / "lib") + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH") else "")
 exporter = env.get("EXPORTER_BIN", str(ROOT / "exporter/target/debug/lean-miri-mir-exporter"))

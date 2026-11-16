@@ -16,11 +16,11 @@ ROOT = Path(__file__).resolve().parents[2]
 operator = (ROOT / 'upstream/miri-source/src/operator.rs').read_text()
 cas = (ROOT / 'upstream/miri-source/src/concurrency/data_race.rs').read_text()
 eq = re.search(r'Eq => (left == right),', operator)
-choice = re.search(r'let cmpxchg_success = (eq.to_scalar\(\).to_bool\(\)\?\s*&& if can_fail_spuriously \{\s*this.machine.rng.get_mut\(\).random_bool\(success_rate\)\s*\} else \{\s*true\s*\});', cas)
+choice = re.search(r'let cmpxchg_success = (eq.to_scalar\(\).to_bool\(\)\?\s*&& if can_fail_spuriously \{\s*ecx.machine.rng.get_mut\(\).random_bool\(success_rate\)\s*\} else \{\s*true\s*\});', cas)
 if eq is None or choice is None:
     raise SystemExit('pinned pointer Eq / CAS expression changed; review adapter')
 expression = choice.group(1).replace('eq.to_scalar().to_bool()?', 'eq').replace(
-    'this.machine.rng.get_mut().random_bool(success_rate)', '!spurious')
+    'ecx.machine.rng.get_mut().random_bool(success_rate)', '!spurious')
 rust = r'''
 fn main() {
  for _width in [32, 64] { for _endian in [0, 1] { for _weak_memory in [false, true] {
@@ -36,7 +36,7 @@ fn main() {
 '''.replace('EQUALITY', eq.group(1)).replace('CHOICE', expression)
 elan = Path(os.environ.get('LEAN_MIRI_ELAN_HOME', str(ROOT / '.elan')))
 rustup = Path(os.environ.get('RUSTUP_HOME', str(ROOT / '.rustup')))
-rustc = rustup / 'toolchains/miri-exporter-8144389c895d/bin/rustc'
+rustc = rustup / 'toolchains/miri-exporter-8eb778d04094/bin/rustc'
 with tempfile.TemporaryDirectory(prefix='lean-miri-pointer-cas-') as directory:
     directory = Path(directory)
     source = directory / 'compare.rs'

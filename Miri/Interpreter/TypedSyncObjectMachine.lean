@@ -53,12 +53,20 @@ def metadataFromObjectHooks [DecidableEq K]
   let physical := LinuxFutexMachine.metadataFromObjectHooks h
   {tryResolve := physical.tryResolve, resolve := physical.resolve, info := physical.info
    lookup := fun address => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
     let object ← machineAction (MemoryExtras.lookupSync h.extras address)
     pure (object.bind fun object => (embedding.project object.payload).map fun payload =>
       {payload,deleteOnWrite := object.deleteOnWrite,onAccess := TypedSyncMetadata.onAccess typed payload})
-   insert := fun address object =>
+   checkAccess := physical.checkAccess
+   remove := fun address size => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
+    let object ← machineAction (MemoryExtras.removeSync h.extras address size)
+    pure (object.bind fun object => (embedding.project object.payload).map fun payload =>
+      {payload,deleteOnWrite := object.deleteOnWrite,onAccess := TypedSyncMetadata.onAccess typed payload})
+   insert := fun address size object => do
+    let _ ← AtomicMachine.mutability h.access address.allocation
     machineAction (MemoryExtras.insertSync h.extras address
-      ⟨embedding.inject object.payload,object.deleteOnWrite,#[]⟩)}
+      ⟨embedding.inject object.payload,object.deleteOnWrite,#[],size⟩)}
 
 def metadata [DecidableEq K]
     (h : LinuxFutexMachine.Hooks K U C P O B H Y Z T E)
@@ -82,7 +90,12 @@ def narrow (base : SyncObject.MetadataHooks S TypedSyncMetadata.Payload)
     let some object ← base.lookup address | return none
     pure ((cast.project object.payload).map fun payload =>
       {payload,deleteOnWrite := object.deleteOnWrite,onAccess := object.onAccess})
-   insert := fun address object => base.insert address
+   checkAccess := base.checkAccess
+   remove := fun address size => do
+    let object ← base.remove address size
+    pure (object.bind fun object => (cast.project object.payload).map fun payload =>
+      {payload,deleteOnWrite := object.deleteOnWrite,onAccess := object.onAccess})
+   insert := fun address size object => base.insert address size
     {payload := cast.inject object.payload,deleteOnWrite := object.deleteOnWrite,onAccess := object.onAccess}}
 def pthread : Downcast (PthreadObjects.Payload TypedSyncRuntime.Ref) where
   inject := .pthread
@@ -112,18 +125,9 @@ def freeBsdFutex : Downcast TypedSyncRuntime.Ref where
 /-- Byte access operations are separated from typed metadata ownership. They
 must be supplied by the actual allocation/atomic machine, never by an arena. -/
 structure Bytes (S : Type) where
-  checkAccess : Pointer (Option Provenance) → Size → EStateM StepError S Unit
-  offset : MPlaceTy Provenance → Size → EStateM StepError S (MPlaceTy Provenance)
-  compareExchangeByteRelaxed : MPlaceTy Provenance → UInt8 → UInt8 → EStateM StepError S (UInt8 × Bool)
-  writeZeros : Pointer (Option Provenance) → Size → EStateM StepError S Unit
-  writeByte : MPlaceTy Provenance → UInt8 → EStateM StepError S Unit
+  writeBytes : Pointer (Option Provenance) → Size → UInt8 → EStateM StepError S Unit
 
 def full (base : SyncObject.MetadataHooks S TypedSyncMetadata.Payload)
     (bytes : Bytes S) (cast : Downcast A) : SyncObject.Hooks S A :=
-  let data := narrow base cast
-  {tryResolve := data.tryResolve, resolve := data.resolve, info := data.info
-   lookup := data.lookup, insert := data.insert
-   checkAccess := bytes.checkAccess, offset := bytes.offset
-   compareExchangeByteRelaxed := bytes.compareExchangeByteRelaxed
-   writeZeros := bytes.writeZeros, writeByte := bytes.writeByte}
+  {toMetadataHooks := narrow base cast, writeBytes := bytes.writeBytes}
 end Miri.Interpreter.TypedSyncObjectMachine

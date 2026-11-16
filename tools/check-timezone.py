@@ -43,7 +43,7 @@ def main():
         parser.error('reference binary/build record differs; rerun setup-miri-reference.sh')
     output.mkdir(parents=True)
     env = os.environ.copy()
-    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8144389c895d'
+    toolchain = Path(env.get('RUSTUP_HOME', ROOT / '.rustup')) / 'toolchains/miri-exporter-8eb778d04094'
     sysroot = Path(env.get('MIRI_SYSROOT', ROOT / 'scratch/miri-sysroot')).resolve()
     env['PATH'] = str(toolchain / 'bin') + ':' + env.get('PATH', '')
     env['LD_LIBRARY_PATH'] = str(toolchain / 'lib') + ':' + env.get('LD_LIBRARY_PATH', '')

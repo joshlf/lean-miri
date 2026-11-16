@@ -8,13 +8,13 @@ export CARGO_HOME="${CARGO_HOME:-$ROOT/.cargo}"
 # Fixture exports use the same pinned Miri std metadata as reference runs.
 export MIRI_SYSROOT="${MIRI_SYSROOT:-$ROOT/scratch/miri-sysroot}"
 export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-1}"
-TOOLCHAIN="miri-exporter-8144389c895d"
+TOOLCHAIN="miri-exporter-8eb778d04094"
 SYSROOT="$("$CARGO_HOME/bin/rustup" run "$TOOLCHAIN" rustc --print sysroot)"
 export PATH="$ROOT/.elan/bin:$SYSROOT/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$SYSROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 "$CARGO_HOME/bin/cargo" +"$TOOLCHAIN" build --offline --manifest-path "$ROOT/exporter/Cargo.toml"
-flock --no-fork /tmp/lean-miri-lake-build.lock lake build Miri.Input
+flock --no-fork /tmp/lean-miri-lake-build.lock lake build Miri
 lake env lean "$ROOT/MiriTests/Input/CompilerForeignSymbolTables.lean"
 lake env lean "$ROOT/MiriTests/Input/DefinitionLookup2026.lean"
 lake env lean "$ROOT/MiriTests/Input/DecoderProfile2026.lean"

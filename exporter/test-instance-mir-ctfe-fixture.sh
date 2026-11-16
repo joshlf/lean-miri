@@ -17,7 +17,7 @@ trap 'rm -rf "$TARGET"' EXIT
 
 CARGO_TARGET_DIR="$TARGET" "$EXPORTER" --cargo --root make_pair --root make_token --root constants --root call_once_shim --root invoke build --lib -p ctfe-consumer --offline \
   --manifest-path "$ROOT/exporter/fixtures/cargo-instance-mir/Cargo.toml"
-JSON="$(find "$TARGET/lean-miri-exporter-8144389c895d" -type f \
+JSON="$(find "$TARGET/lean-miri-exporter-8eb778d04094" -type f \
   -path '*/lean-miri-mir/ctfe_consumer-*.json' -print -quit)"
 if [[ -z "$JSON" ]]; then
   echo "instance MIR exporter did not produce the consumer document under $TARGET" >&2

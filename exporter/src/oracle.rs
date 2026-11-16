@@ -45,6 +45,7 @@ struct Booleans {
     is_monomorphic: bool,
     is_monomorphic_enough: bool,
     is_like_maybe_dangling: bool,
+    is_x87_f80_raw: bool,
     is_freeze: bool,
     is_unpin: bool,
     is_unsafe_unpin: bool,
@@ -96,6 +97,8 @@ pub(super) fn collect<'tcx>(
                 is_monomorphic: !input.has_non_region_param() && !input.has_escaping_bound_vars(),
                 is_monomorphic_enough: !input.has_param(),
                 is_like_maybe_dangling: input.is_like_maybe_dangling(),
+                is_x87_f80_raw: matches!(input.kind(), ty::Adt(def, _)
+                    if tcx.is_lang_item(def.did(), rustc_attr_ir::LangItem::X87F80Raw)),
                 is_freeze: normalized.is_freeze(tcx, env),
                 is_unpin: normalized.is_unpin(tcx, env),
                 is_unsafe_unpin: normalized.is_unsafe_unpin(tcx, env),
@@ -161,7 +164,7 @@ pub(super) fn collect<'tcx>(
                         value: layout.size.bytes(),
                     },
                     ty::VtblEntry::MetadataAlign => VtableEntry::AlignBytes {
-                        value: layout.align.abi.bytes(),
+                        value: layout.align.bytes(),
                     },
                     ty::VtblEntry::Vacant => VtableEntry::Vacant,
                     ty::VtblEntry::Method(instance) => VtableEntry::Method {

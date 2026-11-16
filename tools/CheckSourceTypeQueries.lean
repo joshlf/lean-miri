@@ -12,7 +12,7 @@ def main (args : List String) : IO UInt32 := do
   let .ok types := (oracle.getObjVal? "types").bind Json.getArr? | throw (IO.userError "oracle types absent")
   let booleanKeys := ["is_unsafe_cell","has_erasable_regions","is_c_void","is_simd","is_box",
     "is_global_box","is_dynamic","is_too_generic","is_monomorphic","is_monomorphic_enough",
-    "is_like_maybe_dangling","is_freeze","is_unpin","is_unsafe_unpin","needs_drop","opsem_inhabited","is_sized"]
+    "is_like_maybe_dangling","is_x87_f80_raw","is_freeze","is_unpin","is_unsafe_unpin","needs_drop","opsem_inhabited","is_sized"]
   let mut checked := 0
   let mut failures := 0
   for value in types do

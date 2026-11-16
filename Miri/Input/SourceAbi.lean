@@ -31,8 +31,7 @@ structure Queries where
   pointeeInfo : TyAndLayout TypeId → Size → Except String (Option PointeeInfo)
   passIndirectlyInNonRusticAbis : TypeId → Except String Bool
   thinSelf : TyAndLayout TypeId → Except String (TyAndLayout TypeId)
-  isFreeze : TypeId → Except String Bool
-  needsDrop : TypeId → Except String Bool
+  isX87F80 : TyAndLayout TypeId → Except String Bool
 
 -- rustc_ty_utils::abi::arg_attrs_for_rust_scalar. Pointee classification is a
 -- type query; scalar validity alone cannot establish reference permissions.
@@ -156,8 +155,13 @@ def adjustRust (policy : Policy) (queries : Queries) (conv : CanonAbi)
   return { arg with mode }
 
 inductive Eightbyte where
-  | integer | sse | sseUp
+  | integer | sse | sseUp | x87 | x87Up
   deriving BEq, Repr
+
+def Eightbyte.upperHalf : Eightbyte → Eightbyte
+  | .integer => .integer
+  | .sse | .sseUp => .sseUp
+  | .x87 | .x87Up => .x87Up
 
 def classifySysV (queries : Queries) (layout : TyAndLayout TypeId)
     (offset : Nat) (classes : Array (Option Eightbyte)) :
@@ -173,6 +177,7 @@ where
     let component : Eightbyte ← match layout.layout.backendRepr with
       | .Scalar scalar => pure (match scalar.primitive with
           | .Int .. | .Pointer _ => Eightbyte.integer
+          | .Float .X87F80 => .x87
           | .Float _ => .sse)
       | .SimdVector .. => pure .sse
       | .SimdScalableVector .. => throw "SysV ABI does not support scalable vectors"
@@ -198,12 +203,20 @@ where
     for index in [first:last + 1] do
       if h : index < result.size then
         let old := result[index]
+        match old, current with
+          | some .x87, .sse | some .x87, .sseUp
+          | some .x87Up, .sse | some .x87Up, .sseUp
+          | some .sse, .x87 | some .sse, .x87Up
+          | some .sseUp, .x87 | some .sseUp, .x87Up => return none
+          | _, _ => pure ()
         let merged := match old, current with
           | some .integer, _ | _, .integer => Eightbyte.integer
           | some .sse, _ | _, .sse => Eightbyte.sse
-          | _, _ => Eightbyte.sseUp
+          | some .sseUp, _ | _, .sseUp => Eightbyte.sseUp
+          | some .x87, _ | _, .x87 => Eightbyte.x87
+          | _, _ => current
         result := result.set index (some merged) h
-        if current == .sse then current := .sseUp
+        current := current.upperHalf
       else throw "SysV component index exceeds its classification buffer"
     return some result
 
@@ -225,7 +238,6 @@ def sysVClasses (queries : Queries) (arg : ArgAbi TypeId) :
     if h : index < classes.size then
       if classes[index] == some .sseUp then
         classes := classes.set index (some .sse) h
-        index := index + 1
       else if classes[index] == some .sse then
         index := index + 1
         while index < count do
@@ -234,6 +246,11 @@ def sysVClasses (queries : Queries) (arg : ArgAbi TypeId) :
           index := index + 1
       else index := index + 1
     else throw "SysV component index exceeds its classification buffer"
+  if classes[0]? == some (some .x87Up) then return none
+  for slot in [1:count] do
+    let some previous := classes[slot - 1]? | throw "SysV component index exceeds its classification buffer"
+    let some current := classes[slot]? | throw "SysV component index exceeds its classification buffer"
+    if current == some .x87Up && previous != some .x87 then return none
   return some classes
 
 def sysVRegister (classes : Array (Option Eightbyte)) (index remaining : Nat) :
@@ -250,7 +267,14 @@ def sysVRegister (classes : Array (Option Eightbyte)) (index remaining : Nat) :
       if remaining == 4 then Reg.f32 else Reg.f64
       else Reg.opaqueVector (Size.ofBytes (UInt64.ofNat (8 * (finish - index))))
     return some (register, finish)
-  | some .sseUp => throw "SysV register starts at an upper SSE component"
+  | some .x87 =>
+    let mut finish := index + 1
+    while h : finish < classes.size do
+      unless classes[finish] == some .x87Up do break
+      finish := finish + 1
+    unless finish == index + 2 do throw "SysV x87 register must occupy two eightbytes"
+    return some (⟨.Float, Size.ofBytes 10⟩, finish)
+  | some .sseUp | some .x87Up => throw "SysV register starts at an upper component"
 
 def sysVCast (classes : Array (Option Eightbyte)) (size : Size) : Except String CastTarget := do
   let some (low, index) ← sysVRegister classes 0 size.bytes.toNat
@@ -290,18 +314,23 @@ def adjustSysV (queries : Queries) (abi : FnAbi TypeId) (darwin : Bool) :
     if isArgument && (← queries.passIndirectlyInNonRusticAbis arg.layout.ty) then
       integerRegisters := integerRegisters - 1
       arg := { arg with mode := indirectMode arg.layout.layout }
+    else if isArgument && (← queries.isX87F80 arg.layout) then
+      let reg : Reg := ⟨.Float, Size.ofBytes 10⟩
+      arg := {arg with mode := .Cast 0 ⟨#[], none, ⟨reg, reg.size, false⟩, ArgAttributes.new⟩}
     else
       let mut classes ← sysVClasses queries arg
       if isArgument then
         if let some classified := classes then
-          let neededInteger := classified.foldl (fun count item =>
-            if item == some .integer then count + 1 else count) 0
-          let neededSse := classified.foldl (fun count item =>
-            if item == some .sse then count + 1 else count) 0
-          if neededInteger <= integerRegisters && neededSse <= sseRegisters then
-            integerRegisters := integerRegisters - neededInteger
-            sseRegisters := sseRegisters - neededSse
-          else if arg.layout.layout.isAggregate then classes := none
+          if classified.contains (some .x87) then classes := none
+          else
+            let neededInteger := classified.foldl (fun count item =>
+              if item == some .integer then count + 1 else count) 0
+            let neededSse := classified.foldl (fun count item =>
+              if item == some .sse then count + 1 else count) 0
+            if neededInteger <= integerRegisters && neededSse <= sseRegisters then
+              integerRegisters := integerRegisters - neededInteger
+              sseRegisters := sseRegisters - neededSse
+            else if arg.layout.layout.isAggregate then classes := none
       match classes with
       | none =>
         let mode := indirectMode arg.layout.layout
@@ -438,26 +467,6 @@ def compute (source : SourceAbiPolicy) (target : RuntimeTargetDataLayout) (queri
     let rustArgs ← abi.args.mapM (fun arg => adjustRust policy queries conv arg false)
     let rustRet ← adjustRust policy queries conv abi.ret true
     abi := {abi with args := rustArgs, ret := rustRet}
-    if item && source.optimize && !source.incremental then
-      if let some definition := definition then
-        let mut args := abi.args
-        let mut ret := abi.ret
-        for (initial, index) in (#[ret] ++ args).toList.zipIdx do
-          let some usage := definition.parameterUses[index]? | continue
-          let mut arg := initial
-          let .Indirect attrs space mode := arg.mode | continue
-          let needsDrop ← if usage &&& 1 != 0 && (usage &&& 4 == 0 || usage &&& 8 == 0) then
-            queries.needsDrop arg.layout.ty else pure false
-          let readOnly ← if usage &&& 4 != 0 || needsDrop then pure false
-            else if usage &&& 2 == 0 then pure true else queries.isFreeze arg.layout.ty
-          let capturesNone := usage &&& 8 == 0 && !needsDrop
-          let attrs := {attrs with regular := attrs.regular |||
-            (if readOnly then 32 else 0) ||| (if capturesNone then 7 else 0)}
-          arg := {arg with mode := .Indirect attrs space mode}
-          if index == 0 then ret := arg
-          else if h : index - 1 < args.size then args := args.set (index - 1) arg h
-          else throw "deduced ABI argument index exceeds its argument buffer"
-        abi := {abi with args, ret}
   else if signature.abi == .X86Interrupt then
     if h : 0 < abi.args.size then
       let first := abi.args[0]

@@ -254,6 +254,9 @@ def validate (document : ImportDocument) (coverage : CoroutineCoverage) : Except
           throw "coroutine coverage: asymmetric storage conflicts"
     let some material := coroutineType.sourceLayout.coroutine |
       throw "coroutine coverage: missing source layout material"
+    if let .Coroutine movability := row.kind then
+      unless material.movability == movability do
+        throw "coroutine coverage: source movability differs from body kind"
     unless material.savedTypes == fields.map (·.typeId) && material.variants == row.layout.variants &&
         material.conflicts == row.layout.storageConflicts do
       throw "coroutine coverage: source layout differs from saved-local evidence"

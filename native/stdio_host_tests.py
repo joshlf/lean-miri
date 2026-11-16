@@ -19,10 +19,10 @@ def main():
     scratch.mkdir(parents=True, exist_ok=True)
     workdir = Path(tempfile.mkdtemp(prefix='ci-qa-', dir=scratch))
     print('Native stdio QA artifacts: ' + str(workdir), flush=True)
-    expected = '8144389c895da997dbdecaa635e41d6a50be6ffd'
+    expected = '8eb778d04094d3af4b26580cab327e0413eb1e02'
     assert (ROOT/'upstream/.pins/rustc.commit').read_text().strip() == expected
     rustup = Path(os.environ.get('RUSTUP_HOME', ROOT/'.rustup'))
-    rustc = rustup / 'toolchains/miri-exporter-8144389c895d/bin/rustc'
+    rustc = rustup / 'toolchains/miri-exporter-8eb778d04094/bin/rustc'
     version = subprocess.run([str(rustc), '-vV'], check=True, capture_output=True,
                              text=True, timeout=30)
     assert f'commit-hash: {expected}' in version.stdout.splitlines(), version.stdout

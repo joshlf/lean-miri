@@ -46,6 +46,7 @@ def integer : MIR.IntegerKind → Result Integer
   | .isize | .usize => throw (.unsupported "pointer-sized integer primitive tag")
 def float : FloatTypeTag → Result ABI.Float
   | .f16 => pure .F16 | .f16b => pure .F16B | .f32 => pure .F32
+  | .x87f80 => pure .X87F80
   | .f64 => pure .F64 | .f128 => pure .F128 | .ppcf128 => pure .PpcF128
 
 def primitive (target : RuntimeTargetDataLayout) (source : PrimitiveLayout) : Result Primitive := do
@@ -214,6 +215,7 @@ def importTarget (source : TargetDataLayoutEvidence) : Result RuntimeTargetDataL
     f32Align := ← alignment source.f32AlignBytes,
     f64Align := ← alignment source.f64AlignBytes,
     f128Align := ← alignment source.f128AlignBytes,
+    x87F80Align := ← source.x87F80AlignBytes.mapM alignment,
     aggregateAlign := ← alignment source.aggregateAlignBytes,
     vectorAlign := vectors,
     defaultAddressSpace := ⟨← u32 source.defaultAddressSpace "default address space"⟩,
@@ -311,7 +313,10 @@ private def primitiveType (metadata : RuntimeMetadata) (primitive : Primitive) :
     | .Int integer signed,.uint (.known actual) => !signed && match integer,actual with
       | .I8,.u8 | .I16,.u16 | .I32,.u32 | .I64,.u64 | .I128,.u128 => true | _,_ => false
     | .Float actual,.float expected => match actual,expected with
-      | .F16,.f16 | .F16B,.f16b | .F32,.f32 | .F64,.f64 | .F128,.f128 | .PpcF128,.ppcf128 => true | _,_ => false
+      | .F16,.f16 | .F16B,.f16b | .F32,.f32 | .F64,.f64 | .X87F80,.x87f80 | .F128,.f128 | .PpcF128,.ppcf128 => true | _,_ => false
+    | .Float actual,_ => match actual,node.sourceLayout.specialFloat with
+      | .F16B,some .f16b | .X87F80,some .x87f80 | .PpcF128,some .ppcf128 => true
+      | _,_ => false
     | .Pointer _,.rawPointer pointee .Mut =>
       match metadata.source.types[pointee]? with
       | some {shape := .tuple elements,..} => elements.isEmpty

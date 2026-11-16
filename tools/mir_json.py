@@ -28,8 +28,8 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
         raise MirJSONError("MIR document root must be an object")
     if document.get("schema") != "lean-miri-rustc-mir":
         raise MirJSONError("document is not a lean-miri-rustc-mir export")
-    if type(document.get("schema_version")) is not int or document["schema_version"] != 13:
-        raise MirJSONError("MIR root schema_version must be 13")
+    if type(document.get("schema_version")) is not int or document["schema_version"] != 14:
+        raise MirJSONError("MIR root schema_version must be 14")
     for name in sorted(POOL_NAMES):
         if not isinstance(document.get(name), list):
             raise MirJSONError(f"{name} must be a pool array")
@@ -112,5 +112,5 @@ def inspection_document(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_mir_inspection_document(path: str | Path) -> dict[str, Any]:
-    """Load a schema-11/12 document and explicitly resolve shared inspection payloads."""
+    """Load a schema-14 document and explicitly resolve shared inspection payloads."""
     return inspection_document(load_mir_document(path))

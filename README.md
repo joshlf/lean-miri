@@ -104,7 +104,7 @@ exporting Cargo projects and the input format.
 An executable defaults to its entry function; libraries require explicit roots.
 Repeated `--root` options select multiple functions. A selected generic function
 contributes a declaration; only discovered concrete instances have executable
-MIR. Schema 13 requires fresh exports from earlier input formats.
+MIR. Schema 14 requires fresh exports from earlier input formats.
 
 ## Tests
 
