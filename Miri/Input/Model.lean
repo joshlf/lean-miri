@@ -1,19 +1,30 @@
 import Miri.Input.Model.Types
 import Miri.Input.Model.Catalogs
 import Miri.Input.Model.Coroutine
+import Miri.Input.Model.SourceTraits
+import Miri.Input.Model.SourceVTables
+import Miri.Input.Model.SourceAbi
 
 namespace Miri.Input
 
+structure RootDeclaration where
+  definition : DefinitionRef
+  defPath : String
+  genericParameters : Array SourceParameterKind
+  deriving Repr, DecidableEq
+
 structure ImportDocument where
+  sourceCastTargets : Array SourceCastTarget := #[]
+  rootDeclarations : Array RootDeclaration := #[]
+  sourceVtables : SourceVTableMaterial := {}
+  sourceTraits : SourceTraitMaterial := {}
+  sourceAbi : Option SourceAbiMaterial := none
   compilerPredicates : Array CompilerPredicateEvidence := #[]
-  /-- Version tag for source physical ArgAbi layouts in FnAbi evidence. -/
-  compilerAbiLayoutSchema : Option String := none
   producer : Producer
   runtimeTargetDataLayout : Option TargetDataLayoutEvidence := none
   predicates : Array VtablePredicate := #[]
   definitions : Array DefinitionId := #[]
   typeConstants : Array Miri.MIR.TypeConst := #[]
-  layouts : Array Layout := #[]
   /-- Exact diagnostic and remapped filenames, shared across all source records. -/
   files : Array String := #[]
   spans : Array SourceSpanData := #[]
@@ -22,7 +33,6 @@ structure ImportDocument where
   compilerAllocIdWorld : Option CompilerAllocIdWorld := none
   instances : Array InstanceNode
   selectedScope : Option SelectedScope
-  functionAbis : Array FunctionAbi
   bodyRoots : Array BodyRoot := #[]
   bodies : Array Body
   coroutineCoverage : Option CoroutineCoverage := none

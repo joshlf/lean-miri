@@ -110,8 +110,7 @@ private def dynamicPredicates (prepared : Prepared) (id : TypeId) : Result Predi
 def validityKind (prepared : Prepared) (id : TypeId) : Result ValidityVisitor.TypeKind := do
   let context := prepared.context
   let node ← source context id
-  if context.runtime.source.producer.rustcCommit != "8144389c895da997dbdecaa635e41d6a50be6ffd" then
-    if ← CompilerFacts.boolean context id "is_x87_f80_raw" then return .float
+  if ← CompilerFacts.boolean context id "is_x87_f80_raw" then return .float
   match node.shape with
   | .bool => pure .boolean | .char => pure .character | .int _ | .uint _ => pure .integer
   | .float _ => pure .float | .functionPointer .. => pure .functionPointer | .never => pure .never

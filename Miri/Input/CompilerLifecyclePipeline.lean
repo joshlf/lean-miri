@@ -39,7 +39,7 @@ def prepareProfiled (profile : Lean.Options) (calls : CompilerCallPipeline.Prepa
   let frames ← profileit "preparation.lifecycle.frame_metadata" profile fun _ =>
     CompilerFrameMetadata.prepare calls
   let shim ← profileit "preparation.lifecycle.shim_abi" profile fun _ =>
-    CompilerShimAbi.prepare runtime
+    CompilerShimAbi.prepare runtime program
   return ⟨calls,{instances with program},{lifecycle with program},backtrace,frames,shim⟩
 
 def prepare (calls : CompilerCallPipeline.Prepared) : Except String Prepared :=

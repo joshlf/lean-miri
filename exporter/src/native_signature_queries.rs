@@ -17,8 +17,7 @@ pub(super) fn discover<'tcx>(
     let mut seen = HashSet::new();
     let mut requests = context.instance_events[state.events..].iter().copied()
         .filter(|instance| seen.insert(*instance))
-        .filter(|instance| !context.runtime_query_only_empty_drops.contains(instance)
-            && !context.symbol_only_instances.contains(instance)
+        .filter(|instance| !context.symbol_only_instances.contains(instance)
             && !matches!(instance.def, ty::InstanceKind::Virtual(..)))
         .filter(|instance| {
             let kind = tcx.def_kind(instance.def_id());
@@ -86,7 +85,6 @@ pub(super) fn finish(state: State, context: &ExportContext<'_>) -> Vec<Query> {
     state.facts.into_values().filter(|fact| {
         let instance = context.instance_ids.key(fact.instance_id as usize).unwrap();
         !context.symbol_only_instances.contains(instance)
-            && !context.runtime_query_only_empty_drops.contains(instance)
     }).map(|fact| Query {
         instance_id: fact.instance_id,
         query: fact.query,

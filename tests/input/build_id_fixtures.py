@@ -18,9 +18,9 @@ EXPORTS = ROOT / "tests/input/fixtures"
 def write(name, value):
     if isinstance(value, dict) and value.get("schema") == "lean-miri-rustc-mir":
         version = value["schema_version"]
-        value["schema_version"] = 8
+        value["schema_version"] = 14
         value = pool_document(value)
-        if version != 8:
+        if version != 14:
             value["schema_version"] = version
     (OUT / f"{name}.json").write_text(json.dumps(value, separators=(",", ":")) + "\n")
 
@@ -51,7 +51,7 @@ def set_table_empty(doc, key):
 
 
 def base():
-    return expand_document(json.loads((EXPORTS / "strict-unit.json").read_text()), schema_version=8)
+    return expand_document(json.loads((EXPORTS / "strict-unit.json").read_text()))
 
 
 def main():
@@ -60,8 +60,8 @@ def main():
     del doc["types"][0]["shape"]["kind"]
     write("missing-type-shape-kind", doc)
     doc = base()
-    del doc["layouts"][doc["types"][0]["layout"]]["size_bytes"]
-    write("missing-type-layout-size", doc)
+    del doc["types"][0]["source_layout"]["normalized_type"]
+    write("missing-normalized-type", doc)
 
     write("valid-dense", base())
     doc = base()

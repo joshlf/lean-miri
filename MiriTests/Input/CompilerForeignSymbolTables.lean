@@ -23,16 +23,15 @@ private def unusedPrimitives : Catalog.Primitives := {
 private def document (symbols : Catalog.ForeignSymbols) : ImportDocument := {
   producer := ⟨"miri", "rustc", "version", "target"⟩
   types := #[], allocations := #[], instances := #[], selectedScope := none
-  functionAbis := #[], bodies := #[], producerSettings := unusedSettings
+  bodies := #[], producerSettings := unusedSettings
   queries := {
     session := ⟨#[], false, "test", 0, #[]⟩
-    runtime := ⟨none, #[], #[], #[], symbols⟩
-    frameMetadata := ⟨0, #[]⟩, instanceAbis := #[]
-    functionFacts := ⟨#[], #[], #[]⟩, casts := #[], typeNames := #[], panic := #[]
-    nativeSignatures := #[], retag := #[], covariance := #[]
+    runtime := ⟨none, #[], symbols⟩
+    frameMetadata := ⟨0, #[]⟩, typeNames := #[], panic := #[]
+    nativeSignatures := #[], retag := #[]
     globalBytes := ⟨0, 0, #[], #[]⟩, callerLocations := #[]
     main := ⟨none, none, none, #[], none⟩, primitives := unusedPrimitives
-    vtables := #[], namedTypes := none, shimAbis := none, namedShimAbis := none
+    namedTypes := none, shimAbis := none, namedShimAbis := none
     libcTypeLayouts := none, windowsTypeLayouts := none, namedConstants := none, namedStatics := none } }
 
 private def target : Miri.ABI.RuntimeTargetDataLayout := Id.run do

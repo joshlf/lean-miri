@@ -218,7 +218,9 @@ def main : IO Unit := do
   check (result.isOk && !state.trace.contains "copy" && state.trace.contains "storageLive") "noncapturing closure self"
   let variadicAbi : TestAbi := ⟨#[layout], layout, true, true, 0⟩
   let variadic := { hooks with
-    fnAbiOfInstance := fun _ _ _ => log "fnAbi" variadicAbi
+    fnAbiOfInstance := fun _ _ extra => do
+      unless extra.isEmpty do blocked "callee ABI received caller variadic types"
+      log "fnAbi" {variadicAbi with args := #[]}
     allocateStack := fun _ _ => log "allocateStack" mplace
     copyToMemory := fun _ _ _ => log "copyToMemory" ()
     vaListPtr := fun _ _ => log "vaListPtr" ⟨Size.ZERO, some ()⟩
@@ -253,9 +255,13 @@ def main : IO Unit := do
   let (state, result) := Call.run (Call.initFnCall foreign () 1
     { request with callee := .Other (), callerFnAbi := none }) {}
   check (!result.isOk && state.trace.isEmpty) "foreign call requires ABI"
-  let failedVarargs := { variadic with checkArgumentCompat := fun _ _ _ => do
-    let s ← get
-    log "compat" (!s.trace.contains "copyToMemory") }
+  let failedVarargs := { variadic with
+    checkArgumentCompat := fun _ _ _ => blocked "unexpected vararg compatibility query"
+    allocateStack := fun _ _ => do
+      let s ← get
+      if s.trace.contains "copyToMemory" then blocked "allocateStack"
+      else log "allocateStack" mplace }
   let (state, result) := Call.run (Call.allocateVarargs failedVarargs ()
-    #[(.Copy op, layout), (.Copy op, layout)] #[layout, layout]) {}
-  check (!result.isOk && state.trace == ["compat", "allocateStack", "copyToMemory", "compat"]) "varargs partial allocation remains on later error"
+    #[(.Copy op, layout), (.Copy op, layout)]) {}
+  check (!result.isOk && state.trace == ["allocateStack", "copyToMemory", "allocateStack"])
+    "varargs partial allocation remains on later error without callee ABI queries"

@@ -62,69 +62,6 @@ def frame_metadata : Parser (FrameMetadata) := do
   return {
     localCrate, crates }
 
-private structure instance_abiFields where
-  _environment : Option (String) := none
-  instanceId : Option (Nat) := none
-  extraArgumentTypes : Option (Array (Nat)) := none
-  abiId : Option (Nat) := none
-
-def instance_abi : Parser (InstanceAbi) := do
-  let fields ← object ({} : instance_abiFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "instance_id" => return { fields with instanceId := some (← natural) }
-    | "extra_argument_types" => return { fields with extraArgumentTypes := some (← array (natural)) }
-    | "abi_query" => return { fields with abiId := some (← natural) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let instanceId ← need fields.instanceId "instance_id"
-  let extraArgumentTypes ← need fields.extraArgumentTypes "extra_argument_types"
-  let abiId ← need fields.abiId "abi_query"
-  return {
-    instanceId, extraArgumentTypes, abiId }
-
-private structure pointer_abiFields where
-  _environment : Option (String) := none
-  typeId : Option (Nat) := none
-  extraArgumentTypes : Option (Array (Nat)) := none
-  abiId : Option (Nat) := none
-
-def pointer_abi : Parser (PointerAbi) := do
-  let fields ← object ({} : pointer_abiFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "type_id" => return { fields with typeId := some (← natural) }
-    | "extra_argument_types" => return { fields with extraArgumentTypes := some (← array (natural)) }
-    | "abi_query" => return { fields with abiId := some (← natural) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let typeId ← need fields.typeId "type_id"
-  let extraArgumentTypes ← need fields.extraArgumentTypes "extra_argument_types"
-  let abiId ← need fields.abiId "abi_query"
-  return {
-    typeId, extraArgumentTypes, abiId }
-
-private structure helper_signatureFields where
-  _environment : Option (String) := none
-  signature : Option (Signature) := none
-  splatted : Option (Bool) := none
-  abiId : Option (Nat) := none
-
-def helper_signature : Parser (HelperSignature) := do
-  let fields ← object ({} : helper_signatureFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "signature" => return { fields with signature := some (← signature) }
-    | "splatted" => return { fields with splatted := some (← boolean) }
-    | "abi_query" => return { fields with abiId := some (← natural) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let signature ← need fields.signature "signature"
-  let splatted ← need fields.splatted "splatted"
-  let abiId ← need fields.abiId "abi_query"
-  return {
-    signature, splatted, abiId }
-
 private structure native_signatureFields where
   instanceId : Option (Nat) := none
   query : Option (String) := none
@@ -163,30 +100,6 @@ def retag_query : Parser (RetagQuery) := do
   let rustcNoWritable ← need fields.rustcNoWritable "rustc_no_writable"
   return {
     definition, rustcNoWritable }
-
-private structure covarianceFields where
-  _environment : Option (String) := none
-  sourceType : Option (Nat) := none
-  targetType : Option (Nat) := none
-  value : Option (Bool) := none
-  _variance : Option (String) := none
-
-private def covariance : Parser (CovarianceQuery) := do
-  let fields ← object ({} : covarianceFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "source_type" => return { fields with sourceType := some (← natural) }
-    | "target_type" => return { fields with targetType := some (← natural) }
-    | "value" => return { fields with value := some (← boolean) }
-    | "variance" => return { fields with _variance := some (← expectedString "covariant") }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let sourceType ← need fields.sourceType "source_type"
-  let targetType ← need fields.targetType "target_type"
-  let value ← need fields.value "value"
-  let _variance ← need fields._variance "variance"
-  return {
-    sourceType, targetType, value }
 
 private structure start_resolutionFields where
   instanceId : Option (Nat) := none
@@ -362,141 +275,6 @@ private def shim_signature : Parser (ShimSignature) := do
   return {
     callingConvention, arguments, result, cVariadic }
 
-private structure functionKindFields where
-  kind : Option (String) := none
-  instanceId : Option (Nat) := none
-
-private def functionKind : Parser (Option Nat) := do
-  let fields ← object ({} : functionKindFields) fun fields key => do
-    match key with
-    | "kind" => return { fields with kind := some (← string) }
-    | "instance_id" => return { fields with instanceId := some (← natural) }
-    | _ => skipValue; pure fields
-  let kind ← need fields.kind "kind"
-  let instanceId := fields.instanceId
-  match kind with
-  | "function_pointer" =>
-    if instanceId.isSome then fail "function pointer kind carries instance"
-    pure none
-  | "function_definition" => some <$> need instanceId "instance_id"
-  | _ => fail "unknown compiler function kind"
-
-private structure functionTypeFields where
-  _environment : Option (String) := none
-  typeId : Option (Nat) := none
-  instanceId : Option (Option Nat) := none
-  signature : Option (Signature) := none
-
-private def functionType : Parser (FunctionType) := do
-  let fields ← object ({} : functionTypeFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "type_id" => return { fields with typeId := some (← natural) }
-    | "function_kind" => return { fields with instanceId := some (← functionKind) }
-    | "signature_query" => return { fields with signature := some (← signature) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let typeId ← need fields.typeId "type_id"
-  let instanceId ← need fields.instanceId "function_kind"
-  let signature ← need fields.signature "signature_query"
-  return {
-    typeId, instanceId, signature }
-
-private structure functionFactsFields where
-  types : Option (Array (FunctionType)) := none
-  pointerAbis : Option (Array (PointerAbi)) := none
-  helperSignatures : Option (Array (HelperSignature)) := none
-
-def functionFacts : Parser (FunctionFacts) := do
-  let fields ← object ({} : functionFactsFields) fun fields key => do
-    match key with
-    | "types" => return { fields with types := some (← array (functionType)) }
-    | "pointer_abis" => return { fields with pointerAbis := some (← array (pointer_abi)) }
-    | "helper_signatures" => return { fields with helperSignatures := some (← array (helper_signature)) }
-    | _ => skipValue; pure fields
-  let types ← need fields.types "types"
-  let pointerAbis ← need fields.pointerAbis "pointer_abis"
-  let helperSignatures ← need fields.helperSignatures "helper_signatures"
-  return {
-    types, pointerAbis, helperSignatures }
-
-private structure castQueryFields where
-  _environment : Option (String) := none
-  kind : Option (String) := none
-  resolution : Option (String) := none
-  resolvedInstance : Option (Nat) := none
-  input : Option (Nat) := none
-  args : Option (Bool) := none
-  source : Option (Nat) := none
-  target : Option (Nat) := none
-  value : Option (Option Nat) := none
-  sourceTail : Option (Nat) := none
-  targetTail : Option (Nat) := none
-  output : Option (Nat) := none
-
-def castQuery : Parser (CastQuery) := do
-  let fields ← object ({} : castQueryFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "query_kind" => return { fields with kind := some (← string) }
-    | "resolution_kind" => return { fields with resolution := some (← string) }
-    | "instance_id" => return { fields with resolvedInstance := some (← natural) }
-    | "input_type" => return { fields with input := some (← natural) }
-    | "args_no_bound_vars" => return { fields with args := some (← boolean) }
-    | "input_source" => return { fields with source := some (← natural) }
-    | "input_target" => return { fields with target := some (← natural) }
-    | "value" =>
-      if (← Std.Internal.Parsec.peek!) == '{' then
-        fail "obsolete wrapped compiler cast query value"
-      return { fields with value := some (← nullable natural) }
-    | "source_tail" => return { fields with sourceTail := some (← natural) }
-    | "target_tail" => return { fields with targetTail := some (← natural) }
-    | "type" => return { fields with output := some (← natural) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let kind ← need fields.kind "query_kind"
-  let resolution := fields.resolution
-  let resolvedInstance := fields.resolvedInstance
-  let input := fields.input
-  let args := fields.args
-  let source := fields.source
-  let target := fields.target
-  let value := fields.value
-  let sourceTail := fields.sourceTail
-  let targetTail := fields.targetTail
-  let output := fields.output
-  let hasUnary := input.isSome || args.isSome || resolvedInstance.isSome || resolution.isSome
-  let hasPair := source.isSome || target.isSome
-  let hasTails := sourceTail.isSome || targetTail.isSome
-  match kind with
-  | "resolve_fn_ptr" | "resolve_closure_fn_once" =>
-    if hasPair || hasTails || value.isSome || output.isSome then
-      fail "function resolution carries unrelated query payload"
-    if kind == "resolve_closure_fn_once" && resolution.isSome then
-      fail "closure resolution carries function resolution kind"
-  | "supertrait_slot" =>
-    if hasUnary || hasTails || output.isSome then fail "supertrait slot carries unrelated query payload"
-  | "lockstep_tails" =>
-    if hasUnary || value.isSome || output.isSome then fail "lockstep tails carries unrelated query payload"
-  | "box_type" =>
-    if args.isSome || resolvedInstance.isSome || resolution.isSome || hasPair || hasTails || value.isSome then
-      fail "box type carries unrelated query payload"
-  | _ => pure ()
-  match kind with
-  | "resolve_fn_ptr" =>
-    let resolved ← match ← need resolution "resolution_kind" with
-      | "none" =>
-        if resolvedInstance.isSome then fail "absent function resolution carries instance"
-        pure none
-      | "instance" => some <$> need resolvedInstance "instance_id"
-      | _ => fail "unknown function resolution kind"
-    return .resolveFnPtr (← need input "input_type") (← need args "args_no_bound_vars") resolved
-  | "resolve_closure_fn_once" => return .resolveClosureFnOnce (← need input "input_type") (← need args "args_no_bound_vars") (← need resolvedInstance "instance_id")
-  | "supertrait_slot" => return .supertraitSlot (← need source "input_source") (← need target "input_target") (← need value "value")
-  | "lockstep_tails" => return .lockstepTails (← need source "input_source") (← need target "input_target") (← need sourceTail "source_tail") (← need targetTail "target_tail")
-  | "box_type" => return .boxType (← need input "input_type") (← need output "type")
-  | _ => fail "unknown compiler cast query"
-
 private structure panicQueryFields where
   langItem : Option (String) := none
   definition : Option (Option Nat) := none
@@ -627,40 +405,22 @@ def mainQueries : Parser (Main) := do
   return {
     startLangItem, compilerEntry, compilerEntryType, entries, linkSections := linkSections.join }
 
-private structure shimQueryFields where
-  inputs : Option (Array (Nat)) := none
-  output : Option (Nat) := none
-  abi : Option (Nat) := none
-
-private def shimQuery : Parser (Array Nat × Nat × Nat) := do
-  let fields ← object ({} : shimQueryFields) fun fields key => do
-    match key with
-    | "input_types" => return { fields with inputs := some (← array (natural)) }
-    | "output_type" => return { fields with output := some (← natural) }
-    | "abi_query" => return { fields with abi := some (← natural) }
-    | _ => skipValue; pure fields
-  let inputs ← need fields.inputs "input_types"
-  let output ← need fields.output "output_type"
-  let abi ← need fields.abi "abi_query"
-  return (inputs, output, abi)
-
 private structure shimAbiFields where
-  _environment : Option (String) := none
-  signature : Option (ShimSignature) := none
-  query : Option (Array Nat × Nat × Nat) := none
+  signature : Option ShimSignature := none
+  inputs : Option (Array Nat) := none
+  output : Option Nat := none
 
-def shimAbi : Parser (ShimAbi) := do
+def shimAbi : Parser ShimAbi := do
   let fields ← object ({} : shimAbiFields) fun fields key => do
     match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
     | "signature" => return { fields with signature := some (← shim_signature) }
-    | "query" => return { fields with query := some (← shimQuery) }
+    | "input_types" => return { fields with inputs := some (← array natural) }
+    | "output_type" => return { fields with output := some (← natural) }
     | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let signature ← need fields.signature "signature"
-  let query ← need fields.query "query"
   return {
-    signature, inputTypes := query.1, outputType := query.2.1, abiId := query.2.2 }
+    signature := ← need fields.signature "signature"
+    inputTypes := ← need fields.inputs "input_types"
+    outputType := ← need fields.output "output_type" }
 
 private structure namedShimAbiFields where
   name : Option (String) := none
@@ -748,69 +508,6 @@ def namedStatic : Parser (NamedStatic) := do
     name, path, definition := query.1, isStatic := query.2.1 == "static",
     typeId := query.2.2.1, allocation := query.2.2.2 }
 
-private structure vtableMetadataFields where
-  typeId : Option (Nat) := none
-  sizeBytes : Option (Option Nat) := none
-  alignBytes : Option (Option Nat) := none
-  principalPredicate : Option (Option Nat) := none
-  predicates : Option (Array (Nat)) := none
-  entries : Option (Array (VtableEntry)) := none
-
-private def vtableMetadata : Parser (VtableAllocation) := do
-  let fields ← object ({} : vtableMetadataFields) fun fields key => do
-    match key with
-    | "type" => return { fields with typeId := some (← natural) }
-    | "size_bytes" => return { fields with sizeBytes := some (← nullable natural) }
-    | "align_bytes" => return { fields with alignBytes := some (← nullable natural) }
-    | "principal_predicate" => return { fields with principalPredicate := some (← nullable natural) }
-    | "predicates" => return { fields with predicates := some (← array (natural)) }
-    | "entries" => return { fields with entries := some (← array (DecoderValues.parseVtableEntry "$vtable.entries")) }
-    | _ => skipValue; pure fields
-  let typeId ← need fields.typeId "type"
-  let sizeBytes ← need fields.sizeBytes "size_bytes"
-  let alignBytes ← need fields.alignBytes "align_bytes"
-  let principalPredicate ← need fields.principalPredicate "principal_predicate"
-  let predicates ← need fields.predicates "predicates"
-  let entries ← need fields.entries "entries"
-  return {
-    typeId, sizeBytes, alignBytes, principalPredicate, predicates, entries }
-
-private structure vtableQueryFields where
-  queryId : Option (Nat) := none
-  inputType : Option (Nat) := none
-  inputPredicates : Option (Array (Nat)) := none
-  outputType : Option (Nat) := none
-  outputPredicates : Option (Array (Nat)) := none
-  outputTypeMonomorphic : Option (Bool) := none
-  outputPredicatesMonomorphic : Option (Bool) := none
-  vtableAllocation : Option (Option Nat) := none
-  metadata : Option (VtableAllocation) := none
-
-def vtableQuery : Parser (VtableQuery) := do
-  let fields ← object ({} : vtableQueryFields) fun fields key => do
-    match key with
-    | "query_id" => return { fields with queryId := some (← natural) }
-    | "input_type" => return { fields with inputType := some (← natural) }
-    | "input_predicates" => return { fields with inputPredicates := some (← array (natural)) }
-    | "output_type" => return { fields with outputType := some (← natural) }
-    | "output_predicates" => return { fields with outputPredicates := some (← array (natural)) }
-    | "output_type_monomorphic_enough" => return { fields with outputTypeMonomorphic := some (← boolean) }
-    | "output_predicates_monomorphic_enough" => return { fields with outputPredicatesMonomorphic := some (← boolean) }
-    | "vtable_allocation_id" => return { fields with vtableAllocation := some (← nullable natural) }
-    | "vtable_metadata" => return { fields with metadata := some (← vtableMetadata) }
-    | _ => skipValue; pure fields
-  let queryId ← need fields.queryId "query_id"
-  let inputType ← need fields.inputType "input_type"
-  let inputPredicates ← need fields.inputPredicates "input_predicates"
-  let outputType ← need fields.outputType "output_type"
-  let outputPredicates ← need fields.outputPredicates "output_predicates"
-  let outputTypeMonomorphic ← need fields.outputTypeMonomorphic "output_type_monomorphic_enough"
-  let outputPredicatesMonomorphic ← need fields.outputPredicatesMonomorphic "output_predicates_monomorphic_enough"
-  let vtableAllocation ← need fields.vtableAllocation "vtable_allocation_id"
-  let metadata ← need fields.metadata "vtable_metadata"
-  return {
-    queryId, inputType, inputPredicates, outputType, outputPredicates, outputTypeMonomorphic, outputPredicatesMonomorphic, vtableAllocation, metadata }
-
 private structure namedConstantQueryFields where
   instanceId : Option (Nat) := none
   typeId : Option (Nat) := none
@@ -891,19 +588,14 @@ structure QueryFields where
   session : Option (Session) := none
   runtime : Option (Runtime) := none
   frameMetadata : Option (FrameMetadata) := none
-  instanceAbis : Option (Array InstanceAbi) := none
-  functionFacts : Option (FunctionFacts) := none
-  casts : Option (Array CastQuery) := none
   typeNames : Option (Array TypeName) := none
   panic : Option (Array PanicQuery) := none
   nativeSignatures : Option (Array NativeSignature) := none
   retag : Option (Array RetagQuery) := none
-  covariance : Option (Array CovarianceQuery) := none
   globalBytes : Option (GlobalBytes) := none
   callerLocations : Option (Array CallerLocation) := none
   main : Option (Main) := none
   primitives : Option (Primitives) := none
-  vtables : Option (Array VtableQuery) := none
   namedTypes : Option (Option (Array (String × Nat))) := none
   shimAbis : Option (Option (Array ShimAbi)) := none
   namedShimAbis : Option (Option (Array NamedShimAbi)) := none
@@ -917,19 +609,14 @@ def parseField (fields : QueryFields) (key : String) : Parser (Option QueryField
   | "compiler_session_queries" => return some { fields with session := some (← session) }
   | "compiler_runtime_queries" => return some { fields with runtime := some (← runtime) }
   | "compiler_frame_metadata" => return some { fields with frameMetadata := some (← frame_metadata) }
-  | "compiler_instance_abis" => return some { fields with instanceAbis := some (← array instance_abi) }
-  | "compiler_function_facts" => return some { fields with functionFacts := some (← functionFacts) }
-  | "compiler_cast_queries" => return some { fields with casts := some (← array castQuery) }
   | "compiler_type_name_constants" => return some { fields with typeNames := some (← array typeName) }
   | "compiler_panic_queries" => return some { fields with panic := some (← array panicQuery) }
   | "compiler_native_signature_queries" => return some { fields with nativeSignatures := some (← array native_signature) }
   | "compiler_retag_queries" => return some { fields with retag := some (← array retag_query) }
-  | "compiler_covariance_queries" => return some { fields with covariance := some (← array covariance) }
   | "compiler_global_byte_queries" => return some { fields with globalBytes := some (← globalBytes) }
   | "compiler_caller_location_constants" => return some { fields with callerLocations := some (← array callerLocation) }
   | "compiler_main_queries" => return some { fields with main := some (← mainQueries) }
   | "compiler_runtime_primitives" => return some { fields with primitives := some (← primitives) }
-  | "compiler_vtable_queries" => return some { fields with vtables := some (← array vtableQuery) }
   | "compiler_named_types" => return some { fields with namedTypes := some (← nullable (namedTypes)) }
   | "compiler_shim_abis" => return some { fields with shimAbis := some (← nullable (array shimAbi)) }
   | "compiler_named_shim_abis" => return some { fields with namedShimAbis := some (← nullable (array namedShimAbi)) }
@@ -944,19 +631,14 @@ def finish (fields : QueryFields) : Parser Queries := do
     session := ← need fields.session "compiler_session_queries"
     runtime := ← need fields.runtime "compiler_runtime_queries"
     frameMetadata := ← need fields.frameMetadata "compiler_frame_metadata"
-    instanceAbis := ← need fields.instanceAbis "compiler_instance_abis"
-    functionFacts := ← need fields.functionFacts "compiler_function_facts"
-    casts := ← need fields.casts "compiler_cast_queries"
     typeNames := ← need fields.typeNames "compiler_type_name_constants"
     panic := ← need fields.panic "compiler_panic_queries"
     nativeSignatures := ← need fields.nativeSignatures "compiler_native_signature_queries"
     retag := ← need fields.retag "compiler_retag_queries"
-    covariance := ← need fields.covariance "compiler_covariance_queries"
     globalBytes := ← need fields.globalBytes "compiler_global_byte_queries"
     callerLocations := ← need fields.callerLocations "compiler_caller_location_constants"
     main := ← need fields.main "compiler_main_queries"
     primitives := ← need fields.primitives "compiler_runtime_primitives"
-    vtables := ← need fields.vtables "compiler_vtable_queries"
     namedTypes := fields.namedTypes.join
     shimAbis := fields.shimAbis.join
     namedShimAbis := fields.namedShimAbis.join

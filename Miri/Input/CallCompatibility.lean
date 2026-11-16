@@ -10,65 +10,6 @@ abbrev Result := Except RuntimeMetadataError
 private def require (value : Option A) (path : String) : Result A := RuntimeMetadata.require value path
 private def invalid (path message : String) : RuntimeMetadataError := .invalid path message
 
-def attributes (source : AbiAttributes) : Result ArgAttributes := do
-  if source.regularBits >= 2^16 then throw (invalid "regular attributes" "u16 overflow")
-  let regular := UInt16.ofNat source.regularBits
-  let extension := match source.argExtension with
-    | .none => ArgExtension.None
-    | .zeroExtend => .Zext
-    | .signExtend => .Sext
-  let align ← source.pointeeAlignBytes.mapM RuntimeMetadata.alignment
-  return ⟨regular,extension,← RuntimeMetadata.size source.pointeeSizeBytes,align⟩
-
-private def hintPrimitive (source : AbiRegisterHint) : Result Primitive := do
-  match source with
-  | .integer (.known kind) signed => return .Int (← RuntimeMetadata.integer kind) signed
-  | .float kind => return .Float (← RuntimeMetadata.float kind)
-  | .pointer addressSpace => return .Pointer ⟨← RuntimeMetadata.u32 addressSpace "hint address space"⟩
-
-def register (source : AbiRegister) : Result Reg := do
-  let kind ← match source.kind with
-    | .integer => pure RegKind.Integer | .float => pure .Float | .ppcF128 => pure .PpcF128
-    | .vector => pure (RegKind.Vector (hintVectorElem := ← hintPrimitive (← require source.hintElement "register hint")))
-  return ⟨kind,Size.fromBits (← RuntimeMetadata.u64 source.sizeBits "register bits")⟩
-
-def castTarget (source : AbiCastTarget) : Result CastTarget := do
-  if source.prefixRegisters.size > 8 then throw (invalid "cast prefix" "exceeds source ArrayVec capacity")
-  return {
-    «prefix» := ← source.prefixRegisters.mapM register
-    restOffset := ← source.restOffsetBytes.mapM RuntimeMetadata.size
-    rest := ⟨← register source.restRegister,← RuntimeMetadata.size source.restTotalBytes,source.restIsConsecutive⟩
-    attrs := ← attributes source.attributes }
-
-def passMode (source : AbiPassMode) : Result PassMode := do
-  let expected ← match source.kind with
-    | .ignore | .cast => pure 0
-    | .direct | .indirect => pure 1
-    | .pair | .indirectUnsized => pure 2
-  if source.attributes.size != expected then throw (invalid "pass attributes" "arity mismatch")
-  let attrsAt (index : Nat) := do attributes (← require source.attributes[index]? s!"pass attributes {index}")
-  match source.kind with
-  | .ignore => pure .Ignore
-  | .direct => return .Direct (← attrsAt 0)
-  | .pair => return .Pair (← attrsAt 0) (← attrsAt 1)
-  | .cast =>
-    let pad ← require source.padI32Count "cast.pad_i32_count"
-    if pad >= 256 then throw (invalid "cast padding" "u8 overflow")
-    return .Cast (UInt8.ofNat pad) (← castTarget (← require source.castTarget "cast.target"))
-  | .indirect =>
-    let mode ← require source.indirectMode "indirect mode"
-    let mode := match mode with
-      | .pointer => IndirectMode.Pointer | .onStack => .OnStack
-      | .amdgpuKernelArgument => .AmdgpuKernelArg
-    let space ← source.addressSpace.mapM (fun n => AddressSpace.mk <$> RuntimeMetadata.u32 n "indirect address space")
-    return .Indirect (← attrsAt 0) space mode
-  | .indirectUnsized => return .IndirectUnsized (← attrsAt 0) (← attrsAt 1)
-
-def argument (runtime : RuntimeMetadata) (source : AbiArgument) : Result (ArgAbi TypeId) := do
-  let _ ← runtime.node source.typeId
-  let layout ← runtime.layoutById source.layoutId
-  return ⟨⟨source.typeId,layout⟩,← passMode source.mode⟩
-
 /-- These source compiler queries are absent or only partially represented by
 the exporter. Each consumer must supply exact-key evidence or explicit errors.
 In particular, item names are not reconstructed from diagnostic def paths. -/
@@ -138,9 +79,4 @@ def queries (runtime : RuntimeMetadata) (evidence : Evidence S) :
   isGlobalBox := evidence.isGlobalBox, boxedType := evidence.boxedType
   pointerMetadataType := evidence.pointerMetadataType }
 
-def checkArgumentCompat (runtime : RuntimeMetadata) (evidence : Evidence S) (fuel : Nat)
-    (caller callee : AbiArgument) : Miri.Interpreter.LayoutCompat.M S Bool := do
-  let caller ← lift (argument runtime caller)
-  let callee ← lift (argument runtime callee)
-  Miri.Interpreter.LayoutCompat.checkArgumentCompat (queries runtime evidence) fuel caller callee
 end Miri.Input.CallCompatibility

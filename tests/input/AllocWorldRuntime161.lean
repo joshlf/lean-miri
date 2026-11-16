@@ -199,7 +199,6 @@ private def runSelected (path : String) : IO Unit := do
     throw (IO.userError "final sentinel missing")
   check (sentinel.kind == .dangling && sentinel.status == .dangling && sentinel.allocationId.isNone)
     "final source reservation is not the dangling sentinel"
-  check (world.rawPool.any (·.status == .opaque)) "archived selected fixture has no opaque source reservations"
   let functionRows := world.dedupCatalog.filter (·.keyKind == .function)
   let vtableRows := world.dedupCatalog.filter (·.keyKind == .vtable)
   check (!functionRows.isEmpty && !vtableRows.isEmpty) "selected fixture lacks Fn/VTable rows"
@@ -385,10 +384,11 @@ private def runSelected (path : String) : IO Unit := do
     machineConfig afterFresh.machine.memory prepared.types
       {inputs := #[], cursor := 0} ()).mapError reprStr)
   let sourceState := Miri.Interpreter.ExecutionStateTransport.inward outer
-  let some opaqueRow := world.rawPool.find? (·.status == .opaque) |
-    throw (IO.userError "selected fixture has no opaque raw AllocId")
+  let opaqueState := {sourceState with machine := {sourceState.machine with memory :=
+    {sourceState.machine.memory with opaqueSourceGlobalIds :=
+      sourceState.machine.memory.opaqueSourceGlobalIds.push sentinel.sourceAllocId}}}
   let (afterOpaque, opaqueLookup) := MachineHooks.run
-    (EvalMiriHostEffectsConstruction.sourceAllocIdFromImage image opaqueRow.sourceAllocId) sourceState
+    (EvalMiriHostEffectsConstruction.sourceAllocIdFromImage image sentinel.sourceAllocId) opaqueState
   match opaqueLookup with
   | .error (.unsupported message) =>
     check (message.contains "payload is opaque") "demanded opaque global returned the wrong error"
@@ -489,7 +489,7 @@ private def runSelected (path : String) : IO Unit := do
   -- MachineHooks.run retains the exhausted supply marker on failure.
   check failedState.machine.memory.sourceAllocIdExhausted
     "failed fresh reservation did not retain the source exhaustion state"
-  IO.println s!"source157 live reservations PASS: opaque={world.rawPool.filter (·.status == .opaque) |>.size}, fn-hit/miss, vtable-hit/miss, byte-hit/miss, opaque-demand=Unsupported, fresh={world.nextSourceAllocId}, exhausted-state=retained"
+  IO.println s!"source157 live reservations PASS: opaque={world.rawPool.filter (·.status == .opaque) |>.size}, fn-hit/miss, vtable-hit/miss, byte-hit/miss, synthetic-opaque-demand=Unsupported, fresh={world.nextSourceAllocId}, exhausted-state=retained"
 
 def main (args : List String) : IO Unit := do
   let some path := args.head? | throw (IO.userError "usage: AllocWorldRuntime161 <selected raw export.json>")

@@ -1,107 +1,90 @@
 import Miri.Input.CompilerScopes
 
-/-! Compiler-owned call.rs constructors/drop queries. All keys use canonical
-shared type IDs and complete instances. Absent evidence remains an error. -/
+/-! Type constructors preserve source identity: equal physical layouts cannot
+substitute for the requested pointer, reference, or concrete shim. -/
 namespace Miri.Input.CompilerRuntimeQueries
 open Lean Miri.Interpreter
-structure TypeEntry where
-  typeId : Nat
-  pointerType : Nat
-  referenceType : Nat
-  dropGlue : Except String CallInstance
-structure VirtualEntry where
-  original : CallInstance
-  methodDefinition : MIR.DefId
-  parentTrait : MIR.DefId
-  concreteType : Nat
-  rebasedArgs : Array MIR.GenericArg
-  resolved : Except String CallInstance
 structure Prepared where
   program : LoweredProgram
-  types : Array TypeEntry
   callerLocation : Array (CallInstance × Bool)
-  virtualQueries : Array VirtualEntry
-private def typeId (ctx : LowerContext) (id : Nat) : Except String Nat := do
-  unless ctx.containsTypeId id do throw "runtime query references absent compiler type"
-  pure id
-
 def prepare (program : LoweredProgram) : Except String Prepared := do
-  let raw := program.input.queries.runtime
-  let ctx := LowerContext.ofDocument program.input
-  let tables := program.compilerTables
-  let mut types := #[]
-  for entry in raw.types do
-    let id ← typeId ctx entry.inputType
-    let pointer ← typeId ctx entry.mutPointerType
-    let reference ← typeId ctx entry.mutReferenceType
-    let drop : Except String CallInstance := match entry.dropGlue with
-      | none => .error "drop glue compiler instance absent"
-      | some id => (CompilerInstance.source ctx.instances id).map fun _ => id
-    unless !(types.any (·.typeId == id)) do throw "duplicate compiler runtime type query"
-    types := types.push ⟨id, pointer, reference, drop⟩
-  let mut callers := #[]
-  for entry in raw.instances do
-    let callee := entry.instanceId
-    let _ ← CompilerInstance.source ctx.instances callee
-    let track := entry.requiresCallerLocation
-    if let some (_,prior) := callers.find? (·.1 == callee) then
-      unless prior == track do throw "conflicting full-instance caller-location query"
-    else callers := callers.push (callee,track)
-  let mut virtualQueries := #[]
-  for query in raw.virtualQueries do
-    let original := query.originalInstance
-    let _ ← CompilerInstance.source ctx.instances original
-    unless query.methodDefinition < tables.definitions.size && query.parentTrait < tables.definitions.size do
-      throw "compiler definition ID out of bounds"
-    let concrete ← typeId ctx query.concreteType
-    let resolved := (CompilerInstance.source ctx.instances query.resolved).map fun _ => query.resolved
-    virtualQueries := virtualQueries.push ⟨original, query.methodDefinition, query.parentTrait,
-      concrete, query.rebasedArgs, resolved⟩
-  pure ⟨program, types, callers, virtualQueries⟩
-private def entry (prepared : Prepared) (id : Nat) : Except String TypeEntry := do
-  let some entry := prepared.types.find? (·.typeId == id)
-    | throw "missing exact compiler runtime type query"
-  pure entry
+  let some abi := program.input.sourceAbi | throw "source ABI definitions are absent"
+  let callers := abi.definitions.filterMap fun definition => definition.map fun definition =>
+    (definition.instanceId,definition.callerLocation.isSome)
+  pure ⟨program,callers⟩
 
-def mutPointerType (prepared : Prepared) (id : Nat) : Except String Nat :=
-  return (← entry prepared id).pointerType
+def mutPointerType (prepared : Prepared) (id : Nat) : Except String Nat := do
+  let candidates := prepared.program.input.types.filter fun node => match node.shape with
+    | .rawPointer pointee .Mut => pointee == id
+    | _ => false
+  unless candidates.size == 1 do throw "canonical mutable pointer type is absent or ambiguous"
+  let some result := candidates[0]? | throw "mutable pointer type index invariant"
+  pure result.id
 
-def mutReferenceType (prepared : Prepared) (id : Nat) : Except String Nat :=
-  return (← entry prepared id).referenceType
+def mutReferenceType (prepared : Prepared) (id : Nat) : Except String Nat := do
+  let candidates := prepared.program.input.types.filter fun node => match node.shape with
+    | .reference pointee .Mut .Erased => pointee == id
+    | _ => false
+  unless candidates.size == 1 do throw "canonical erased mutable reference type is absent or ambiguous"
+  let some result := candidates[0]? | throw "mutable reference type index invariant"
+  pure result.id
 
 def resolveDropGlue (prepared : Prepared) (id : Nat) : Except String CallInstance := do
-  (← entry prepared id).dropGlue
+  let some node := prepared.program.input.types[id]? | throw "drop type is absent"
+  let normalized := node.sourceLayout.normalizedType
+  let candidates := prepared.program.input.instances.filter fun candidate => match candidate.instanceKind with
+    | .Shim (.DropGlue _ ty) =>
+      (candidate.genericArgs[0]? == some (.Type normalized)) && (ty.isNone || ty == some normalized)
+    | _ => false
+  unless candidates.size == 1 do throw "collected concrete drop glue is absent or ambiguous"
+  let some callee := candidates[0]? | throw "drop glue index invariant"
+  pure callee.id
 
 def requiresCallerLocation (prepared : Prepared) (callee : CallInstance) : Except String Bool := do
-  let some (_,track) := prepared.callerLocation.find? (·.1 == callee)
-    | throw "missing exact full-instance caller-location query"
-  pure track
+  let node ← CompilerInstance.source prepared.program.input.instances callee
+  match node.instanceKind with
+  | .Item _ | .Virtual .. | .Shim (.VTable _) =>
+    let some (_,track) := prepared.callerLocation.find? (·.1 == callee)
+      | throw "source caller-location attributes are absent"
+    pure track
+  | .Shim (.ClosureOnce _ _ track) => pure track
+  | _ => pure false
 def parentTrait (prepared : Prepared) (method : MIR.DefId) : Except String MIR.DefId := do
-  let matching := prepared.virtualQueries.filter (·.methodDefinition == method)
-  let some first := matching[0]? | throw "missing exact virtual parent-trait query"
-  unless matching.all (·.parentTrait == first.parentTrait) do throw "conflicting parent-trait queries"
-  pure first.parentTrait
+  let candidates := prepared.program.input.sourceTraits.declarations.filter (·.ownVtableMethods.contains method)
+  unless candidates.size == 1 do throw "method owner trait declaration is absent or ambiguous"
+  let some declaration := candidates[0]? | throw "method owner index invariant"
+  pure declaration.definition
 
 def rebaseVirtualArgs (prepared : Prepared) (args : Array MIR.GenericArg)
     (parent : MIR.DefId) (concrete : Nat) : Except String (Array MIR.GenericArg) := do
-  let instances := prepared.program.input.instances
-  let mut matching := #[]
-  for entry in prepared.virtualQueries do
-    if entry.parentTrait == parent && entry.concreteType == concrete then
-      if (← CompilerInstance.argsOf instances entry.original) == args then
-        matching := matching.push entry
-  let some first := matching[0]? | throw "missing complete-key virtual rebase query"
-  unless matching.all (·.rebasedArgs == first.rebasedArgs) do throw "conflicting virtual rebase queries"
-  pure first.rebasedArgs
+  let some declaration := prepared.program.input.sourceTraits.declarations.find? (·.definition == parent)
+    | throw "virtual method parent declaration is absent"
+  unless !declaration.parameters.isEmpty && declaration.parameters.size ≤ args.size do
+    throw "virtual method arguments do not contain the parent trait prefix"
+  if bound : 0 < args.size then
+    pure (args.set 0 (.Type concrete) bound)
+  else throw "virtual method Self argument invariant"
 
 def expectResolveForVTable (prepared : Prepared) (method : MIR.DefId)
     (args : Array MIR.GenericArg) : Except String CallInstance := do
-  let matching := prepared.virtualQueries.filter fun entry =>
-    entry.methodDefinition == method && entry.rebasedArgs == args
-  let some first := matching[0]? | throw "missing complete-key virtual resolution query"
-  let callee ← first.resolved
-  for entry in matching do
-    unless (← entry.resolved) == callee do throw "conflicting virtual resolutions"
+  let some self := args[0]? | throw "vtable method has no Self argument"
+  let MIR.GenericArg.Type concrete := self | throw "vtable method has no concrete Self type"
+  let document := prepared.program.input
+  let mut result := none
+  for binding in document.sourceVtables.bindings do
+    if binding.typeId != concrete then continue
+    for methodBinding in binding.methods do
+      if methodBinding.definition != method then continue
+      let some owner := document.predicates[methodBinding.owner]? | throw "vtable owner predicate is absent"
+      let prefixSize := owner.genericArgs.size+1
+      if args.size < prefixSize || args.extract 1 prefixSize != owner.genericArgs then continue
+      unless (args.extract prefixSize args.size).all (fun arg => match arg with | .Lifetime .Erased => true | _ => false) do
+        throw "object method has non-erased generic arguments"
+      let some callee := methodBinding.instanceId | throw "selected vtable method is vacant"
+      if let some previous := result then
+        unless previous == callee do throw "conflicting concrete vtable method bindings"
+      result := some callee
+  let some callee := result | throw "concrete vtable method binding is absent"
   pure callee
 private def lift (result : Except String A) : EStateM StepError S A :=
   match result with

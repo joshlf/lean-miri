@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Finite original/control comparisons and mutations of fresh coroutine evidence.
 
-Requires a built coherent schema-13 exporter/native pair and coroutine_native_queries. No builds or flag/budget
+Requires a built coherent schema-14 exporter/native pair and coroutine_native_queries. No builds or flag/budget
 changes are performed. Serialize heavy checks externally with the guest lock.
 """
 import argparse
@@ -16,7 +16,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "tests/upstream_ui")]
 from suite import discover
-from mir_json import load_mir_document, pool_entry
+from mir_json import load_mir_document
 from run_guarded import run
 
 spec = importlib.util.spec_from_file_location("coroutine_ui", ROOT / "tools/check-upstream-ui.py")
@@ -48,26 +48,20 @@ def check_queries(control, output, env, settings):
     auxiliary["source_kind"]["def_id"] = definition
     selected = None
     for row in catalog["coroutines"]:
-        node = document["types"][row["coroutine_type"]]
-        for parent in node["compiler_facts"]["projection_queries"]["parents"]:
-            if parent["variant"] is not None:
-                actual = pool_entry(document, "layouts", parent["layout"])
-                for index in range(len(document["layouts"])):
-                    other = pool_entry(document, "layouts", index)
-                    if other["fields"]["field_count"] == actual["fields"]["field_count"] and other["size_bytes"] != actual["size_bytes"]:
-                        selected = (parent, index)
-                        break
-            if selected:
+        material = document["types"][row["coroutine_type"]]["source_layout"]["coroutine"]
+        for index, variant in enumerate(material["variants"]):
+            if variant:
+                selected = (material, index)
                 break
         if selected:
             break
-    assert selected, "control must provide a bound-valid wrong physical variant layout"
-    parent, wrong_layout = selected
-    original_layout = parent["layout"]
-    parent["layout"] = wrong_layout
-    save("physical-variant", "selected query differs from exact physical variant")
-    parent["layout"] = original_layout
-    del document, catalog, old, auxiliary, selected, parent
+    assert selected, "control must provide a nonempty saved-local state"
+    material, index = selected
+    original = material["variants"][index]
+    material["variants"][index] = original[:-1]
+    save("source-variant", "source layout differs from saved-local evidence")
+    material["variants"][index] = original
+    del document, catalog, old, auxiliary, selected, material
     gc.collect()
     for snapshot, expected in mutations:
         code = run(["lake", "env", "lean", "--run", "tests/input/CoroutineReject.lean", str(snapshot), expected],
@@ -114,11 +108,11 @@ def main():
             assert not record["reference_profile_differences"] and not record["lean_profile_differences"], record
             snapshot = Path(record["directory"]) / "input.json"
             document = load_mir_document(snapshot)
-            assert document["schema_version"] == 13
+            assert document["schema_version"] == 14
             coverage = document["compiler_coroutine_coverage"]
             assert coverage["coroutines"] and coverage["auxiliary_bodies"]
             owners = {document["bodies"][row["owner_body"]]["instance_id"] for row in coverage["coroutines"]}
-            assert owners <= {row["instance_id"] for row in document["compiler_instance_abis"]}
+            assert owners <= {row["instance_id"] for row in document["source_abi"]["definitions"] if row is not None}
             assert not owners & {row["instance_id"] for row in document["compiler_native_signature_queries"]}
             if selected is None and control is None:
                 control = snapshot

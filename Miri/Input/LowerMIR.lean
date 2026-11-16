@@ -7,7 +7,6 @@ abbrev LowerResult := Except String
 
 structure LowerContext where
   spans : Array SourceSpanData := #[]
-  layouts : Array Layout := #[]
   definitions : Array DefinitionId := #[]
   instances : Array InstanceNode := #[]
   typeConstants : Array MIR.TypeConst := #[]
@@ -27,7 +26,7 @@ def LowerContext.ofTypes (types : Array TypeNode) : LowerContext :=
 def LowerContext.ofDocument (document : ImportDocument) : LowerContext :=
   {LowerContext.ofTypes document.types with
     allocationIds := document.allocations.map (·.id), spans := document.spans,
-    layouts := document.layouts, definitions := document.definitions,
+    definitions := document.definitions,
     instances := document.instances, typeConstants := document.typeConstants}
 
 structure LoweredBody where

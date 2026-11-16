@@ -30,33 +30,15 @@ def main (args : List String) : IO Unit := do
   let extensions ← must (set withFirst "synthetic_second" malformedCast)
   let _ ← must (decodeJson extensions.compress)
   IO.println "PASS unknown Cast-shaped extension payloads skipped"
-  let bodies ← must ((← must (base.getObjVal? "bodies")).getArr?)
-  let some body := bodies[0]? | throw (IO.userError "fixture has no body")
-  let blocks ← must ((← must (body.getObjVal? "basic_blocks")).getArr?)
-  let some block := blocks[0]? | throw (IO.userError "fixture has no block")
-  let locals ← must ((← must (body.getObjVal? "locals")).getArr?)
-  let some localDecl := locals[0]? | throw (IO.userError "fixture has no local")
-  let ty ← must (localDecl.getObjVal? "type")
-  let terminator ← must (block.getObjVal? "terminator")
-  let sourceInfo ← must (terminator.getObjVal? "source_info")
-  let place := Json.mkObj [("local", toJson (0 : Nat)), ("type", ty), ("projection", toJson (#[] : Array Json))]
-  let cast ← must (set malformedCast "cast_kind" (Json.mkObj [
-    ("kind", toJson ("PointerCoercion" : String)),
-    ("coercion", Json.mkObj [("kind", toJson ("Unsize" : String))]),
-    ("source", toJson ("as_cast" : String))]))
-  let cast ← must (set cast "operand" (Json.mkObj [("kind", toJson ("Copy" : String)), ("place", place)]))
-  let cast ← must (set cast "target_type" ty)
-  let kinds ← must ((← must (base.getObjVal? "statement_kinds")).getArr?)
-  let kind := Json.mkObj [
-    ("variant", toJson ("Assign" : String)), ("place", place), ("rvalue", cast)]
-  let base ← must (set base "statement_kinds" (.arr (kinds.push kind)))
-  let statement := Json.mkObj [("source_info", sourceInfo), ("kind", toJson kinds.size)]
-  let block ← must (set block "statements" (toJson #[statement]))
-  let body ← must (set body "basic_blocks" (toJson (blocks.set! 0 block)))
-  let input ← must (set base "bodies" (toJson (bodies.set! 0 body)))
+  let material ← must (base.getObjVal? "source_vtables")
+  let bindings ← must ((← must (material.getObjVal? "bindings")).getArr?)
+  let malformed := Json.mkObj [("type_id", toJson (0 : Nat)), ("principal", Json.null),
+    ("methods", Json.arr #[])]
+  let material ← must (set material "bindings" (.arr (bindings.push malformed)))
+  let input ← must (set base "source_vtables" material)
   match decodeJson input.compress with
   | .error message =>
-    check (message.contains "runtime_vtable")
+    check (message.contains "drop_instance")
       s!"malformed typed vtable must fail its missing metadata; got {message}"
-    IO.println s!"PASS malformed typed vtable payload rejected: {message}"
-  | .ok _ => throw (IO.userError "malformed typed dynamic vtable upcast was accepted")
+    IO.println s!"PASS malformed typed vtable declaration rejected: {message}"
+  | .ok _ => throw (IO.userError "malformed typed vtable declaration was accepted")

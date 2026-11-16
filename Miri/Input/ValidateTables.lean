@@ -6,8 +6,6 @@ private structure ReferenceBounds where
   types : Nat
   allocations : Nat
   instances : Nat
-  layouts : Nat
-  abis : Nat
   spans : Nat
   definitions : Nat
   constants : Nat
@@ -103,22 +101,6 @@ private def typeShape (b : ReferenceBounds) (path : String) : TypeShape → Exce
       checkId b.types id s!"{path}.elements[{index}]" "type"
   | .bool | .char | .int _ | .uint _ | .float _ | .str | .never => pure ()
 
-private def compilerFacts (b : ReferenceBounds) (path : String) (value : TypeCompilerFacts) : Except String Unit := do
-  for (name, id) in value.typeQueries do
-    if let some id := id then checkId b.types id s!"{path}.type_queries.{name}" "type"
-  if let some id := value.definitionId then checkId b.definitions id s!"{path}.definition" "definition"
-  if let some adt := value.adt then checkId b.definitions adt.definitionId s!"{path}.adt.definition" "definition"
-  if let some queries := value.projectionQueries then
-    for (parent, pi) in queries.parents.toList.zipIdx do
-      checkId b.layouts parent.layoutId s!"{path}.projection_queries.parents[{pi}].layout" "layout"
-      for (field, fi) in parent.fields.toList.zipIdx do
-        checkId b.types field.typeId s!"{path}.projection_queries.parents[{pi}].fields[{fi}].type" "type"
-        checkId b.layouts field.layoutId s!"{path}.projection_queries.parents[{pi}].fields[{fi}].layout" "layout"
-  if let some (_, id) := value.simdSizeAndType then checkId b.types id s!"{path}.simd_size_and_type.element" "type"
-  if let some discriminants := value.discriminants then
-    for (value, index) in discriminants.values.toList.zipIdx do
-      checkId b.types value.typeId s!"{path}.discriminants.values[{index}].type" "type"
-
 private def typeConstant (b : ReferenceBounds) (path : String) : MIR.TypeConst → Except String Unit
   | .Param _ _ declaredType => do
     if let some id := declaredType then checkId b.types id s!"{path}.type" "type"
@@ -166,8 +148,8 @@ private def memory (b : ReferenceBounds) (path : String) (value : AllocationMemo
 private def validateExtraReferences (types : Array TypeNode) (instances : Array InstanceNode) : Except String Unit := do
   for node in instances do
     if node.kind == .virtualDispatchTarget then
-      let some (ty, _) := node.virtualIdentity |
-        throw s!"instances[{node.id}].virtual_identity: virtual identity lacks its compiler function type and ABI"
+      let some ty := node.virtualIdentity |
+        throw s!"instances[{node.id}].virtual_identity: virtual identity lacks its source function type"
       let some functionType := types[ty]? |
         throw s!"instances[{node.id}].virtual_identity.function_type: missing compiler function type"
       unless functionType.shapeKind == .functionPointer || functionType.shapeKind == .functionDefinition do
@@ -189,7 +171,6 @@ private def vtable (b : ReferenceBounds) (path : String) (value : VtableAllocati
 private def externDeclaration (b : ReferenceBounds) (path : String) (value : Catalog.ExternDeclaration) : Except String Unit := do
   checkId b.definitions value.definition path "definition"
   checkId b.types value.typeId path "type"
-  checkId b.layouts value.layoutId path "layout"
 
 private def foreignCandidate (b : ReferenceBounds) (path : String) (value : Catalog.ForeignCandidate) : Except String Unit := do
   checkId b.definitions value.definition path "definition"
@@ -199,30 +180,14 @@ private def foreignCandidate (b : ReferenceBounds) (path : String) (value : Cata
 private def shimAbi (b : ReferenceBounds) (path : String) (value : Catalog.ShimAbi) : Except String Unit := do
   for id in value.inputTypes do checkId b.types id path "type"
   checkId b.types value.outputType path "type"
-  checkId b.abis value.abiId path "function ABI"
 
 private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String Unit := do
   checkId b.spans q.session.rootSpan "$.compiler_session.root_span" "span"
   if let some startup := q.runtime.startup then
     if let some (id, _) := startup.coreEscapeDefault then
       checkId b.definitions id "$.compiler_runtime_queries.startup.core_escape_default" "definition"
-  for row in q.runtime.types do
-    for id in #[row.inputType, row.mutPointerType, row.mutReferenceType] do
-      checkId b.types id "$.compiler_runtime_queries.types" "type"
-    if let some id := row.dropGlue then checkId b.instances id "$.compiler_runtime_queries.types.drop_glue" "instance"
   for row in q.runtime.instances do
     checkId b.instances row.instanceId "$.compiler_runtime_queries.instances" "instance"
-  for row in q.runtime.virtualQueries do
-    let path := "$.compiler_runtime_queries.virtual_queries"
-    for id in #[row.originalInstance, row.resolved] do checkId b.instances id path "instance"
-    for id in #[row.methodDefinition, row.parentTrait] do checkId b.definitions id path "definition"
-    checkId b.types row.concreteType path "type"
-    genericArgs b path row.rebasedArgs
-    checkId b.types row.vtableQuery.inputType path "type"
-    for id in row.vtableQuery.inputPredicates do checkId b.predicates id path "predicate"
-    unless q.vtables.any (fun table => table.queryId == row.vtableQuery.queryId &&
-        table.inputType == row.vtableQuery.inputType && table.inputPredicates == row.vtableQuery.inputPredicates) do
-      throw s!"{path}: virtual call references a missing exact vtable query"
   let fs := q.runtime.foreignSymbols
   if let some rows := fs.exportedCandidates then
     for row in rows do foreignCandidate b "$.compiler_runtime_queries.foreign_symbols.exported_candidates" row
@@ -245,38 +210,6 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
         checkId b.definitions definition path "definition"
         externDeclaration b path declaration
         checkId b.allocations allocation path "allocation"
-  for row in q.instanceAbis do
-    let path := "$.compiler_instance_abis"
-    checkId b.instances row.instanceId path "instance"
-    checkId b.abis row.abiId path "function ABI"
-    for id in row.extraArgumentTypes do checkId b.types id path "type"
-  for row in q.functionFacts.types do
-    let path := "$.compiler_function_facts.types"
-    checkId b.types row.typeId path "type"
-    if let some id := row.instanceId then checkId b.instances id path "instance"
-    catalogSignature b path row.signature
-  for row in q.functionFacts.pointerAbis do
-    let path := "$.compiler_function_facts.fn_ptr_abis"
-    checkId b.types row.typeId path "type"
-    checkId b.abis row.abiId path "function ABI"
-    for id in row.extraArgumentTypes do checkId b.types id path "type"
-  for row in q.functionFacts.helperSignatures do
-    catalogSignature b "$.compiler_function_facts.helper_signatures" row.signature
-    checkId b.abis row.abiId "$.compiler_function_facts.helper_signatures" "function ABI"
-  for row in q.casts do
-    let path := "$.compiler_cast_queries"
-    match row with
-    | .resolveFnPtr input _ inst =>
-      checkId b.types input path "type"
-      if let some id := inst then checkId b.instances id path "instance"
-    | .resolveClosureFnOnce input _ inst =>
-      checkId b.types input path "type"
-      checkId b.instances inst path "instance"
-    | .supertraitSlot source target _ | .boxType source target =>
-      checkId b.types source path "type"
-      checkId b.types target path "type"
-    | .lockstepTails source target sourceTail targetTail =>
-      for id in #[source, target, sourceTail, targetTail] do checkId b.types id path "type"
   for row in q.typeNames do
     for id in #[row.inputType, row.resultType] do checkId b.types id "$.compiler_type_name_constants" "type"
   for row in q.callerLocations do
@@ -288,10 +221,7 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
   for row in q.panic do
     if let some id := row.definition then checkId b.definitions id "$.compiler_panic_queries" "definition"
   for row in q.retag do checkId b.definitions row.definition "$.compiler_retag_queries" "definition"
-  for row in q.covariance do
-    checkId b.types row.sourceType "$.compiler_covariance_queries" "type"
-    checkId b.types row.targetType "$.compiler_covariance_queries" "type"
-  checkId b.types q.globalBytes.strType "$.compiler_global_byte_queries.str_type" "type"
+
   for id in q.globalBytes.coveredAllocations do checkId b.allocations id "$.compiler_global_byte_queries.covered_allocations" "allocation"
   for row in q.globalBytes.candidates do
     for (_, allocation) in row.salts do
@@ -321,12 +251,6 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
     checkId b.types id "$.compiler_primitive_types" "type"
   for id in #[p.callerLocationType,p.orderingEnum] do
     if let some id := id then checkId b.types id "$.compiler_primitive_types" "type"
-  for row in q.vtables do
-    let path := "$.compiler_vtable_queries"
-    for id in #[row.inputType,row.outputType] do checkId b.types id path "type"
-    for id in row.inputPredicates ++ row.outputPredicates do checkId b.predicates id path "predicate"
-    if let some id := row.vtableAllocation then checkId b.allocations id path "allocation"
-    vtable b path row.metadata
   if let some rows := q.namedTypes then
     for (_,id) in rows do checkId b.types id "$.compiler_named_types" "type"
   if let some rows := q.shimAbis then
@@ -347,42 +271,6 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
       checkId b.definitions row.definition path "definition"
       checkId b.types row.typeId path "type"
       checkId b.allocations row.allocation path "allocation"
-
-private def unsizingPointee (document : ImportDocument) (id : Nat) : Option Nat := do
-  let node ← document.types[id]?
-  match node.shape with
-  | .reference ty _ _ | .rawPointer ty _ => some ty
-  | _ => some id
-
-private def dynamicType (document : ImportDocument) (id : Nat) : Bool :=
-  match document.types[id]? with
-  | some node => match node.shape with | .dynamicTraitObject .. => true | _ => false
-  | none => false
-
-private def validateUpcast (document : ImportDocument) (path : String)
-    (value : DynamicUpcastEvidence) : Except String Unit := do
-  unless value.operandType == value.sourceType && value.castTarget == value.targetType do
-    throw s!"{path}: dynamic upcast descriptor disagrees with its cast"
-  unless unsizingPointee document value.sourceType == some value.sourcePointeeType &&
-      unsizingPointee document value.targetType == some value.targetPointeeType do
-    throw s!"{path}: dynamic upcast descriptor disagrees with its pointee types"
-  let full := document.queries.casts.filter fun row => match row with
-    | .lockstepTails source target _ _ => source == value.sourceType && target == value.targetType
-    | _ => false
-  unless full.size == 1 && full[0]? == some (.lockstepTails value.sourceType value.targetType value.sourceType value.targetType) do
-    throw s!"{path}: dynamic upcast lacks its exact full-type lockstep query"
-  let pointees := document.queries.casts.filter fun row => match row with
-    | .lockstepTails source target _ _ => source == value.sourcePointeeType && target == value.targetPointeeType
-    | _ => false
-  unless pointees.size == 1 && pointees[0]? == some (.lockstepTails value.sourcePointeeType value.targetPointeeType value.sourceTailType value.targetTailType) do
-    throw s!"{path}: dynamic upcast lacks its exact pointee lockstep query"
-  unless dynamicType document value.sourceTailType && dynamicType document value.targetTailType &&
-      value.querySource == value.sourceTailType && value.queryTarget == value.targetTailType do
-    throw s!"{path}: dynamic upcast tails disagree with the compiler supertrait query"
-  let slots := document.queries.casts.filter fun row => match row with
-    | .supertraitSlot source target _ => source == value.sourceTailType && target == value.targetTailType
-    | _ => false
-  unless slots.size == 1 do throw s!"{path}: dynamic upcast requires one exact supertrait-slot query"
 
 private def valueAllocations : MIR.ConstValue → Array Nat
   | .Scalar (.Ptr (.Allocation id _ _ _)) | .Slice id _ | .Indirect id _ => #[id]
@@ -442,17 +330,45 @@ private def validateRequiredExecution (document : ImportDocument) : Except Strin
 
 /-- Validate forward table references and graph relationships after row-local
 invariants, including dense instance IDs, have been established by the parsers. -/
+private def sourceLayout (b : ReferenceBounds) (path : String) (shape : TypeShape)
+    (source : SourceTypeLayout) : Except String Unit := do
+  checkId b.types source.normalizedType (path ++ ".normalized_type") "type"
+  for id in source.closureUpvars do checkId b.types id (path ++ ".closure_upvars") "type"
+  if let some id := source.definition then checkId b.definitions id (path ++ ".definition") "definition"
+  if let some simd := source.simd then
+    checkId b.types simd.element (path ++ ".simd.element") "type"
+    unless simd.count > 0 && simd.count ≤ 32768 do throw (path ++ ": invalid SIMD lane count")
+  if let some vectors := source.scalableVectors then
+    unless vectors > 0 && vectors ≤ 8 && source.simd.isSome do
+      throw (path ++ ": invalid scalable vector count")
+  if let some coroutine := source.coroutine then
+    for field in coroutine.traitFields do
+      checkId b.types field.typeId (path ++ ".coroutine.trait_fields") "type"
+    for id in coroutine.locals ++ coroutine.savedTypes ++ coroutine.prefix do checkId b.types id (path ++ ".coroutine") "type"
+    unless coroutine.seed < 2^64 do throw (path ++ ": coroutine seed overflows u64")
+    unless coroutine.savedTypes.size == coroutine.locals.size do throw (path ++ ": saved type count mismatch")
+    unless coroutine.conflicts.size == coroutine.locals.size do throw (path ++ ": conflict matrix row count mismatch")
+    for row in coroutine.variants ++ coroutine.conflicts do
+      let mut seen : Std.HashSet Nat := {}
+      for id in row do
+        checkId coroutine.locals.size id (path ++ ".coroutine.local") "saved local"
+        if seen.contains id then throw (path ++ ": duplicate saved local index")
+        seen := seen.insert id
+  match shape with
+  | .adt data =>
+    if data.kind == .enumKind then
+      unless source.discriminants.size == data.variants.size do throw (path ++ ": enum discriminant count mismatch")
+      for value in source.discriminants do
+        unless -(2^127 : Int) ≤ value && value < (2^128 : Int) do throw (path ++ ": discriminant exceeds u128/i128 range")
+  | .closure _ _ count =>
+    unless count == source.closureUpvars.size do throw (path ++ ": closure capture type count mismatch")
+  | _ => pure ()
+
 def validateParsedTables (document : ImportDocument) : Except String Unit := do
-  for row in document.queries.instanceAbis do
-    if let some node := document.instances[row.instanceId]? then
-      if let .LlvmIntrinsic _ := node.instanceKind then
-        throw "$.compiler_instance_abis: LLVM intrinsic has no ordinary FnAbi query"
   let b : ReferenceBounds := {
     types := document.types.size
     allocations := document.allocations.size
     instances := document.instances.size
-    layouts := document.layouts.size
-    abis := document.functionAbis.size
     spans := document.spans.size
     definitions := document.definitions.size
     constants := document.typeConstants.size
@@ -468,11 +384,8 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
     checkId document.files.size span.file s!"$.spans[{index}].file" "file"
   for (node, index) in document.types.toList.zipIdx do
     let path := s!"$.types[{index}]"
-    checkId b.layouts node.layoutId s!"{path}.layout" "layout"
-    if let some id := node.layoutQueryInputTypeId then
-      checkId b.types id s!"{path}.layout_query_input_type" "type"
     typeShape b s!"{path}.shape" node.shape
-    if let some facts := node.compilerFacts then compilerFacts b s!"{path}.compiler_facts" facts
+    sourceLayout b s!"{path}.source_layout" node.shape node.sourceLayout
   for (value, index) in document.typeConstants.toList.zipIdx do
     typeConstant b s!"$.type_constants[{index}]" value
   for (value, index) in document.predicates.toList.zipIdx do
@@ -496,10 +409,7 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
         let some child := document.bodies[childId]? | throw s!"{path}.promoted_bodies: body is absent"
         unless child.instanceId == value.id do
           throw s!"{path}.promoted_bodies: instance identity mismatch"
-  for (value, index) in document.functionAbis.toList.zipIdx do
-    for (argument, ai) in (value.arguments.push value.returnValue).toList.zipIdx do
-      checkId b.types argument.typeId s!"$.fn_abis[{index}].arguments[{ai}].type" "type"
-      checkId b.layouts argument.layoutId s!"$.fn_abis[{index}].arguments[{ai}].layout" "layout"
+
   for (value, index) in document.allocations.toList.zipIdx do
     let path := s!"$.allocations[{index}]"
     if let some image := value.memory then memory b path image
@@ -537,10 +447,9 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
           | some node => match node.instanceKind with | .LlvmIntrinsic _ => true | _ => false
           | none => false
         match resolution.abi with
-        | .normal id =>
+        | .normal =>
           unless resolution.kind != .llvmIntrinsic && !isLlvm do
             throw s!"{path}: LLVM intrinsic cannot carry an ordinary ABI"
-          checkId b.abis id path "function ABI"
         | .llvmIntrinsic =>
           unless resolution.kind == .llvmIntrinsic && isLlvm && resolution.dispatchSlot.isNone do
             throw s!"{path}: no-ABI call must resolve to an exact LLVM intrinsic"
@@ -604,20 +513,20 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
   if let some selected := document.selectedScope then
     for (root, index) in selected.roots.toList.zipIdx do
       checkId b.definitions root.definitionId s!"$.selected_scope.roots[{index}].def_id" "definition"
+  for target in document.sourceCastTargets do
+    match target with
+    | .functionPointer input instanceId =>
+      checkId b.types input "$.source_cast_targets" "type"
+      if let some id := instanceId then checkId b.instances id "$.source_cast_targets" "instance"
+    | .closureOnce input instanceId =>
+      checkId b.types input "$.source_cast_targets" "type"
+      checkId b.instances instanceId "$.source_cast_targets" "instance"
   catalogs b document.queries
   validateExtraReferences document.types document.instances
   for node in document.instances do
-    if let some (ty, abi) := node.virtualIdentity then
+    if let some ty := node.virtualIdentity then
       checkId b.types ty s!"$.instances[{node.id}].virtual_identity.function_type" "type"
-      checkId b.abis abi s!"$.instances[{node.id}].virtual_identity.fn_abi" "function ABI"
-      let matching := document.queries.instanceAbis.filter (·.instanceId == node.id)
-      unless matching.size == 1 && matching[0]?.map (·.abiId) == some abi do
-        throw s!"$.instances[{node.id}].virtual_identity.fn_abi: virtual identity must match one exact full-instance FnAbi query"
     if let some id := node.fallbackInstance then checkId b.instances id s!"$.instances[{node.id}].fallback_instance" "instance"
-  for (body, _) in bodyEntries do
-    for block in body.nodeFacts do
-      for node in block do
-        for upcast in node.dynamicUpcasts do validateUpcast document body.sourcePath upcast
   validateRequiredExecution document
 
 end Miri.Input

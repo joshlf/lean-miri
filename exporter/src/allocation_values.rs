@@ -44,13 +44,6 @@ pub(super) struct Allocation {
     pub data: AllocationData,
 }
 impl Allocation {
-    pub fn memory(&self) -> Option<&Memory> {
-        match &self.data {
-            AllocationData::Memory { memory } => Some(memory),
-            _ => None,
-        }
-    }
-
     pub fn kind(&self) -> &'static str {
         match self.data {
             AllocationData::Memory { .. } => "memory",

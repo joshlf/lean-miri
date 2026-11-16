@@ -3,9 +3,9 @@
 use super::*;
 #[derive(serde::Serialize)]
 pub(super) struct Recipe {
-    typing_env: &'static str,
     signature: Signature,
-    query: Query,
+    input_types: Vec<u64>,
+    output_type: u64,
 }
 #[derive(serde::Serialize)]
 struct Signature {
@@ -14,12 +14,6 @@ struct Signature {
     #[serde(rename = "return")]
     result: String,
     c_variadic: bool,
-}
-#[derive(serde::Serialize)]
-struct Query {
-    input_types: Vec<u64>,
-    output_type: u64,
-    abi_query: u64,
 }
 #[derive(serde::Serialize)]
 pub(super) struct NamedSignature {
@@ -224,62 +218,26 @@ fn variadic_query<'tcx>(
     ret: &str,
     variadic: bool,
 ) -> Result<Recipe, String> {
-    let result = (|| -> Result<Query, String> {
-        let inputs = args
-            .iter()
-            .map(|key| descriptor(tcx, key))
-            .collect::<Result<Vec<_>, _>>()?;
-        let output = descriptor(tcx, ret)?;
-        let external = match abi {
-            "C" => rustc_abi::ExternAbi::C { unwind: false },
-            "Rust" => rustc_abi::ExternAbi::Rust,
-            "System" => rustc_abi::ExternAbi::System { unwind: false },
-            _ => return Err("unsupported exact shim ABI".into()),
-        };
-        let signature = ty::Binder::dummy(
-            tcx.mk_fn_sig(
-                inputs.iter().copied(),
-                output,
-                ty::FnSigKind::default()
-                    .set_c_variadic(variadic)
-                    .set_abi(external),
-            ),
-        );
-        let input_types = inputs
-            .iter()
-            .map(|ty| type_json(context, tcx, *ty))
-            .collect::<Result<Vec<_>, String>>()?;
-        let output_type = type_json(context, tcx, output)?;
-        let value = match tcx.fn_abi_of_fn_ptr(
-            ty::TypingEnv::fully_monomorphized().as_query_input((signature, ty::List::empty())),
-        ) {
-            Ok(abi) => compiler_fact(fn_abi_json(context, tcx, abi)?),
-            Err(error) => export_failure(
-                "shim_abi::variadic_query",
-                format!(
-                    "{}; {}",
-                    "rustc fn_abi_of_fn_ptr failed",
-                    format!("{error:?}")
-                ),
-            )?,
-        };
-        Ok(Query {
-            input_types,
-            output_type,
-            abi_query: value,
-        })
-    })();
-    Ok::<_, String>(Recipe {
-        typing_env: "fully_monomorphized",
+    let inputs = args.iter().map(|key| descriptor(tcx, key)).collect::<Result<Vec<_>, _>>()?;
+    let output = descriptor(tcx, ret)?;
+    if !matches!(abi, "C" | "Rust" | "System") {
+        return Err("unsupported source shim calling convention".into());
+    }
+    let input_types = inputs.iter().map(|ty| type_json(context, tcx, *ty))
+        .collect::<Result<Vec<_>, String>>()?;
+    let output_type = type_json(context, tcx, output)?;
+    Ok(Recipe {
         signature: Signature {
             calling_convention: abi.to_owned(),
             arguments: args.iter().map(|s| (*s).to_owned()).collect(),
             result: ret.to_owned(),
             c_variadic: variadic,
         },
-        query: result.map_err(|reason| format!("shim ABI {abi}({args:?}) -> {ret}: {reason}"))?,
+        input_types,
+        output_type,
     })
 }
+
 pub(super) fn export<'tcx>(
     tcx: TyCtxt<'tcx>,
     context: &mut ExportContext<'tcx>,

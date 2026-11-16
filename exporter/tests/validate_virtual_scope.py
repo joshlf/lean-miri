@@ -23,7 +23,8 @@ for target in virtual_targets:
     assert "status" not in target
     assert target["body_status"] == "not_applicable"
     assert "status" not in target["virtual_identity"]
-    assert "status" not in pool_entry(doc, "fn_abis", target["virtual_identity"]["fn_abi"])
+    assert pool_entry(doc, "types", target["virtual_identity"]["function_type"])["shape"]["kind"] == "function_definition"
+    assert doc["source_abi"]["definitions"][target["instance_id"]] is not None
 
 def walk(value):
     if isinstance(value, dict):
@@ -34,20 +35,14 @@ def walk(value):
         for child in value:
             yield from walk(child)
 
-calls = [
-    node for node in walk(doc["bodies"])
-    if node.get("virtual_resolution", {}).get("instance_id") is not None
-]
+calls = [node for node in walk(doc["bodies"]) if node.get("kind") == "virtual_dispatch"]
 assert calls, "the MIR callsite lost its virtual operation"
 for call in calls:
-    assert call["kind"] == "virtual_dispatch"
     assert isinstance(call.get("dispatch_slot"), int)
-    assert isinstance(pool_entry(doc, "instances", call["virtual_resolution"]["instance_id"])["generic_args"], list)
-    # An opaque input has no compiler-created concrete vtable candidate.
-    # Runtime selection remains demand-local and returns Unsupported when the
-    # actual receiver's table or matching method entry is absent.
-    assert call["virtual_resolution"].get("candidate_query_ids") == []
-
+    assert "virtual_resolution" not in call
+assert doc["source_vtables"]["bindings"] == [], "opaque dyn input invented a concrete vtable target"
+assert not any("ValueCell as ValueSource" in row["def_path"] and row["kind"] == "instance_mir"
+               for row in doc["instances"]), "unreached implementation body leaked into abstract root"
 assert "status" not in scope
 assert "unresolved_obligations" not in scope
-print("validated exact abstract virtual dispatch identity with runtime target demand left open")
+print("validated abstract virtual identity and signature without invented concrete targets")

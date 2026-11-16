@@ -55,37 +55,27 @@ python3 tools/check-vtable-erasure.py tests/repro/vtable/hrtb-upcast-erasure-con
 These controls test named higher-ranked binders and a borrowed global's vtable.
 The HRTB command also requires that adding `Send` preserve two distinct predicate
 arrays for the same concrete type, before and after erasure.
-The upcast command requires a consumer-resolved `TraitVPtr`, sharing its memory
-image between higher-ranked and erased principal queries. It also rejects an
-unrelated principal aliased to that image, conflicting layout, and missing
-compiler normalization evidence. Symbolic predicate/salt identities stay distinct.
-They do not witness a nonidentity query. The runner defaults to `nonidentity`
-for new candidate inputs and rejects a candidate whose emitted complete
-type/predicate pairs all stay unchanged. It also requires an actual connected
-runtime lookup of a changed pair; a changed row confined to a root/template
-catalog does not discharge that branch. The Lean query harness additionally
-checks canonical-output closure, missing-key rejection and the exact catalog
-join for every salt in 0–31, including raw/dense/runtime allocation identity.
-Connected guest execution reuses the no_std single-thread, exit-zero and leak
-assertions in `203-upcast-a-prefix.lean`; it does not assert an upcast operation
-or general whole-machine safety for these controls.
+The upcast command computes `TraitVPtr` entries from source trait declarations,
+checks shared memory-backed pointer identity, and rejects missing executable
+bindings and duplicate binding keys. Predicate and salt identities stay distinct.
+These controls do not witness nonidentity normalization. The runner defaults to
+`nonidentity` for new candidates and rejects unchanged complete type/predicate
+pairs. That mode also requires a changed pair to be consumed by connected guest
+execution; source-material presence alone cannot discharge the branch.
 
-Add `--trace-queries` to an identity-control command to retain a
-`.vtable-origins.json` producer sidecar, both `.consumer-N.log` files and a
-`.vtable-consumption.json` join. Nonidentity mode enables this automatically.
-Origins distinguish root templates, normalized query bodies, instantiated
-bodies, unsize/upcast demands, recursive TraitVPtr parents and symbolic globals.
-Globals newly reserved by salt probes are explicitly labelled as probes;
-preexisting hits keep their original classification. These are collection
-sites, not a claim that every collected body runs. The runtime log comes from
-the real compiler-backed erasure lookup, and joins its exact type/predicate
-token to the exported query ID. Zero runtime calls is allowed for an identity
-control and is reported as zero coverage, never as a nonidentity witness.
-Numeric body/type/predicate identities are local to the fingerprinted export.
-The optional producer sidecar does not alter exported input bytes or issue
-additional compiler queries. The Lean trace toggle has a kernel-checked lookup
-identity theorem, including missing-key errors. Logs and inventories stay in
-ignored scratch; the normal source runner leaves tracing disabled.
+The Lean harness checks normalization idempotence, missing type/predicate source
+material, and exact vtable catalog joins for every salt in 0–31. Runtime traces
+contain complete input/output type and predicate identities and are checked
+against the finite source material. Both `.consumer-N.log` files and a
+`.vtable-consumption.json` report identify the untouched exported bytes. No
+compiler-query answer catalog or producer query-ID sidecar is involved.
+Identity controls may report zero runtime normalization calls; that is zero
+branch coverage. Numeric identities are local to the fingerprinted export.
+The trace toggle retains its kernel-checked result-identity theorem; normal
+execution leaves tracing disabled. Connected execution retains the single-thread,
+exit-zero and leak assertions in `203-upcast-a-prefix.lean`; those assertions do
+not establish general whole-machine safety or nonidentity producer-to-consumer
+coverage.
 
 The cross-crate metadata control builds `metadata-producer.rs` separately. Its
 public constant contains a CTFE-created HRTB vtable; `metadata-consumer.rs` reads

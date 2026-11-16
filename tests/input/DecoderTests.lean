@@ -1,5 +1,6 @@
 import MiriTests.Input.JsonFixtures
 import Miri.Input.Decoder
+import Miri.Input.RuntimeMetadata
 
 open Lean
 open Miri.Input
@@ -125,11 +126,12 @@ def main (args : List String) : IO UInt32 := do
     "float name was not decoded to the pinned float tag"
   check (document.types.any fun node => node.shapeMetadata.adtKind == some .enumKind)
     "enum ADT name was not decoded to its typed tag"
-  check (!document.functionAbis.isEmpty)
-    "function ABI calling convention was not decoded to a known enum"
-  check (document.layouts.any fun node => match node.variantsLayout with
-    | some variants => variants.tagEncoding.isSome
-    | none => false) "structured variant tag-encoding metadata was not decoded"
+  check (document.sourceAbi.any fun material => material.definitions.any Option.isSome)
+    "concrete source ABI signatures were not decoded"
+  let runtime ← must ((RuntimeMetadata.ofDocument document).mapError toString)
+  check (document.types.any fun node => match runtime.lookup node.id with
+    | .ok result => match result.layout.variants with | .Multiple .. => true | _ => false
+    | .error _ => false) "source enum declarations did not produce variant layouts"
   for allocation in document.allocations do
     match allocation.memory with
     | none => pure ()
@@ -183,32 +185,24 @@ def main (args : List String) : IO UInt32 := do
     setField original "types" (encodeArray (← updateAt types index node))
   check (malformedResult unknownSafety) "unknown function safety was accepted"
 
-  let incompleteCanonicalAbi ← must <| do
-    let replacement := object [("kind", string "arm")]
-    let (changed, found) ← replaceFirstField original "calling_convention" replacement
-    if !found then throw "fixture does not contain a canonical calling convention"
+  let unknownSourceAbi ← must <| do
+    let (changed, found) ← replaceFirstField original "abi" (string "future_abi")
+    if !found then throw "fixture does not contain a source ABI tag"
     pure changed
-  check (malformedResult incompleteCanonicalAbi) "incompleteCanonicalAbi: failed input was accepted"
+  check (malformedResult unknownSourceAbi) "unknown source ABI was accepted"
 
-  let nicheTypeIndex := document.layouts.toList.findIdx? (fun node =>
-    match node.variantsLayout with
-    | some variants => variants.tagEncoding.isSome
-    | none => false)
-  match nicheTypeIndex with
+  let enumTypeIndex := document.types.toList.findIdx? (fun node => node.shapeMetadata.adtKind == some .enumKind)
+  match enumTypeIndex with
   | some index =>
-    let badTagEncoding ← must <| do
-      let layouts ← array (← getField original "layouts")
-      let layoutId ← (← JsonFixtures.parse (← getAt layouts index)).natural
-      let payloads ← array (← getField original "layout_values")
-      let layout ← getAt payloads layoutId
-      let variants ← getField layout "variants"
-      let encoding ← getField variants "tag_encoding"
-      let corrupt ← setField encoding "niche_start" (string "not-a-number")
-      let variants ← setField variants "tag_encoding" corrupt
-      let layout ← setField layout "variants" variants
-      setField original "layout_values" (encodeArray (← updateAt payloads layoutId layout))
-    check (malformedResult badTagEncoding) "malformed u128 niche encoding was accepted"
-  | none => fail "fixture did not exercise a structured tag encoding"
+    let badDiscriminants ← must <| do
+      let types ← array (← getField original "types")
+      let node ← getAt types index
+      let attrs ← getField node "source_layout"
+      let attrs ← setField attrs "variant_discriminants" (encodeArray #[string "not-a-number"])
+      let node ← setField node "source_layout" attrs
+      setField original "types" (encodeArray (← updateAt types index node))
+    check (malformedResult badDiscriminants) "malformed source discriminant accepted"
+  | none => fail "fixture did not exercise source enum declarations"
 
   let badRelocation ← must <| do
     let (changed, found) ← replaceFirstField original "storage_offset_bytes" (number 999999)
@@ -333,9 +327,11 @@ def main (args : List String) : IO UInt32 := do
   let scopedButIncompleteGraph ← must <| do
     let types ← array (← getField scopedButIncompleteGraph "types")
     let first ← getAt types 0
-    let first ← setField first "layout" (number 999999999)
+    let sourceLayout ← getField first "source_layout"
+    let sourceLayout ← setField sourceLayout "normalized_type" (number 999999999)
+    let first ← setField first "source_layout" sourceLayout
     setField scopedButIncompleteGraph "types" (encodeArray (← updateAt types 0 first))
-  check (malformedResult scopedButIncompleteGraph) "selected scope erased failed catalog data"
+  check (malformedResult scopedButIncompleteGraph) "selected scope erased a dangling normalized type"
 
   check (!(decodeJson "{}").isOk) "missing schema and compiler tables were accepted"
 

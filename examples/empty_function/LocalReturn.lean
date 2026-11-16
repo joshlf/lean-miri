@@ -36,7 +36,7 @@ private theorem bound_copy (s : Static) (layout : LocalLayout) (dest : RuntimePl
     (by simpa only [Configuration.rootConfig,capacity,Nat.add_assoc] using s.built)
   have compatible : s.cfg.copy.compatible s.abi.ret.layout s.abi.ret.layout = .ok true := by
     rw [source.compatible]
-    simp [CompilerCovariance.compatible,CompilerCovariance.relation,CompilerCovariance.relationWithIndex,
+    simp [CompilerCovariance.compatible,CompilerCovariance.relation,
       profile.debug,Except.mapError,bind,Except.bind,pure,Except.pure]
   have padding : s.cfg.copy.hasPadding s.abi.ret.layout = .ok true := by
     rw [source.padding]

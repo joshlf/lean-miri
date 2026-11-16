@@ -87,11 +87,10 @@ lean_exe profile_runtime_decoder where
   srcDir := "tools"
   root := `ProfileRuntimeDecoder
 
-lean_exe typed_function_abi_tests where
+lean_exe source_abi_boundary_tests where
   srcDir := "tests/input"
-  root := `TypedFunctionAbiTests
+  root := `SourceAbiBoundaryTests
 
--- Execute the existing provider assertions as compiled Lean against fresh inputs.
 lean_exe coroutine_native_queries where
   srcDir := "tests/input"
   root := `CoroutineNativeQueries

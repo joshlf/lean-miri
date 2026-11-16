@@ -1,9 +1,9 @@
 {
   "schema": "lean-miri-rustc-mir",
-  "schema_version": 11,
+  "schema_version": 14,
   "producer": {
-    "miri_commit": "7fa591d7d4dd9af8154becbc8332f8096f8323b1",
-    "rustc_commit": "8144389c895da997dbdecaa635e41d6a50be6ffd",
+    "miri_commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
+    "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
     "rustc_version": "pinned",
     "target_triple": "x86_64-unknown-linux-gnu",
     "input_settings": {
@@ -33,8 +33,34 @@
         "kind": "tuple",
         "elements": []
       },
-      "layout": 0,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 0,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 1,
@@ -43,8 +69,34 @@
         "kind": "uint",
         "unsigned_kind": "u8"
       },
-      "layout": 1,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 1,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 2,
@@ -53,8 +105,34 @@
         "kind": "uint",
         "unsigned_kind": "u16"
       },
-      "layout": 2,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 2,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 3,
@@ -63,8 +141,34 @@
         "kind": "uint",
         "unsigned_kind": "u32"
       },
-      "layout": 3,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 3,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 4,
@@ -73,8 +177,34 @@
         "kind": "uint",
         "unsigned_kind": "u64"
       },
-      "layout": 4,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 4,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 5,
@@ -83,8 +213,34 @@
         "kind": "uint",
         "unsigned_kind": "u128"
       },
-      "layout": 5,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 5,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 6,
@@ -93,8 +249,34 @@
         "kind": "int",
         "signed_kind": "i8"
       },
-      "layout": 6,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 6,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 7,
@@ -103,8 +285,34 @@
         "kind": "int",
         "signed_kind": "i16"
       },
-      "layout": 7,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 7,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 8,
@@ -113,8 +321,34 @@
         "kind": "int",
         "signed_kind": "i32"
       },
-      "layout": 8,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 8,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 9,
@@ -123,8 +357,34 @@
         "kind": "int",
         "signed_kind": "i64"
       },
-      "layout": 9,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 9,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 10,
@@ -133,8 +393,34 @@
         "kind": "int",
         "signed_kind": "i128"
       },
-      "layout": 10,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 10,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 11,
@@ -142,8 +428,34 @@
       "shape": {
         "kind": "bool"
       },
-      "layout": 11,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 11,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 12,
@@ -152,8 +464,34 @@
         "kind": "uint",
         "unsigned_kind": "usize"
       },
-      "layout": 12,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 12,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 13,
@@ -162,8 +500,34 @@
         "kind": "int",
         "signed_kind": "isize"
       },
-      "layout": 13,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 13,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 14,
@@ -175,8 +539,34 @@
           "kind": "immutable"
         }
       },
-      "layout": 14,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 14,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 15,
@@ -188,8 +578,34 @@
           "kind": "mutable"
         }
       },
-      "layout": 15,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 15,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 16,
@@ -201,8 +617,34 @@
           "kind": "immutable"
         }
       },
-      "layout": 16,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 16,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 17,
@@ -214,8 +656,34 @@
           "kind": "immutable"
         }
       },
-      "layout": 17,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 17,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 18,
@@ -223,8 +691,34 @@
       "shape": {
         "kind": "str"
       },
-      "layout": 18,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 18,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     },
     {
       "type_id": 19,
@@ -239,8 +733,34 @@
           "kind": "erased"
         }
       },
-      "layout": 19,
-      "layout_query_input_type": null
+      "source_layout": {
+        "normalized_type": 19,
+        "closure_upvars": [],
+        "variant_discriminants": [],
+        "simd": null,
+        "scalable_vectors": null,
+        "special_float": null,
+        "coroutine": null,
+        "variances": [],
+        "is_unsafe_cell": false,
+        "is_unsafe_pinned": false,
+        "is_manually_drop": false,
+        "is_maybe_uninit": false,
+        "is_phantom_data": false,
+        "is_box": false,
+        "is_global_allocator": false,
+        "is_c_void": false,
+        "is_maybe_dangling": false,
+        "nonnull_optimization_guaranteed": false,
+        "definition": null,
+        "item_name": null,
+        "capture_names": null,
+        "has_destructor": false,
+        "is_dyn_metadata": false,
+        "type_id_hash": null,
+        "is_x87_f80": false,
+        "cfi_encoding": null
+      }
     }
   ],
   "allocations": [
@@ -313,28 +833,6 @@
       "required_consts": []
     }
   ],
-  "layouts": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    4,
-    9,
-    12,
-    12,
-    12,
-    12,
-    13,
-    14
-  ],
   "spans": [
     {
       "lo": 0,
@@ -352,7 +850,6 @@
       "is_dummy": false
     }
   ],
-  "fn_abis": [],
   "definitions": [
     {
       "crate": 1,
@@ -372,7 +869,6 @@
     }
   ],
   "predicates": [],
-  "compiler_abi_layout_schema": "physical_ty_and_layout_v1",
   "compiler_predicate_queries": [],
   "compiler_session_queries": {
     "internal_target_features": [],
@@ -382,8 +878,6 @@
     "runtime_checks": []
   },
   "compiler_runtime_queries": {
-    "types": [],
-    "virtual": [],
     "instances": [],
     "foreign_symbols": {
       "target": {
@@ -408,20 +902,11 @@
       }
     ]
   },
-  "compiler_function_facts": {
-    "types": [],
-    "pointer_abis": [],
-    "helper_signatures": []
-  },
-  "compiler_instance_abis": [],
-  "compiler_cast_queries": [],
   "compiler_type_name_constants": [],
   "compiler_panic_queries": [],
   "compiler_native_signature_queries": [],
   "compiler_retag_queries": [],
-  "compiler_covariance_queries": [],
   "compiler_caller_location_constants": [],
-  "compiler_vtable_queries": [],
   "compiler_global_byte_queries": {
     "salt_count": 32,
     "str_type": 18,
@@ -466,539 +951,6 @@
   "byte_images": [
     ""
   ],
-  "layout_values": [
-    {
-      "kind": "layout",
-      "size_bytes": 0,
-      "abi_align_bytes": 1,
-      "unadjusted_abi_align_bytes": 1,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "memory",
-        "sized": true
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 1,
-      "abi_align_bytes": 1,
-      "unadjusted_abi_align_bytes": 1,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 1,
-            "integer_kind": "u8",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "255"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 2,
-      "abi_align_bytes": 2,
-      "unadjusted_abi_align_bytes": 2,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 2,
-            "integer_kind": "u16",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "65535"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 4,
-      "abi_align_bytes": 4,
-      "unadjusted_abi_align_bytes": 4,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 4,
-            "integer_kind": "u32",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "4294967295"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 8,
-      "abi_align_bytes": 8,
-      "unadjusted_abi_align_bytes": 8,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 8,
-            "integer_kind": "u64",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "18446744073709551615"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 16,
-      "abi_align_bytes": 16,
-      "unadjusted_abi_align_bytes": 16,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 16,
-            "integer_kind": "u128",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "340282366920938463463374607431768211455"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 1,
-      "abi_align_bytes": 1,
-      "unadjusted_abi_align_bytes": 1,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 1,
-            "integer_kind": "i8",
-            "signed": true
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "255"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 2,
-      "abi_align_bytes": 2,
-      "unadjusted_abi_align_bytes": 2,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 2,
-            "integer_kind": "i16",
-            "signed": true
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "65535"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 4,
-      "abi_align_bytes": 4,
-      "unadjusted_abi_align_bytes": 4,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 4,
-            "integer_kind": "i32",
-            "signed": true
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "4294967295"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 8,
-      "abi_align_bytes": 8,
-      "unadjusted_abi_align_bytes": 8,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 8,
-            "integer_kind": "i64",
-            "signed": true
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "18446744073709551615"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 16,
-      "abi_align_bytes": 16,
-      "unadjusted_abi_align_bytes": 16,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 16,
-            "integer_kind": "i128",
-            "signed": true
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "340282366920938463463374607431768211455"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 1,
-      "abi_align_bytes": 1,
-      "unadjusted_abi_align_bytes": 1,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 1,
-            "integer_kind": "u8",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "1"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 8,
-      "abi_align_bytes": 8,
-      "unadjusted_abi_align_bytes": 8,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar",
-        "scalar": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "pointer",
-            "size_bytes": 8,
-            "address_space": 0
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "18446744073709551615"
-          }
-        }
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 0,
-      "abi_align_bytes": 1,
-      "unadjusted_abi_align_bytes": 1,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "array",
-        "field_count": 0,
-        "stride_bytes": 1
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "memory",
-        "sized": false
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    },
-    {
-      "kind": "layout",
-      "size_bytes": 16,
-      "abi_align_bytes": 8,
-      "unadjusted_abi_align_bytes": 8,
-      "field_offsets_bytes": [],
-      "fields": {
-        "kind": "primitive",
-        "field_count": 0
-      },
-      "variants": {
-        "kind": "single",
-        "variant_index": 0
-      },
-      "backend_repr": {
-        "kind": "scalar_pair",
-        "first": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "pointer",
-            "size_bytes": 8,
-            "address_space": 0
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "18446744073709551615"
-          }
-        },
-        "second": {
-          "kind": "initialized",
-          "primitive": {
-            "kind": "integer",
-            "size_bytes": 8,
-            "integer_kind": "u64",
-            "signed": false
-          },
-          "valid_range": {
-            "start": "0",
-            "end": "18446744073709551615"
-          }
-        },
-        "second_offset_bytes": 8
-      },
-      "max_repr_align_bytes": null,
-      "repr_c": false,
-      "uninhabited": false,
-      "largest_niche": null,
-      "randomization_seed": 0
-    }
-  ],
-  "boolean_queries": [],
-  "discriminants": [],
   "initialization_ranges": [
     []
   ],
@@ -1015,5 +967,140 @@
       "scope": 0
     }
   ],
-  "abi_arguments": []
+  "root_declarations": [],
+  "runtime_target_data_layout": {
+    "evidence_path": "rustc_abi/src/lib.rs::TargetDataLayout; TyCtxt::data_layout",
+    "llvm_data_layout": "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+    "private_inventory_evidence": "p/pf directives and instruction-space inheritance from pinned TargetDataLayout::parse_from_llvm_datalayout_string",
+    "alignment_evidence": "pinned TargetDataLayout stores ABI Align only; preferred LLVM alignment entries remain in llvm_data_layout",
+    "endian": "little",
+    "pointer_width_bits": 64,
+    "object_size_bound_bytes": 2305843009213693952,
+    "i1_align_bytes": 1,
+    "i8_align_bytes": 1,
+    "i16_align_bytes": 2,
+    "i32_align_bytes": 4,
+    "i64_align_bytes": 8,
+    "i128_align_bytes": 16,
+    "f16_align_bytes": 2,
+    "f32_align_bytes": 4,
+    "f64_align_bytes": 8,
+    "f128_align_bytes": 16,
+    "aggregate_align_bytes": 1,
+    "vector_align": [
+      {
+        "size_bytes": 8,
+        "align_bytes": 8
+      },
+      {
+        "size_bytes": 16,
+        "align_bytes": 16
+      }
+    ],
+    "default_address_space": 0,
+    "default_address_space_pointer_spec": {
+      "pointer_size_bytes": 8,
+      "pointer_align_bytes": 8,
+      "pointer_offset_bytes": 8,
+      "is_fat": false
+    },
+    "address_space_info": [
+      {
+        "address_space": 270,
+        "spec": {
+          "pointer_size_bytes": 4,
+          "pointer_align_bytes": 4,
+          "pointer_offset_bytes": 4,
+          "is_fat": false
+        },
+        "object_size_bound_bytes": 2147483648
+      },
+      {
+        "address_space": 271,
+        "spec": {
+          "pointer_size_bytes": 4,
+          "pointer_align_bytes": 4,
+          "pointer_offset_bytes": 4,
+          "is_fat": false
+        },
+        "object_size_bound_bytes": 2147483648
+      },
+      {
+        "address_space": 272,
+        "spec": {
+          "pointer_size_bytes": 8,
+          "pointer_align_bytes": 8,
+          "pointer_offset_bytes": 8,
+          "is_fat": false
+        },
+        "object_size_bound_bytes": 2305843009213693952
+      }
+    ],
+    "instruction_address_space": 0,
+    "c_enum_min_size": "I32",
+    "x87_f80_align_bytes": 16
+  },
+  "source_vtables": {
+    "no_trait_vptr": false,
+    "object_traits": [],
+    "bindings": []
+  },
+  "invocation": {
+    "kind": "direct_rustc_driver",
+    "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
+    "rustc_executable": "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8eb778d04094/bin/rustc",
+    "working_directory": "/workspace/lean-miri",
+    "rustc_args": [
+      "examples/empty_function/empty_function.rs",
+      "--crate-type=lib",
+      "--crate-name=empty_function",
+      "--edition=2024",
+      "-Zmir-opt-level=0",
+      "--cfg=miri",
+      "-Zalways-encode-mir",
+      "-Zextra-const-ub-checks",
+      "-Zmir-preserve-ub",
+      "-Zmir-enable-passes=-CheckAlignment,-CheckNull,-CheckEnums",
+      "-Zmir-enable-passes=-ReferencePropagation,-GVN",
+      "-Zdeduplicate-diagnostics=no",
+      "--sysroot",
+      "/workspace/lean-miri/.rustup/toolchains/miri-exporter-8eb778d04094"
+    ],
+    "rustc_args_fingerprint_fnv1a64": "e9063eaba2647835",
+    "root_paths": [
+      "empty_function"
+    ]
+  },
+  "selected_scope": null,
+  "source_abi": {
+    "policy": {
+      "architecture": "x86_64",
+      "windows": false,
+      "darwin": false,
+      "simd_types_indirect": true,
+      "soft_float": false,
+      "max_reliable_alignment": 536870912,
+      "box_noalias": true,
+      "llvm_writable": false,
+      "optimize": false,
+      "panic_unwinds": true,
+      "panic_in_drop_unwinds": true
+    },
+    "definitions": []
+  },
+  "source_trait_material": {
+    "types": [],
+    "declarations": [],
+    "adt_declarations": [],
+    "associated_type_declarations": []
+  },
+  "compiler_coroutine_coverage": {
+    "body_coroutines": [
+      false
+    ],
+    "coroutines": [],
+    "auxiliary_bodies": []
+  },
+  "source_cast_targets": [],
+  "mir_query": "TyCtxt::instance_mir(InstanceKind::Item(def_id)); ordinary runtime function bodies use optimized_mir"
 }

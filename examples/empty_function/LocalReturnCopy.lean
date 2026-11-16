@@ -279,7 +279,7 @@ theorem copy_no_validate [DecidableEq K] (access : ValidityMachine.Access K U)
     (EmptyFunction.Configuration.proofOptions s.options) leaves (remaining+1) metadata.construction s.cfg outer
   have compatible : s.cfg.copy.compatible s.abi.ret.layout s.abi.ret.layout = .ok true := by
     rw [source.compatible]
-    simp [CompilerCovariance.compatible, CompilerCovariance.relation, CompilerCovariance.relationWithIndex,
+    simp [CompilerCovariance.compatible, CompilerCovariance.relation,
       profile.debug, Except.mapError, bind, Except.bind, pure, Except.pure]
   have padding : s.cfg.copy.hasPadding s.abi.ret.layout = .ok true := by
     rw [source.padding]
@@ -323,7 +323,7 @@ theorem copy_no_validate [DecidableEq K] (access : ValidityMachine.Access K U)
     (EmptyFunction.Configuration.proofOptions s.options) leaves (remaining+1) metadata.construction s.cfg outer
   have compatible : s.cfg.copy.compatible s.abi.ret.layout s.abi.ret.layout = .ok true := by
     rw [source.compatible]
-    simp [CompilerCovariance.compatible,CompilerCovariance.relation,CompilerCovariance.relationWithIndex,
+    simp [CompilerCovariance.compatible,CompilerCovariance.relation,
       profile.debug,Except.mapError,bind,Except.bind,pure,Except.pure]
   have identical : copyRuntimePlace s.cfg.projection.place s.cfg.copy () ⟨.immediate .uninit,s.abi.ret.layout⟩
       (destination frames frame id s.abi.ret.layout) allowTransmute =

@@ -23,20 +23,16 @@ def prepare_negative(kind, source, target):
     # A separate preparation process releases the large decoded compiler graph
     # before starting the native reader. Never hold two copies beside a guest.
     document = json.loads(Path(source).read_text())
-    if kind in ("missing-start", "mismatched-start-type"):
+    if kind in ("missing-start-declaration", "dangling-start-signature"):
         main = next(row for row in document["compiler_main_queries"]["entries"]
                     if row["signature_query"]["compiler_selected_entry"])
-        pointer = main["signature_query"]["function_pointer_type"]
-        output = document["compiler_runtime_primitives"]["isize"]
-        exact = lambda row: row["signature"]["inputs"][:1] == [pointer] and row["signature"]["output"] == output
-        rows = document["compiler_function_facts"]["helper_signatures"]
-        assert any(exact(row) for row in rows)
-        if kind == "missing-start":
-            document["compiler_function_facts"]["helper_signatures"] = [row for row in rows if not exact(row)]
+        start = main["signature_query"]["start_resolution"]["instance_id"]
+        definitions = document["source_abi"]["definitions"]
+        assert definitions[start] is not None
+        if kind == "missing-start-declaration":
+            definitions[start] = None
         else:
-            for row in rows:
-                if exact(row):
-                    row["signature"]["inputs"][0] = document["compiler_runtime_primitives"]["unit"]
+            definitions[start]["signature"]["inputs"][0] = len(document["types"])
     else:
         symbol = kind.removeprefix("missing-")
         rows = document["compiler_named_shim_abis"]
@@ -49,6 +45,7 @@ def prepare_negative(kind, source, target):
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--runner", type=Path, required=True)
+    parser.add_argument("--exporter", type=Path, default=ROOT / "exporter/target/release/lean-miri-mir-exporter")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
@@ -58,7 +55,7 @@ def main():
     env["LD_LIBRARY_PATH"] = str(toolchain / "lib") + ":" + env.get("LD_LIBRARY_PATH", "")
     env["LEAN_MIRI_PREPARED_ALLOC_ID_WORLD"] = "1"
     env["LEAN_MIRI_RUN_PREPARED_MIRI"] = "1"
-    settings = SimpleNamespace(exporter=ROOT / "exporter/target/release/lean-miri-mir-exporter",
+    settings = SimpleNamespace(exporter=args.exporter.resolve(),
         runner=args.runner.resolve(), sysroot=ROOT / "scratch/miri-sysroot",
         export_timeout=180, timeout=180, memory_limit=12 * 1024**3, keep_inputs=True)
     binary_hashes = [driver.sha256(settings.exporter), driver.sha256(settings.runner)]
@@ -74,7 +71,7 @@ def main():
 
     negatives = []
 
-    def reject(name, path, expected):
+    def reject(name, path, expected, *, boundary=False):
         snapshot = args.output / (name + ".json")
         source = Path(records[path]["directory"]) / "input.json"
         preparation = driver.invoke([sys.executable, __file__, "--prepare-negative", name, str(source), str(snapshot)],
@@ -84,6 +81,11 @@ def main():
         command = [str(settings.runner), str(snapshot), "--ui-source", str(driver.SOURCES / path),
                    "--ui-flags", "[]"]
         code = driver.invoke(command, env, log, settings.timeout, settings.memory_limit)
+        if boundary:
+            assert code != 0 and expected in log.read_text(), (name, code, log)
+            negatives.append({"name": name, "reader_rejected": True})
+            print("negative boundary PASS", name, flush=True)
+            return
         assert code == 0, (name, code, log)
         terminal = [json.loads(line.removeprefix("upstream_result: "))
                     for line in log.read_text().splitlines() if line.startswith("upstream_result: ")]
@@ -93,8 +95,8 @@ def main():
         negatives.append({"name": name, "terminal": terminal[0]})
         print("negative PASS", name, flush=True)
 
-    reject("missing-start", "start_result.rs", "missing exact compiler dummy-signature ABI query")
-    reject("mismatched-start-type", "start_result.rs", "missing exact compiler dummy-signature ABI query")
+    reject("missing-start-declaration", "start_result.rs", "source caller-location attributes are absent")
+    reject("dangling-start-signature", "start_result.rs", "source_abi: missing signature type", boundary=True)
     for path, symbol in [("runtime_getrandom.rs", "getrandom"), ("runtime_cxa.rs", "__cxa_thread_atexit_impl")]:
         reject("missing-" + symbol, path, "missing exact named compiler shim ABI query " + symbol)
     assert binary_hashes == [driver.sha256(settings.exporter), driver.sha256(settings.runner)]

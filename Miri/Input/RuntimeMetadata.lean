@@ -1,5 +1,6 @@
 import Miri.Input.Model
 import Miri.ABI.Layout
+import Miri.Input.ConcreteTypeLayout
 
 /-! Internal compiler-metadata bridge, not the public import API. Successful
 conversion supplies records and queries; it does not establish execution
@@ -252,10 +253,11 @@ def node (metadata : RuntimeMetadata) (id : TypeId) : Result TypeNode := do
   pure value
 
 def lookup (metadata : RuntimeMetadata) (id : TypeId) : Result (TyAndLayout TypeId) := do
-  let sourceNode ← metadata.node id
-  let sourceLayout ← require metadata.source.layouts[sourceNode.layoutId]?
-    s!"compiler layout ID {sourceNode.layoutId} out of bounds"
-  return ⟨id,← layout metadata.target sourceLayout⟩
+  let node ← metadata.node id
+  let normalized := node.sourceLayout.normalizedType
+  let value ← ConcreteTypeLayout.calculate metadata.source metadata.target normalized
+    |>.mapError (fun message => .invalid s!"concrete layout for type {id}" message)
+  return ⟨normalized,value⟩
 
 /-- This is an explicit diagnostic inventory, not an execution-readiness test. -/
 def obligations (metadata : RuntimeMetadata) : Array (TypeId × RuntimeMetadataError) :=
@@ -303,84 +305,123 @@ def overflowTupleLayout (metadata : RuntimeMetadata) (element : TyAndLayout Type
   let boolean ← metadata.findKind .bool
   metadata.tupleLayout #[element.ty,boolean.ty]
 
-private def projectionParents (metadata : RuntimeMetadata) (id : TypeId) : Result (Array ProjectionParent) := do
-  let node ← metadata.node id
-  let some facts := node.compilerFacts | return #[]
-  let some queries := facts.projectionQueries | return #[]
-  unless queries.typingEnvironment == "fully_monomorphized" do
-    throw (.invalid "projection query" "typing environment mismatch")
-  pure queries.parents
-/-- Resolve a physical compiler layout only at the operation that needs it. -/
-def layoutById (metadata : RuntimeMetadata) (id : Nat) : Result LayoutData := do
-  let source ← require metadata.source.layouts[id]? s!"compiler layout ID {id} out of bounds"
-  layout metadata.target source
+private def primitiveType (metadata : RuntimeMetadata) (primitive : Primitive) : Result TypeId := do
+  let candidates := metadata.source.types.filter fun node =>
+    match primitive,node.shape with
+    | .Int integer signed,.int (.known actual) => signed && match integer,actual with
+      | .I8,.i8 | .I16,.i16 | .I32,.i32 | .I64,.i64 | .I128,.i128 => true | _,_ => false
+    | .Int integer signed,.uint (.known actual) => !signed && match integer,actual with
+      | .I8,.u8 | .I16,.u16 | .I32,.u32 | .I64,.u64 | .I128,.u128 => true | _,_ => false
+    | .Float actual,.float expected => match actual,expected with
+      | .F16,.f16 | .F16B,.f16b | .F32,.f32 | .F64,.f64 | .X87F80,.x87f80 | .F128,.f128 | .PpcF128,.ppcf128 => true | _,_ => false
+    | .Float actual,_ => match actual,node.sourceLayout.specialFloat with
+      | .F16B,some .f16b | .X87F80,some .x87f80 | .PpcF128,some .ppcf128 => true
+      | _,_ => false
+    | .Pointer _,.rawPointer pointee .Mut =>
+      match metadata.source.types[pointee]? with
+      | some {shape := .tuple elements,..} => elements.isEmpty
+      | _ => false
+    | _,_ => false
+  unless candidates.size == 1 do throw (.unsupported "canonical primitive type identity is absent or ambiguous")
+  return (← require candidates[0]? "canonical primitive type").id
 
-private def projectionLayout (metadata : RuntimeMetadata) (id : TypeId) (layoutId : LayoutId) :
-    Result (TyAndLayout TypeId) := do
-  return ⟨id,← metadata.layoutById layoutId⟩
+private def tagLayout (metadata : RuntimeMetadata) (tag : ABI.Scalar) : Result (TyAndLayout TypeId) := do
+  let id ← primitiveType metadata tag.primitive
+  let layout ← ConcreteLayout.scalarLayout metadata.target tag |>.mapError (fun message => .invalid "tag layout" message)
+  pure ⟨id,layout⟩
 
-/-- Source type relationships are read from typed compiler payloads, never
-from display/debug strings. ADT field selection uses the selected variant. -/
 def field (metadata : RuntimeMetadata) (parent : TyAndLayout TypeId) (index : Nat) :
-    Result (TyAndLayout TypeId) := do
-  let node ← metadata.node parent.ty
-  for record in ← projectionParents metadata parent.ty do
-    let queried ← projectionLayout metadata parent.ty record.layoutId
-    if queried == parent then
-      -- The source `str` branch ignores the requested index and always
-      -- returns u8. The producer represents that single exact query result
-      -- at row zero; do not infer a fictitious field count from it.
-      let sourceIndex := if node.shapeKind == .str then 0 else index
-      let source ← require (record.fields.find? (·.index == sourceIndex)) "compiler projection field"
-      let id := source.typeId
-      let _ ← metadata.node id
-      return ← projectionLayout metadata id source.layoutId
-  let id ← match node.shape with
-    | .tuple values => require values[index]? "tuple field"
-    | .array element .. | .slice element => pure element
-    | .str => return ← stringElementLayout metadata
-    | .adt data => do
-      let .Single selected := parent.layout.variants
-        | throw (.unsupported "ADT field needs selected variant")
-      let variant ← require (data.variants.find? (·.index == selected)) "ADT variant"
-      let source ← require (variant.fields.find? (·.index == index)) "ADT field"
-      pure source.typeId
-    | _ => throw (.unsupported "type field query")
-  metadata.lookup id
+    Result (TyAndLayout TypeId) := go (metadata.source.types.size+1) parent
+where
+  go : Nat → TyAndLayout TypeId → Result (TyAndLayout TypeId)
+    | 0,_ => throw (.invalid "field layout" "cyclic unsafe binder")
+    | fuel+1,parent => do
+      let node ← metadata.node parent.ty
+      if let .Multiple tag _ tagIndex _ := parent.layout.variants then
+        if index == tagIndex then return ← tagLayout metadata tag
+      let id ← match node.shape with
+        | .tuple values => require values[index]? "tuple field"
+        | .array element .. | .slice element => pure element
+        | .str => return ← stringElementLayout metadata
+        | .patternType base _ =>
+          unless index == 0 do throw (.invalid "pattern field" "field index is not zero")
+          pure base
+        | .closure .. | .coroutineClosure .. => require node.sourceLayout.closureUpvars[index]? "closure capture"
+        | .unsafeBinder inner _ => return ← go fuel {parent with ty := inner}
+        | .adt data => do
+          let .Single selected := parent.layout.variants | throw (.unsupported "ADT field requires a selected variant")
+          let variant ← require data.variants[selected]? "ADT variant"
+          let source ← require variant.fields[index]? "ADT field"
+          pure source.typeId
+        | .rawPointer pointee _ | .reference pointee .. => do
+          unless index < parent.layout.fields.count do throw (.invalid "wide pointer field" "field index out of bounds")
+          if index == 0 then
+            let primitive : Primitive := .Pointer AddressSpace.ZERO
+            let size ← primitive.size metadata.target |>.mapError (fun e => .invalid "pointer field" (reprStr e))
+            let range ← WrappingRange.full size |>.mapError (fun e => .invalid "pointer field" (reprStr e))
+            let range := if node.shapeKind == .reference then {range with start := 1} else range
+            let layout ← ConcreteLayout.scalarLayout metadata.target (.Initialized (value := primitive) (validRange := range))
+              |>.mapError (fun e => .invalid "pointer field" e)
+            return ⟨parent.ty,layout⟩
+          let tail ← ConcreteTypeLayout.pointerTail metadata.source (metadata.source.types.size+1) pointee
+            |>.mapError (fun e => .invalid "pointer metadata" e)
+          let candidates ← match tail with
+            | .str | .slice _ => pure (metadata.source.types.filter fun source =>
+                source.shapeMetadata.unsignedKind == some (.known .usize))
+            | .dynamicTraitObject _ principal _ => do
+              let definition ← principal.mapM fun id => do
+                pure (← require metadata.source.predicates[id]? "dynamic principal").definitionId
+              let count ← metadata.source.sourceTraits.vtableMinEntries definition
+                |>.mapError (fun message => .invalid "vtable minimum entries" message)
+              pure (metadata.source.types.filter fun source => match source.shape with
+                | .reference array .Not .Static => match metadata.source.types[array]? with
+                  | some {shape := .array element _ constructor,..} =>
+                    constructor.count == count &&
+                      (metadata.source.types[element]?).any (fun element => element.shapeMetadata.unsignedKind == some (.known .usize))
+                  | _ => false
+                | _ => false)
+            | _ => throw (.invalid "pointer metadata" "wide pointer has a thin struct tail")
+          unless candidates.size == 1 do throw (.unsupported "canonical pointer metadata type absent or ambiguous")
+          pure (← require candidates[0]? "pointer metadata").id
+        | .coroutine .. => do
+          let material ← require node.sourceLayout.coroutine "coroutine source layout"
+          match parent.layout.variants with
+          | .Single selected =>
+            let fields ← require material.variants[selected]? "coroutine variant"
+            let saved ← require fields[index]? "coroutine variant field"
+            require material.savedTypes[saved]? "coroutine saved field"
+          | .Multiple .. => require material.prefix[index]? "coroutine prefix field"
+          | .Empty => throw (.invalid "coroutine field" "empty coroutine layout")
+        | _ => throw (.unsupported "type field query")
+      metadata.lookup id
 
-/-- Reconstructs precisely `LayoutData::for_variant` in pinned
-rustc_abi/layout/simple.rs:158–185. Missing uninhabited-variant compiler queries
-remain obligations instead of fabricated field metadata. -/
 def forVariant (metadata : RuntimeMetadata) (parent : TyAndLayout TypeId) (index : Nat) :
     Result (TyAndLayout TypeId) := do
-  let _ ← metadata.node parent.ty
-  for record in ← projectionParents metadata parent.ty do
-    if record.variant == some index then
-      -- Validate the supplied parent against a source default/variant result
-      -- before applying another query; structural resemblance is not a key.
-      let canonical ← metadata.lookup parent.ty
-      unless canonical == parent do
-        match parent.layout.variants with
-        | .Single actual =>
-          if actual == index then return parent
-          throw (.invalid "compiler variant projection" "cannot apply for_variant twice to a selected parent")
-        | _ => throw (.invalid "compiler variant projection" "parent differs from exact source layout")
-      return ← projectionLayout metadata parent.ty record.layoutId
+  let node ← metadata.node parent.ty
   match parent.layout.variants with
   | .Single actual =>
     if actual == index then return parent
-    throw (.unsupported "compiler uninhabited variant query")
-  | .Empty => throw (.unsupported "compiler empty-enum variant query")
+    let canonical ← metadata.lookup parent.ty
+    unless canonical.layout.variants == parent.layout.variants do
+      throw (.invalid "variant projection" "cannot select another variant from a projected variant")
+    let .adt data := node.shape | throw (.invalid "variant projection" "non-ADT single layout")
+    let variant ← require data.variants[index]? "uninhabited ADT variant"
+    return ⟨parent.ty,{ConcreteLayout.neverLayout metadata.target with
+      variants := .Single index
+      fields := if variant.fields.isEmpty then .Arbitrary #[] #[] else .Union variant.fields.size}⟩
+  | .Empty =>
+    let .adt data := node.shape | throw (.invalid "variant projection" "non-ADT empty layout")
+    let variant ← require data.variants[index]? "uninhabited ADT variant"
+    return ⟨parent.ty,{ConcreteLayout.neverLayout metadata.target with
+      variants := .Single index
+      fields := if variant.fields.isEmpty then .Arbitrary #[] #[] else .Union variant.fields.size}⟩
   | .Multiple _ _ _ variants =>
     let variant ← require variants[index]? "variant index"
-    return ⟨parent.ty, { parent.layout with
+    return ⟨parent.ty,{parent.layout with
       fields := .Arbitrary variant.fieldOffsets variant.fieldsInMemoryOrder
-      variants := .Single index
-      backendRepr := variant.backendRepr
-      largestNiche := variant.largestNiche
-      uninhabited := variant.uninhabited
-      size := variant.size
-      randomizationSeed := 0 }⟩
+      variants := .Single index, backendRepr := variant.backendRepr
+      largestNiche := variant.largestNiche, uninhabited := variant.uninhabited
+      size := variant.size, randomizationSeed := 0}⟩
 
 def pointee (metadata : RuntimeMetadata) (parent : TyAndLayout TypeId) :
     Result (TyAndLayout TypeId) := do

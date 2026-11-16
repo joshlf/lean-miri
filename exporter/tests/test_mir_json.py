@@ -12,14 +12,21 @@ from mir_json import MirJSONError, POOL_NAMES, decode_mir_document, load_mir_doc
 
 
 def document(**fields):
-    return {"schema": "lean-miri-rustc-mir", "schema_version": 11,
-            **{name: [] for name in POOL_NAMES}, **{name: [] for name in SHARED_POOLS}, "layouts": [], "files": [], "byte_images": [], **fields}
+    value = {"schema": "lean-miri-rustc-mir", "schema_version": 14,
+             **{name: [] for name in POOL_NAMES}, **{name: [] for name in SHARED_POOLS},
+             "files": [], "byte_images": [], "source_trait_material": {},
+             "source_vtables": {}, "source_abi": {}, "source_cast_targets": [],
+             "root_declarations": [], **fields}
+    value.setdefault("compiler_coroutine_coverage", {
+        "body_coroutines": [False] * (len(value["bodies"]) if isinstance(value["bodies"], list) else 0),
+        "coroutines": [], "auxiliary_bodies": []})
+    return value
 
 
 class MirJSONTests(unittest.TestCase):
     def test_preserves_recursive_references(self):
-        encoded = document(types=[{"shape": {"pointee": 0}, "layout": 0}],
-                           layouts=[0], layout_values=[{"size_bytes": 8}], payload={"type": 0})
+        encoded = document(types=[{"shape": {"pointee": 0}, "source_layout": {"normalized_type": 0}}],
+                           payload={"type": 0})
         self.assertIs(decode_mir_document(encoded), encoded)
         self.assertEqual(encoded["payload"], {"type": 0})
         self.assertEqual(pool_entry(encoded, "types", 0)["shape"]["pointee"], 0)
@@ -58,26 +65,24 @@ class MirJSONTests(unittest.TestCase):
                     decode_mir_document(document(**{name: value}))
 
     def test_requires_current_schema_version(self):
-        for version in (4, 6, 7, 8, 9, 10, True, "11", 11.0):
-            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 11, 12 or 13"):
+        for version in (4, 6, 7, 8, 9, 10, 11, 12, 13, True, "14", 14.0):
+            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 14"):
                 decode_mir_document(document(schema_version=version))
 
-    def test_schema_12_and_13_require_exact_coroutine_catalog_and_preserve_version(self):
+    def test_current_schema_requires_exact_coroutine_catalog_and_preserves_version(self):
         catalog = {"body_coroutines": [], "coroutines": [], "auxiliary_bodies": []}
-        with self.assertRaisesRegex(MirJSONError, "forbids"):
-            decode_mir_document(document(compiler_coroutine_coverage=catalog))
-        for version in (12, 13):
-            with self.subTest(version=version):
-                current = document(schema_version=version, compiler_coroutine_coverage=catalog)
-                self.assertIs(decode_mir_document(current), current)
-                self.assertEqual(expand_document(current)["schema_version"], version)
-                for invalid in (None, {}, {**catalog, "unknown_witness": True},
-                                {**catalog, "body_coroutines": [False]},
-                                {**catalog, "body_coroutines": [0]}):
-                    with self.subTest(catalog=invalid), self.assertRaises(MirJSONError):
-                        decode_mir_document(document(schema_version=version, compiler_coroutine_coverage=invalid))
-                with self.assertRaises(MirJSONError):
-                    decode_mir_document(document(schema_version=version))
+        current = document(schema_version=14, compiler_coroutine_coverage=catalog)
+        self.assertIs(decode_mir_document(current), current)
+        self.assertEqual(expand_document(current)["schema_version"], 14)
+        for invalid in (None, {}, {**catalog, "unknown_witness": True},
+                        {**catalog, "body_coroutines": [False]},
+                        {**catalog, "body_coroutines": [0]}):
+            with self.subTest(catalog=invalid), self.assertRaises(MirJSONError):
+                decode_mir_document(document(schema_version=14, compiler_coroutine_coverage=invalid))
+        with self.assertRaises(MirJSONError):
+            missing = document()
+            del missing["compiler_coroutine_coverage"]
+            decode_mir_document(missing)
 
     def test_coroutine_auxiliary_roles_and_source_pool_round_trip(self):
         body = {"instance_id": 0, "source_def_id": 0,
@@ -94,7 +99,7 @@ class MirJSONTests(unittest.TestCase):
                               "storage_conflicts": [[]]},
                    "drop_sync": None, "drop_async": 0, "drop_proxy_async": None}
         catalog = {"body_coroutines": [True], "coroutines": [witness], "auxiliary_bodies": [auxiliary]}
-        current = document(schema_version=12, bodies=[body], types=[{}], instances=[{}], definitions=[{}], spans=[{}],
+        current = document(schema_version=14, bodies=[body], types=[{}], instances=[{}], definitions=[{}], spans=[{}],
                            source_infos=[{"span": 0, "scope": 0}], compiler_coroutine_coverage=catalog)
         self.assertIs(decode_mir_document(current), current)
         expanded = expand_document(current)
@@ -114,16 +119,15 @@ class MirJSONTests(unittest.TestCase):
             with self.assertRaises(MirJSONError):
                 decode_mir_document(invalid)
 
-    def test_current_schema_preserves_compact_layout_and_llvm_evidence(self):
-        formula = {"field_offsets_bytes": {"kind": "array", "stride_bytes": 4, "field_count": 2}}
-        call = {"basic_blocks": [{"terminator": {"kind": {"resolution": {
-            "kind": "llvm_intrinsic", "function_type": 0, "instance_id": 0}}}}]}
-        current = document(layouts=[0], layout_values=[formula], bodies=[call])
+    def test_source_material_keeps_its_typed_reference_graph(self):
+        current = document(types=[{"source_layout": {"normalized_type": 0},
+                                   "shape": {"kind": "raw_pointer", "pointee": 0}}],
+                           root_declarations=[{"definition": 0, "def_path": "generic", "generic_parameters": ["type"]}])
         self.assertIs(decode_mir_document(current), current)
-        self.assertEqual(pool_entry(current, "layouts", 0), formula)
-        for version in (8, 9, 10):
-            with self.assertRaisesRegex(MirJSONError, "schema_version must be 11, 12 or 13"):
-                decode_mir_document(document(schema_version=version, layouts=[0], layout_values=[formula], bodies=[call]))
+        self.assertEqual(pool_entry(current, "types", 0)["shape"]["pointee"], 0)
+        for name in ("source_trait_material", "source_vtables", "source_abi"):
+            with self.subTest(name=name), self.assertRaises(MirJSONError):
+                decode_mir_document(document(**{name: []}))
 
     def test_filename_ids_stay_shared_and_unexpanded(self):
         encoded = document(files=["src/a.rs", "src/b.rs"],
@@ -138,9 +142,8 @@ class MirJSONTests(unittest.TestCase):
                 decode_mir_document(document(files=invalid))
 
     def test_lossless_pool_projection_preserves_identity_and_defaults(self):
-        raw = document(schema_version=8, layouts=[{"size_bytes": 0}, {"size_bytes": 0}],
-            types=[{"compiler_facts": {"boolean_queries": {"is_dynamic": False},
-                    "discriminants": {"has_discriminants": False, "values": [], "adt_variant_count": None}}}],
+        raw = document(types=[{"source_layout": {"normalized_type": 0, "is_box": False,
+                                                "simd": None, "variant_discriminants": []}}],
             bodies=[{"backtrace_spans": [], "locals": [{"source_info": {"span": 0, "scope": 0}}],
                      "basic_blocks": [{"statements": [{"source_info": {"span": 0, "scope": 0},
                         "kind": {"variant": "Nop"}}], "terminator": {"source_info": {"span": 0, "scope": 0},
@@ -150,9 +153,7 @@ class MirJSONTests(unittest.TestCase):
         for name in SHARED_POOLS:
             raw.pop(name, None)
         pooled = pool_document(raw)
-        self.assertEqual(expand_document(pooled, schema_version=8), raw)
-        self.assertEqual(pooled["layouts"], [0, 0])
-        self.assertEqual(len(pooled["layout_values"]), 1)
+        self.assertEqual(expand_document(pooled), raw)
         self.assertEqual(len(pooled["source_infos"]), 1)
         statement = pooled["bodies"][0]["basic_blocks"][0]["statements"][0]
         self.assertIs(type(statement["source_info"]), int)
@@ -160,15 +161,14 @@ class MirJSONTests(unittest.TestCase):
         self.assertIs(type(pooled["bodies"][0]["locals"][0]["source_info"]), int)
         self.assertIs(type(pooled["bodies"][0]["basic_blocks"][0]["terminator"]["source_info"]), int)
         self.assertIsInstance(pooled["bodies"][0]["basic_blocks"][0]["terminator"]["kind"], dict)
-        self.assertEqual(pooled["discriminants"][0]["adt_variant_count"], None)
-        self.assertIs(pooled["boolean_queries"][0]["is_dynamic"], False)
+        self.assertIsNone(pooled["types"][0]["source_layout"]["simd"])
+        self.assertIs(pooled["types"][0]["source_layout"]["is_box"], False)
         self.assertEqual(pooled["relocations"], [[]])
         self.assertEqual([node["allocation_id"] for node in pooled["allocations"]], [0, 1])
 
     def test_shared_pool_shape_and_reference_bounds(self):
-        encoded = document(layouts=[0], layout_values=[{"size_bytes": 8}],
-                           source_infos=[{"span": 0, "scope": 0}])
-        self.assertEqual(pool_entry(encoded, "layouts", 0), {"size_bytes": 8})
+        encoded = document(source_infos=[{"span": 0, "scope": 0}])
+        self.assertEqual(pool_entry(encoded, "source_infos", 0), {"span": 0, "scope": 0})
         for invalid in (-1, 1, True, "0"):
             with self.subTest(index=invalid), self.assertRaises(MirJSONError):
                 pool_entry(encoded, "source_infos", invalid)

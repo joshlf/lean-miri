@@ -13,7 +13,7 @@ private def check (condition : Bool) (message : String) : IO Unit :=
   let .ok runtime := RuntimeMetadata.ofDocument decoded.document | throw (IO.userError "root_u32 metadata failed")
   for node in decoded.document.types do
     let .ok selected := runtime.node node.id | throw (IO.userError "type ID lookup failed")
-    check (selected.id == node.id && selected.layoutId == node.layoutId) "type lookup changed its definition"
+    check (selected.id == node.id && selected.sourceLayout.normalizedType == node.sourceLayout.normalizedType) "type lookup changed its definition"
   for key in #["bool", "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "usize", "isize", "unit", "unit_pointer_const", "unit_pointer_mut"] do
     if let .ok physical := CompilerPrimitiveFacts.primitiveLayout runtime key then
       check (decide (runtime.lookup physical.ty = Except.ok (ε := RuntimeMetadataError) physical))

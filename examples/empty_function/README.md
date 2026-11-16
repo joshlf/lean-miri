@@ -49,22 +49,28 @@ field; every pre-existing option remains a caller input with its existing
 profile constraints. Every diagnostic-off option record embeds unchanged
 (`proofOptions_of_disabled`). Raw option records requesting diagnostic collection
 are normalized to this explicit profile; the theorem does not establish safety
-or normal completion for the opt-in collector. Fixed Rust/MIR inputs and the
-final target's caller premises are unchanged.
+or normal completion for the opt-in collector. The Rust source, concrete MIR and
+final target's caller premises are unchanged; the pinned compiler input uses the
+source-material format.
 
 Miri source additions expose proof-only APIs; the interpreter implementation
-is unchanged by this example. The fixed Rust/MIR hashes are recorded in
-`SHA256SUMS`. The schema-11 input retains canonical instance, body, type, layout
-and span IDs. Each concrete instance has one resolved body with evaluated
-constants; metadata premises refer to checked table lookups and span bounds. The proof-only reflected MIR block is `noncomputable` to avoid
+is unchanged by this example. The fixed Rust/input hashes are recorded in
+`SHA256SUMS`. The schema-14 input contains the concrete body, evaluated constants
+and finite type/declaration, ABI and allocation-identity material. It contains no
+layout or FnAbi answer tables; the production Lean providers compute those values.
+Generic function MIR is absent. Metadata premises remain explicit pure-query
+facts and span bounds. The proof-only reflected MIR block is `noncomputable` to avoid
 a Lean native-code-generation boxing panic; no native executable validation
 of that block is claimed.
 
-Run `bash tools/check-empty-function.sh` to compile the committed root and its source
-closure, check the final target type, and audit imported EmptyFunction/Miri declarations
+Run `bash tools/check-empty-function.sh` to check the actual fixture's source
+ABI/layout/Freeze/inhabited/validity providers, then compile the committed root
+and its source closure, check the final target type, and audit imported EmptyFunction/Miri declarations
 (including private/generated declarations) for transitive axioms. Only
-`propext`, `Quot.sound`, and `Classical.choice` are permitted.
-See [STATUS.md](../../STATUS.md#empty-function-call-safety).
+`propext`, `Quot.sound`, and `Classical.choice` are permitted. The executable
+provider assertions are finite checks; they neither supply theorem premises nor
+establish the full caller domain or general compiler-query correctness.
+See [STATUS.md](../../STATUS.md#empty-function-caller-domain-transport).
 
 ## Continuous integration
 

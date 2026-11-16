@@ -18,8 +18,7 @@ private def reject (value : Json) (label : String) (diagnostic : String := "") :
   | .error error =>
     check (diagnostic.isEmpty || error.contains diagnostic) s!"{label}: unexpected diagnostic {error}"
 
-private def poolNames := #["layout_values", "boolean_queries", "discriminants",
-  "initialization_ranges", "relocations", "backtrace_spans", "statement_kinds", "source_infos"]
+private def poolNames := #["initialization_ranges", "relocations", "backtrace_spans", "statement_kinds", "source_infos"]
 
 private def memory (id size image ranges relocations : Nat) : Json := Json.mkObj [
   ("allocation_id", toJson id), ("source_alloc_id", toJson (id + 1)),
@@ -29,46 +28,27 @@ private def memory (id size image ranges relocations : Nat) : Json := Json.mkObj
 
 def main : IO Unit := do
   let original ← must (Json.parse (← IO.FS.readFile "tests/input/fixtures/strict-unit.json"))
-  let baseline ← must (decodeJson original.compress)
+  let _ ← must (decodeJson original.compress)
   for name in poolNames do
     let fields ← must original.getObj?
     reject (Json.mkObj (fields.toList.filter (fun field => field.1 != name))) s!"missing {name} pool"
     reject (← must (set original name (.arr #[.bool false]))) s!"malformed unused {name} payload"
-  let layouts ← must ((← must (original.getObjVal? "layouts")).getArr?)
-  let shared ← must (set original "layouts" (.arr (layouts.push layouts[0]!)))
-  let decoded ← must (decodeJson shared.compress)
-  check (decoded.document.layouts.size == baseline.document.layouts.size + 1)
-    "shared physical payload collapsed an existing LayoutId"
-  for invalid in #[toJson (999999 : Nat), toJson (-1 : Int), .str "0", .null] do
-    reject (← must (set original "layouts" (.arr (layouts.set! 0 invalid)))) "invalid layout payload ID"
   let allocations ← must ((← must (original.getObjVal? "allocations")).getArr?)
   for name in #["initialization_ranges", "relocations"] do
     let bad ← must (set allocations[0]! name (toJson (999999 : Nat)))
     reject (← must (set original "allocations" (.arr (allocations.set! 0 bad)))) s!"dangling allocation {name} pool"
 
-  let facts ← must (Json.parse "{\"typing_env\":\"fully_monomorphized\",\"boolean_queries\":0,\"type_queries\":{},\"adt\":null,\"capture_names\":null,\"simd_size_and_type\":null,\"discriminants\":0,\"projection_queries\":null,\"definition\":null}")
-  let booleans ← must (Json.parse "{\"is_dynamic\":false}")
-  let discriminants ← must (Json.parse "{\"has_discriminants\":false,\"adt_variant_count\":null,\"values\":[]}")
   let types ← must ((← must (original.getObjVal? "types")).getArr?)
-  let first ← must (set types[0]! "compiler_facts" facts)
-  let second ← must (set types[1]! "compiler_facts" facts)
-  let source ← must (set original "types" (.arr ((types.set! 0 first).set! 1 second)))
-  let source ← must (set source "boolean_queries" (.arr #[booleans]))
-  let source ← must (set source "discriminants" (.arr #[discriminants]))
-  let decoded ← must (decodeJson source.compress)
-  let some firstFacts := (decoded.document.types[0]?).bind (·.compilerFacts)
-    | throw (IO.userError "shared boolean facts absent")
-  check (firstFacts.booleanQueries == #[("is_dynamic", false)] &&
-    firstFacts.discriminants.any (fun info => !info.hasDiscriminants && info.adtVariantCount.isNone && info.values.isEmpty))
-    "shared type payload changed false, null or empty-array values"
-  for name in #["boolean_queries", "discriminants"] do
-    let badFacts ← must (set facts name (toJson (999999 : Nat)))
-    let first ← must (set first "compiler_facts" badFacts)
-    reject (← must (set source "types" (.arr (types.set! 0 first)))) s!"dangling type {name} pool" name
-  let nullableFacts ← must (set facts "discriminants" .null)
-  let nullableFirst ← must (set first "compiler_facts" nullableFacts)
-  let nullable ← must (set source "types" (.arr (types.set! 0 nullableFirst)))
-  let _ ← must (decodeJson nullable.compress)
+  let attrs ← must (types[0]!.getObjVal? "source_layout")
+  let decoded ← must (decodeJson original.compress)
+  let some firstNode := decoded.document.types[0]? | throw (IO.userError "missing typed source declaration")
+  let first := firstNode.sourceLayout
+  check (!first.isUnsafeCell && first.captureNames.isNone && first.discriminants.isEmpty)
+    "source declarations changed false, null or empty-array values"
+  for invalid in #[.str "false", .null, toJson (0 : Nat)] do
+    let badAttrs ← must (set attrs "is_unsafe_cell" invalid)
+    let first ← must (set types[0]! "source_layout" badAttrs)
+    reject (← must (set original "types" (.arr (types.set! 0 first)))) "malformed source declaration boolean"
 
   -- One mask is valid for a one-byte allocation and invalid for a two-byte one.
   -- Pooling must retain the allocation-size check at each use.

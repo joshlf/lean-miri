@@ -1,5 +1,4 @@
-"""Diagnostic joins must distinguish catalog queries from runtime consumption."""
-import copy
+"""Diagnostic joins distinguish finite source material from runtime consumption."""
 import importlib.util
 import json
 from pathlib import Path
@@ -13,51 +12,54 @@ SPEC.loader.exec_module(MODULE)
 
 class ConsumptionTests(unittest.TestCase):
     def setUp(self):
-        # Synthetic parser data only; never a producer/nonidentity witness.
-        self.document = {'producer': {'rustc_commit': 'unit-test'}, 'compiler_vtable_queries': [{
-            'query_id': 0, 'input_type': 10, 'output_type': 10,
-            'input_predicates': [1], 'output_predicates': [2]}]}
-        self.provenance = {'schema': 'lean-miri-vtable-origins-v1', 'queries': [{
-            'query_id': 0, 'input_type_id': 10, 'input_predicate_ids': [1],
-            'origins': [{'route': 'unsize_cast', 'body': {'role': 'root_template'}}]}]}
-        raw = json.dumps(self.document).encode()
-        self.provenance.update(snapshot_fnv1a64=MODULE.fingerprint(raw), snapshot_byte_length=len(raw), rustc_commit='unit-test')
-        self.mapping = 'vtable_query_map query_id=0 input_type=10 input_token=11 output_type=10 output_token=12\n'
-        self.runtime = 'vtable_query input_type=10 input_token=11 query_id=0\n'
+        # Synthetic parser controls only; never a genuine nonidentity witness.
+        self.document = {
+            'producer': {'rustc_commit': 'unit-test'},
+            'types': [{'source_layout': {'normalized_type': 0}}],
+            'compiler_predicate_queries': [
+                {'predicate_id': 0, 'erased': 1}, {'predicate_id': 1, 'erased': 1}],
+        }
+        self.mapping = 'vtable_source_map input_type=0 input_predicates=#[0] output_type=0 output_predicates=#[1]\n'
+        self.runtime = 'vtable_query input_type=0 input_predicates=#[0] output_type=0 output_predicates=#[1]\n'
 
     def summarize(self, runtime):
-        return MODULE.summarize_queries(json.dumps(self.document).encode(), self.provenance, self.mapping, runtime)
+        return MODULE.summarize_queries(json.dumps(self.document).encode(), self.mapping, runtime)
 
-    def test_catalog_nonidentity_is_not_runtime_coverage(self):
+    def test_material_nonidentity_is_not_runtime_coverage(self):
         result = self.summarize('')
-        self.assertEqual(result['nonidentity_catalog_queries'], 1)
+        self.assertEqual(result['nonidentity_source_keys'], 1)
         self.assertEqual(result['runtime_nonidentity_calls'], 0)
 
-    def test_rejects_stale_producer_sidecar(self):
-        self.provenance['snapshot_fnv1a64'] = '0000000000000000'
-        with self.assertRaisesRegex(ValueError, 'different input bytes'):
-            self.summarize(self.runtime)
+    def test_summary_identifies_exact_source_bytes(self):
+        result = self.summarize(self.runtime)
+        raw = json.dumps(self.document).encode()
+        self.assertEqual(result['snapshot_fnv1a64'], MODULE.fingerprint(raw))
+        self.assertEqual(result['snapshot_byte_length'], len(raw))
 
     def test_counts_actual_repeated_lookup(self):
         self.assertEqual(self.summarize(self.runtime * 2)['runtime_nonidentity_calls'], 2)
 
     def test_rejects_wrong_complete_pair(self):
-        with self.assertRaisesRegex(ValueError, 'exact consumer key'):
-            self.summarize(self.runtime.replace('input_token=11', 'input_token=12'))
+        with self.assertRaisesRegex(ValueError, 'exact source key'):
+            self.summarize(self.runtime.replace('output_predicates=#[1]', 'output_predicates=#[0]'))
 
     def test_rejects_missing_key(self):
-        with self.assertRaisesRegex(ValueError, 'no compiler query identity'):
-            self.summarize(self.runtime.replace('query_id=0', 'query_id=missing'))
+        with self.assertRaisesRegex(ValueError, 'incomplete exact source query trace'):
+            self.summarize(self.runtime.replace('input_predicates=#[0] ', ''))
 
-    def test_rejects_unclosed_or_duplicate_origin_rows(self):
-        self.provenance['queries'].append(copy.deepcopy(self.provenance['queries'][0]))
-        with self.assertRaisesRegex(ValueError, 'missing/duplicate'):
+    def test_rejects_duplicate_mapping(self):
+        self.mapping *= 2
+        with self.assertRaisesRegex(ValueError, 'duplicate source key'):
             self.summarize(self.runtime)
 
     def test_rejects_incorrect_identity_mapping(self):
-        self.mapping = self.mapping.replace('output_token=12', 'output_token=11')
-        with self.assertRaisesRegex(ValueError, 'predicate identity'):
+        self.mapping = self.mapping.replace('output_predicates=#[1]', 'output_predicates=#[0]')
+        with self.assertRaisesRegex(ValueError, 'exact source key'):
             self.summarize(self.runtime)
+
+    def test_rejects_absent_source_material(self):
+        with self.assertRaisesRegex(ValueError, 'no predicate source material'):
+            self.summarize(self.runtime.replace('input_predicates=#[0]', 'input_predicates=#[9]'))
 
 
 class ExternalConstantTests(unittest.TestCase):

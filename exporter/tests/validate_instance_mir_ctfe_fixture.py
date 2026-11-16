@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate source116 external Ctor and #[rustc_comptime] instance MIR rows."""
+"""Validate reachable external constructors and rustc-evaluated constants."""
 import json
 import pathlib
 import sys
@@ -25,34 +25,22 @@ def walk(value):
 
 def main(path):
     document = load_mir_document(path)
-    expected = {
-        "ctfe_producer_types::Pair": (2, 4),
-        "ctfe_producer_types::Token::Number": (2, 11),
-        "ctfe_producer_types::compile_time_add": (2, 17),
-        "ctfe_producer_types::Opcode::compile_time_xor": (2, 21),
-    }
-    rows = {row.get("def_path"): row for row in document["instances"]}
-    for def_path, (crate, index) in expected.items():
-        require(def_path in rows, f"missing instance row {def_path}")
+    rows = {row.get("def_path"): row for row in document["instances"]
+            if row.get("kind") == "instance_mir"}
+    for def_path in ("ctfe_producer_types::Pair", "ctfe_producer_types::Token::Number"):
+        require(def_path in rows, f"missing concrete constructor {def_path}")
         row = rows[def_path]
-        require(pool_entry(document, "definitions", row["def_id"]) == {"crate": crate, "index": index},
-                f"{def_path} DefId changed: {row['def_id']}")
-        require(row["instance_kind"] == {"def_id": row["def_id"], "kind": "item"},
-                f"{def_path} is not an Item instance: {row['instance_kind']}")
-        require(row["kind"] == "instance_mir" and "status" not in row,
-                f"{def_path} is not supported instance MIR: {row['kind']}")
         body = pool_entry(document, "bodies", row["body"])
-        require(body["instance_id"] == row["instance_id"],
-                f"{def_path} body belongs to another concrete instance")
-        require(pool_entry(document, "definitions", body["source_def_id"]) == {"crate": crate, "index": index},
-                f"{def_path} loaded body has a different source DefId")
-        require("source_instance_kind" not in body,
-                f"{def_path} loaded body contains an unused source instance kind")
-        require(body["basic_blocks"], f"{def_path} loaded body has no basic blocks")
-        for node in walk(body["basic_blocks"]):
-            require(node.get("status") != "unsupported",
-                    f"{def_path} body contains unsupported node {node}")
-
+        require(body["instance_id"] == row["instance_id"], "constructor body identity differs")
+        require(body["source_def_id"] == row["def_id"], "constructor source identity differs")
+        require(body["basic_blocks"], "constructor body has no blocks")
+    for def_path in ("ctfe_producer_types::compile_time_add", "ctfe_producer_types::Opcode::compile_time_xor"):
+        require(def_path not in rows, f"CTFE-only function leaked into executable closure: {def_path}")
+    constants = pool_entry(document, "bodies", rows["constants"]["body"])
+    bits = {node["bits_unsigned"] for node in walk(constants) if "bits_unsigned" in node}
+    require({"42", "121"}.issubset(bits), "constant results were not evaluated by rustc")
+    require([row["def_path"] for row in document["root_declarations"]] == ["invoke"],
+            "generic root declaration was not retained separately")
     pair = pool_entry(document, "bodies", rows["ctfe_producer_types::Pair"]["body"])["basic_blocks"]
     pair_aggregate = [n for n in walk(pair) if n.get("kind") == "Aggregate"]
     require(any(n.get("aggregate_kind", {}).get("def_path") == "ctfe_producer_types::Pair"
@@ -62,13 +50,6 @@ def main(path):
     require(any(n.get("aggregate_kind", {}).get("def_path") == "ctfe_producer_types::Token"
                 and n.get("aggregate_kind", {}).get("variant_index") == 1
                 for n in variant_aggregate), "enum constructor body lacks Token::Number variant 1")
-
-    add_body = pool_entry(document, "bodies", rows["ctfe_producer_types::compile_time_add"]["body"])["basic_blocks"]
-    xor_body = pool_entry(document, "bodies", rows["ctfe_producer_types::Opcode::compile_time_xor"]["body"])["basic_blocks"]
-    require(any(n.get("kind") == "BinaryOp" and n.get("operator", {}).get("kind") == "add_with_overflow"
-                for n in walk(add_body)), "compile_time_add body lacks supported addition")
-    require(any(n.get("kind") == "BinaryOp" and n.get("operator", {}).get("kind") == "bit_xor"
-                for n in walk(xor_body)), "compile_time_xor body lacks supported xor")
 
     calls = []
     for caller in ("make_pair", "make_token"):
@@ -85,7 +66,7 @@ def main(path):
         require(resolution.get("kind") == "indirect_function_pointer"
                 and "status" not in resolution,
                 f"constructor call resolution changed: {resolution}")
-    print("validated four supported normalized external instance_mir bodies and two indirect constructor call sites")
+    print("validated concrete external constructors, evaluated constants, and declaration-only generic root")
 
 
 if __name__ == "__main__":

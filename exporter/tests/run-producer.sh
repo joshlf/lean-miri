@@ -17,9 +17,13 @@ case "$1" in
     python3 "$ROOT/exporter/tests/validate_producer_settings.py"
     ;;
   primitive_ranges)
-    "$EXPORTER" --output "$OUT" "$ROOT/exporter/fixtures/primitive_ranges.rs" \
+    LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=0 LEAN_MIRI_RUN_PREPARED_MIRI=0 "$EXPORTER" \
+      --output "$OUT" --oracle-output "$WORK/oracle.json" --root full --root niche \
+      "$ROOT/exporter/fixtures/primitive_ranges.rs" \
       --crate-type=lib --crate-name=primitive_ranges
-    python3 "$ROOT/exporter/tests/validate_primitive_ranges.py" "$OUT"
+    python3 "$ROOT/exporter/tests/validate_primitive_ranges.py" "$OUT" "$WORK/oracle.json"
+    export ELAN_HOME="${ELAN_HOME:-$ROOT/.elan}"
+    "$ROOT/.elan/bin/lake" env lean --run tools/CheckSourceLayouts.lean "$OUT" "$WORK/oracle.json"
     ;;
   selected_alloc_world|selected_static_typeid)
     if [[ "$1" == selected_alloc_world ]]; then

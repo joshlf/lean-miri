@@ -15,8 +15,6 @@ namespace Miri.Input
 abbrev TypeId := Nat
 abbrev AllocationId := Nat
 abbrev InstanceId := Nat
-abbrev LayoutId := Nat
-abbrev FunctionAbiId := Nat
 abbrev SpanId := Nat
 abbrev DefinitionRef := Nat
 abbrev TypeConstantId := Nat
@@ -76,10 +74,6 @@ inductive ScalarShapeKind where
   | initialized | union
   deriving Repr, DecidableEq
 
-
-inductive PassModeKind where
-  | ignore | direct | pair | cast | indirect | indirectUnsized
-  deriving Repr, DecidableEq
 
 inductive AllocationKind where
   | memory | function | static | vtable | typeId
@@ -235,36 +229,13 @@ structure Layout where
   variants : Option TaggedNode
   backendRepr : Option TaggedNode
 
-inductive ArmCallKind where
-  | aapcs | cmseNonSecureCall | cmseNonSecureEntry
-  deriving Repr, DecidableEq
-
-inductive InterruptCallKind where
-  | avr | avrNonBlocking | msp430 | riscvMachine | riscvSupervisor | x86
-  deriving Repr, DecidableEq
-
-inductive X86CallKind where
-  | fastcall | stdcall | sysv64 | thiscall | vectorcall | win64
-  deriving Repr, DecidableEq
-
-inductive CanonicalAbiKind where
-  | c | rust | rustCold | rustPreserveNone | rustTail | custom | swift
-  | arm | gpuKernel | interrupt | x86
-  deriving Repr, DecidableEq
-
-structure CanonicalAbi where
-  kind : CanonicalAbiKind
-  armCall : Option ArmCallKind
-  interruptKind : Option InterruptCallKind
-  x86Call : Option X86CallKind
-  deriving BEq
-
 structure FunctionSignature where
   inputs : Array TypeId
   output : TypeId
   safety : Miri.MIR.Safety
   abi : Miri.ABI.ExternAbi
   cVariadic : Bool
+  splatted : Option Nat := none
 
 
 inductive CompilerPattern where
@@ -392,26 +363,6 @@ def pattern : TypeShape → Option CompilerPattern
 
 end TypeShape
 
-structure AdtCompilerFacts where
-  definitionId : DefinitionRef
-  itemName : String
-  cfiEncoding : Option (Option String) := none
-  nonnullOptimizationGuaranteed : Bool
-
-structure ProjectionField where
-  index : Nat
-  typeId : TypeId
-  layoutId : LayoutId
-
-structure ProjectionParent where
-  variant : Option Nat
-  layoutId : LayoutId
-  fields : Array ProjectionField
-
-structure ProjectionQueries where
-  typingEnvironment : String
-  parents : Array ProjectionParent
-
 structure DiscriminantValue where
   variant : Nat
   typeId : TypeId
@@ -422,25 +373,59 @@ structure DiscriminantInfo where
   adtVariantCount : Option Nat
   values : Array DiscriminantValue
 
-structure TypeCompilerFacts where
-  typingEnvironment : String
-  booleanQueries : Array (String × Bool)
-  typeQueries : Array (String × Option TypeId)
-  adt : Option AdtCompilerFacts := none
-  definitionId : Option DefinitionRef := none
-  projectionQueries : Option ProjectionQueries := none
-  simdSizeAndType : Option (Nat × TypeId) := none
-  discriminants : Option DiscriminantInfo := none
+structure SourceSimd where
+  count : Nat
+  element : TypeId
+
+structure SourceCoroutineTraitField where
+  typeId : TypeId
+  ignoreForTraits : Bool
+  deriving Repr, DecidableEq
+
+structure SourceCoroutineLayout where
+  locals : Array TypeId
+  savedTypes : Array TypeId
+  «prefix» : Array TypeId
+  variants : Array (Array Nat)
+  conflicts : Array (Array Nat)
+  seed : Nat
+  movability : Miri.MIR.Movability
+  /-- Pre-cleanup witness fields; the post-cleanup savedTypes layout is insufficient. -/
+  traitFields : Array SourceCoroutineTraitField
+
+structure SourceTypeLayout where
+  normalizedType : TypeId
+  closureUpvars : Array TypeId := #[]
+  discriminants : Array Int := #[]
+  simd : Option SourceSimd := none
+  coroutine : Option SourceCoroutineLayout := none
+  specialFloat : Option FloatTypeTag := none
+  isX87F80 : Bool := false
+  scalableVectors : Option Nat := none
+  variances : Array MIR.Variance := #[]
+  hasDestructor : Bool := false
+  isDynMetadata : Bool := false
   typeIdHash : Option Nat := none
+  isUnsafeCell : Bool := false
+  isUnsafePinned : Bool := false
+  isManuallyDrop : Bool := false
+  isMaybeUninit : Bool := false
+  isPhantomData : Bool := false
+  isBox : Bool := false
+  isGlobalAllocator : Bool := false
+  isCVoid : Bool := false
+  isMaybeDangling : Bool := false
+  nonnullOptimizationGuaranteed : Bool := false
+  definition : Option DefinitionRef := none
+  itemName : Option String := none
+  cfiEncoding : Option String := none
   captureNames : Option (Array (Option String)) := none
 
 structure TypeNode where
-  layoutQueryInputTypeId : Option TypeId := none
-  compilerFacts : Option TypeCompilerFacts := none
   id : TypeId
+  sourceLayout : SourceTypeLayout := {normalizedType := id}
   display : String
   shape : TypeShape
-  layoutId : LayoutId
 
 namespace TypeNode
 
@@ -506,77 +491,6 @@ structure AllocationMemory where
   initializationRanges : Array InitRange
   relocations : Array Relocation
   deriving Repr, DecidableEq
-
-inductive ArgumentExtensionKind where
-  | none | zeroExtend | signExtend
-  deriving Repr, DecidableEq
-
-inductive ArgumentCaptureKind where
-  | none | address | readOnly | unrestricted
-  deriving Repr, DecidableEq
-
-inductive IndirectModeKind where
-  | pointer | onStack | amdgpuKernelArgument
-  deriving Repr, DecidableEq
-
-structure AbiAttributes where
-  regularBits : Nat
-  pointeeSizeBytes : Nat
-  pointeeAlignBytes : Option Nat
-  argExtension : ArgumentExtensionKind
-  deriving BEq
-
-inductive AbiRegisterKind where
-  | integer | float | ppcF128 | vector
-  deriving Repr, DecidableEq
-
-inductive AbiRegisterHint where
-  | integer (kind : IntegerTypeTag) (signed : Bool)
-  | float (kind : FloatTypeTag)
-  | pointer (addressSpace : Nat)
-  deriving Repr, DecidableEq
-
-structure AbiRegister where
-  kind : AbiRegisterKind
-  sizeBits : Nat
-  hintElement : Option AbiRegisterHint
-  deriving BEq
-
-structure AbiCastTarget where
-  prefixRegisters : Array AbiRegister
-  restOffsetBytes : Option Nat
-  restRegister : AbiRegister
-  restTotalBytes : Nat
-  restIsConsecutive : Bool
-  attributes : AbiAttributes
-  deriving BEq
-
-structure AbiPassMode where
-  kind : PassModeKind
-  attributes : Array AbiAttributes
-  castTarget : Option AbiCastTarget
-  padI32Count : Option Nat
-  addressSpace : Option Nat
-  indirectMode : Option IndirectModeKind
-  deriving BEq
-
-structure AbiArgument where
-  typeId : TypeId
-  /-- Physical compiler TyAndLayout for this FnAbi argument. The logical type
-  remains `typeId`; Rust can adjust the ABI layout independently (notably the
-  forced-thin virtual-call receiver). The input schema validates its presence. -/
-  layoutId : LayoutId
-  mode : AbiPassMode
-  deriving BEq
-
-structure FunctionAbi where
-  arguments : Array AbiArgument
-  returnValue : AbiArgument
-  callingConvention : CanonicalAbi
-  canUnwind : Bool
-  cVariadic : Bool
-  fixedCount : Nat
-  deriving BEq
 
 structure DefinitionId where
   crateIndex : Nat
@@ -717,7 +631,7 @@ inductive CallResolutionKind where
 
 /-- Only the compiler's LLVM intrinsic dispatch has no ordinary FnAbi. -/
 inductive CallAbiEvidence where
-  | normal (id : FunctionAbiId)
+  | normal
   | llvmIntrinsic
   deriving Repr, DecidableEq
 
@@ -771,23 +685,10 @@ structure PlaceFact where
   typeId : TypeId
   projectionTypes : Array TypeId
 
-structure DynamicUpcastEvidence where
-  operandType : TypeId
-  castTarget : TypeId
-  sourceType : TypeId
-  targetType : TypeId
-  sourcePointeeType : TypeId
-  targetPointeeType : TypeId
-  sourceTailType : TypeId
-  targetTailType : TypeId
-  querySource : TypeId
-  queryTarget : TypeId
-
 structure NodeFacts where
   places : Array PlaceFact := #[]
   constantAllocations : Array AllocationId := #[]
   threadLocals : Array ThreadLocalEvidence := #[]
-  dynamicUpcasts : Array DynamicUpcastEvidence := #[]
 
 structure BodyCore where
   mir : Miri.MIR.Body
@@ -824,6 +725,11 @@ structure BodyRoot where
   threadLocalStatic : Bool
   promotedBodies : Array PromotedBody
 
+inductive SourceCastTarget where
+  | functionPointer (inputType : TypeId) (instanceId : Option InstanceId)
+  | closureOnce (inputType : TypeId) (instanceId : InstanceId)
+  deriving Repr, DecidableEq
+
 structure InstanceNode where
   instanceKind : Miri.Interpreter.CallInstanceKind
   genericArgs : Array Miri.MIR.GenericArg
@@ -835,7 +741,7 @@ structure InstanceNode where
   promotedBodies : Array PromotedBody
   dispatchSlot : Option Nat := none
   bodyStatus : Option String := none
-  virtualIdentity : Option (TypeId × FunctionAbiId) := none
+  virtualIdentity : Option TypeId := none
   foreignItem : Option Bool := none
   symbolName : Option String := none
   fallbackInstance : Option InstanceId := none
@@ -901,6 +807,7 @@ structure CompilerPredicateEvidence where
   stableKey : Nat
   autoTrait : Bool
   normalizedId : Option Nat
+  erasedId : PredicateId
   original : PredicateId
   deriving BEq
 

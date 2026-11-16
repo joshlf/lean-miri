@@ -130,3 +130,38 @@ Changes that move work between these phases can improve one span without
 improving total runtime. A schema change requires fresh exports from identical
 Rust source, compiler configuration and guest settings; record both serialized
 artifact hashes and sizes, and compare outcomes before interpreting timings.
+
+For exporter or schema changes, `tools/measure-pipeline.py` measures fresh export
+through the native runner's terminal result. Supply baseline and candidate
+exporter/runner binaries built from fixed revisions, one unchanged Rust source,
+the pinned compiler directory and its prepared MIR sysroot:
+
+```bash
+python3 tools/measure-pipeline.py \
+  --source tests/repro/startup/empty-main.rs --root main \
+  --baseline-exporter /absolute/baseline/exporter \
+  --baseline-runner /absolute/baseline/native_runner \
+  --candidate-exporter /absolute/candidate/exporter \
+  --candidate-runner /absolute/candidate/native_runner \
+  --rustc-toolchain .rustup/toolchains/miri-exporter-8144389c895d \
+  --miri-sysroot scratch/miri-sysroot --cpu 2 --pairs 3 \
+  --output-dir scratch/performance/pipeline-empty-main \
+  -- --crate-name=empty_main --edition=2021
+```
+
+The output directory must be new. The collector copies all four binaries before
+timing, alternates baseline/candidate order between pairs, and uses one CPU and
+one Lean thread for both phases. Both exporters receive identical source paths,
+roots, flags and prepared sysroot. `results.json` records source, binary and
+exported-input hashes, input sizes, phase and total wall/CPU times, child peak RSS,
+sampled process-group RSS, same-CPU steal and cgroup throttling deltas. Build time
+and exported-input hashing are excluded. Total wall time includes collector and
+process-launch overhead; samples taken every 50ms can miss short RSS peaks.
+The default expected terminal outcome is `run: finalized_exit code=0` (before
+the diagnostic suffix following `;`); an exporter
+failure, timeout, nonzero runner status or different terminal line fails the
+comparison and suppresses summaries. Finite execution success is not a safety
+proof. Add `--profile` to record Lean's internal spans; leave it off for ordinary
+execution measurements. Use `measure.py` on each exported input separately when
+detailed phase attribution is needed. Keep other builds out of the measured trials and inspect
+sample spread and host counters before interpreting differences.

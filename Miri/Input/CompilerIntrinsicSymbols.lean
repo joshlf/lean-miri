@@ -14,9 +14,7 @@ private def lift (value : Except String A) : MachineHooks.M K U A :=
 
 def typeHash (p : CompilerProviders.Prepared) (ty : MIR.TyId) : Except String U128 := do
   let source ← p.runtime.node ty |>.mapError toString
-  let some facts := source.compilerFacts | throw "compiler TypeId hash evidence missing"
-  let some value := facts.typeIdHash | throw "compiler TypeId hash evidence missing"
-  unless value < 2^128 do throw "compiler TypeId hash exceeds u128"
+  let some value := source.sourceLayout.typeIdHash | throw "compiler TypeId identity hash is absent"
   pure (BitVec.ofNat 128 value)
 
 def importedTypeId (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)

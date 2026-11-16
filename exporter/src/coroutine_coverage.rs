@@ -33,31 +33,22 @@ pub(super) struct Coverage {
 #[serde(rename_all = "snake_case")]
 pub(super) enum Role { Sync, Async, ProxyAsync }
 #[derive(serde::Serialize)]
-pub(super) struct Auxiliary<B = pool_body::Body> {
+pub(super) struct Auxiliary {
     pub owner_body: u64,
     pub role: Role,
     // source.instance can be the resume Item for async/proxy bodies. It must
     // never be used as an executable-body pool key (drop.rs:258,350).
     pub source_kind: pool_instance::InstanceKind,
-    pub body: B,
+    pub body: pool_body::Body,
 }
 #[derive(serde::Serialize)]
-pub(super) struct Catalog<B = pool_body::Body> {
+pub(super) struct Catalog {
     pub body_coroutines: Vec<bool>,
     pub coroutines: Vec<Coverage>,
-    pub auxiliary_bodies: Vec<Auxiliary<B>>,
+    pub auxiliary_bodies: Vec<Auxiliary>,
 }
-impl<B> Default for Catalog<B> {
+impl Default for Catalog {
     fn default() -> Self { Self { body_coroutines: Vec::new(), coroutines: Vec::new(), auxiliary_bodies: Vec::new() } }
-}
-impl Catalog {
-    pub fn finish(self, ids: &HashMap<(u64, Vec<u64>), u64>, candidates: &HashMap<u64, Vec<u64>>)
-        -> Result<Catalog<pool_body::Body<u64, Vec<u64>>>, String> {
-        Ok(Catalog { body_coroutines: self.body_coroutines, coroutines: self.coroutines, auxiliary_bodies: self.auxiliary_bodies.into_iter()
-            .map(|row| Ok(Auxiliary { owner_body: row.owner_body, role: row.role,
-                source_kind: row.source_kind, body: row.body.finish(ids, candidates)? }))
-            .collect::<Result<_, String>>()? })
-    }
 }
 
 fn lowered(body: &rustc_middle::mir::Body<'_>) -> Result<(), String> {
@@ -173,7 +164,7 @@ mod tests {
     }
     #[test]
     fn empty_catalog_is_explicit_and_role_tags_are_exact() {
-        let catalog: Catalog<pool_body::Body<u64, Vec<u64>>> = Catalog::default();
+        let catalog: Catalog = Catalog::default();
         assert_eq!(serde_json::to_value(catalog).unwrap(), serde_json::json!({
             "body_coroutines": [], "coroutines": [], "auxiliary_bodies": [] }));
         assert_eq!(serde_json::to_value(Role::Sync).unwrap(), "sync");
@@ -188,7 +179,7 @@ mod tests {
                     source_kind: pool_instance::InstanceKind::Item { def_id: 7 }, body: body(19) },
                 Auxiliary { owner_body: 0, role: Role::ProxyAsync,
                     source_kind: pool_instance::InstanceKind::Item { def_id: 7 }, body: body(19) }] };
-        let closed = catalog.finish(&HashMap::new(), &HashMap::new()).unwrap();
+        let closed = catalog;
         let value = serde_json::to_value(closed).unwrap();
         let rows = value["auxiliary_bodies"].as_array().unwrap();
         assert_eq!(rows.len(), 2);

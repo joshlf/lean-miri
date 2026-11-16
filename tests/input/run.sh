@@ -14,7 +14,7 @@ export PATH="$ROOT/.elan/bin:$SYSROOT/bin:$CARGO_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$SYSROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 "$CARGO_HOME/bin/cargo" +"$TOOLCHAIN" build --offline --manifest-path "$ROOT/exporter/Cargo.toml"
-flock --no-fork /tmp/lean-miri-lake-build.lock lake build Miri.Input
+flock --no-fork /tmp/lean-miri-lake-build.lock lake build Miri
 lake env lean "$ROOT/MiriTests/Input/CompilerForeignSymbolTables.lean"
 lake env lean "$ROOT/MiriTests/Input/DefinitionLookup2026.lean"
 lake env lean "$ROOT/MiriTests/Input/DecoderProfile2026.lean"
@@ -33,9 +33,12 @@ LOWERING_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-lowering-XXXXXX.json")"
 NOOP_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-noop-XXXXXX.json")"
 ALLOC_WORLD_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-alloc-world-XXXXXX.json")"
 ROOT_WORLD_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-root-world-XXXXXX.json")"
-trap 'rm -f "$OUT" "$SCOPE_OUT" "$NOOP_OUT" "$LOWERING_OUT" "$ALLOC_WORLD_OUT" "$ROOT_WORLD_OUT"' EXIT
+LLVM_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-llvm-XXXXXX.json")"
+DYN_BOUNDS_OUT="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-dyn-bounds-XXXXXX.json")"
+DYN_BOUNDS_ORACLE="$(mktemp "${TMPDIR:-/tmp}/lean-miri-input-dyn-bounds-oracle-XXXXXX.json")"
+trap 'rm -f "$OUT" "$SCOPE_OUT" "$NOOP_OUT" "$LOWERING_OUT" "$ALLOC_WORLD_OUT" "$ROOT_WORLD_OUT" "$LLVM_OUT" "$DYN_BOUNDS_OUT" "$DYN_BOUNDS_ORACLE"' EXIT
 "$ROOT/exporter/target/debug/lean-miri-mir-exporter" \
-  --output "$OUT" "$ROOT/exporter/fixtures/mir_features.rs" \
+  --output "$OUT" --root direct_tag_value --root get_vtable_root --root as_trait_object --root as_drop_trait_object --root call_trait_object --root make_link --root promoted_ref --root byte_string --root pointer_slice --root read_tls --root id --root array_len --root exercise "$ROOT/exporter/fixtures/mir_features.rs" \
   --crate-type=lib --crate-name=mir_features
 python3 "$ROOT/exporter/tests/validate_fixture.py" "$OUT"
 lake env lean --run "$ROOT/tests/input/RuntimeMetadataPools.lean" "$OUT"
@@ -44,8 +47,16 @@ lake env lean --run "$ROOT/tests/input/DecoderTests.lean" "$OUT"
 # Typed-pool and two-pass cases replace the removed shared-JSON transport tests.
 lake env lean --run "$ROOT/tests/input/TwoPassDecoder.lean"
 lake env lean --run "$ROOT/tests/input/DecoderDynamicScan2026.lean" "$OUT"
-lake env lean --run "$ROOT/tests/input/TypedFunctionAbiTests.lean" "$OUT"
-lake env lean --run "$ROOT/tests/input/CompilerInstanceAbiIndex142.lean" "$OUT"
+lake env lean --run "$ROOT/tests/input/SourceAbiBoundaryTests.lean" "$OUT"
+lake env lean --run "$ROOT/tests/input/SourceQueryTests.lean" "$OUT"
+env -u LEAN_MIRI_PREPARED_ALLOC_ID_WORLD "$ROOT/exporter/target/debug/lean-miri-mir-exporter" \
+  --output "$DYN_BOUNDS_OUT" --oracle-output "$DYN_BOUNDS_ORACLE" --root root \
+  "$ROOT/exporter/fixtures/scope/concrete_dyn_bounds.rs" --crate-type=lib --crate-name=concrete_dyn_bounds
+python3 "$ROOT/tools/check-source-queries.py" --skip-build "$DYN_BOUNDS_OUT" "$DYN_BOUNDS_ORACLE"
+"$ROOT/exporter/target/debug/lean-miri-mir-exporter" \
+  --output "$LLVM_OUT" --root identity "$ROOT/exporter/fixtures/fail_closed/llvm_no_abi.rs" \
+  --crate-type=lib --crate-name=llvm_no_abi
+lake env lean --run "$ROOT/tests/input/LlvmCallEvidence.lean" "$LLVM_OUT"
 lake env lean --run "$ROOT/tests/input/CompilerBacktraceIndexTests2026.lean" "$OUT"
 lake env lean --run "$ROOT/tests/input/TypedCompilerPreparationTests.lean" "$OUT"
 lake env lean --run "$ROOT/tests/input/ImportCLI.lean" "$OUT"
@@ -68,7 +79,7 @@ python3 "$ROOT/exporter/tests/validate_noops_fixture.py" "$NOOP_OUT"
 lake env lean --run "$ROOT/tests/input/NoopTests.lean" "$NOOP_OUT"
 
 "$ROOT/exporter/target/debug/lean-miri-mir-exporter" \
-  --output "$LOWERING_OUT" "$ROOT/exporter/fixtures/mir_lowering.rs" \
+  --output "$LOWERING_OUT" --root assembly_identity --root repeat_and_borrow --root raw_pointer "$ROOT/exporter/fixtures/mir_lowering.rs" \
   --crate-type=lib --crate-name=mir_lowering
 lake env lean --run "$ROOT/tests/input/LowerProgramTests.lean" "$LOWERING_OUT"
 

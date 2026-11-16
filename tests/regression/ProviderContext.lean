@@ -43,7 +43,7 @@ private def checkRuntime (runtime : RuntimeMetadata) (program : LoweredProgram) 
     let node ← match runtime.node source.id with
       | .ok node => pure node
       | .error reason => throw (IO.userError (toString reason))
-    check (node.id == source.id && node.layoutId == source.layoutId && node.shapeKind == source.shapeKind)
+    check (node.id == source.id && node.sourceLayout.normalizedType == source.sourceLayout.normalizedType && node.shapeKind == source.shapeKind)
       "runtime type lookup differs from its program's compiler type definition"
 
 private def checkInlineLookup (prepared : CompilerProviders.Prepared) : IO Unit := do

@@ -6,12 +6,17 @@ import Miri.Input.DecodeMIR
 import Miri.Input.CatalogDecoder
 import Miri.Input.SharedPools
 import Miri.Input.CoroutineCoverage
+import Miri.Input.SourceTraitsDecoder
+import Miri.Input.SourceVTablesDecoder
+import Miri.Input.SourceAbiDecoder
+import Miri.Input.SourceCastTargetsCodec
 
 namespace Miri.Input
 open Lean DecoderValues
 
 private def validateSelectedScope (scope : SelectedScope) (_bodies : Array Body)
-    (instances : Array InstanceNode) (bodyRoots : Array BodyRoot) : Except String Unit := do
+    (instances : Array InstanceNode) (bodyRoots : Array BodyRoot)
+    (declarations : Array RootDeclaration) : Except String Unit := do
   if scope.kind != "rooted_structural_closure" then
     throw ("$.selected_scope.kind" ++ ": " ++ s!"unrecognized selected-scope kind `{scope.kind}`")
   if scope.semantics != "structural_export_closure_only" then
@@ -22,9 +27,26 @@ private def validateSelectedScope (scope : SelectedScope) (_bodies : Array Body)
       body.definitionId == root.definitionId && body.defPath == root.defPath
     let resolvedInstance := instances.any fun inst =>
       inst.definitionId == some root.definitionId && inst.defPath == some root.defPath
-    if !resolvedBody && !resolvedInstance then
+    let declared := declarations.any fun declaration =>
+      declaration.definition == root.definitionId && declaration.defPath == root.defPath
+    if !resolvedBody && !resolvedInstance && !declared then
       throw (s!"$.selected_scope.roots[{index}]" ++ ": " ++ "selected DefId and path do not resolve to an emitted body or instance")
   return ()
+
+private structure RootDeclarationFields where
+  definition : Option Nat := none
+  defPath : Option String := none
+  parameters : Option (Array SourceParameterKind) := none
+
+private def parseRootDeclaration : JsonReader.Parser RootDeclaration := do
+  let value ← JsonReader.object ({} : RootDeclarationFields) fun value key => do
+    match key with
+    | "definition" => return {value with definition := some (← JsonReader.natural)}
+    | "def_path" => return {value with defPath := some (← JsonReader.string)}
+    | "generic_parameters" => return {value with parameters := some (← JsonReader.array SourceTraitsDecoder.parameterKind)}
+    | _ => JsonReader.skipValue; return value
+  return ⟨← JsonReader.required value.definition "definition",← JsonReader.required value.defPath "def_path",
+    ← JsonReader.required value.parameters "generic_parameters"⟩
 
 private structure ProducerFields where
   miriCommit : Option String := none
@@ -57,7 +79,6 @@ private structure ParsedDocument where
   schema : String
   schemaVersion : Nat
   bodyReferences : Array DecodeMIR.References
-  abiArguments : Array AbiArgument
 
 private def denseRow (what : String) (index : Nat) (getId : α → Nat)
     (parser : JsonReader.Parser α) : JsonReader.Parser α := do
@@ -192,6 +213,11 @@ private def finishWorld (nodes : Array AllocationNode) (hexByGraph : Array (Opti
     rawPool, dedupCatalog, pending.completeKeyFamilies, pending.nonExhaustiveKeyFamilies⟩
 
 private structure DocumentFields where
+  sourceCastTargets : Option (Array SourceCastTarget) := none
+  rootDeclarations : Option (Array RootDeclaration) := none
+  sourceVtables : Option SourceVTableMaterial := none
+  sourceTraits : Option SourceTraitMaterial := none
+  sourceAbi : Option SourceAbiMaterial := none
   schema : Option (String) := none
   schemaVersion : Option (Nat) := none
   producer : Option (Producer × Catalog.ProducerSettings) := none
@@ -201,13 +227,10 @@ private structure DocumentFields where
   typeConstants : Option (Array MIR.TypeConst) := none
   files : Option (Array String) := none
   spans : Option (Array SourceSpanData) := none
-  layouts : Option (Array Layout) := none
-  functionAbis : Option (Array FunctionAbi) := none
   types : Option (Array TypeNode) := none
   byteImages : Option (Array (AllocationBytes × String)) := none
   allocations : Option (Array (Array AllocationNode)) := none
   instances : Option (Array InstanceNode) := none
-  compilerAbiLayoutSchema : Option (String) := none
   bodies : Option (Array Body) := none
   bodyReferences : Array DecodeMIR.References := #[]
   coroutineCoverage : Option CoroutineCoverageCodec.Parsed := none
@@ -223,24 +246,21 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
     | "schema" => return {d with schema := some (← JsonReader.string)}
     | "schema_version" => return {d with schemaVersion := some (← JsonReader.natural)}
     | "producer" => return {d with producer := some (← parseProducer)}
+    | "source_abi" => return {d with sourceAbi := some (← SourceAbiDecoder.parse)}
+    | "source_cast_targets" => return {d with sourceCastTargets := some (← JsonReader.array SourceCastTargetsCodec.parse)}
+    | "source_trait_material" => return {d with sourceTraits := some (← SourceTraitsDecoder.material)}
+    | "source_vtables" => return {d with sourceVtables := some (← SourceVTablesDecoder.parse)}
+    | "root_declarations" => return {d with rootDeclarations := some (← JsonReader.array parseRootDeclaration)}
     | "predicates" => return {d with predicates := some (← parsePredicates)}
     | "compiler_predicate_queries" => return {d with compilerPredicates := some (← JsonReader.array decodeCompilerPredicateEvidence)}
     | "definitions" => return {d with definitions := some (← parseDefinitions)}
     | "type_constants" => return {d with typeConstants := some (← parseConstants)}
     | "files" => return {d with files := some (← parseFiles)}
     | "spans" => return {d with spans := some (← JsonReader.arrayIndexed (fun index => parseSourceSpan s!"$.spans[{index}]"))}
-    | "layouts" =>
-      let values ← JsonReader.arrayIndexed fun index => do
-        let id ← JsonReader.natural
-        let some value := pools.layouts[id]? | JsonReader.fail s!"$.layouts[{index}]: unresolved layout value {id}"
-        pure value
-      return {d with layouts := some values}
-    | "fn_abis" => return {d with functionAbis := some (← JsonReader.arrayIndexed (fun index => parseFunctionAbi s!"$.fn_abis[{index}]" (some pools.abiArguments)))}
-    | "types" => return {d with types := some (← JsonReader.arrayIndexed (fun index => denseRow "type IDs" index (·.id) (parseTypeNode s!"$.types[{index}]" pools.booleans pools.discriminants)))}
+    | "types" => return {d with types := some (← JsonReader.arrayIndexed (fun index => denseRow "type IDs" index (·.id) (parseTypeNode s!"$.types[{index}]")))}
     | "byte_images" => return {d with byteImages := some (← parseByteImages)}
     | "allocations" => return {d with allocations := some (← JsonReader.arrayIndexed (fun index => parseAllocation s!"$.allocations[{index}]" pools.mir.initializationRanges pools.mir.relocations))}
     | "instances" => return {d with instances := some (← parseInstances)}
-    | "compiler_abi_layout_schema" => return {d with compilerAbiLayoutSchema := some (← JsonReader.string)}
     | "bodies" =>
       let bodies ← JsonReader.arrayIndexed (fun index => DecodeMIR.parseBody s!"$.bodies[{index}]" (some pools.mir))
       return {d with bodies := some (bodies.map (·.value)), bodyReferences := bodies.map (·.references)}
@@ -256,7 +276,6 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
   let schema ← JsonReader.required d.schema "schema"
   let schemaVersion ← JsonReader.required d.schemaVersion "schema_version"
   let (producer, producerSettings) ← JsonReader.required d.producer "producer"
-  let compilerAbiLayoutSchema ← JsonReader.required d.compilerAbiLayoutSchema "compiler_abi_layout_schema"
   let byteImages ← JsonReader.required d.byteImages "byte_images"
   let groups ← JsonReader.required d.allocations "allocations"
   let pendingNodes := groups.flatten.qsort (fun a b => a.id < b.id)
@@ -280,6 +299,11 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
       pure {row with body}
     pure {parsed.value with auxiliaryBodies}
   let value : ImportDocument := {
+    sourceCastTargets := ← JsonReader.required d.sourceCastTargets "source_cast_targets"
+    sourceAbi := some (← JsonReader.required d.sourceAbi "source_abi")
+    sourceTraits := ← JsonReader.required d.sourceTraits "source_trait_material"
+    sourceVtables := ← JsonReader.required d.sourceVtables "source_vtables"
+    rootDeclarations := ← JsonReader.required d.rootDeclarations "root_declarations"
     producer, producerSettings
     predicates := ← JsonReader.required d.predicates "predicates"
     compilerPredicates := ← JsonReader.required d.compilerPredicates "compiler_predicate_queries"
@@ -287,12 +311,9 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
     typeConstants := ← JsonReader.required d.typeConstants "type_constants"
     files := ← JsonReader.required d.files "files"
     spans := ← JsonReader.required d.spans "spans"
-    layouts := ← JsonReader.required d.layouts "layouts"
-    functionAbis := ← JsonReader.required d.functionAbis "fn_abis"
     types := ← JsonReader.required d.types "types"
     allocations := allocations
     instances := ← JsonReader.required d.instances "instances"
-    compilerAbiLayoutSchema := some compilerAbiLayoutSchema
     bodies := bodies
     coroutineCoverage := coroutineCoverage
     bodyRoots := ← JsonReader.required d.bodyRoots "body_roots"
@@ -302,10 +323,23 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
     queries := ← CatalogDecoder.finish d.queries
   }
   return ⟨value, schema, schemaVersion,
-    d.bodyReferences ++ (d.coroutineCoverage.map (·.references)).getD #[], pools.abiArguments⟩
+    d.bodyReferences ++ (d.coroutineCoverage.map (·.references)).getD #[]⟩
 
 private def validateParsedDocument (parsed : ParsedDocument) (profile : Options) : Except String ImportDocument := do
   let d := parsed.value
+  SourceCastTargetsCodec.validate d.types d.sourceCastTargets
+  if let some material := d.sourceAbi then SourceAbiDecoder.validate d.types d.instances material
+  SourceTraitsDecoder.validate d.definitions d.typeConstants d.sourceTraits
+  SourceVTablesDecoder.validate d.types d.definitions d.predicates d.instances d.sourceVtables
+  let mut declared : Std.HashSet Nat := {}
+  for declaration in d.rootDeclarations do
+    unless declaration.definition < d.definitions.size do throw "root declaration definition is absent"
+    if declared.contains declaration.definition then throw "duplicate root declaration"
+    declared := declared.insert declaration.definition
+    unless declaration.genericParameters.any (· != .lifetime) do
+      throw "declaration-only root has no type or constant parameters"
+    if d.bodyRoots.any (·.definitionId == declaration.definition) then
+      throw "declaration-only root also has an executable root body"
   let schema := parsed.schema
   let schemaVersion := parsed.schemaVersion
   let producer := d.producer
@@ -314,75 +348,54 @@ private def validateParsedDocument (parsed : ParsedDocument) (profile : Options)
   let definitions := d.definitions
   let typeConstants := d.typeConstants
   let spans := d.spans
-  let layouts := d.layouts
   let types := d.types
   let allocations := d.allocations
   let instances := d.instances
-  let compilerAbiLayoutSchema := d.compilerAbiLayoutSchema
   let bodies := d.bodies
   let bodyRoots := d.bodyRoots
   let compilerAllocIdWorld := d.compilerAllocIdWorld
   let selectedScope := d.selectedScope
   if schema != expectedSchema then throw s!"$.schema: expected `{expectedSchema}`"
-  unless schemaVersion == 11 || schemaVersion == 12 || schemaVersion == expectedSchemaVersion do
+  unless schemaVersion == expectedSchemaVersion do
     throw "$.schema_version: unsupported schema version"
-  match schemaVersion, d.coroutineCoverage with
-  | 11, some _ => throw "schema 11 forbids compiler_coroutine_coverage"
-  | 12, none => throw "schema 12 requires compiler_coroutine_coverage"
-  | 13, none => throw "schema 13 requires compiler_coroutine_coverage"
-  | 12, some coverage | 13, some coverage => CoroutineCoverageCodec.validate d coverage
-  | _, _ => pure ()
-  if let some target := d.runtimeTargetDataLayout then
-    if schemaVersion == 13 && target.x87F80AlignBytes.isNone then
-      throw "schema 13 requires x87_f80_align_bytes"
-    if schemaVersion != 13 && target.x87F80AlignBytes.isSome then
-      throw "legacy schema forbids x87_f80_align_bytes"
-  for ty in types do
-    if let some adt := ty.compilerFacts.bind (·.adt) then
-      if schemaVersion == 13 && adt.cfiEncoding.isNone then
-        throw "schema 13 requires explicit ADT cfi_encoding metadata"
-      if schemaVersion != 13 && adt.cfiEncoding.isSome then
-        throw "legacy schema forbids ADT cfi_encoding metadata"
-  if producer.miriCommit != (if schemaVersion == 13 then expectedMiriCommit else legacyMiriCommit) then throw "$.producer.miri_commit: input is from the wrong pinned Miri revision"
-  if producer.rustcCommit != (if schemaVersion == 13 then expectedRustcCommit else legacyRustcCommit) then throw "$.producer.rustc_commit: input is from the wrong pinned rustc revision"
-  unless compilerAbiLayoutSchema == some expectedCompilerAbiLayoutSchema do
-    throw s!"$.compiler_abi_layout_schema: unsupported schema `{compilerAbiLayoutSchema}`"
-  if types.isEmpty then throw "$.types: input has no type graph; refusing an empty import"
-  if bodies.isEmpty then throw "$.bodies: input has no MIR bodies; refusing an empty import"
+  let some coverage := d.coroutineCoverage | throw "$.compiler_coroutine_coverage: source coverage is absent"
+  CoroutineCoverageCodec.validate d coverage
+  if producer.miriCommit != expectedMiriCommit then throw "$.producer.miri_commit: input is from the wrong pinned Miri revision"
+  if producer.rustcCommit != expectedRustcCommit then throw "$.producer.rustc_commit: input is from the wrong pinned rustc revision"
+  if types.isEmpty && d.rootDeclarations.isEmpty then throw "$.types: input has no type graph"
+  if bodies.isEmpty && d.rootDeclarations.isEmpty then throw "$.bodies: input has no executable or declared root"
   profileit "decoder.validate_predicate_queries" profile fun _ => do
     unless compilerPredicates.size == predicates.size do
       throw "$.compiler_predicate_queries: predicate query and definition tables differ in size"
     for (query, index) in compilerPredicates.toList.zipIdx do
       unless query.id == index && query.original == index do
         throw s!"$.compiler_predicate_queries[{index}]: predicate query identity mismatch"
+      unless query.typingEnvironment == "fully_monomorphized" do
+        throw "predicate normalization has a non-monomorphic typing environment"
       let some definition := predicates[index]? | throw "compiler predicate table index invariant"
       unless query.autoTrait == (definition.kind == .autoTrait) do
         throw s!"$.compiler_predicate_queries[{index}]: auto-trait query disagrees with predicate definition"
-      if let some normalized := query.normalizedId then
-        unless normalized < predicates.size do
-          throw s!"$.compiler_predicate_queries[{index}]: dangling normalized predicate reference {normalized}"
+      let some normalized := query.normalizedId | throw "predicate normalization result is absent"
+      unless normalized < predicates.size && query.erasedId < predicates.size do
+        throw s!"$.compiler_predicate_queries[{index}]: dangling normalized or erased predicate reference"
   profileit "decoder.validate_alloc_id_world" profile fun _ => do
     if let some world := compilerAllocIdWorld then validateCompilerAllocIdWorld allocations world
+  let metadata ← RuntimeMetadata.ofDocument d |>.mapError toString
   let bodyContext : DecodeMIR.Context := {
     typeCount := types.size, allocationCount := allocations.size,
     definitionCount := definitions.size, typeConstantCount := typeConstants.size,
     spanCount := spans.size,
-    scalarSize := fun id => (types[id]?).bind fun ty => (layouts[ty.layoutId]?).bind (·.sizeBytes) }
+    scalarSize := fun id => (metadata.lookup id).toOption.map (·.layout.size.bytes.toNat) }
   profileit "decoder.validate_body_references" profile fun _ =>
     parsed.bodyReferences.forM (DecodeMIR.validateReferences bodyContext)
   match selectedScope with
   | some scope => profileit "decoder.selected_scope_validation" profile fun _ =>
-      validateSelectedScope scope bodies instances bodyRoots
+      validateSelectedScope scope bodies instances bodyRoots d.rootDeclarations
   | none => pure ()
   profileit "decoder.validate_catalog_queries" profile fun _ =>
     CatalogDecoder.validateQueries bodyContext d.queries
   let core := d
   profileit "decoder.validate_cross_table_references" profile fun _ => validateParsedTables core
-  for (argument, index) in parsed.abiArguments.toList.zipIdx do
-    unless argument.typeId < types.size do
-      throw s!"$.abi_arguments[{index}].type: dangling type reference {argument.typeId}"
-    unless argument.layoutId < layouts.size do
-      throw s!"$.abi_arguments[{index}].layout: dangling layout reference {argument.layoutId}"
   pure core
 
 /-- Parse complete input, including all forward-reference and graph checks,

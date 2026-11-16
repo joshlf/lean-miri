@@ -241,10 +241,10 @@ pub(super) enum Operand {
 
 #[derive(Serialize)]
 #[serde(tag = "variant")]
-pub(super) enum StatementKind<Q = VtableQueryKey> {
+pub(super) enum StatementKind {
     Assign {
         place: Place,
-        rvalue: Rvalue<Q>,
+        rvalue: Rvalue,
     },
     FakeRead {
         cause: FakeReadCause,
@@ -413,7 +413,7 @@ pub(super) enum AggregateKind {
 
 #[derive(Serialize)]
 #[serde(tag = "kind")]
-pub(super) enum Rvalue<Q = VtableQueryKey> {
+pub(super) enum Rvalue {
     Use {
         operand: Operand,
         retag: Retag,
@@ -441,9 +441,6 @@ pub(super) enum Rvalue<Q = VtableQueryKey> {
         cast_kind: CastKind,
         operand: Operand,
         target_type: u64,
-        vtable_allocation: Option<VtableAllocation>,
-        vtable_query: Option<VtableQuery<Q>>,
-        vtable_probe: Option<VtableProbe>,
     },
     BinaryOp {
         operator: Operator,
@@ -474,56 +471,6 @@ pub(super) enum Rvalue<Q = VtableQueryKey> {
         mutability: crate::pool_type::Mutability,
         place: Place,
     },
-}
-
-#[derive(Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub(super) enum VtableAllocation {
-    SameDynamicVtableNoop {
-        r#type: u64,
-    },
-    DynamicVtableUpcast {
-        source_type: u64,
-        target_type: u64,
-        source_pointee_type: u64,
-        target_pointee_type: u64,
-        source_tail_type: u64,
-        target_tail_type: u64,
-        supertrait_slot_query: SupertraitSlotQuery,
-        runtime_vtable: &'static str,
-    },
-}
-#[derive(Serialize)]
-pub(super) struct SupertraitSlotQuery {
-    pub query_kind: &'static str,
-    pub typing_env: &'static str,
-    pub input_source: u64,
-    pub input_target: u64,
-}
-#[derive(Serialize)]
-pub(super) struct VtableQuery<Q = VtableQueryKey> {
-    pub source_type: u64,
-    pub target_type: u64,
-    pub source_pointee_type: u64,
-    pub target_pointee_type: u64,
-    pub input_type: u64,
-    pub input_predicates: Vec<u64>,
-    pub source_tail_type: u64,
-    pub target_tail_type: u64,
-    pub query_id: Q,
-}
-pub(super) struct VtableQueryKey {
-    pub input_type_id: u64,
-    pub input_predicate_ids: Vec<u64>,
-}
-// The exporter currently emits no cast vtable probes. This uninhabited type
-// prevents an arbitrary payload from entering that optional schema position.
-#[derive(Serialize)]
-pub(super) enum VtableProbe {}
-
-pub(super) enum UnsizeVtable {
-    Allocation(VtableAllocation),
-    Query(VtableQuery),
 }
 
 #[derive(Serialize)]
@@ -604,7 +551,7 @@ pub(super) struct CallSource {
 
 #[derive(Serialize)]
 #[serde(tag = "variant")]
-pub(super) enum TerminatorKind<C = crate::resolution_values::PendingCandidates> {
+pub(super) enum TerminatorKind {
     Goto {
         target: u32,
         loop_hints: Vec<LoopHint>,
@@ -629,7 +576,7 @@ pub(super) enum TerminatorKind<C = crate::resolution_values::PendingCandidates> 
     },
     Call {
         function: Operand,
-        resolution: crate::resolution_values::Callee<C>,
+        resolution: crate::resolution_values::Callee,
         args: Vec<CallArgument>,
         destination: Place,
         target: Option<u32>,
@@ -639,7 +586,7 @@ pub(super) enum TerminatorKind<C = crate::resolution_values::PendingCandidates> 
     },
     TailCall {
         function: Operand,
-        resolution: crate::resolution_values::Callee<C>,
+        resolution: crate::resolution_values::Callee,
         args: Vec<CallArgument>,
         function_span: u64,
     },
@@ -746,24 +693,24 @@ pub(super) struct AsmOptions {
 }
 
 #[derive(Serialize)]
-pub(super) struct Statement<Q = VtableQueryKey> {
+pub(super) struct Statement {
     pub source_info: Shared<SourceInfo>,
-    pub kind: Shared<StatementKind<Q>>,
+    pub kind: Shared<StatementKind>,
 }
 #[derive(Serialize)]
-pub(super) struct Terminator<C = crate::resolution_values::PendingCandidates> {
+pub(super) struct Terminator {
     pub source_info: Shared<SourceInfo>,
-    pub kind: TerminatorKind<C>,
+    pub kind: TerminatorKind,
 }
 #[derive(Serialize)]
-pub(super) struct BasicBlock<Q = VtableQueryKey, C = crate::resolution_values::PendingCandidates> {
+pub(super) struct BasicBlock {
     pub block: u32,
     pub is_cleanup: bool,
-    pub statements: Vec<Statement<Q>>,
-    pub terminator: Option<Terminator<C>>,
+    pub statements: Vec<Statement>,
+    pub terminator: Option<Terminator>,
 }
 #[derive(Serialize)]
-pub(super) struct Body<Q = VtableQueryKey, C = crate::resolution_values::PendingCandidates> {
+pub(super) struct Body {
     pub instance_id: u64,
     pub preamble_def_span: u64,
     pub backtrace_spans: Shared<Vec<BacktraceSpan>>,
@@ -774,7 +721,7 @@ pub(super) struct Body<Q = VtableQueryKey, C = crate::resolution_values::Pending
     pub spread_arg: Option<u32>,
     pub span: u64,
     pub locals: Vec<Local>,
-    pub basic_blocks: Vec<BasicBlock<Q, C>>,
+    pub basic_blocks: Vec<BasicBlock>,
     pub source_scopes: Vec<SourceScope>,
     pub required_consts: Vec<crate::pool_constant::Operand>,
 }
@@ -805,7 +752,7 @@ mod tests {
 
     #[test]
     fn intrinsic_discriminant_is_flattened_into_statement() {
-        let statement = StatementKind::<u64>::Intrinsic {
+        let statement = StatementKind::Intrinsic {
             intrinsic: Intrinsic::Assume {
                 value: Operand::RuntimeChecks {
                     check: RuntimeCheck::UbChecks { enabled: true },
@@ -816,418 +763,5 @@ mod tests {
             serde_json::to_value(statement).unwrap(),
             json!({"variant":"Intrinsic","intrinsic":"Assume","value":{"kind":"RuntimeChecks","check":{"kind":"ub_checks","enabled":true}}})
         );
-    }
-}
-
-impl StatementKind<VtableQueryKey> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<StatementKind<u64>, String> {
-        Ok(match self {
-            Self::Assign { place, rvalue } => StatementKind::Assign {
-                place: place,
-                rvalue: rvalue.finish(ids, candidates)?,
-            },
-            Self::FakeRead { cause, place } => StatementKind::FakeRead {
-                cause: cause,
-                place: place,
-            },
-            Self::SetDiscriminant {
-                place,
-                variant_index,
-            } => StatementKind::SetDiscriminant {
-                place: place,
-                variant_index: variant_index,
-            },
-            Self::StorageLive { local } => StatementKind::StorageLive { local: local },
-            Self::StorageDead { local } => StatementKind::StorageDead { local: local },
-            Self::PlaceMention { place } => StatementKind::PlaceMention { place: place },
-            Self::AscribeUserType {
-                execution,
-                place,
-                user_type_projection,
-                variance,
-            } => StatementKind::AscribeUserType {
-                execution: execution,
-                place: place,
-                user_type_projection: user_type_projection,
-                variance: variance,
-            },
-            Self::Coverage {
-                execution,
-                coverage,
-            } => StatementKind::Coverage {
-                execution: execution,
-                coverage: coverage,
-            },
-            Self::Intrinsic { intrinsic } => StatementKind::Intrinsic {
-                intrinsic: intrinsic,
-            },
-            Self::ConstEvalCounter => StatementKind::ConstEvalCounter,
-            Self::Nop => StatementKind::Nop,
-            Self::BackwardIncompatibleDropHint { place, reason } => {
-                StatementKind::BackwardIncompatibleDropHint {
-                    place: place,
-                    reason: reason,
-                }
-            }
-        })
-    }
-}
-
-impl Rvalue<VtableQueryKey> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        _candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<Rvalue<u64>, String> {
-        Ok(match self {
-            Self::Use { operand, retag } => Rvalue::Use {
-                operand: operand,
-                retag: retag,
-            },
-            Self::Repeat { operand, count } => Rvalue::Repeat {
-                operand: operand,
-                count: count,
-            },
-            Self::Ref {
-                region,
-                borrow_kind,
-                place,
-            } => Rvalue::Ref {
-                region: region,
-                borrow_kind: borrow_kind,
-                place: place,
-            },
-            Self::ThreadLocalRef {
-                global_info,
-                def_id,
-                def_path,
-                initializer,
-            } => Rvalue::ThreadLocalRef {
-                global_info: global_info,
-                def_id: def_id,
-                def_path: def_path,
-                initializer: initializer,
-            },
-            Self::RawPtr {
-                pointer_kind,
-                place,
-            } => Rvalue::RawPtr {
-                pointer_kind: pointer_kind,
-                place: place,
-            },
-            Self::Cast {
-                cast_kind,
-                operand,
-                target_type,
-                vtable_allocation,
-                vtable_query,
-                vtable_probe,
-            } => Rvalue::Cast {
-                cast_kind: cast_kind,
-                operand: operand,
-                target_type: target_type,
-                vtable_allocation: vtable_allocation,
-                vtable_query: vtable_query.map(|query| query.finish(ids)).transpose()?,
-                vtable_probe: vtable_probe,
-            },
-            Self::BinaryOp {
-                operator,
-                left,
-                right,
-                implicit_overflow_tuple_type,
-            } => Rvalue::BinaryOp {
-                operator: operator,
-                left: left,
-                right: right,
-                implicit_overflow_tuple_type: implicit_overflow_tuple_type,
-            },
-            Self::UnaryOp { operator, operand } => Rvalue::UnaryOp {
-                operator: operator,
-                operand: operand,
-            },
-            Self::Discriminant { place } => Rvalue::Discriminant { place: place },
-            Self::Aggregate {
-                aggregate_kind,
-                operands,
-            } => Rvalue::Aggregate {
-                aggregate_kind: aggregate_kind,
-                operands: operands,
-            },
-            Self::CopyForDeref { place } => Rvalue::CopyForDeref { place: place },
-            Self::WrapUnsafeBinder { operand, r#type } => {
-                Rvalue::WrapUnsafeBinder { operand, r#type }
-            }
-            Self::Reborrow {
-                r#type,
-                mutability,
-                place,
-            } => Rvalue::Reborrow {
-                r#type,
-                mutability,
-                place,
-            },
-        })
-    }
-}
-
-impl Statement<VtableQueryKey> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<Statement<u64>, String> {
-        Ok({
-            let Self { source_info, kind } = self;
-            Statement {
-                source_info: source_info,
-                kind: kind.try_map(|kind| kind.finish(ids, candidates))?,
-            }
-        })
-    }
-}
-
-impl TerminatorKind<crate::resolution_values::PendingCandidates> {
-    pub fn finish(
-        self,
-        _ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<TerminatorKind<Vec<u64>>, String> {
-        Ok(match self {
-            Self::Goto { target, loop_hints } => TerminatorKind::Goto {
-                target: target,
-                loop_hints: loop_hints,
-            },
-            Self::SwitchInt {
-                discriminant,
-                targets,
-                otherwise,
-            } => TerminatorKind::SwitchInt {
-                discriminant: discriminant,
-                targets: targets,
-                otherwise: otherwise,
-            },
-            Self::UnwindResume => TerminatorKind::UnwindResume,
-            Self::UnwindTerminate { reason } => TerminatorKind::UnwindTerminate { reason: reason },
-            Self::Return => TerminatorKind::Return,
-            Self::Unreachable => TerminatorKind::Unreachable,
-            Self::Drop {
-                place,
-                target,
-                unwind,
-                replace,
-                async_drop,
-            } => TerminatorKind::Drop {
-                place: place,
-                target: target,
-                unwind: unwind,
-                replace: replace,
-                async_drop: async_drop,
-            },
-            Self::Call {
-                function,
-                resolution,
-                args,
-                destination,
-                target,
-                unwind,
-                call_source,
-                function_span,
-            } => TerminatorKind::Call {
-                function: function,
-                resolution: resolution.finish(candidates),
-                args: args,
-                destination: destination,
-                target: target,
-                unwind: unwind,
-                call_source: call_source,
-                function_span: function_span,
-            },
-            Self::TailCall {
-                function,
-                resolution,
-                args,
-                function_span,
-            } => TerminatorKind::TailCall {
-                function: function,
-                resolution: resolution.finish(candidates),
-                args: args,
-                function_span: function_span,
-            },
-            Self::Assert {
-                condition,
-                expected,
-                message,
-                target,
-                unwind,
-            } => TerminatorKind::Assert {
-                condition: condition,
-                expected: expected,
-                message: message,
-                target: target,
-                unwind: unwind,
-            },
-            Self::Yield {
-                value,
-                resume,
-                resume_arg,
-                drop,
-            } => TerminatorKind::Yield {
-                value: value,
-                resume: resume,
-                resume_arg: resume_arg,
-                drop: drop,
-            },
-            Self::CoroutineDrop => TerminatorKind::CoroutineDrop,
-            Self::FalseEdge {
-                real_target,
-                imaginary_target,
-            } => TerminatorKind::FalseEdge {
-                real_target: real_target,
-                imaginary_target: imaginary_target,
-            },
-            Self::FalseUnwind {
-                real_target,
-                unwind,
-            } => TerminatorKind::FalseUnwind {
-                real_target: real_target,
-                unwind: unwind,
-            },
-            Self::InlineAsm {
-                asm_macro,
-                template,
-                operands,
-                options,
-                line_spans,
-                targets,
-                unwind,
-                execution_obligation,
-            } => TerminatorKind::InlineAsm {
-                asm_macro: asm_macro,
-                template: template,
-                operands: operands,
-                options: options,
-                line_spans: line_spans,
-                targets: targets,
-                unwind: unwind,
-                execution_obligation: execution_obligation,
-            },
-        })
-    }
-}
-
-impl Terminator<crate::resolution_values::PendingCandidates> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<Terminator<Vec<u64>>, String> {
-        Ok({
-            let Self { source_info, kind } = self;
-            Terminator {
-                source_info: source_info,
-                kind: kind.finish(ids, candidates)?,
-            }
-        })
-    }
-}
-
-impl BasicBlock<VtableQueryKey, crate::resolution_values::PendingCandidates> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<BasicBlock<u64, Vec<u64>>, String> {
-        Ok({
-            let Self {
-                block,
-                is_cleanup,
-                statements,
-                terminator,
-            } = self;
-            BasicBlock {
-                block: block,
-                is_cleanup: is_cleanup,
-                statements: statements
-                    .into_iter()
-                    .map(|item| item.finish(ids, candidates))
-                    .collect::<Result<_, String>>()?,
-                terminator: terminator
-                    .map(|item| item.finish(ids, candidates))
-                    .transpose()?,
-            }
-        })
-    }
-}
-
-impl Body<VtableQueryKey, crate::resolution_values::PendingCandidates> {
-    pub fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-        candidates: &std::collections::HashMap<u64, Vec<u64>>,
-    ) -> Result<Body<u64, Vec<u64>>, String> {
-        Ok({
-            let Self {
-                instance_id,
-                preamble_def_span,
-                backtrace_spans,
-                source_def_id,
-                phase,
-                injection_phase,
-                arg_count,
-                spread_arg,
-                span,
-                locals,
-                basic_blocks,
-                source_scopes,
-                required_consts,
-            } = self;
-            Body {
-                instance_id,
-                preamble_def_span: preamble_def_span,
-                backtrace_spans: backtrace_spans,
-                source_def_id: source_def_id,
-                phase: phase,
-                injection_phase: injection_phase,
-                arg_count: arg_count,
-                spread_arg: spread_arg,
-                span: span,
-                locals: locals,
-                basic_blocks: basic_blocks
-                    .into_iter()
-                    .map(|item| item.finish(ids, candidates))
-                    .collect::<Result<_, String>>()?,
-                source_scopes: source_scopes,
-                required_consts: required_consts,
-            }
-        })
-    }
-}
-
-impl VtableQuery<VtableQueryKey> {
-    fn finish(
-        self,
-        ids: &std::collections::HashMap<(u64, Vec<u64>), u64>,
-    ) -> Result<VtableQuery<u64>, String> {
-        let query_id = *ids
-            .get(&(
-                self.query_id.input_type_id,
-                self.query_id.input_predicate_ids,
-            ))
-            .ok_or("vtable query is absent from the finalized compiler catalog")?;
-        Ok(VtableQuery {
-            source_type: self.source_type,
-            target_type: self.target_type,
-            source_pointee_type: self.source_pointee_type,
-            target_pointee_type: self.target_pointee_type,
-            input_type: self.input_type,
-            input_predicates: self.input_predicates,
-            source_tail_type: self.source_tail_type,
-            target_tail_type: self.target_tail_type,
-            query_id,
-        })
     }
 }

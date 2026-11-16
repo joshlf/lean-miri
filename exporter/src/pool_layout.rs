@@ -348,7 +348,7 @@ pub(super) enum CanonAbi {
     X86 { x86_call: &'static str },
 }
 impl CanonAbi {
-    fn new(abi: rustc_abi::CanonAbi) -> Self {
+    pub(super) fn new(abi: rustc_abi::CanonAbi) -> Self {
         use rustc_abi::CanonAbi as A;
         match abi {
             A::C => Self::C,
@@ -501,7 +501,7 @@ pub(super) enum PassMode {
     },
 }
 impl PassMode {
-    fn new(p: &rustc_target::callconv::PassMode) -> Self {
+    pub(super) fn new(p: &rustc_target::callconv::PassMode) -> Self {
         use rustc_target::callconv::{IndirectMode as I, PassMode as P};
         match p {
             P::Ignore => Self::Ignore,
@@ -546,50 +546,6 @@ pub(super) struct ArgAbi {
     pub layout: usize,
     pub mode: PassMode,
 }
-#[derive(Serialize)]
-pub(super) struct FnAbi {
-    calling_convention: CanonAbi,
-    c_variadic: bool,
-    fixed_count: u32,
-    can_unwind: bool,
-    #[serde(rename = "return")]
-    pub ret: super::shared_json::Shared<ArgAbi>,
-    pub arguments: Vec<super::shared_json::Shared<ArgAbi>>,
-}
-impl FnAbi {
-    pub fn new<'tcx>(
-        context: &mut super::ExportContext<'tcx>,
-        tcx: TyCtxt<'tcx>,
-        abi: &rustc_target::callconv::FnAbi<'tcx, rustc_middle::ty::Ty<'tcx>>,
-    ) -> Result<Self, String> {
-        fn arg<'tcx>(
-            context: &mut super::ExportContext<'tcx>,
-            tcx: TyCtxt<'tcx>,
-            a: &rustc_target::callconv::ArgAbi<'tcx, rustc_middle::ty::Ty<'tcx>>,
-        ) -> Result<super::shared_json::Shared<ArgAbi>, String> {
-            let ty = super::type_json(context, tcx, a.layout.ty)?;
-            let layout = super::layout_value_json(context, tcx, a.layout) as usize;
-            Ok(ArgAbi {
-                ty,
-                layout,
-                mode: PassMode::new(&a.mode),
-            }.into())
-        }
-        Ok(Self {
-            calling_convention: CanonAbi::new(abi.conv),
-            c_variadic: abi.c_variadic,
-            fixed_count: abi.fixed_count,
-            can_unwind: abi.can_unwind,
-            ret: arg(context, tcx, &abi.ret)?,
-            arguments: abi
-                .args
-                .iter()
-                .map(|a| arg(context, tcx, a))
-                .collect::<Result<_, _>>()?,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

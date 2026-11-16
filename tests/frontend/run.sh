@@ -20,7 +20,7 @@ if [[ "${FRONTEND_SKIP_LAKE_BUILD:-0}" != 1 ]]; then
 fi
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
-"$exporter_bin" --output "$work_dir/full.json" \
+"$exporter_bin" --output "$work_dir/full.json" --root add_one --root identity \
   exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure
 "$exporter_bin" --output "$work_dir/scope.json" \
   --root add_one exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure

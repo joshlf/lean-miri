@@ -19,13 +19,9 @@ enum ImportLinkage {
 struct DeclarationFact {
     definition: u64,
     symbol: String,
-    typing_env: &'static str,
     ty: u64,
-    layout: u64,
     import_linkage: ImportLinkage,
     definition_mutability: &'static str,
-    type_is_freeze: bool,
-    decl_is_mut: bool,
 }
 #[derive(Clone)]
 struct CandidateFact {
@@ -76,14 +72,10 @@ enum FallbackFact {
 struct Declaration {
     definition: u64,
     symbol: String,
-    typing_env: &'static str,
     #[serde(rename = "type")]
     ty: u64,
-    layout: u64,
     import_linkage: ImportLinkage,
     definition_mutability: &'static str,
-    type_is_freeze: bool,
-    decl_is_mut: bool,
 }
 #[derive(Clone, serde::Serialize)]
 struct Candidate {
@@ -211,10 +203,9 @@ pub(super) fn finish(tcx: TyCtxt<'_>, facts: Facts) -> Catalog {
 
 impl From<DeclarationFact> for Declaration {
     fn from(f: DeclarationFact) -> Self { Self {
-        definition:f.definition, symbol:f.symbol, typing_env:f.typing_env, ty:f.ty,
-        layout:f.layout, import_linkage:f.import_linkage,
-        definition_mutability:f.definition_mutability, type_is_freeze:f.type_is_freeze,
-        decl_is_mut:f.decl_is_mut,
+        definition:f.definition, symbol:f.symbol, ty:f.ty,
+        import_linkage:f.import_linkage,
+        definition_mutability:f.definition_mutability,
     } }
 }
 impl From<CandidateFact> for Candidate {
@@ -273,7 +264,6 @@ fn extern_static_declaration<'tcx>(
     let instance = ty::Instance::mono(tcx, def);
     let symbol = tcx.symbol_name(instance).name.to_string();
     let def_ty = tcx.type_of(def).instantiate_identity().skip_norm_wip();
-    let env = ty::TypingEnv::fully_monomorphized();
     let attrs = tcx.codegen_fn_attrs(def);
     let import_linkage = match attrs.import_linkage {
         None => ImportLinkage::None,
@@ -289,30 +279,12 @@ fn extern_static_declaration<'tcx>(
         rustc_ast::Mutability::Not => "immutable",
     };
     let type_ref = type_json(context, tcx, def_ty)?;
-    Ok::<_, String>(match tcx.layout_of(env.as_query_input(def_ty)) {
-        Ok(layout) => {
-            let ty_is_freeze = layout.ty.is_freeze(tcx, env);
-            let declaration_mutable = !(mutability == rustc_ast::Mutability::Not && ty_is_freeze);
-            DeclarationFact {
-                definition: def_json(context, def),
-                symbol,
-                typing_env: "fully_monomorphized",
-                ty: type_ref,
-                layout: layout_value_json(context, tcx, layout),
-                import_linkage,
-                definition_mutability,
-                type_is_freeze: ty_is_freeze,
-                decl_is_mut: declaration_mutable,
-            }
-        }
-        Err(error) => export_failure(
-            "foreign_symbols::extern_static_declaration",
-            format!(
-                "{}; {}",
-                "extern-static declaration layout query failed",
-                format!("{error:?}")
-            ),
-        )?,
+    Ok(DeclarationFact {
+        definition: def_json(context, def),
+        symbol,
+        ty: type_ref,
+        import_linkage,
+        definition_mutability,
     })
 }
 
@@ -684,7 +656,6 @@ pub(super) fn discover<'tcx>(
             .find(|(_, candidate_id)| **candidate_id == id)
             .map(|(instance, _)| *instance);
         if let Some(instance) = selected_instance {
-            register_selected_foreign_call_transfers(context, tcx, &row.symbol, instance)?;
             promote.push(instance);
         }
     }

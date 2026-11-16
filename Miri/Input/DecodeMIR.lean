@@ -270,7 +270,6 @@ structure RvalueFields where
   def_id : Option (Nat) := none
   global_info : Option (StaticGlobalInfo) := none
   initializer : Option (Option AllocationMemory) := none
-  vtable_allocation : Option (Option DynamicUpcastEvidence) := none
 
 def rvalueField (s : RvalueFields) (key : String) : MIRParser.Parser (RvalueFields) := do
   match key with
@@ -300,7 +299,6 @@ def rvalueField (s : RvalueFields) (key : String) : MIRParser.Parser (RvalueFiel
   | "def_id" => return {s with def_id := some (← (do let id ← natural; recordDef id; pure id))}
   | "global_info" => return {s with global_info := some (← DecoderValues.decodeStaticGlobalInfo)}
   | "initializer" => return {s with initializer := some (← tlsInitializer)}
-  | "vtable_allocation" => return {s with vtable_allocation := some (← upcast)}
   | _ => skipValue; pure s
 def finishRvalueFields (s : RvalueFields) : MIRParser.Parser (MIR.Rvalue) := do
   let discriminator ← required s.kind "kind"
@@ -315,11 +313,11 @@ def finishRvalueFields (s : RvalueFields) : MIRParser.Parser (MIR.Rvalue) := do
     | "Ref" => ["kind", "region", "borrow_kind", "place"]
     | "ThreadLocalRef" => ["kind", "def_id", "global_info", "initializer"]
     | "RawPtr" => ["kind", "pointer_kind", "place"]
-    | "Cast" => ["kind", "cast_kind", "operand", "target_type", "vtable_allocation"]
+    | "Cast" => ["kind", "cast_kind", "operand", "target_type"]
     | "Aggregate" => ["kind", "aggregate_kind", "operands"]
     | "Reborrow" => ["kind", "type", "mutability", "place"]
     | _ => ["kind"]
-  rejectIncompatible allowed [("kind", s.kind.isSome), ("operand", s.operand.isSome), ("left", s.left.isSome), ("right", s.right.isSome), ("operands", s.operands.isSome), ("retag", s.retag.isSome), ("operator", s.operator.isSome), ("place", s.place.isSome), ("type", s.type.isSome), ("target_type", s.target_type.isSome), ("count", s.count.isSome), ("region", s.region.isSome), ("borrow_kind", s.borrow_kind.isSome), ("pointer_kind", s.pointer_kind.isSome), ("cast_kind", s.cast_kind.isSome), ("aggregate_kind", s.aggregate_kind.isSome), ("mutability", s.mutability.isSome), ("def_id", s.def_id.isSome), ("global_info", s.global_info.isSome), ("initializer", s.initializer.isSome), ("vtable_allocation", s.vtable_allocation.isSome)]
+  rejectIncompatible allowed [("kind", s.kind.isSome), ("operand", s.operand.isSome), ("left", s.left.isSome), ("right", s.right.isSome), ("operands", s.operands.isSome), ("retag", s.retag.isSome), ("operator", s.operator.isSome), ("place", s.place.isSome), ("type", s.type.isSome), ("target_type", s.target_type.isSome), ("count", s.count.isSome), ("region", s.region.isSome), ("borrow_kind", s.borrow_kind.isSome), ("pointer_kind", s.pointer_kind.isSome), ("cast_kind", s.cast_kind.isSome), ("aggregate_kind", s.aggregate_kind.isSome), ("mutability", s.mutability.isSome), ("def_id", s.def_id.isSome), ("global_info", s.global_info.isSome), ("initializer", s.initializer.isSome)]
   match (← required s.kind "kind") with
   | "Use" => pure (.Use (← required s.operand "operand") (← required s.retag "retag"))
   | "BinaryOp" => pure (.BinaryOp (← liftExcept (binOpTag (← required s.operator "operator"))) (← required s.left "left") (← required s.right "right"))
@@ -344,20 +342,8 @@ def finishRvalueFields (s : RvalueFields) : MIRParser.Parser (MIR.Rvalue) := do
   | "RawPtr" => pure (.RawPtr (← required s.pointer_kind "pointer_kind") (← required s.place "place"))
   | "Cast" =>
     let kind ← required s.cast_kind "cast_kind"
-    let desc := s.vtable_allocation.join
-    if desc.isSome then
-      match kind with
-      | .PointerCoercion .Unsize _ => pure ()
-      | _ => reject "dynamic vtable descriptor requires an unsizing cast"
     let operand ← required s.operand "operand"
     let target ← required s.target_type "target_type"
-    if let some desc := desc then
-      let some operandType := operand.typeId | reject "dynamic vtable upcast lacks operand type"
-      let desc := {desc with operandType, castTarget := target}
-      for id in #[desc.operandType, desc.castTarget, desc.sourceType, desc.targetType,
-          desc.sourcePointeeType, desc.targetPointeeType, desc.sourceTailType, desc.targetTailType,
-          desc.querySource, desc.queryTarget] do recordType id
-      modify fun s => {s with facts.dynamicUpcasts := s.facts.dynamicUpcasts.push desc}
     pure (.Cast kind operand.value target)
   | "Aggregate" => pure (.Aggregate (← required s.aggregate_kind "aggregate_kind") ((← required s.operands "operands").map (·.value)))
   | "Reborrow" => pure (.Reborrow (← required s.type "type") (← required s.mutability "mutability") (← required s.place "place"))
@@ -483,8 +469,7 @@ private def sharedStatement : MIRParser.Parser MIR.StatementKind := do
       facts := {
         places := state.facts.places ++ entry.facts.places
         constantAllocations := state.facts.constantAllocations ++ entry.facts.constantAllocations
-        threadLocals := state.facts.threadLocals ++ entry.facts.threadLocals
-        dynamicUpcasts := state.facts.dynamicUpcasts ++ entry.facts.dynamicUpcasts }
+        threadLocals := state.facts.threadLocals ++ entry.facts.threadLocals }
       locals := mergeBound state.locals entry.locals
       blocks := mergeBound state.blocks entry.blocks
       scopes := mergeBound state.scopes entry.scopes }

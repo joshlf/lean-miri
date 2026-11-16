@@ -1,15 +1,57 @@
 //! Semantic type graph stored while collecting compiler facts.
 use crate::pool_values::{BoundVariable, GenericArgument, Region};
 use serde::Serialize;
-use crate::shared_json::Shared;
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct Type {
     pub type_id: u64,
     pub display: String,
     pub shape: Shape,
-    pub layout: u64,
-    pub layout_query_input_type: Option<u64>,
-    pub compiler_facts: CompilerFacts,
+    pub source_layout: SourceLayout,
+}
+#[derive(Clone, Debug, Serialize)]
+pub(super) struct SourceLayout {
+    pub normalized_type: u64,
+    pub closure_upvars: Vec<u64>,
+    pub variant_discriminants: Vec<String>,
+    pub simd: Option<Simd>,
+    pub scalable_vectors: Option<u64>,
+    pub special_float: Option<&'static str>,
+    pub is_x87_f80: bool,
+    pub cfi_encoding: Option<String>,
+    pub coroutine: Option<SourceCoroutineLayout>,
+    pub variances: Vec<crate::pool_body::Variance>,
+    pub is_unsafe_cell: bool,
+    pub is_unsafe_pinned: bool,
+    pub is_manually_drop: bool,
+    pub is_maybe_uninit: bool,
+    pub is_phantom_data: bool,
+    pub is_box: bool,
+    pub is_global_allocator: bool,
+    pub is_c_void: bool,
+    pub is_maybe_dangling: bool,
+    pub nonnull_optimization_guaranteed: bool,
+    pub definition: Option<u64>,
+    pub item_name: Option<String>,
+    pub capture_names: Option<Vec<Option<String>>>,
+    pub has_destructor: bool,
+    pub is_dyn_metadata: bool,
+    pub type_id_hash: Option<String>,
+}
+#[derive(Clone, Debug, Serialize)]
+pub(super) struct SourceCoroutineLayout {
+    pub movability: &'static str,
+    pub trait_fields: Vec<SourceCoroutineTraitField>,
+    pub saved_types: Vec<u64>,
+    pub locals: Vec<u64>,
+    pub prefix: Vec<u64>,
+    pub variants: Vec<Vec<usize>>,
+    pub conflicts: Vec<Vec<usize>>,
+    pub seed: u64,
+}
+#[derive(Clone, Debug, Serialize)]
+pub(super) struct SourceCoroutineTraitField {
+    pub r#type: u64,
+    pub ignore_for_traits: bool,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -154,6 +196,7 @@ pub(super) struct FunctionSignature {
     pub safety: Safety,
     pub abi: ExternAbi,
     pub c_variadic: bool,
+    pub splatted: Option<u8>,
 }
 #[derive(Clone, Debug, Serialize)]
 pub(super) struct Alias {
@@ -189,91 +232,7 @@ pub(super) enum ScalableElement {
     Container,
 }
 #[derive(Clone, Debug, Serialize)]
-pub(super) struct CompilerFacts {
-    pub typing_env: &'static str,
-    pub boolean_queries: Shared<BooleanQueries>,
-    pub type_queries: TypeQueries,
-    pub adt: Option<AdtFacts>,
-    pub capture_names: Option<Vec<Option<String>>>,
-    pub simd_size_and_type: Option<Simd>,
-    pub discriminants: Shared<Discriminants>,
-    pub projection_queries: Option<ProjectionQueries>,
-    pub definition: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub type_id_hash: Option<String>,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct BooleanQueries {
-    pub is_x87_f80_raw: bool,
-    pub is_unsafe_cell: bool,
-    pub has_erasable_regions: bool,
-    pub is_c_void: bool,
-    pub is_simd: bool,
-    pub is_box: bool,
-    pub is_global_box: bool,
-    pub is_dynamic: bool,
-    pub is_too_generic: bool,
-    pub is_monomorphic: bool,
-    pub is_monomorphic_enough: bool,
-    pub is_like_maybe_dangling: bool,
-    pub is_freeze: bool,
-    pub is_unpin: bool,
-    pub is_unsafe_unpin: bool,
-    pub needs_drop: bool,
-    pub opsem_inhabited: bool,
-    pub is_sized: bool,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct TypeQueries {
-    pub discriminant_type: u64,
-    pub normalized: u64,
-    pub builtin_deref_explicit: Option<u64>,
-    pub builtin_deref_implicit: Option<u64>,
-    pub boxed_type: Option<u64>,
-    pub unsafe_binder_erased: Option<u64>,
-    pub metadata_tail: u64,
-    pub pointer_metadata_type: u64,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct AdtFacts {
-    pub definition: u64,
-    pub item_name: String,
-    pub cfi_encoding: Option<String>,
-    pub nonnull_optimization_guaranteed: bool,
-}
-#[derive(Clone, Debug, Serialize)]
 pub(super) struct Simd {
     pub count: u64,
     pub element: u64,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct Discriminants {
-    pub has_discriminants: bool,
-    pub adt_variant_count: Option<usize>,
-    pub values: Vec<Discriminant>,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct Discriminant {
-    pub variant: u32,
-    #[serde(rename = "type")]
-    pub ty: u64,
-    pub bits: String,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct ProjectionQueries {
-    pub typing_env: &'static str,
-    pub parents: Vec<ProjectionParent>,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct ProjectionParent {
-    pub variant: Option<usize>,
-    pub layout: u64,
-    pub fields: Vec<ProjectionField>,
-}
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct ProjectionField {
-    pub index: usize,
-    #[serde(rename = "type")]
-    pub ty: u64,
-    pub layout: u64,
 }

@@ -8,13 +8,27 @@ compiler u128 bits; declaration indices, encoded tags and signed discriminants
 are not conflated. -/
 namespace Miri.Input.CompilerDiscriminantFacts
 open Lean Miri.ABI Miri.Interpreter
-private def data (context : CompilerFacts.Context) (id : TypeId) : Except String DiscriminantInfo := do
-  let source ← context.runtime.node id |>.mapError toString
-  let some facts := source.compilerFacts | throw "missing discriminant compiler facts"
-  unless facts.typingEnvironment == "fully_monomorphized" do
-    throw "discriminant compiler environment mismatch"
-  let some query := facts.discriminants | throw "missing discriminant compiler query"
-  pure query
+private def data (context : CompilerFacts.Context) (id : TypeId) : Except String DiscriminantInfo :=
+  go (context.runtime.source.types.size + 1) id
+where
+  go (fuel id : Nat) : Except String DiscriminantInfo := do
+    let .succ fuel := fuel | throw "recursive unsafe-binder discriminant source"
+    let source ← context.runtime.node id |>.mapError toString
+    if let .unsafeBinder inner _ := source.shape then return ← go fuel inner
+    let count := match source.shape with | .adt adt => some adt.variants.size | _ => none
+    let discriminants ← match source.shape with
+      | .adt adt => pure (if adt.kind == .enumKind then some source.sourceLayout.discriminants else none)
+      | .coroutine .. =>
+        let some layout := source.sourceLayout.coroutine | throw "coroutine source material is absent"
+        pure (some ((List.range layout.variants.size).toArray.map Int.ofNat))
+      | _ => pure none
+    let some discriminants := discriminants | return ⟨false,count,#[]⟩
+    let typeId ← ConcreteTypeQueries.discriminantType context.runtime id
+    let layout ← context.runtime.lookup typeId |>.mapError toString
+    let width := layout.layout.size.bytes.toNat * 8
+    let values := discriminants.mapIdx fun variant value =>
+      ({variant,typeId,bits := (value % Int.ofNat (2^width)).toNat} : DiscriminantValue)
+    return ⟨true,count,values⟩
 
 def discriminantLayout (context : CompilerFacts.Context) (ty : TypeId) :
     Except String (TyAndLayout TypeId) := do
