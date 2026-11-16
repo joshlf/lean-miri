@@ -25,7 +25,9 @@ also audit every imported example theorem; they do not certify unselected module
 `Check` imports the final ordinary-input theorem and witness, the independent
 pool, bounded-window and empty-contract results, and the component and
 generated-state regression roots. Every retained Lean module is reachable from
-these roots; the aggregate audits private and generated declarations as well.
+these roots. Both checkers run the shared transitive axiom audit once after
+compiling the selected roots. It checks every imported theorem and owned
+declaration, including private and generated declarations.
 
 The parallel checker freezes the full source graph and verifies input, library
 and artifact hashes around the kernel compilation and transitive axiom audit:
@@ -107,7 +109,7 @@ for current validation and the separation between old and new results.
 | `CurrentCallOrdinaryWitnessSafety.lean` | Original strong Result for that input at length 2/count 1, with the accepted-copy guard |
 | `CurrentCallOrdinaryJointSafety.lean` | Original strong Result for every count in the adopted positive source/LIVE return branch with both allocations LIVE; per-byte spatial source ownership |
 | `S05ZeroCellActualCallRepaired.lean` | Revised generated-state access/copy completion regressions |
-| `Check.lean` | Imports and transitive axiom audit |
+| `Check.lean` | Aggregate proof imports and fixed-document facts |
 
 `guarded_copy_checks` quantifies over arbitrary 64-bit lengths/counts and
 allocation-relative slice starts. Its assumptions are containment of the

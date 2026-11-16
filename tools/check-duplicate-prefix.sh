@@ -6,6 +6,10 @@ cd "$(dirname "$0")/.."
 export ELAN_HOME="${LEAN_MIRI_ELAN_HOME:-$PWD/.elan}"
 export PATH="$ELAN_HOME/bin:$PATH"
 export LEAN_NUM_THREADS=1
+roots=("$@")
+if (( ${#roots[@]} == 0 )); then
+  roots=(Check)
+fi
 sha256sum --check examples/duplicate_prefix/SHA256SUMS
 flock --no-fork /tmp/lean-miri-lake-build.lock lake build Miri.Frontend.ImportMIR
 # import_mir reads an external file at elaboration time. Never reuse a client
@@ -18,11 +22,12 @@ sha256sum --check "$out/input-SHA256SUMS"
 # Keep the dependency graph and source bodies from the same point in time.
 # This also permits independent proof work while a large MIR import checks.
 cp -R examples/duplicate_prefix "$out/source/duplicate_prefix"
+cp tools/duplicate-prefix-axiom-audit.lean "$out/axiom-audit.lean"
 echo "Source snapshot: $out/source/duplicate_prefix"
 base="$(lake env printenv LEAN_PATH)"
 export LEAN_PATH="$out:$base"
 # Follow the example imports so each source is checked freshly in dependency order.
-python3 - "$out/source/duplicate_prefix" "${@:-Check}" > "$out/modules.txt" <<'PYMODULES'
+python3 - "$out/source/duplicate_prefix" "${roots[@]}" > "$out/modules.txt" <<'PYMODULES'
 from pathlib import Path
 import re, sys
 root = Path(sys.argv[1])
@@ -52,26 +57,14 @@ for module in "${modules[@]}"; do
     "$out/source/duplicate_prefix/$module.lean"
   touch "$out/duplicate_prefix/$module.done"
 done
-if (( $# > 0 )); then
-  # Custom roots need the same all-declaration audit as the default Check root.
-  audit="$out/SelectedAudit.lean"
-  for module in "$@"; do
-    echo "import duplicate_prefix.$module"
-  done > "$audit"
-  cat >> "$audit" <<'LEANAUDIT'
-open Lean Elab Command in
-run_cmd do
-  let mut count : Nat := 0
-  for (name, _) in (← getEnv).constants.toList do
-    if (name.toString.splitOn "DuplicatePrefix.").length != 1 then
-      count := count + 1
-      for dependency in (← collectAxioms name) do
-        unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
-          throwError "{name} depends on unapproved axiom {dependency}"
-  logInfo m!"PASS: audited {count} example declarations"
-LEANAUDIT
-  lean -j1 "$audit"
-fi
+# Default and selected roots use the same full audit, exactly once at the end.
+audit="$out/Audit.lean"
+for module in "${roots[@]}"; do
+  echo "import duplicate_prefix.$module"
+done > "$audit"
+cat "$out/axiom-audit.lean" >> "$audit"
+lean -j1 "$audit"
+cmp "$out/axiom-audit.lean" tools/duplicate-prefix-axiom-audit.lean
 # Reflection reads repository-relative input paths; reject any input mutation
 # during this fresh snapshot check before certifying its artifacts.
 cmp "$out/input-SHA256SUMS" examples/duplicate_prefix/SHA256SUMS

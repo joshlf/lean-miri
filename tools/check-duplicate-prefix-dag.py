@@ -112,6 +112,9 @@ def main():
     p = parser()
     a = p.parse_args()
     checker_sha256 = digest(Path(__file__))
+    audit_source = ROOT / 'tools/duplicate-prefix-axiom-audit.lean'
+    audit_template = audit_source.read_bytes()
+    audit_sha256 = hashlib.sha256(audit_template).hexdigest()
     if not 1 <= a.jobs <= 4:
         p.error('--jobs must be 1..4 (each Lean uses -j1)')
     if a.seed and not a.seed_log:
@@ -214,25 +217,13 @@ def main():
                 reused += was_reused
                 print(f'{len(records)}/{len(deps)} {n} ' + ('reuse' if was_reused else 'fresh'), flush=True)
     audit = out / 'Audit.lean'
-    audit.write_text('import Lean\n' + ''.join('import duplicate_prefix.' + n + '\n' for n in (a.roots or ['Check'])) + '''
-open Lean Elab Command in
-run_cmd do
-  let mut theorems : Nat := 0
-  let mut owned : Nat := 0
-  for (name, info) in (← getEnv).constants.toList do
-    let theoremDecl := match info with | .thmInfo _ => true | _ => false
-    let own := (name.toString.splitOn "DuplicatePrefix.").length != 1
-    if theoremDecl then theorems := theorems + 1
-    if own then owned := owned + 1
-    if theoremDecl || own then
-      for dependency in (← collectAxioms name) do
-        unless #[``propext, ``Quot.sound, ``Classical.choice].contains dependency do
-          throwError "{name} depends on unapproved axiom {dependency}"
-  logInfo m!"PASS: audited {theorems} imported theorems and {owned} owned declarations"
-''')
+    audit.write_text(''.join('import duplicate_prefix.' + n + '\n' for n in (a.roots or ['Check']))
+                     + audit_template.decode('utf-8'))
     run(['lean', '-j1', str(audit)], env=env)
     if inputs() != start_inputs or external() != start_external:
         raise RuntimeError('input or library changed during check')
+    if digest(audit_source) != audit_sha256:
+        raise RuntimeError('axiom audit source changed during check')
     if digest(Path(__file__)) != checker_sha256:
         raise RuntimeError('checker source changed during check')
     for n in deps:
@@ -245,7 +236,7 @@ run_cmd do
     # Only a fully successful audited closure is promoted as a reusable manifest.
     (out / 'manifest.json').write_text(json.dumps({'context': context,
         'modules': records, 'roots': a.roots or ['Check'], 'reused': reused,
-        'checker_sha256': checker_sha256,
+        'checker_sha256': checker_sha256, 'audit_sha256': audit_sha256,
         'reused_artifacts': 'immutable-links' if a.link_reused_artifacts else 'copies'}, sort_keys=True, indent=2))
     print(f'PASS: {len(records)} modules, {reused} exact reuses; selected kernel/axiom closure audited', flush=True)
 
