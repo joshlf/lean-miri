@@ -42,20 +42,28 @@ instance-definition lookups. Extras lemmas preserve arbitrary diagnostic
 backtraces independently of weak-memory and synchronization conditions. The
 public ordinary-input and result requirements are unchanged.
 
-On 2026-11-15, the complete frozen `Check` closure passed: 5,638 modules,
-including 4,352 exact source/dependency/artifact-bound reuses from a successful
-independent check. The transitive audit checked 179,879 imported theorems and
-80,972 owned declarations, including private/generated declarations, accepting
-only `propext`, `Quot.sound` and `Classical.choice`. Fixed Rust/MIR hashes,
-library sources, compiler artifacts and snapshot/current-source bindings were
-verified before the successful manifest was written.
+The example retains only the dependency closures of the public safety/witness,
+independent contract results and component/regression roots. Single-use
+classification and continuation wrappers are composed at their use sites. The
+ordinary-input domain, public result definitions and retained top-level theorem
+statements are unchanged. Every remaining example module is reachable from
+`Check`.
+
+On 2026-11-16 (Asia/Tokyo), the complete frozen `Check` closure passed: 3,090
+modules, including 3,088 exact source/dependency/artifact-bound reuses from a
+successful independent check. The transitive audit checked 148,056 imported
+theorems and 48,123 owned declarations, including private/generated declarations,
+accepting only `propext`, `Quot.sound` and `Classical.choice`. Fixed Rust/MIR
+hashes, library sources, compiler artifacts and snapshot/current-source bindings
+were verified before the successful manifest was written.
 
 `tools/check-quick.sh` passes all 135 Python tests, source lint, fixed-fixture
 integrity and coverage-link checks. `WildcardPostorderDisabled.lean` and
-`CutoffBorrowTraceDiagnostic.lean` compile successfully. The full
+`CutoffBorrowTraceDiagnostic.lean` compiled successfully during the main
+integration; they were not rerun for this proof-only cleanup. The full
 `tools/check.sh` suite, Tree Borrows component differential suite and independent
-Miri derivative QA were not rerun for this integration. These checks do not
-establish Rust caller-domain formation or Rust/interpreter correspondence.
+Miri derivative QA were not rerun. These checks do not establish Rust
+caller-domain formation or Rust/interpreter correspondence.
 
 ## Self-contained Lean test entry points
 

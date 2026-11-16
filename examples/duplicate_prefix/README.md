@@ -20,7 +20,12 @@ the external JSON read by `import_mir` is not an ordinary Lean import dependency
 To check a selected component and its complete import closure, pass its module
 name, for example `bash tools/check-duplicate-prefix.sh GeneralBorrowRange`.
 Multiple module names select the union of their closures. Selected-root runs
-also audit every imported example theorem; they do not certify unselected drafts.
+also audit every imported example theorem; they do not certify unselected modules.
+
+`Check` imports the final ordinary-input theorem and witness, the independent
+pool, bounded-window and empty-contract results, and the component and
+generated-state regression roots. Every retained Lean module is reachable from
+these roots; the aggregate audits private and generated declarations as well.
 
 The parallel checker freezes the full source graph and verifies input, library
 and artifact hashes around the kernel compilation and transitive axiom audit:

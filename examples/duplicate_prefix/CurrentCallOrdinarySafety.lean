@@ -1,5 +1,8 @@
 import duplicate_prefix.CurrentCallOrdinaryEmptySafety
-import duplicate_prefix.CurrentCallOrdinaryPositiveSafety
+import duplicate_prefix.CurrentCallOrdinaryJointSafety
+import duplicate_prefix.CurrentCallOrdinaryLiveCurrentSafety
+import duplicate_prefix.CurrentCallOrdinaryCurrentLiveSafety
+import duplicate_prefix.CurrentCallOrdinaryCurrentSafety
 
 /-! The adopted-input dispatcher joins the empty and positive entry producers
 to the original all-count Result. Representation choices remain inside those
@@ -36,7 +39,7 @@ cache coherence, including states without LIVE rows. Bare provenance exposure
 does not imply the latter. This theorem does not establish formation of that
 domain for every Rust execution history. -/
 namespace DuplicatePrefix.CurrentCallOrdinarySafety
-open Miri Miri.Input Miri.Memory Miri.MIR Miri.Interpreter
+open Miri Miri.Input Miri.ABI Miri.Memory Miri.MIR Miri.Interpreter
 open CurrentCallOrdinaryInput
 set_option autoImplicit false
 
@@ -47,7 +50,26 @@ theorem invoke {options limits remaining span before argument len place}
     DuplicatePrefixArgumentCallResult.Result options limits remaining span before argument len count place := by
   by_cases empty : len = 0
   · exact CurrentCallOrdinaryEmptySafety.invoke input empty count
-  · exact CurrentCallOrdinaryPositiveSafety.invoke input empty count
+  · have positiveNat : 0 < len.toNat := Nat.pos_of_ne_zero (fun zero => empty (UInt64.toNat_inj.mp zero))
+    rcases input.source with ⟨zero, _⟩ | ⟨_, fits, family, offset, capacity, encoding, assigned, charge, selected, backing, ready⟩
+    · exact False.elim (empty zero)
+    · rcases backing with sourceLive | sourceCurrent
+      · rcases input.returnBacking with returnLive | returnCurrent
+        · have oldSourceRole := sourceLive
+          obtain ⟨entry, found, _⟩ := sourceLive
+          obtain ⟨returnEntry, returnFound, _⟩ := returnLive
+          have query : CurrentCallConversionPlan.sourceQuery before argument len = .ok (some family.allocation) := by
+            rw [encoding]
+            exact CurrentCallConversionPlanAdequacy.query_of_selected before input.tracker family offset capacity len true selected (.inl oldSourceRole) fits
+          apply CurrentCallOrdinaryJointSafety.live input empty
+          · simp only [CurrentCallOrdinaryJointEntry.sourceIsLive, query, found, Option.isSome_some]
+          · simp only [returnFound, Option.isSome_some]
+        · exact CurrentCallOrdinaryLiveCurrentSafety.invoke input family offset capacity positiveNat fits encoding assigned charge selected sourceLive ready returnCurrent count
+      · rcases input.returnBacking with returnLive | returnCurrent
+        · exact CurrentCallOrdinaryCurrentLiveSafety.invoke input family offset capacity positiveNat fits encoding assigned charge selected sourceCurrent ready returnLive count
+        · by_cases same : family.allocation = input.returnFamily.allocation
+          · exact CurrentCallOrdinaryCurrentSafety.same input family offset capacity positiveNat fits encoding assigned charge selected sourceCurrent returnCurrent same count
+          · exact CurrentCallOrdinaryCurrentSafety.different input family offset capacity positiveNat fits encoding assigned charge selected sourceCurrent returnCurrent same count
 
 end DuplicatePrefix.CurrentCallOrdinarySafety
 
