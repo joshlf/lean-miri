@@ -17,11 +17,9 @@ Upstream main `08879436` has been integrated with rustc
 `8eb778d04094d3af4b26580cab327e0413eb1e02` and Miri
 `93c45edea8b148a6b6f05ec9384449a04217143f`. The new source provider passes the
 finite comparisons below. The latest coroutine-material correction passes all
-six fresh execution comparisons and their negative controls; its final full
-proof and performance reruns are in progress. The prior proof/performance counts
-below belong to the preceding frozen artifacts until those reruns finish.
-The isolated upstream baseline
-passes all 268
+six fresh execution comparisons and their negative controls, the full fixed-input
+proof and the final-artifact performance comparison below. The isolated upstream
+baseline passes all 268
 empty-function proof modules and the 78,057-declaration axiom audit, and its
 fresh standard-library startup export executes with exit code zero. Historical
 results explicitly naming `c8daa215` retain their original scope.
@@ -102,7 +100,7 @@ premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
 all 268 proof modules and the 77,958-declaration transitive axiom audit.
 Separately, the schema-14 fixture passes the canonical checker on its actual
 input path with the current compiler/Miri pins: all 268 modules, the final
-`target`/`noUB` types, and 78,237 imported declarations including private/generated
+`target`/`noUB` types, and 78,305 imported declarations including private/generated
 declarations. Only `propext`, `Classical.choice` and `Quot.sound` occur.
 Input, example and library-source hashes remained unchanged during the successful
 check; the compiled proof artifacts are recorded separately.
@@ -814,20 +812,20 @@ All six trials finish with `finalized_exit code=0` and choice cursor 1608.
 
 | Metric | main | Schema 14 |
 | --- | --- | --- |
-| Export-to-result wall median, seconds (min–max) | 14.801 (14.712–15.173) | 9.504 (9.481–9.626) |
-| Total process CPU median, seconds | 14.648 | 9.374 |
-| Export wall median, seconds | 5.327 | 2.711 |
-| Lean runner wall median, seconds | 9.385 | 6.775 |
+| Export-to-result wall median, seconds (min–max) | 15.006 (14.964–15.275) | 9.452 (9.322–9.756) |
+| Total process CPU median, seconds | 14.818 | 9.331 |
+| Export wall median, seconds | 5.393 | 2.632 |
+| Lean runner wall median, seconds | 9.673 | 6.870 |
 | Exported bytes | 116,485,200 | 85,115,048 |
-| Maximum exporter child RSS, bytes | 525,144,064 | 407,805,952 |
-| Maximum runner child RSS, bytes | 708,620,288 | 579,293,184 |
+| Maximum exporter child RSS, bytes | 524,337,152 | 407,146,496 |
+| Maximum runner child RSS, bytes | 708,554,752 | 580,603,904 |
 
-The observed median reductions are 35.79% wall time, 36.00% CPU time and 26.93%
+The observed median reductions are 37.01% wall time, 37.03% CPU time and 26.93%
 serialized size for this input. Source and per-variant input hashes are stable.
-Same-CPU steal is recorded (6–34 ticks per phase); no cgroup throttling is
+Same-CPU steal is recorded (5–43 ticks per phase); no cgroup throttling is
 observed. These three-pair shared-host samples do not establish a general
 speedup. Tested exporter/runner SHA-256 prefixes are `23a044e868d3`/`ac924c216cd5`
-for main and `a89ae9ff308d`/`c897e42b3fe3` for schema 14.
+for main and `bc69674bdec8`/`c2e2a27f6123` for schema 14.
 `tools/measure-pipeline.py` freezes artifacts and records raw trials, counters,
 hashes and outcome gates. Build time and input hashing are outside the measured
 export-to-result interval.
