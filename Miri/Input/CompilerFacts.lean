@@ -3,6 +3,7 @@ import Miri.Input.CompilerPrimitiveFacts
 import Miri.Interpreter.TypedRetag
 import Miri.Interpreter.LayoutCompat
 import Miri.Interpreter.ValidityVisitor
+import Miri.Input.ConcreteTypeQueries
 
 /-! Required compiler facts for the fixed interpreter. Query evidence is keyed
 by exact compilation-local TyId and explicit fully_monomorphized typing_env.
@@ -50,23 +51,11 @@ def ofProgram (runtime : RuntimeMetadata) (program : LoweredProgram) : Result Co
   }
 private def node (context : Context) (id : TypeId) : Result TypeNode :=
   (context.runtime.node id).mapError toString
-private def facts (context : Context) (id : TypeId) : Result TypeCompilerFacts := do
-  let source ← node context id
-  let some facts := source.compilerFacts | throw s!"missing compiler_facts for type {id}"
-  unless facts.typingEnvironment == "fully_monomorphized" do
-    throw "compiler query typing-environment mismatch"
-  pure facts
+def boolean (context : Context) (id : TypeId) (query : String) : Result Bool :=
+  ConcreteTypeQueries.boolean context.runtime id query
 
-def boolean (context : Context) (id : TypeId) (query : String) : Result Bool := do
-  let facts ← facts context id
-  let some (_,entry) := facts.booleanQueries.find? (·.1 == query) | throw s!"missing compiler boolean query {query}"
-  pure entry
-
-def optionalType (context : Context) (id : TypeId) (query : String) : Result (Option TypeId) := do
-  let facts ← facts context id
-  let some (_,entry) := facts.typeQueries.find? (·.1 == query) | throw s!"missing compiler type query {query}"
-  if let some ty := entry then let _ ← node context ty
-  pure entry
+def optionalType (context : Context) (id : TypeId) (query : String) : Result (Option TypeId) :=
+  ConcreteTypeQueries.optionalType context.runtime id query
 
 def requiredType (context : Context) (id : TypeId) (query : String) : Result TypeId := do
   let some ty ← optionalType context id query | throw s!"compiler query {query} returned None"
@@ -92,19 +81,16 @@ def retagTypeShape (context : Context) (id : TypeId) : Result Miri.TreeBorrows.R
   pure ⟨← boolean context id "is_global_box",source.shapeKind == .reference,
     source.shapeKind == .rawPointer,← boolean context id "is_box"⟩
 
-private def adtFacts (context : Context) (id : TypeId) : Result AdtCompilerFacts := do
-  let some value := (← facts context id).adt | throw "ADT query requested for a non-ADT"
-  pure value
-
 private def adtShape (context : Context) (id : TypeId) : Result AdtShape := do
   let .adt value := (← node context id).shape | throw "ADT layout query on non-ADT"
   pure value
 
-def itemName (context : Context) (id : TypeId) : Result String :=
-  return (← adtFacts context id).itemName
+def itemName (context : Context) (id : TypeId) : Result String := do
+  let some name := (← node context id).sourceLayout.itemName | throw "ADT item name declaration is absent"
+  return name
 
 def nonnullOptimizationGuaranteed (context : Context) (id : TypeId) : Result Bool :=
-  return (← adtFacts context id).nonnullOptimizationGuaranteed
+  return (← node context id).sourceLayout.nonnullOptimizationGuaranteed
 
 def reprEqualUpToSeed (context : Context) (left right : TypeId) : Result Bool := do
   let a := (← adtShape context left).representation

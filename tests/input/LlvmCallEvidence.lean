@@ -27,23 +27,21 @@ def main (args : List String) : IO Unit := do
   let text ← IO.FS.readFile path
   let raw ← must (Json.parse text)
   let decoded ← must (decodeJson text)
-  let legacyText ← IO.FS.readFile "examples/empty_function/input.json"
-  let _ ← must (decodeJson legacyText)
   let calls := decoded.document.bodies.flatMap (·.callEvidence.filterMap id)
   check (calls.any (·.abi == .llvmIntrinsic)) "fixture has no LLVM call evidence"
   for version in #[(8 : Nat), 9, 10] do
     rejects (decodeJson (set raw "schema_version" (toJson version)).compress)
       s!"obsolete schema {version} accepted current LLVM evidence"
-  rejects (decodeJson (mutateCalls raw (fun j => set j "fn_abi" (toJson (0 : Nat)))).compress)
-    "LLVM call accepted ordinary ABI"
   rejects (decodeJson (mutateCalls raw (fun j => set j "kind" (.str "resolved_instance"))).compress)
-    "ordinary call accepted absent ABI"
-  rejects (decodeJson (mutateCalls raw (fun j => set (set j "kind" (.str "resolved_instance")) "fn_abi" (toJson (0 : Nat)))).compress)
-    "LLVM instance accepted normal ABI evidence"
-  rejects (decodeJson (mutateCalls raw (fun j => set j "kind" (.str "indirect_function_pointer"))).compress)
-    "indirect call accepted absent ABI"
+    "ordinary call accepted LLVM intrinsic identity"
+  let indirect ← must (decodeJson (mutateCalls raw (fun j => set j "kind" (.str "indirect_function_pointer"))).compress)
+  let indirectRuntime ← must (RuntimeMetadata.ofDocument indirect.document |>.mapError toString)
+  let indirectProgram ← must (lowerProgram indirect.document)
+  let indirectCalls ← must (CallResolution.prepareWithRuntime indirectRuntime indirectProgram)
+  check (indirectCalls.entries.any fun entry => !entry.outcome.isOk)
+    "indirect call preparation accepted a function definition operand"
   rejects (decodeJson (mutateCalls raw (fun j => set j "kind" (.str "virtual_dispatch"))).compress)
-    "virtual call accepted absent ABI"
+    "virtual call accepted a nonvirtual LLVM identity"
   let some item := decoded.document.instances.findIdx? (fun node =>
       match node.instanceKind with | .Item _ => true | _ => false) |
     throw (IO.userError "fixture has no Item identity")
@@ -65,20 +63,22 @@ def main (args : List String) : IO Unit := do
   rejects (decodeJson (mutateCalls raw (fun j =>
       set (set j "function_type" (toJson otherType)) "instance_id" (toJson otherId))).compress)
     "LLVM evidence accepted a coherent foreign identity for the wrong MIR operand"
-  let queries ← must (raw.getObjValAs? (Array Json) "compiler_instance_abis")
-  let fake := Json.mkObj [("typing_env", .str "fully_monomorphized"),
-    ("instance_id", toJson llvmId), ("extra_argument_types", .arr #[]), ("abi_query", toJson (0 : Nat))]
-  rejects (decodeJson (set raw "compiler_instance_abis" (.arr (queries.push fake))).compress)
-    "LLVM intrinsic accepted a fabricated ordinary ABI query"
-  let some abiRow := decoded.document.queries.instanceAbis[0]? |
-    throw (IO.userError "fixture has no normal ABI control")
-  let forgedDocument := {decoded.document with queries := {decoded.document.queries with
-    instanceAbis := decoded.document.queries.instanceAbis.push {abiRow with instanceId := llvmId}}}
+  let some material := decoded.document.sourceAbi | throw (IO.userError "missing source ABI material")
+  check ((material.definitions[llvmId]?.getD none).isNone)
+    "LLVM intrinsic unexpectedly has an ordinary source ABI definition"
+  let source ← must (raw.getObjVal? "source_abi")
+  let definitions ← must (source.getObjValAs? (Array Json) "definitions")
+  let some row := definitions.find? (· != .null)
+    | throw (IO.userError "missing normal source ABI control")
+  let definitions := definitions ++ Array.replicate (llvmId + 1 - definitions.size) Json.null
+  let forged := set row "instance_id" (toJson llvmId)
+  rejects (decodeJson (set raw "source_abi"
+    (set source "definitions" (.arr (definitions.set! llvmId forged)))).compress)
+    "LLVM intrinsic accepted an ordinary source ABI definition"
   let runtime ← must ((RuntimeMetadata.ofDocument decoded.document).mapError toString)
-  let forgedProgram ← must (lowerProgram forgedDocument)
-  rejects (CompilerInstanceAbi.prepare runtime forgedProgram)
-    "direct prepared API accepted a fabricated ordinary LLVM ABI row"
   let originalProgram ← must (lowerProgram decoded.document)
+  rejects (SourceAbiRuntime.ofInstance ⟨runtime, originalProgram, none⟩ llvmId #[])
+    "LLVM intrinsic source ABI demand silently succeeded"
   let originalCalls ← must (CallResolution.prepareWithRuntime runtime originalProgram)
   check (originalCalls.entries.all (·.outcome.isOk)) "valid LLVM direct preparation failed"
   let wrongItemDocument := {decoded.document with bodies := decoded.document.bodies.map fun body =>
@@ -89,4 +89,4 @@ def main (args : List String) : IO Unit := do
   check (wrongItemCalls.entries.any fun entry => match entry.outcome with
     | .error message => message == "LLVM call tag/canonical instance mismatch"
     | .ok _ => false) "direct call preparation accepted LLVM no-ABI tag for Item"
-  IO.println "LLVM no-ABI decoder controls passed; current pooled input accepted; obsolete schema versions rejected"
+  IO.println "LLVM no-ABI decoder controls passed; current source input accepted; obsolete schema versions rejected"

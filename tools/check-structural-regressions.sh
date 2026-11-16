@@ -5,14 +5,16 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export ELAN_HOME="${LEAN_MIRI_ELAN_HOME:-$PWD/.elan}"
 export PATH="$ELAN_HOME/bin:$PATH"
-python3 tools/prepare-regression-inputs.py || exit 1
+python3 tools/prepare-regression-inputs.py --fixture u32 --fixture control-flow || exit 1
 status=0
+flock --no-fork /tmp/lean-miri-lake-build.lock lake build \
+  Miri.Input.CompilerAllocationBacktrace Miri.Input.CompilerForeignSymbols NativeRunner native_stdio_host_qa || exit 1
 for test in tests/regression/*.lean MiriTests/Regression/*.lean; do
   printf 'Checking %s\n' "$test"
   lake env lean "$test" || status=1
 done
-# Consume pinned schema-11 unit inputs copied byte for byte above. These are
-# retained unit inputs, not fresh producer/Miri comparisons.
+# Consume fresh current-schema inputs. These checks exercise typed providers;
+# they do not compare execution against Miri.
 lake env lean --run tests/regression/LowerContext.lean \
   scratch/regression-inputs/u32.checked.json || status=1
 for test in ProviderContext PrimitiveRebinding; do
@@ -35,7 +37,6 @@ done
 lake env lean --run tests/input/LlvmSymbolRegistry.lean || status=1
 lake env lean --run tests/resource_destruction/SourceDrops.lean || status=1
 lake env lean --run tests/run_loop/HostStdioReplay.lean || status=1
-flock --no-fork /tmp/lean-miri-lake-build.lock lake build NativeRunner native_stdio_host_qa || status=1
 lake env lean --run tests/run_loop/NativeStdioProtocol.lean || status=1
 lake env lean tests/resource_destruction/KindOnlyHostError.lean || status=1
 python3 native/stdio_host_tests.py || status=1

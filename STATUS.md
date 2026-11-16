@@ -13,93 +13,60 @@ the ability to verify arbitrary Rust are not claimed.
 
 ## Exported input coverage
 
-Each concrete instance and promoted index has one executable MIR body. The
-exporter substitutes generic arguments, normalizes types, and evaluates MIR
-constants, including unused required constants, before emitting that body.
-Runtime storage, pointer and layout queries use the resolved types. Unbound
-generic templates are rejected as executable roots; diagnostic spans and scopes
-remain attached to the resolved instructions.
-The exporter aborts when requested semantic compiler data is unavailable; the
-Lean input API no longer retains failed exporter payloads as execution inputs.
-Successful values are serialized without success-status wrappers or a
-completeness flag; consumers validate the semantic fields they use.
-Compiler query catalogs and the owned final `ExportDocument` use concrete Rust
-serialization types. Required vtable references finalize locally against the
-closed query map;
-virtual candidates are sorted and deduplicated for the exact original instance.
-Pending references cannot serialize. The export document and peripheral metadata
-write directly through serde without constructing a JSON Value tree. Diagnostic
-fingerprints use
-the emitted bytes, and prepared-reference sidecars receive the allocator frontier
-directly.
-Cast-query consumers, including dynamic-upcast evidence validation, read direct
-result fields. Executables with custom `no_main` entry points retain startup
-preflight facts and the core C-ulong and mutable i32-pointer types required by
-machine construction without demanding an OS catalog. Intrinsic type-name and
-caller-location constants are lowered from their direct compiler payloads. A genuine absent
-function-pointer target has `resolution_kind: none` and no instance identity;
-`resolution_kind: instance` carries a canonical instance ID. This preserves
-the optional answer when exact query-key fields are attached.
-The vtable-erasure reader uses typed predicate/type references, including
-TraitVPtr child joins. Only the HRTB upcast controls require lockstep query rows;
-static and cross-crate controls require direct decoding without those rows.
-Resolved constants no longer retain their unevaluated definition identity, so
-the cross-crate fixture checks its external constant in independently emitted
-compiler MIR and checks the exported root allocation’s symbolic-vtable relocation.
-This is a fixture-specific provenance check, not a general translation proof.
-Local fresh wrapper checks pass for static, cross-crate, HRTB and HRTB-upcast
-controls, including same-TyCtxt references, exact catalog joins over 32 salts,
-and canonical Lean guest exit zero. These controls also passed the hosted
-extended/fresh suites at `6a76fcbd`; the overall results and remaining failures
-are described under Hosted regressions and coverage below.
-Coroutine frame layout serialization and foreign TLS initializers remain
-unimplemented and now stop export. This boundary does not establish compiler
-query closure or interpreter correspondence.
+This implementation and the validation below use the original main base
+`c8daa215` with rustc `8144389c895da997dbdecaa635e41d6a50be6ffd` and Miri
+`7fa591d7d4dd9af8154becbc8332f8096f8323b1`. Integration with upstream main
+`08879436` and its updated compiler/Miri pins remains unresolved; these results
+do not establish compatibility with that revision.
 
-The schema-9 follow-up emitted schema 9 and strictly supported schemas 8 and 9
-at that revision (the later schema-10 baseline is described below).
-Schema 8 retained its existing dense-layout and call-evidence validation and
-rejects the new compact-array and LLVM no-ABI forms. Array offsets in schema 9
-use an explicit stride/count formula instead of an enumerated vector. The
-reader checks shape agreement, u64 bounds and the last offset without traversing
-all fields; runtime lookup retains the existing checked multiplication. Local
-theorems cover the exact offset value for every in-bounds index. Zero-length
-and zero-stride arrays remain supported.
+Schema 13 exports concrete instance/promoted MIR from selected roots, evaluated
+constants, concrete type structure and finite declaration material. Executables
+default to their entry function; libraries require explicit roots. Repeated
+`--root` options select multiple definitions. Generic roots contribute
+`root_declarations` only; generic function MIR is never an execution input.
+Unselected function bodies are absent unless the structural closure discovers a
+concrete call, cast, allocation, vtable, drop or shim edge to them.
 
-LLVM intrinsic calls carry explicit no-ABI evidence tied to the exact declared
-FnDef type, DefId, generic arguments and current MIR call operand. Ordinary
-calls still require genuine FnAbi evidence; no replacement ABI is fabricated.
-Signature checks use the canonical prepared symbol registry and pinned builtin
-exemptions, retaining missing, duplicate and weak-symbol behavior. The core call
-implementation is unchanged.
+Lean computes layout, ABI, type/trait and vtable operations from typed source
+material. The execution input has no layout, FnAbi, covariance or vtable-answer
+catalogs. Concrete ADT fields/repr drive layout; generic type patterns, ADT tails
+and associated-type bounds support trait reasoning without generic function MIR.
+Lean never starts or communicates with rustc during execution, and execution
+state/caches are not shared between runs. Earlier wire formats require fresh
+export. Historical schema-7 through schema-12 results below do not validate this
+breaking input/provider change.
 
-Fifteen fixed connected inputs with their same-TyCtxt reference observations
-and three eval-core inputs retain the schema-8 resolved-body typed-pool
-contract. Allocation byte vectors share a document-local exact byte
-image pool; function payloads group identities by Instance. Graph IDs, raw source
-IDs, initialization and provenance remain independent. Prepared raw-pool slots
-and indexed salt results derive serialized facts from those allocation nodes.
-Span and backtrace filenames remain validated numeric IDs
-in a shared exact-string file table until diagnostics or backtrace APIs present
-them. Runtime-metadata checks export their
-Rust inputs afresh. Performance checks now obtain
-fresh producer inputs. The DST and large Tree Borrows connected cases now
-generate inputs and same-TyCtxt references in CI from unchanged tracked sources,
-flags and reviewed guest configuration; fixed assertions and choice tapes are
-preserved. This adds pinned toolchain/sysroot build cost and replaces saved
-allocation-history replay for those two cases. Their historical archives are
-not CI inputs.
-The 17-case Lean connected replay passes under schema 7 with unchanged expected
-outcomes, including fresh same-TyCtxt references for the DST and large Tree
-Borrows cases. Decoder controls reject missing byte images, repeated identities,
-unmatched raw slots, incomplete salt arrays and unchecked foreign TLS
-initializers. A decoded shared-byte cyclic graph retains distinct runtime IDs,
-mutability, initialization and CTFE provenance flags.
-The earlier hosted replay lane also passed at `6a76fcbd`. Neither result
-establishes validation of the schema-9 follow-up source; the
-broader hosted results and remaining failures are described below. These finite
-executions do not establish compiler query closure, interpreter correspondence
-or whole-machine safety.
+rustc MIR transformation, normalization and constant evaluation remain trusted.
+Additional trusted finite facts include target/declaration attributes, inferred
+variance, type identity and bound-variable flags, compiler coroutine state
+material, predicate normalization/erasure/order, actual cast
+resolution, concrete vtable/drop/method bindings and optimized defining-body
+parameter-use summaries. Lean derives final layout and ABI values, including ABI
+parameter attributes, from those inputs. The trait-header inventory and outer-head
+filter must retain every relevant implementation. See the
+[exporter contract](exporter/README.md#compiler-trust-boundary) for the boundary.
+
+Constant graphs preserve separate allocation/source identities, bytes,
+initialization, alignment, mutability, relocations, offsets and CTFE provenance,
+including sharing and cycles. Evaluated constant vtables retain their compiler
+memory/entries and layout. Prepared allocation-world input retains all 32 salted
+identities for reached function/vtable constructors and the source-ID frontier;
+this finite identity history remains trusted. General preservation of pointer
+meaning, runtime constructor containment and agreement with Rust are unproved.
+
+Fresh schema-13 ordinary-std startup and dynamic-upcast/provenance guests complete
+with `finalized_exit code=0`; the upcast/provenance guest also matches its
+same-TyCtxt reference. Finite std compiler comparisons agree for 8,915 layouts,
+151,555 Boolean type queries and 3,705 ABI requests. The selected vtable corpus
+agrees for 63 vtable rows and 35 upcast-slot comparisons. These include source
+pattern, associated-type, higher-ranked-lifetime, PhantomData and enum/ABI cases;
+they are not a general algorithm-equivalence or all-choice safety proof.
+
+The new-input empty-function proof and final-artifact identical-source comparison
+also pass, with their separate guarantees below. Historical fixture successes
+remain evidence for their own formats and revisions. General instance/material
+containment, compiler-query equivalence and Rust/interpreter correspondence remain
+open.
 
 ## Empty-function caller-domain transport
 
@@ -120,9 +87,17 @@ other scheduler interleavings and caller execution after return are outside scop
 
 The example adapter disables the new allocation-backtrace diagnostic option
 through `Configuration.proofOptions`, preserving every pre-existing option.
-The proof covers this legacy diagnostic-off profile; collection-enabled UI
-executions are separate finite comparisons. Fixed Rust/MIR inputs and the
-target theorem are unchanged.
+The proof covers the diagnostic-off profile; collection-enabled UI executions
+are separate finite comparisons. The Rust source, target theorem and caller-domain
+premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
+all 268 proof modules and the 77,958-declaration transitive axiom audit.
+Separately, the schema-13 fixture passes the canonical checker on its actual
+input path: all 268 modules, the final `target`/`noUB` types, and 78,127 imported
+declarations including private/generated declarations. Only `propext`,
+`Classical.choice` and `Quot.sound` occur. Input, example, library-source and
+compiled-library hashes remained unchanged during the successful check.
+The `EmptyFunctionQueries` executable separately passes actual layout/ABI/trait
+provider assertions; it supplies no theorem premise or safety verdict.
 
 ## Remaining general proofs (not acceptance conditions for current finite QA)
 
@@ -585,48 +560,45 @@ execution of the three long SIMD files has not been measured. Export success
 does not establish their execution result. The no-core, coroutine-layout, native leak-report
 rendering and performance gaps above remain unresolved.
 
-The ordinary standard-library startup closure from
-`tests/repro/startup/empty-main.rs` now decodes directly into MIR. A fresh
-7,322-body export completed native execution with `finalized_exit code=0` under
-the bounded-diagnostic-zero choice profile. This finite witness does not establish
-behavior for other standard-library closures or all permitted choices.
+An earlier standard-library startup closure from
+`tests/repro/startup/empty-main.rs` decoded directly into MIR. Its fresh 7,322-body
+export completed native execution with `finalized_exit code=0` under the
+bounded-diagnostic-zero choice profile. This historical finite witness does not
+validate schema 13, other standard-library closures or all permitted choices.
 
 ### Compiler query closure and prepared allocation identity
 
-General query closure remains unproved for the [exporter](exporter/src/main.rs),
-[allocator world](exporter/src/allocator_world.rs),
-[CompilerAllocIdWorld](Miri/Input/CompilerAllocIdWorld.lean) and
-[Decoder](Miri/Input/Decoder.lean). Retain genuine fresh exports exposing
-uncollected queries and extend producer closure from their typed keys and source
-operations. A target reproduction must pass fresh export → real connected
-execution while missing keys still produce Unsupported. This does not require
-query completeness for every program or agreement with vanilla Miri's raw
-AllocId history. Entry function pointers, backtrace frame Instances, Offset
-overflow pairs and memory-backed vtable providers already have implementations
-and finite controls; investigate actual missing queries before extending them.
+Schema 13 removes pre-enumerated layout/ABI/relation result matrices. The
+remaining closure obligation is that every instance and piece of material needed
+by a permitted runtime path is present or constructible from the finite input.
+Direct calls alone do not establish this: function-pointer constants, dynamic
+vtable/upcast paths, foreign callbacks, external-crate MIR, drop glue and shims
+can introduce further execution targets. Deduplication handles repeated concrete
+recursion, but is not a termination proof for fresh instantiations.
 
-Nonidentity erase/anonymize vtable queries still lack genuine producer-to-consumer
-validation. Pin a triggering input and check the join between
-[VTable](Miri/Interpreter/VTable.lean) and the compiler catalog, distinguishing
-all 32 salts, type/predicate identity and raw/dense IDs. A dynamic vtable's CTFE
-salt0 probe is not its runtime-salt ID. Use [erasure controls](tests/repro/README.md)
-and `tools/check-vtable-erasure.py --trace-queries`: a changed catalog pair must
-actually be consumed by the connected runtime, alongside fresh reference,
-query/catalog and salt checks. Catalog rows from roots/templates or TraitVPtr
-children do not establish runtime consumption. Identity controls and synthetic
-changed pairs cannot discharge this branch.
+General instance/material containment, trait-header filtering soundness and
+source-query fidelity remain unproved. Fresh missing-material reproductions must
+pass exporter -> real connected execution after a fix, while genuine unsupported
+cases still fail explicitly. Metadata-only identities and oracle coverage do not
+establish executable-body containment. Required external/std MIR must be
+available from the pinned prepared dependencies.
 
-Before adding syntax variants, investigate whether noncanonical pairs are
-reachable. Pinned rustc normalizes/erases successful MIR queries, CTFE vtable
-creation and TraitVPtr principals; its normalization provider also erases the
-resolved result after alias normalization. Struct-tail traversal normalizes
-fields without unconditionally rewriting its initial input pair. Metadata
-decoding preserves the encoded pair, and `reserve_and_set_vtable_alloc` itself
-does not normalize. HRTB, upcast, static and cross-crate metadata controls have
-retained identity pairs only. These controls and source tracing do not prove
-canonicality preservation across type extraction, metadata decoding and recursive
-demand closure, or general nonreachability of nonidentity pairs. The TraitVPtr
-provider lies outside the selected local rustc source corpus.
+Prepared-world selected-key coverage is finite. Preserve distinct graph/raw IDs,
+all 32 salts, initialization and provenance, including constant vtables and
+cyclic/shared memory. General constant-memory constructor coverage and agreement
+with vanilla Miri's raw allocation history are not established by a prepared
+snapshot or same-TyCtxt comparison.
+
+Nonidentity erase/anonymize vtable behavior still needs genuine producer-to-runtime
+coverage with the source providers. Identity cases, synthetic changed pairs and
+unused source bindings do not establish that the runtime consumes a changed
+normalized type/predicate pair correctly. Upcasts and TraitVPtr children must
+preserve both the logical vtable graph and salted source identities. Historical
+catalog-join success is not evidence for the new provider. Fresh static,
+cross-crate, HRTB and HRTB-upcast source controls pass, but their consumption
+sidecars contain no nonidentity source keys or runtime calls. The HRTB and
+HRTB-upcast cases each consume two identity erasure queries. This finite identity
+coverage leaves the genuine nonidentity branch unresolved.
 
 The exact generated-call ABI collector is locally validated on the schema-11
 `054990d8` baseline. It preserves source helper-signature keys before region
@@ -759,10 +731,40 @@ fixed input hashes. Rust/MIR bytes, SHA records, claims and budgets are unchange
 
 ### Performance and optimization assurance
 
+The final-artifact comparison uses `tests/repro/startup/empty-main.rs`, main
+`c8daa215` and this schema-13 implementation, with identical `--root main`,
+`--crate-name=empty_main`, `--edition=2021`, pinned prepared sysroot and diagnostic
+seed zero. Three alternating pairs run sequentially on CPU 0 with one Lean
+thread, profiling and oracle output disabled, and no concurrent builds/checks.
+All six trials finish with `finalized_exit code=0` and choice cursor 1371.
+
+| Metric | main | Schema 13 |
+| --- | --- | --- |
+| Export-to-result wall median, seconds (min–max) | 10.588 (10.234–11.758) | 7.367 (7.327–7.397) |
+| Total process CPU median, seconds | 10.461 | 7.315 |
+| Export wall median, seconds | 3.522 | 2.001 |
+| Lean runner wall median, seconds | 7.066 | 5.354 |
+| Exported bytes | 94,349,941 | 70,221,875 |
+| Maximum exporter child RSS, bytes | 469,012,480 | 376,320,000 |
+| Maximum runner child RSS, bytes | 592,764,928 | 515,133,440 |
+
+The observed median reductions are 30.43% wall time, 30.07% CPU time and 25.57%
+serialized size for this input. Source and per-variant input hashes are stable.
+Same-CPU steal is recorded (2–21 ticks per phase); no cgroup throttling is
+observed. These three-pair shared-host samples do not establish a general
+speedup. Tested exporter/runner SHA-256 prefixes are `ec8547b4e94a`/`4195bb157795`
+for main and `54a23b8c76b5`/`a286ef3f8584` for schema 13.
+`tools/measure-pipeline.py` freezes artifacts and records raw trials, counters,
+hashes and outcome gates. Build time and input hashing are outside the measured
+export-to-result interval. Current-upstream-pin performance is unmeasured.
+
 Remaining performance work includes residual equality and validation work,
 and preparation outside typed input decoding and the optimized call-resolution
 lookup. Caller-location still scans its catalog; optimization must retain
 source-order diagnostics, malformed-row handling and fresh Location allocations.
+The exporter also still evaluates caller-location constants for all collected
+spans. This finite pass remains an optimization opportunity separate from the
+removed type/generic result matrices.
 Measure current immutable artifacts with the protocol in [AGENTS](AGENTS.md);
 old timings and shared-host samples do not establish a general speedup.
 At `6a76fcbd`, hosted `pass/btreemap.rs@tree` exceeded its 900-second execution
@@ -791,7 +793,7 @@ freedom over every permitted choice.
 Input decoding constructs final MIR, catalog values and per-instruction facts
 while parsing concrete typed tables. Integer scalar values carry their exact
 compiler byte width; the reader checks their range immediately and checks width
-agreement against the completed type/layout tables. Constructor shape, local
+agreement against the computed concrete type layout. Constructor shape, local
 body bounds and table identities are checked during parsing. Compact numeric
 MIR-reference summaries survive until table counts are known; cross-table
 references, joins and required execution graphs still require completed tables.

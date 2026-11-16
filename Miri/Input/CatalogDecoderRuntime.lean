@@ -197,7 +197,6 @@ private def targetFeature : Parser (TargetFeature) := do
 
 private structure runtimeInstanceFields where
   instanceId : Option (Nat) := none
-  requiresCallerLocation : Option (Bool) := none
   display : Option (String) := none
   inlineNever : Option (Bool) := none
   targetFeatures : Option (Array (TargetFeature)) := none
@@ -212,7 +211,6 @@ private def runtimeInstance : Parser (RuntimeInstance) := do
   let fields ← object ({} : runtimeInstanceFields) fun fields key => do
     match key with
     | "instance_id" => return { fields with instanceId := some (← natural) }
-    | "requires_caller_location" => return { fields with requiresCallerLocation := some (← boolean) }
     | "display" => return { fields with display := some (← string) }
     | "inline_never" => return { fields with inlineNever := some (← boolean) }
     | "target_features" => return { fields with targetFeatures := some (← array (targetFeature)) }
@@ -224,7 +222,6 @@ private def runtimeInstance : Parser (RuntimeInstance) := do
     | "symbol_name" => return { fields with symbolName := some (← string) }
     | _ => skipValue; pure fields
   let instanceId ← need fields.instanceId "instance_id"
-  let requiresCallerLocation ← need fields.requiresCallerLocation "requires_caller_location"
   let display ← need fields.display "display"
   let inlineNever ← need fields.inlineNever "inline_never"
   let targetFeatures ← need fields.targetFeatures "target_features"
@@ -235,82 +232,7 @@ private def runtimeInstance : Parser (RuntimeInstance) := do
   let codegenSymbolName := fields.codegenSymbolName
   let symbolName := fields.symbolName
   return {
-    instanceId, requiresCallerLocation, display, inlineNever, targetFeatures, isForeignItem, isClosureLike, intrinsicMetadata, itemName, codegenSymbolName, symbolName }
-
-private structure runtimeTypeFields where
-  _environment : Option (String) := none
-  inputType : Option (Nat) := none
-  mutPointerType : Option (Nat) := none
-  mutReferenceType : Option (Nat) := none
-  dropGlue : Option (Nat) := none
-
-private def runtimeType : Parser (RuntimeType) := do
-  let fields ← object ({} : runtimeTypeFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "input_type_id" => return { fields with inputType := some (← natural) }
-    | "mut_pointer_type" => return { fields with mutPointerType := some (← natural) }
-    | "mut_reference_type" => return { fields with mutReferenceType := some (← natural) }
-    | "drop_glue" => return { fields with dropGlue := some (← natural) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let inputType ← need fields.inputType "input_type_id"
-  let mutPointerType ← need fields.mutPointerType "mut_pointer_type"
-  let mutReferenceType ← need fields.mutReferenceType "mut_reference_type"
-  let dropGlue := fields.dropGlue
-  return {
-    inputType, mutPointerType, mutReferenceType, dropGlue }
-
-private structure vtableRefFields where
-  inputType : Option (Nat) := none
-  inputPredicates : Option (Array (Nat)) := none
-  queryId : Option (Nat) := none
-
-private def vtableRef : Parser (VtableRef) := do
-  let fields ← object ({} : vtableRefFields) fun fields key => do
-    match key with
-    | "input_type" => return { fields with inputType := some (← natural) }
-    | "input_predicates" => return { fields with inputPredicates := some (← array (natural)) }
-    | "query_id" => return { fields with queryId := some (← natural) }
-    | _ => skipValue; pure fields
-  let inputType ← need fields.inputType "input_type"
-  let inputPredicates ← need fields.inputPredicates "input_predicates"
-  let queryId ← need fields.queryId "query_id"
-  return {
-    inputType, inputPredicates, queryId }
-
-private structure runtimeVirtualFields where
-  _environment : Option (String) := none
-  originalInstance : Option (Nat) := none
-  methodDefinition : Option (Nat) := none
-  parentTrait : Option (Nat) := none
-  concreteType : Option (Nat) := none
-  rebasedArgs : Option (Array Miri.MIR.GenericArg) := none
-  resolved : Option (Nat) := none
-  vtableQuery : Option (VtableRef) := none
-
-private def runtimeVirtual : Parser (RuntimeVirtual) := do
-  let fields ← object ({} : runtimeVirtualFields) fun fields key => do
-    match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
-    | "original_instance_id" => return { fields with originalInstance := some (← natural) }
-    | "method_definition" => return { fields with methodDefinition := some (← natural) }
-    | "parent_trait" => return { fields with parentTrait := some (← natural) }
-    | "concrete_type" => return { fields with concreteType := some (← natural) }
-    | "rebased_args" => return { fields with rebasedArgs := some (← GenericArgsCodec.decode) }
-    | "resolved" => return { fields with resolved := some (← natural) }
-    | "vtable_query" => return { fields with vtableQuery := some (← vtableRef) }
-    | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
-  let originalInstance ← need fields.originalInstance "original_instance_id"
-  let methodDefinition ← need fields.methodDefinition "method_definition"
-  let parentTrait ← need fields.parentTrait "parent_trait"
-  let concreteType ← need fields.concreteType "concrete_type"
-  let rebasedArgs ← need fields.rebasedArgs "rebased_args"
-  let resolved ← need fields.resolved "resolved"
-  let vtableQuery ← need fields.vtableQuery "vtable_query"
-  return {
-    originalInstance, methodDefinition, parentTrait, concreteType, rebasedArgs, resolved, vtableQuery }
+    instanceId, display, inlineNever, targetFeatures, isForeignItem, isClosureLike, intrinsicMetadata, itemName, codegenSymbolName, symbolName }
 
 private structure escapeDefaultFields where
   definition : Option (Nat) := none
@@ -362,44 +284,32 @@ private def linkage : Parser (ImportLinkage) := do
   | _ => fail "unknown extern import linkage"
 
 private structure declarationFields where
-  _environment : Option (String) := none
   definition : Option (Nat) := none
   symbol : Option (String) := none
   typeId : Option (Nat) := none
-  layoutId : Option (Nat) := none
   importLinkage : Option (ImportLinkage) := none
   mutability : Option (String) := none
-  typeIsFreeze : Option (Bool) := none
-  declIsMut : Option (Bool) := none
 
 private def declaration : Parser (ExternDeclaration) := do
   let fields ← object ({} : declarationFields) fun fields key => do
     match key with
-    | "typing_env" => return { fields with _environment := some (← expectedString "fully_monomorphized") }
     | "definition" => return { fields with definition := some (← natural) }
     | "symbol" => return { fields with symbol := some (← string) }
     | "type" => return { fields with typeId := some (← natural) }
-    | "layout" => return { fields with layoutId := some (← natural) }
     | "import_linkage" => return { fields with importLinkage := some (← linkage) }
     | "definition_mutability" => return { fields with mutability := some (← string) }
-    | "type_is_freeze" => return { fields with typeIsFreeze := some (← boolean) }
-    | "decl_is_mut" => return { fields with declIsMut := some (← boolean) }
     | _ => skipValue; pure fields
-  let _environment ← need fields._environment "typing_env"
   let definition ← need fields.definition "definition"
   let symbol ← need fields.symbol "symbol"
   let typeId ← need fields.typeId "type"
-  let layoutId ← need fields.layoutId "layout"
   let importLinkage ← need fields.importLinkage "import_linkage"
   let mutability ← need fields.mutability "definition_mutability"
-  let typeIsFreeze ← need fields.typeIsFreeze "type_is_freeze"
-  let declIsMut ← need fields.declIsMut "decl_is_mut"
   let definitionMutability ← match mutability with
     | "mutable" => pure MemoryMutability.mutable
     | "immutable" => pure .immutable
     | _ => fail "unknown extern definition mutability"
   return {
-    definition, symbol, typeId, layoutId, importLinkage, definitionMutability, typeIsFreeze, declIsMut }
+    definition, symbol, typeId, importLinkage, definitionMutability }
 
 private structure candidateFields where
   iterationIndex : Option (Nat) := none
@@ -671,8 +581,6 @@ private def foreignSymbols : Parser (ForeignSymbols) := do
 
 private structure runtimeFields where
   startup : Option (Startup) := none
-  types : Option (Array (RuntimeType)) := none
-  virtualQueries : Option (Array (RuntimeVirtual)) := none
   instances : Option (Array (RuntimeInstance)) := none
   foreignSymbols : Option (ForeignSymbols) := none
 
@@ -680,18 +588,14 @@ def runtime : Parser (Runtime) := do
   let fields ← object ({} : runtimeFields) fun fields key => do
     match key with
     | "startup" => return { fields with startup := some (← startup) }
-    | "types" => return { fields with types := some (← array (runtimeType)) }
-    | "virtual" => return { fields with virtualQueries := some (← array (runtimeVirtual)) }
     | "instances" => return { fields with instances := some (← array (runtimeInstance)) }
     | "foreign_symbols" => return { fields with foreignSymbols := some (← foreignSymbols) }
     | _ => skipValue; pure fields
   let startup := fields.startup
-  let types ← need fields.types "types"
-  let virtualQueries ← need fields.virtualQueries "virtual"
   let instances ← need fields.instances "instances"
   let foreignSymbols ← need fields.foreignSymbols "foreign_symbols"
   return {
-    startup, types, virtualQueries, instances, foreignSymbols }
+    startup, instances, foreignSymbols }
 
 private structure targetPointerFields where
   pointerSizeBytes : Option (Nat) := none

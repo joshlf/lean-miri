@@ -9,6 +9,13 @@ executes that data and defines the semantics used in safety proofs.
 The project is under development; the import and proof APIs are experimental.
 See [STATUS.md](STATUS.md) for remaining work.
 
+The exporter collects concrete function instances reachable from selected roots,
+uses rustc to normalize their MIR and evaluate constants, and emits finite type
+and declaration material. Lean computes layout, ABI, trait and vtable queries
+from that material when needed. Lean execution does not call rustc and does not
+instantiate generic function MIR. JSON is decoded into typed input once;
+execution state and caches belong to the individual run.
+
 ## API reference
 
 Browse the [Miri API reference](https://proofs-rs.github.io/lean-miri/Miri.html),
@@ -49,7 +56,7 @@ fn main() {
 }
 RS
 LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1 bash tools/export-mir.sh \
-  --output scratch/example.json -- scratch/example.rs --crate-name example
+  --output scratch/example.json --root main -- scratch/example.rs --crate-name example
 bash tools/run.sh scratch/example.json
 ```
 
@@ -94,6 +101,10 @@ it does not generate a safety proof.
 [its examples](MiriTests/Safety/OperationalSafety.lean) demonstrate the proof interface.
 See the [exporter guide](exporter/README.md) for selecting functions with `--root`,
 exporting Cargo projects and the input format.
+An executable defaults to its entry function; libraries require explicit roots.
+Repeated `--root` options select multiple functions. A selected generic function
+contributes a declaration; only discovered concrete instances have executable
+MIR. Schema 13 requires fresh exports from earlier input formats.
 
 ## Tests
 

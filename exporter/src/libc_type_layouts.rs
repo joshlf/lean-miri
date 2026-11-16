@@ -70,8 +70,6 @@ fn query<'tcx>(
     name: &str,
 ) -> Result<u64, String> {
     let result = (|| -> Result<u64, String> {
-        // This is the same exact crate/type namespace query as Miri's
-        // resolve_path(tcx, &["libc", name], TypeNS), followed by layout_of.
         let instance =
             shim_abi::named_instance(tcx, &["libc", name], rustc_hir::def::Namespace::TypeNS)?;
         let ty = instance.ty(tcx, ty::TypingEnv::fully_monomorphized());
@@ -82,12 +80,7 @@ fn query<'tcx>(
         {
             return Err("libc type path did not resolve to a closed monomorphic type".into());
         }
-        match tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty)) {
-            Ok(_) => Ok(type_json(context, tcx, ty)?),
-            Err(error) => Err(format!(
-                "rustc layout_of failed for libc::{name}: {error:?}"
-            )),
-        }
+        type_json(context, tcx, ty)
     })();
     Ok::<_, String>(match result {
         Ok(value) => value,

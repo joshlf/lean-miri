@@ -703,6 +703,8 @@ private def runMain (args : List String) (control : Option ControlOutput) : IO U
   boundary "decode: start"
   let decoded ← must (Input.decodeJsonProfiled input profile)
   boundary "decode: accepted"
+  if decoded.document.bodyRoots.isEmpty && !decoded.document.rootDeclarations.isEmpty then
+    throw (IO.userError "input contains declaration-only roots; no concrete executable root was selected")
   boundary "lower: start"
   let program ← must (Input.lowerProgram decoded.document)
   boundary "lower: complete"

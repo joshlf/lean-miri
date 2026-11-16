@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/exporter/tests/fixture-env.sh"
 EXPORTER="${EXPORTER_BIN:-$ROOT/exporter/target/debug/lean-miri-mir-exporter}"
+CHECKS="$(mktemp "${TMPDIR:-/tmp}/lean-miri-call-transfer-checks-XXXXXX.json")"
 TEMP_OUT=0
 if [[ -n "${OUT:-}" ]]; then
   EXPORT_OUT="$OUT"
@@ -19,6 +20,7 @@ else
   TEMP_ERR=1
 fi
 cleanup() {
+  rm -f "$CHECKS"
   if [[ $TEMP_OUT == 1 ]]; then rm -f "$EXPORT_OUT"; fi
   if [[ $TEMP_ERR == 1 ]]; then rm -f "$EXPORT_ERR"; fi
 }
@@ -33,4 +35,6 @@ if ! "$EXPORTER" --output "$EXPORT_OUT" --root call_transfer_root \
   cat "$EXPORT_ERR" >&2
   exit 1
 fi
-python3 "$ROOT/exporter/tests/validate_call_transfer_fixture.py" "$EXPORT_OUT"
+python3 "$ROOT/exporter/tests/validate_call_transfer_fixture.py" "$EXPORT_OUT" "$CHECKS"
+export ELAN_HOME="${ELAN_HOME:-$ROOT/.elan}"
+(cd "$ROOT" && "$ROOT/.elan/bin/lake" env lean --run tests/input/CallTransferQueries.lean "$EXPORT_OUT" "$CHECKS")

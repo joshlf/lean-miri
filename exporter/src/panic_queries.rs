@@ -25,15 +25,7 @@ pub(super) fn register_termination_helpers<'tcx>(
                     } else {
                         Vec::new()
                     };
-                    super::generated_call_queries::register_target_call(
-                        context,
-                        tcx,
-                        instance,
-                        args,
-                        tcx.types.unit,
-                        rustc_abi::ExternAbi::Rust,
-                        ty::TypingEnv::fully_monomorphized(),
-                    )?;
+                    super::generated_calls::register_types(context, tcx, args, tcx.types.unit)?;
                 }
             }
         },
@@ -54,15 +46,7 @@ pub(super) fn register_unwind_termination<'tcx>(
     }
     let instance = ty::Instance::mono(tcx, definition);
     context.register_instance(instance);
-    generated_call_queries::register_target_call(
-        context,
-        tcx,
-        instance,
-        Vec::new(),
-        tcx.types.unit,
-        rustc_abi::ExternAbi::Rust,
-        ty::TypingEnv::fully_monomorphized(),
-    )
+    super::generated_calls::register_types(context, tcx, Vec::new(), tcx.types.unit)
 }
 #[derive(serde::Serialize)]
 pub(super) struct Query {
@@ -237,15 +221,7 @@ pub(super) fn register_assert<'tcx>(
                 }
                 _ => Vec::new(),
             };
-            super::generated_call_queries::register_target_call(
-                context,
-                tcx,
-                instance,
-                caller_args,
-                tcx.types.unit,
-                rustc_abi::ExternAbi::Rust,
-                ty::TypingEnv::fully_monomorphized(),
-            )?;
+            super::generated_calls::register_types(context, tcx, caller_args, tcx.types.unit)?;
         }
     })
 }

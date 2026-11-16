@@ -1,4 +1,5 @@
 import Miri.Input.CompilerLinkSections
+import Miri.Input.ConcreteTraitQueries
 
 /-! Exact compiler support for `machine.rs::extern_static_pointer`.
 Declaration metadata is keyed by shared DefId identity. Exported-static
@@ -53,25 +54,19 @@ private def definition (tables : CompilerTables) (id : Nat) : Except String MIR.
 private def linkage : Catalog.ImportLinkage → ExternStatic.ImportLinkage
   | .none => .none | .externalWeak _ => .externalWeak | .other _ => .other
 
-private def decodeDeclaration (ctx : LowerContext) (tables : CompilerTables)
+private def decodeDeclaration (runtime : RuntimeMetadata) (tables : CompilerTables)
     (raw : Catalog.ExternDeclaration) : Except String Declaration := do
   let definitionId ← definition tables raw.definition
   let result := do
-    unless ctx.containsTypeId raw.typeId do throw "extern-static declaration references absent compiler type"
-    let some layout := ctx.layouts[raw.layoutId]? | throw "extern-static layout ID out of bounds"
-    let some bytes := layout.sizeBytes | throw "extern-static layout size missing"
-    let some alignment := layout.abiAlignBytes | throw "extern-static layout alignment missing"
-    let size ← RuntimeMetadata.size bytes |>.mapError toString
-    let align ← RuntimeMetadata.alignment alignment |>.mapError toString
-    let sourceMutability := raw.definitionMutability == MemoryMutability.mutable || !raw.typeIsFreeze
-    unless raw.declIsMut == sourceMutability do
-      throw "extern-static declaration mutability disagrees with definition mutability and Freeze query"
-    pure (size, align)
+    let value ← runtime.lookup raw.typeId |>.mapError toString
+    let freeze ← ConcreteTraitQueries.check runtime .freeze value.ty
+    let mutable := raw.definitionMutability == MemoryMutability.mutable || !freeze
+    pure (value.layout.size,value.layout.align.abi,mutable)
   match result with
-  | .ok (size, align) => pure ⟨definitionId, raw.symbol, size, align, linkage raw.importLinkage, raw.declIsMut, .ok ()⟩
-  | .error reason => pure ⟨definitionId, raw.symbol, .ZERO, .ONE, .other, false, .error reason⟩
+  | .ok (size,align,mutable) => pure ⟨definitionId,raw.symbol,size,align,linkage raw.importLinkage,mutable,.ok ()⟩
+  | .error reason => pure ⟨definitionId,raw.symbol,.ZERO,.ONE,.other,false,.error reason⟩
 
-private def selectedWinner (ctx : LowerContext) (tables : CompilerTables)
+private def selectedWinner (runtime : RuntimeMetadata) (ctx : LowerContext) (tables : CompilerTables)
     (raw : Catalog.SelectedExport) : Except String (String × Winner) := do
   match raw with
   | .ambiguous symbol reason => pure (symbol, ⟨none, "ambiguous", none, .error (.machineStop reason)⟩)
@@ -80,7 +75,7 @@ private def selectedWinner (ctx : LowerContext) (tables : CompilerTables)
     pure (symbol, ⟨some id, kind, none, .ok ()⟩)
   | .static symbol id declaration allocation =>
     let id ← definition tables id
-    let embedded ← decodeDeclaration ctx tables declaration
+    let embedded ← decodeDeclaration runtime tables declaration
     unless embedded.definition == id do throw "selected exported static declaration DefId differs from its winner"
     unless embedded.symbol == symbol do throw "selected exported static declaration symbol differs from its winner"
     if let .error reason := embedded.result then
@@ -103,13 +98,13 @@ def prepare (runtime : RuntimeMetadata) (program : LoweredProgram) : Except Stri
     pure ⟨program, runtime, .error "compiler selected exports absent", targetResult, #[], #[]⟩
   let mut declarations := #[]
   for record in records do
-    let entry ← decodeDeclaration ctx program.compilerTables record
+    let entry ← decodeDeclaration runtime program.compilerTables record
     if let some old := declarations.find? (·.definition == entry.definition) then
       unless old == entry do throw "conflicting exact extern-static declaration queries"
     else declarations := declarations.push entry
   let mut selected := #[]
   for record in winners do
-    let (symbol, winner) ← selectedWinner ctx program.compilerTables record
+    let (symbol, winner) ← selectedWinner runtime ctx program.compilerTables record
     if selected.any (·.symbol == symbol) then throw "duplicate selected exported symbol row"
     selected := selected.push ⟨symbol, winner⟩
   pure ⟨program, runtime, .ok (), targetResult, declarations, selected⟩

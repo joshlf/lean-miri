@@ -1,6 +1,5 @@
-"""Pinned compiler-fixture projection preserves every retained semantic value."""
-import gzip
-import hashlib
+"""Current source materials survive exact payload sharing without identity merging."""
+import copy
 import json
 from pathlib import Path
 import sys
@@ -8,52 +7,71 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from shared_json_pools import expand_document, pool_document, project_unused_metadata
+from shared_json_pools import SHARED_POOLS, expand_document, pool_document
 from mir_json import decode_mir_document
 
 
-class SharedFixtureProjectionTests(unittest.TestCase):
-    def test_pinned_projection_is_lossless(self):
-        manifest = json.loads((ROOT / "tests/fixtures/shared-pools-projection.json").read_text())
-        self.assertEqual(len(manifest["fixtures"]), 20)
-        for row in manifest["fixtures"]:
-            with self.subTest(path=row["path"]):
-                source = ROOT / row["path"]
-                raw = source.read_bytes()
-                self.assertEqual(hashlib.sha256(raw).hexdigest(), row["target_file_sha256"])
-                if source.suffix == ".gz":
-                    raw = gzip.decompress(raw)
-                document = decode_mir_document(json.loads(raw))
-                expanded = expand_document(document, schema_version=row["source_schema"])
-                canonical = json.dumps(expanded, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
-                self.assertEqual(hashlib.sha256(canonical).hexdigest(), row["expanded_retained_canonical_sha256"])
+class SharedFixturePoolTests(unittest.TestCase):
+    def test_current_maintained_fixture_round_trip(self):
+        document = decode_mir_document(json.loads((ROOT / "examples/empty_function/input.json").read_bytes()))
+        before = copy.deepcopy(document)
+        expanded = expand_document(document)
+        pooled = pool_document(expanded)
+        decode_mir_document(pooled)
+        self.assertEqual(expand_document(pooled), expanded)
+        self.assertEqual(document, before, "inspection or pooling mutated the wire identities")
+        self.assertFalse({"layouts", "fn_abis", "compiler_facts", "boolean_queries"} & pooled.keys())
+        self.assertEqual(pooled["byte_images"], document["byte_images"])
+        self.assertEqual(pooled["types"], document["types"])
+        self.assertEqual(pooled["source_trait_material"], document["source_trait_material"])
+        self.assertEqual(pooled["source_vtables"], document["source_vtables"])
 
-    def test_abi_pool_uses_complete_argument(self):
-        argument = {"type": 0, "layout": 0, "mode": {"kind": "Direct", "attrs": []}}
-        changed_mode = {**argument, "mode": {"kind": "Ignore"}}
-        changed_layout = {**argument, "layout": 1}
-        changed_type = {**argument, "type": 1}
-        source = {"schema_version": 8, "layouts": [], "fn_abis": [
-            {"return": argument, "arguments": [argument, changed_mode, changed_layout, changed_type]}]}
+    def test_complete_payload_dedup_preserves_source_and_allocation_identities(self):
+        source = {
+            "schema_version": 13,
+            "byte_images": ["00"],
+            "types": [{"type_id": 0, "source_layout": {"normalized_type": 0}}],
+            "allocations": [
+                {"allocation_id": 0, "source_alloc_id": 17, "byte_image_id": 0,
+                 "initialization_ranges": [[0, 1]], "relocations": []},
+                {"allocation_id": 1, "source_alloc_id": 29, "byte_image_id": 0,
+                 "initialization_ranges": [], "relocations": []}],
+            "bodies": [{"backtrace_spans": [], "basic_blocks": [{"statements": [
+                {"source_info": {"span": 0, "scope": 0}, "kind": {"variant": "Nop"}},
+                {"source_info": {"span": 0, "scope": 0}, "kind": {"variant": "Nop"}},
+                {"source_info": {"span": 0, "scope": 1}, "kind": {"variant": "StorageLive", "local": 0}},
+                {"source_info": {"span": 0, "scope": 1}, "kind": {"variant": "StorageLive", "local": 1}},
+            ]}]}],
+        }
         pooled = pool_document(source)
-        self.assertEqual(len(pooled["abi_arguments"]), 4)
-        self.assertEqual(pooled["fn_abis"][0]["return"], pooled["fn_abis"][0]["arguments"][0])
-        self.assertEqual(expand_document(pooled, schema_version=8), source)
+        self.assertEqual(len(pooled["source_infos"]), 2)
+        self.assertEqual(len(pooled["statement_kinds"]), 3)
+        statements = pooled["bodies"][0]["basic_blocks"][0]["statements"]
+        self.assertEqual(statements[0], statements[1])
+        self.assertNotEqual(statements[2]["kind"], statements[3]["kind"])
+        self.assertEqual(pooled["allocations"][0]["relocations"], pooled["allocations"][1]["relocations"])
+        self.assertNotEqual(pooled["allocations"][0]["initialization_ranges"],
+                            pooled["allocations"][1]["initialization_ranges"])
+        self.assertEqual([row["source_alloc_id"] for row in pooled["allocations"]], [17, 29])
+        self.assertEqual(expand_document(pooled), source)
 
-    def test_unused_metadata_projection_retains_required_consts(self):
-        source = {"schema_version": 8, "layouts": [], "spans": [
-            {"ctxt": {"status": "debug_payload", "rustc_debug": "#123"}}], "bodies": [{
-            "tainted_by_errors": None, "mentioned_items": [], "pass_count": 9,
-            "required_consts": ["retained"], "locals": [
-                {"type": 2, "layout": 3, "mutability": "mutable", "local_info": {}}],
-            "source_scopes": [{"span": 0, "local_data": {}}]}]}
-        projected = project_unused_metadata(source)
-        self.assertEqual(projected["spans"][0]["ctxt"], "#123")
-        self.assertEqual(projected["bodies"], [{"required_consts": ["retained"],
-            "locals": [{"type": 2}], "source_scopes": [{"span": 0}]}])
-        source["bodies"][0]["tainted_by_errors"] = {"error": "tainted"}
-        with self.assertRaisesRegex(ValueError, "tainted MIR"):
-            pool_document(source)
+    def test_invalid_shared_references_fail(self):
+        for field, pool in [("source_info", "source_infos"), ("relocations", "relocations"),
+                            ("initialization_ranges", "initialization_ranges"),
+                            ("backtrace_spans", "backtrace_spans")]:
+            for invalid in (-1, 1, True, 0.0, None):
+                with self.subTest(field=field, reference=invalid), self.assertRaisesRegex(ValueError, "out of range"):
+                    expand_document({pool: [{}], "payload": {field: invalid}})
+        for invalid in (-1, 1, True, 0.0, None):
+            with self.subTest(statement=invalid), self.assertRaisesRegex(ValueError, "out of range"):
+                expand_document({"statement_kinds": [{}], "statements": [{"kind": invalid}]})
+
+    def test_pooling_rejects_historical_and_malformed_schema(self):
+        for version in (8, 11, 12, True, "13", 13.0, None):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "requires schema 13"):
+                pool_document({"schema_version": version})
+        self.assertEqual(set(SHARED_POOLS), {"initialization_ranges", "relocations", "backtrace_spans",
+                                           "statement_kinds", "source_infos"})
 
 
 if __name__ == "__main__":

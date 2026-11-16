@@ -28,3 +28,18 @@ license text is retained in `third_party/licenses/chrono-tz-0.10.4/LICENSE`.
 The IANA tzdb files included in that generated table are public domain as
 stated by chrono-tz's license. Exact source hashes and the offline generator
 are documented in [chrono-tz translation](docs/chrono-tz-source-port.md).
+
+The randomized field-layout implementation in
+`Miri/Input/ConcreteFieldShuffle.lean` translates Rand 0.9.3's slice shuffle and
+integer sampling, and rand_xoshiro 0.7.0's Xoshiro128** and SplitMix64 generators.
+The source files retain these notices: “Copyright 2018-2023 Developers of the
+Rand project” (`rand/src/seq/{slice,increasing_uniform}.rs`), “Copyright 2018-2020 Developers of the
+Rand project” and “Copyright 2017 The Rust Project Developers”
+(`rand/src/distr/uniform_int.rs`), and “Copyright 2018 Developers of the Rand
+project” (`rand_xoshiro/src/{xoshiro128starstar,splitmix64}.rs`). Both crates are
+licensed under MIT OR Apache-2.0; their license and copyright texts are retained
+under `third_party/licenses/rand-0.9.3/` and
+`third_party/licenses/rand_xoshiro-0.7.0/`.
+The seed word order follows rand_core 0.9.3's little-endian implementation
+helpers, bearing “Copyright 2018 Developers of the Rand project.” Its MIT OR
+Apache-2.0 texts are retained in `third_party/licenses/rand_core-0.9.3/`.

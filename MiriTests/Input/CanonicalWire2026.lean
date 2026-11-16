@@ -1,8 +1,8 @@
-import Miri.Input.CallCompatibility
+import MiriTests.Input.OracleAbi
 import Miri.Input.TableTail
 import Miri.Input.CompilerExternAbi
 
-open Miri Miri.Input
+open Miri Miri.Input Miri.Input.OracleAbi
 
 private def check (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
@@ -57,8 +57,8 @@ def main : IO Unit := do
 
   for bits in #[0, 1, 2, 4, 6, 7, 8, 16, 32, 64, 128, 256, 512, 65535] do
     let text := "{\"regular_bits\":" ++ toString bits ++ ",\"pointee_size_bytes\":0,\"pointee_align_bytes\":null,\"arg_extension\":{\"kind\":\"none\"}}"
-    let parsed ← must (JsonReader.run (DecoderValues.parseAbiAttributes "attributes") text)
-    let .ok actual := CallCompatibility.attributes parsed
+    let parsed ← must (JsonReader.run (OracleAbi.parseAbiAttributes "attributes") text)
+    let .ok actual := OracleAbi.attributes parsed
       | throw (IO.userError "canonical regular bits rejected")
     check (actual.regular.toNat == bits) "regular bits changed during runtime conversion"
     for captureMask in #[4, 6, 7] do
@@ -66,7 +66,7 @@ def main : IO Unit := do
         "overlapping capture masks changed during runtime conversion"
     check (actual.contains 64 == (bits &&& 64 == 64)) "InReg no longer comes from canonical bits"
   let oversized : AbiAttributes := ⟨65536, 0, none, .none⟩
-  check (!(CallCompatibility.attributes oversized).isOk) "u16 regular bits overflow accepted"
+  check (!(OracleAbi.attributes oversized).isOk) "u16 regular bits overflow accepted"
   let cAbi ← must (JsonReader.run CompilerExternAbi.decode "{\"kind\":\"c\",\"unwind\":false}")
   let system ← must (JsonReader.run CompilerExternAbi.decode "{\"kind\":\"system\",\"unwind\":false}")
   let unwind ← must (JsonReader.run CompilerExternAbi.decode "{\"kind\":\"c\",\"unwind\":true}")
@@ -77,8 +77,7 @@ def main : IO Unit := do
   check (!(JsonReader.run CompilerExternAbi.decode "{\"kind\":\"rust\",\"unwind\":false}").isOk)
     "Rust accepted an inapplicable unwind flag"
 
-  let typeText := "{\"type_id\":7,\"display\":\"bool\",\"layout\":0,\"layout_query_input_type\":3,\"shape\":{\"kind\":\"bool\"}}"
-  let node ← must (JsonReader.run DecoderValues.parseTypeNode typeText)
-  check (node.id == 7 && node.layoutQueryInputTypeId == some 3)
-    "original and region-erased query type identities collapsed"
-  IO.println "canonical wire fields preserve repr, ABI flags, unwind and query type distinctions"
+  let signatureText := "{\"inputs\":[0,1],\"output\":0,\"safety\":{\"kind\":\"safe\"},\"abi\":{\"kind\":\"rust\",\"unwind\":null},\"c_variadic\":false,\"splatted\":1}"
+  let signature ← must (JsonReader.run DecoderValues.parseFunctionSignature signatureText)
+  check (signature.splatted == some 1) "source splatted argument index collapsed"
+  IO.println "canonical source fields preserve repr, oracle ABI flags, unwind and splatted signature index"

@@ -47,6 +47,8 @@ def main(path: str) -> None:
     require(sum(row is None for row in rows) == len(nodes), "unmatched serialized raw slot")
 
     selected_counts = {"function": 0, "vtable": 0}
+    selected_functions = []
+    selected_vtables = []
     for row_index, catalog in enumerate(world["dedup_catalog"]):
         kind = catalog["key_kind"]
         if kind not in selected_counts:
@@ -58,6 +60,12 @@ def main(path: str) -> None:
         require(key_node["kind"] == kind and "status" not in key_node,
                 f"catalog row {row_index} key node has wrong kind/status")
         typed_key = function_key(document, key_node) if kind == "function" else vtable_key(key_node)
+        if kind == "function":
+            selected_functions.append(pool_entry(document, "instances", key_node["instance_id"])["def_path"])
+        else:
+            selected_vtables.append((pool_entry(document, "types", key_node["type"])["shape"]["def_path"],
+                                    tuple(pool_entry(document, "predicates", predicate)["def_path"]
+                                          for predicate in key_node["predicates"])))
         require(salts[0] == catalog["key_allocation_id"],
                 f"catalog row {row_index} salt zero is not the selected key node")
         for salt, result in enumerate(salts):
@@ -71,7 +79,10 @@ def main(path: str) -> None:
             require(result_key == typed_key,
                     f"catalog row {row_index} salt {salt} changes its exact typed key")
 
-    require(selected_counts == {"function": 1, "vtable": 1}, "fixture must select exactly one function and one vtable key")
+    require(selected_functions == ["increment"], "selected function key differs from the actual fn-pointer target")
+    require(set(selected_vtables) == {("Concrete", ("Value",)), ("Concrete", ("std::marker::MetaSized",))}
+            and len(selected_vtables) == 2,
+            "selected vtable keys differ from Value and its reached MetaSized supertrait")
     require(world["complete_key_families"] == ["byte_memory"],
             "selected functions/vtables were incorrectly marked exhaustive")
     require({"function", "vtable"}.issubset(set(world["non_exhaustive_key_families"])),

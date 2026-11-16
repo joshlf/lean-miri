@@ -48,13 +48,13 @@ private def constant (bits : String) : String :=
 private def forwardOrder (source : String) : Except String String := do
   let fs ← fields source
   let body ← get source "bodies"
-  let layouts ← get source "layouts"
+  let types ← get source "types"
   return obj (#[("bodies",body)] ++
-    fs.filter (fun item => item.1 != "bodies" && item.1 != "layouts") ++ #[("layouts",layouts)])
+    fs.filter (fun item => item.1 != "bodies" && item.1 != "types") ++ #[("types",types)])
 
 private def checkCallEvidence : IO Unit := do
   let parse (kind inst slot : String) := JsonReader.run DecodeMIR.callEvidence (obj #[
-    ("dispatch_slot", slot), ("fn_abi", "0"), ("function_type", "0"),
+    ("dispatch_slot", slot), ("function_type", "0"),
     ("instance_id", inst), ("kind", Json.renderString kind)])
   let direct ← must (parse "resolved_instance" "3" "null")
   check (direct.kind == .direct && direct.instanceId == some 3 && direct.dispatchSlot == none)
@@ -122,12 +122,12 @@ def main : IO Unit := do
   | .Val (.Scalar (.Int bits width)) ty =>
     check (bits == 255 && width == 1 && ty == 1) "explicit scalar width changed across forward tables"
   | _ => throw (IO.userError "wrong resolved scalar constant")
+  let runtime ← must ((RuntimeMetadata.ofDocument baseline.document).mapError toString)
   let asmContext : DecodeMIR.Context := {
     typeCount := baseline.document.types.size, allocationCount := baseline.document.allocations.size,
     definitionCount := baseline.document.definitions.size, typeConstantCount := baseline.document.typeConstants.size,
     spanCount := baseline.document.spans.size,
-    scalarSize := fun id => (baseline.document.types[id]?).bind fun ty =>
-      (baseline.document.layouts[ty.layoutId]?).bind (·.sizeBytes) }
+    scalarSize := fun id => (runtime.lookup id).toOption.map (·.layout.size.bytes.toNat) }
   let asmRegister := "{\"name\":\"reg\",\"arch\":\"X86_64\",\"kind\":\"register_class\"}"
   let asmInput := obj #[("value", obj #[("constant", constant "255"), ("kind", "\"Constant\"")]),
     ("register", asmRegister), ("kind", "\"in\"")]

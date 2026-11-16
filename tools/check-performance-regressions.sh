@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 export ELAN_HOME="${LEAN_MIRI_ELAN_HOME:-$PWD/.elan}"
 export PATH="$ELAN_HOME/bin:$PATH"
 export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-1}"
-flock --no-fork /tmp/lean-miri-lake-build.lock lake build +Miri:olean +MiriTests:olean +Miri.OperationalSafety:olean +Miri.Frontend.ImportMIR:olean +Miri.Input.ExecutionChoicePolicy:olean +NativeRunner:olean typed_function_abi_tests
+flock --no-fork /tmp/lean-miri-lake-build.lock lake build +Miri:olean +MiriTests:olean +Miri.OperationalSafety:olean +Miri.Frontend.ImportMIR:olean +Miri.Input.ExecutionChoicePolicy:olean +NativeRunner:olean source_abi_boundary_tests
 python3 tests/input/build_id_fixtures.py
 # Performance readers need genuine successful exports, independently of the
 # synthetic ID cases. Regenerate them with the current pinned producer.
@@ -20,7 +20,7 @@ export PATH="$performance_sysroot/bin:$PATH"
 export LD_LIBRARY_PATH="$performance_sysroot/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 rustup run "$performance_toolchain" cargo build --locked --offline --manifest-path exporter/Cargo.toml
 exporter/target/debug/lean-miri-mir-exporter \
-  --output scratch/decoder-id-inputs/genuine-mir-features.json exporter/fixtures/mir_features.rs \
+  --output scratch/decoder-id-inputs/genuine-mir-features.json --root direct_tag_value --root get_vtable_root --root as_trait_object --root as_drop_trait_object --root call_trait_object --root make_link --root promoted_ref --root byte_string --root pointer_slice --root read_tls --root id --root array_len --root exercise exporter/fixtures/mir_features.rs \
   --crate-type=lib --crate-name=mir_features
 # The tracked helper supplies real caller-location constants for indexed lookup.
 exporter/target/debug/lean-miri-mir-exporter \
@@ -44,4 +44,4 @@ done
 lake env lean MiriTests/AxiomAudit.lean
 
 lake env lean --run tests/input/CallerLocationIndex2026.lean scratch/decoder-id-inputs/genuine-fresh.json
-.lake/build/bin/typed_function_abi_tests scratch/decoder-id-inputs/genuine-mir-features.json
+.lake/build/bin/source_abi_boundary_tests scratch/decoder-id-inputs/genuine-mir-features.json

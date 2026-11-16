@@ -47,8 +47,9 @@ backend vector size does not establish either source property. -/
 def simdSizeAndType (context : CompilerFacts.Context) (id : TyId) : Except String (UInt64 × TyId) := do
   unless ← isSimd context id do throw "simd_size_and_type requested for non-SIMD compiler type"
   let node ← context.runtime.node id |>.mapError toString
-  let some facts := node.compilerFacts | throw "missing SIMD compiler facts"
-  let some (count,element) := facts.simdSizeAndType | throw "missing SIMD size/type compiler query"
+  let some simd := node.sourceLayout.simd | throw "missing SIMD declaration material"
+  let count := simd.count
+  let element := simd.element
   unless count < 2^64 do throw "SIMD lane count exceeds source u64"
   let _ ← context.runtime.lookup element |>.mapError toString
   pure (UInt64.ofNat count,element)

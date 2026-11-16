@@ -1,7 +1,7 @@
 import empty_function.CanonicalDictionaries
 
 /-! Pure compiler evidence at the actual canonical call hooks. The hypotheses
-are compiler table queries only; no runtime action's success is assumed. -/
+are pure metadata queries; no runtime action's success is assumed. -/
 namespace EmptyFunction.MetadataQueries
 open Miri Miri.ABI Miri.Memory Miri.MIR Miri.Input Miri.Interpreter
 open CanonicalDictionaries

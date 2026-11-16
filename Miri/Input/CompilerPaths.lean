@@ -32,8 +32,7 @@ def fieldPath (context : CompilerFacts.Context) (layout : TyAndLayout TypeId)
       throw "source invariant: tag path on non-variant type"
   match source.shapeKind with
   | .closure | .coroutine | .coroutineClosure =>
-    let some facts := source.compilerFacts | throw "capture-name compiler evidence missing"
-    let some names := facts.captureNames | throw "capture-name compiler array evidence missing"
+    let some names := source.sourceLayout.captureNames | throw "capture-name declaration material is absent"
     let name := match names[index]? with
       | none | some none => toString index
       | some (some name) => name

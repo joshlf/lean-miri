@@ -1,313 +1,184 @@
 # MIR exporter
 
-Exports structured MIR, monomorphized instances, types, physical layouts, ABIs,
-allocation graphs, and query information for statics/TLS/vtables and other
-entities from the pinned rustc_private. See the
+The pinned rustc frontend exports a structural closure of concrete MIR instances,
+evaluated constants and finite compiler material. Lean uses that material to
+compute layout, ABI, trait and vtable queries during execution. Generic function
+MIR is not exported or instantiated by Lean. See the
 [development guide](../docs/development.md#rust-toolchain-and-reference-setup)
-for pinned versions and setup.
+for the pinned compiler and MIR-enabled standard library.
+
+After setup, run from the repository root:
 
 ```bash
-export CARGO_HOME="$PWD/.cargo" RUSTUP_HOME="$PWD/.rustup"
-export MIRI_SYSROOT="$PWD/scratch/miri-sysroot"
-toolchain="$RUSTUP_HOME/toolchains/miri-exporter-8144389c895d"
-export PATH="$toolchain/bin:$CARGO_HOME/bin:$PATH"
-export LD_LIBRARY_PATH="$toolchain/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d build --locked --manifest-path exporter/Cargo.toml
+bash tools/build-exporter.sh
 mkdir -p scratch/exports
-exporter/target/debug/lean-miri-mir-exporter --output scratch/exports/add-one.json \
-  --root add_one -- exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure
+bash tools/export-mir.sh --output scratch/exports/add-one.json --root add_one -- \
+  exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure
 ELAN_HOME="$PWD/.elan" .elan/bin/lake build check_input
 ELAN_HOME="$PWD/.elan" .elan/bin/lake exe check_input scratch/exports/add-one.json
 ```
 
-`check_input` diagnoses readiness; it does not execute a guest or prove safety.
-See [CheckInput.lean](../tools/CheckInput.lean) for actual arguments and exit
-classifications. Import into Lean constants uses the experimental `import_mir`
-in `Miri.Frontend.ImportMIR`. A minimal executable client-generation example
-is in [check_import.py](../tests/frontend/check_import.py); canonical configuration
-and terminal-check examples are in [connected tests](../tests/connected/README.md).
+`check_input` checks input acceptance; it neither executes the guest nor proves
+safety. `import_mir` in `Miri.Frontend.ImportMIR` reflects accepted typed input
+into closed Lean constants. See the [main guide](../README.md) for execution and
+the [connected tests](../tests/connected/README.md) for expected-result checks.
 
-`--root` specifies an exact nongeneric local def-path. Without it, closed local
-bodies are roots. Generic definitions enter the graph through their actual
-monomorphic instances; unsubstituted templates are not exported as executable
-bodies. Selecting a generic definition directly is an error.
+## Roots and concrete reachability
 
-Every requested semantic query must succeed. Missing MIR, failed normalization,
-layout or ABI queries, unavailable initializers and incomplete producer evidence
-abort the export with a nonzero exit status. No failed query is serialized as a
-payload that a consumer might later accept. Target and execution demand determine
-which queries apply; pure `no_std` and `no_core` roots do not request OS startup
-or foreign-shim catalogs. Successful `false`, `None` and empty query results
-retain their meaning. Diagnostic debug payloads remain separate.
+`--root` selects an exact local def-path and may be repeated. An executable with
+no explicit roots selects its entry function; libraries require a root list.
+A generic root contributes `root_declarations` metadata without a body.
+Concrete instances discovered from executable roots enter the ordinary body
+closure. Unselected generic definitions do not contribute function MIR.
 
-For Cargo projects, use `exporter/target/debug/lean-miri-mir-exporter --cargo check
---manifest-path /path/to/Cargo.toml`. The wrapper uses pinned Cargo/rustc,
-rebuilds dependency crates with MIR, writes target-crate JSON under `lean-miri-mir/`
-in the target directory, and continues ordinary metadata/codegen. It uses
-`MIRI_SYSROOT` for the target and optional `MIRI_HOST_SYSROOT` for host
-build tools/proc macros. Host tools use the pinned compiler and are not exported.
-Response-file invocations fail closed because their
-exact arguments cannot be fingerprinted.
+The closure follows every basic block, rather than only one diagnostic execution.
+Direct calls, function-pointer casts and constant relocations register concrete
+instances. Vtable constructors register concrete method and drop instances;
+supertraits, dynamic upcasts and generated shims can extend that closure.
+Available external-crate MIR is traversed in the same way as local MIR. Missing
+required MIR stops export, so dependencies and std must contain compatible MIR.
+The collector does not rely solely on code-generation mono items.
 
-## Input contract
+Compiler identities, executable bodies and source-material demands remain
+distinct. An identity used only as metadata does not automatically demand a
+body. Source discovery can reveal further executable instances, so the collector
+closes these domains together. It does not build layout/ABI/covariance answers
+for arbitrary combinations of all known types and functions.
 
-The producer writes `lean-miri-rustc-mir` version 12. Evaluated integer scalars carry
-`bits_unsigned` and the compiler layout's `size_bytes`, so consumers can construct
-the machine scalar before reading the type and layout tables. Zero-sized and
-pointer constants retain their separate representations. Compiler values have
-separate tables with document-local, dense, zero-based IDs:
+Each executable body is keyed by a concrete instance and promoted index.
+Intrinsic, virtual and foreign identities retain their dispatch kind rather than
+requiring an ordinary MIR body. rustc substitutes a body's
+generic arguments, normalizes the MIR and evaluates constants, including unused
+required constants, before serialization. Remaining type/const parameters,
+normalization failures, unavailable initializers and unfinished references stop
+export. Ordinary recursion reuses the instance key; deduplication alone does not
+prove termination when fresh concrete instantiations keep appearing.
 
-| Table | Interning key |
+## Source input
+
+The producer and reader use `lean-miri-rustc-mir` schema 13. Earlier versions
+require fresh export. The execution document contains no layout, FnAbi or
+covariance answer tables. Table IDs are dense and local to one document;
+allocation source IDs retain a separate raw identity.
+
+| Material | Contents and consumer |
 | --- | --- |
-| `types` | Exact rustc `Ty`, retaining binders and regions |
-| `layouts` | Complete `TyAndLayout`, including field and variant layouts |
-| `fn_abis` | Complete `FnAbi`, including argument layouts and passing modes |
-| `instances` | Exact rustc `InstanceKind` and its local generic arguments |
-| `allocations` | Compiler `AllocId`, independently of memory contents |
-| `spans` | Compiler `Span`, including its hygiene context |
-| `files` | Exact filename spelling (string values, shared across spans and backtraces) |
-| `byte_images` | Exact immutable byte vector (shared storage, independent allocation identities) |
-| `definitions` | Compiler `DefId` (crate and definition index) |
-| `type_constants` | Compiler `Const`, including its type and constructor |
-| `predicates` | Full bound existential predicate; comparison rank is separate |
-| `bodies` | Instance, promoted index and source/query mode |
+| `bodies`, `instances`, `body_roots` | Concrete MIR, compiler instance identities, call/cast references and selected executable roots |
+| `types` | Concrete type structure, substituted ADT fields and variants, repr, discriminants, normalization references, lang-item flags and declaration attributes |
+| `runtime_target_data_layout`, `source_abi` | Target geometry and ABI policy, normalized callable signatures, function attributes and parameter-use summaries |
+| `source_trait_material` | Relevant trait/impl declarations, generic type patterns, clauses, ADT tails and associated-type bounds |
+| `source_vtables` | Instantiated object-trait method/supertrait graph and concrete drop/method instance bindings |
+| `source_cast_targets` | Resolution witnesses for actual function-pointer and closure casts |
+| `allocations`, `byte_images` | Evaluated constant memory and symbolic compiler allocations, with distinct identities, initialization and provenance |
+| `definitions`, `type_constants`, `predicates` | Referenced compiler identities and normalized finite declaration material |
+| `files`, `spans`, shared payload arrays | Source information and exact shared payloads used by MIR and memory |
 
-ABI rows store `return` and each `arguments` entry as an index into
-`abi_arguments`. Each payload contains the complete type, layout and passing mode;
-sharing requires equality of all three, including all mode attributes.
+Concrete ADT field types and repr drive Lean layout calculation. Generic type
+patterns are retained where trait selection, potentially-unsized tails or
+associated-type bounds need them. This does not introduce generic function MIR
+or a runtime function-body substitution phase. Layout, ABI and trait algorithms
+consume the decoded typed records; runtime-created arrays and pointer types use
+the same query implementation.
 
-The Rust collector uses one `Pool<K, D>` implementation for the ten compiler identity tables. The additional `files` and `byte_images` tables intern exact strings and byte vectors.
-Each compiler key `K` owns its reserved index and a single concrete semantic
-value `D`, such as `pool_layout::Layout`, `pool_type::Type` or `pool_body::Body`.
-Nested fields are Rust records, enums, optional values and typed references;
-collection does not store JSON trees in these pools. Serialization converts the
-completed values to JSON when assembling the output document.
+The input boundary checks tags, scalar widths, declaration scopes, identities,
+local MIR bounds and references, then returns typed `ExecutionInput`. It retains
+neither a generic JSON tree nor a second MIR tree. The file entrypoint currently
+reads a complete `String`. Lean execution uses only the input and its own state;
+it starts no compiler process and uses no cache shared between executions.
+Unsupported algorithms and missing runtime material remain explicit errors.
+LLVM intrinsic identities retain explicit dispatch without an ordinary FnAbi;
+ordinary calls use Lean's ABI calculation and unknown LLVM operations still fail.
 
-The allocation wire array groups function allocations with the same Instance into
-one payload and an `identities` array of `[graph_id, source_alloc_id]` pairs.
-Other allocation kinds retain their individual identities. Every memory payload,
-including static and thread-local initializers, stores a `byte_image_id`; size,
-alignment, initialization, relocations and provenance flags remain independent.
-Prepared-world `raw_pool` positions imply source ID `index + 1`: null slots join
-their unique serialized allocation, while opaque and dangling globals retain
-explicit exceptional rows. Dedup salt arrays carry graph IDs in salt order;
-source IDs and byte keys come from those allocations. All 32 outcomes remain
-required for function, vtable and byte keys. The reader accepts strict schema 11 and schema 12 inputs.
+## Compiler trust boundary
 
-Schema 12 requires `compiler_coroutine_coverage`, including an explicit Boolean
-marker for every executable body. A marked body owns one complete, normalized
-coroutine witness: kind, erased yield/resume fields, saved-local types and source
-information, state-to-field mappings, variant sources and storage conflicts.
-The saved-local `source_info` uses the existing source-info pool. Missing or
-unknown witnesses and unlowered executable terminators fail closed. Schema 11
-forbids the new table; its maintained input bytes remain unchanged.
+The input trusts rustc's MIR selection, monomorphization, normalization and
+constant evaluation. Declaration and target facts also remain compiler input:
+repr and inferred variance, lang-item/type identity, bound-variable flags,
+normalized signatures and compiler coroutine state material,
+predicate normalization/erasure/order and concrete cast resolution. ABI
+parameter-use bits come from the defining crate's optimized generic body;
+instantiated MIR can change those uses and cannot reconstruct that summary.
+Lean computes final layout and ABI values from these inputs, including final
+parameter attributes, rather than receiving the compiler's final answer rows.
 
-Coroutine auxiliary MIR uses a separate owner/role table, retaining the compiler's
-actual source kind and snapshot phase. It never becomes a callable body merely
-because an async/proxy snapshot shares the resume function's source identity.
-Callable drop shims still come from the exact `instance_mir` query. The reader
-checks owner/source/role/phase links, full selected physical variant layouts and
-saved-state field types/layouts. Root tag queries retain their compiler-produced
-narrowed scalar layout. These rules follow the pinned compiler's
-[StateTransform](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/coroutine/mod.rs),
-[drop snapshots](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/coroutine/drop.rs)
-and [canonical shim construction](https://github.com/rust-lang/rust/blob/8144389c895da997dbdecaa635e41d6a50be6ffd/compiler/rustc_mir_transform/src/shim.rs).
-This metadata coverage does not establish general coroutine execution support.
+The instantiated object-trait graph and vtable bindings retain rustc's method
+eligibility, concrete resolution, vacancy and drop instances. Lean computes
+object graph traversal, slots and runtime metadata from
+those bindings and declarations. A vtable already evaluated inside a constant
+retains its rustc-produced memory/entries, size and alignment as part of trusted
+constant evaluation. This is separate from Lean's runtime vtable calculation.
 
-Schema 11 uses exact-equality payload pools without changing compiler identity.
-`layouts` is an array of indices into `layout_values`: a type's `layout` still
-indexes `layouts`, so equal physical payloads retain separate `LayoutId`s.
-Type `boolean_queries` fields index root `boolean_queries`, and non-null
-`discriminants` fields index root `discriminants`; null remains explicit.
-Every memory payload's `initialization_ranges` and `relocations` fields index
-root arrays of arrays with those names. Bodies index root `backtrace_spans`;
-statement `kind` fields index `statement_kinds`; MIR `source_info` fields index
-`source_infos`. Source information remains separate from statement kinds so
-sharing a statement does not merge its use sites. Pool payloads retain all
-false values, null values and empty arrays. Lean resolves forward references
-independently of root field order and checks contextual bounds at each use.
+Constants retain more than value bytes: allocation identity, alignment,
+mutability, initialized ranges, relocations, encoded offsets, CTFE provenance
+flags and graph sharing/cycles remain explicit. Equal byte images do not merge
+allocation identities. IDs are reserved before recursively following references.
 
-Maintained historical fixtures were mechanically projected from schema 8 with
-`tools/shared_json_pools.py`; the inverse projection preserves every retained
-JSON value. Schema 11 removes body diagnostics unused by Lean, local debug info,
-mutability and redundant layouts, and source-scope local data. `required_consts`
-remains present. The exporter rejects tainted MIR before collecting any body,
-including promoted bodies. Span `ctxt` contains its original rustc debug text as
-a string. `tests/fixtures/shared-pools-projection.json` pins both file hashes
-and the original and retained canonical expanded hashes. Connected reference sidecars preserve the
-original reference snapshot binding under `wire_projection`; this transformation
-does not constitute a new compiler export or Miri execution.
+`LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1` captures the prepared compiler allocation
+world used by ordinary main execution and reference comparisons. Reached
+function/vtable keys retain all 32 salted source identities, with selected
+static/TypeId keys and the raw-ID frontier. These are trusted finite identity and
+address-history facts. They preserve observable allocation distinctions; they
+are not a proof of arbitrary runtime constructor coverage or equivalence with
+vanilla Miri's allocation history. Missing selected keys and truncated salts are
+rejected. Runtime values and allocations are created afresh for each execution.
 
-Discovery retains compiler query results until the reachable graph closes.
-Append-only request domains have consumer cursors; pair consumers visit new sites
-against all targets and old sites against new targets, including negative query
-results. Instance eligibility changes notify dependent consumers. Signature,
-predicate, allocation-byte, and identity collectors retain their completed facts.
-After convergence, read-only finalization builds query rows, orders vtable queries,
-resolves their final allocation references, and assigns predicate comparison ranks.
-Pool serialization stays in discovery when it can reveal another compiler key;
-output projection does not create keys or rerun discovery.
+The exporter trusts that its trait-header inventory and disjoint outer-head
+filter retain every relevant implementation; selected clauses and tail heads
+extend the material. General instance/material containment, algorithm fidelity
+and Rust/interpreter correspondence remain separate proof obligations in
+[STATUS.md](../STATUS.md). A successful export or finite comparison is not a
+UB-freedom theorem.
 
-References are numeric indices interpreted by the field's schema. Span `file` and
-backtrace `source_position.filename` reference the global `files` string table.
-Span filenames retain rustc's debug spelling; backtrace filenames retain its
-remapped display spelling. Distinct spellings remain distinct, even when they
-refer to the same source file. Lean retains these IDs through decoding and
-preparation and resolves text only when displaying diagnostics or serving the
-guest backtrace filename query. Layouts retain
-exact compiler `TyAndLayout` keys, including field and variant layouts. Allocation
-IDs retain compiler allocation identity even when bytes are equal. IDs are local
-to the document; exported `source_alloc_id` records the separate raw Miri AllocId.
-Schema 8 stores ABI argument attributes only as `regular_bits`, argument extension,
-and pointee size/alignment. Boolean attributes and capture mode are derived from
-those bits. External ABIs retain their structured `kind` and `unwind`; their
-canonical source spelling is not stored. ADT representation stores `flags_bits`,
-integer, alignment, packing and scalable-element data, rather than boolean views
-of those values. Type compiler facts use the owning `type_id` and optional
-`layout_query_input_type`; an absent layout-query input means the owning type.
-This preserves a distinct region-erased query input when one exists.
-Backtrace `source_position.byte_position` is the body-specific collapsed position;
-it can differ from the global span's position for an inlined body.
-The reader accepts schemas 11 and 12. Explicit array offsets retain their count,
-width and per-field equality checks. The producer stores array offsets as an
-exact stride/count formula, and represents a resolved LLVM intrinsic call with
-`kind: "llvm_intrinsic"`, `function_type` and `instance_id`, without `fn_abi`.
-Only an exact `LlvmIntrinsic` compiler identity may use that form. Normal,
-virtual and indirect calls still require an ordinary ABI. LLVM dispatch retains
-its intrinsic signature, argument, feature and memory checks; unknown intrinsics
-remain Unsupported. LLVM-ABI function-pointer signatures and layouts are retained
-as metadata, but have no ordinary ABI row. Synthetic LLVM-ABI helper candidates
-are omitted while their valid Rust-ABI candidates remain. An actual LLVM-ABI
-function-pointer call fails export explicitly before the compiler's undefined
-ABI query; ordinary function-pointer queries remain required. Older wire
-versions must be regenerated with the current producer.
+## Cargo and reference execution
 
-Generic arguments remain in their owning records, with type and type-constant
-references into the corresponding tables. `body_roots` records root metadata and
-body IDs. Each concrete instance and promoted index identifies one executable
-body, with generic arguments substituted, types normalized and constants
-evaluated before export. Roots and instance records reference that same body.
-Generic templates are not executable inputs; normalization or constant-evaluation
-failures abort export, including unused required constants. Diagnostic spans and
-scopes remain attached to the resolved instructions.
-This is a breaking wire-format change: earlier source/normalization-body
-snapshots must be regenerated. The reader requires each body's concrete
-`instance_id` and evaluated constants; it does not support the earlier shape.
-[Decoder](../Miri/Input/Decoder.lean) validates typed-table and query contracts.
-Successful query results are serialized directly: booleans remain booleans,
-optional results use JSON null, and structured results carry their semantic
-fields. There are no success-status wrappers or completeness flag. Lean validates
-required fields, semantic tags and references before returning an execution input.
-An ID is reserved before its definition is traversed, so mutually recursive
-references do not require a table ordering. Export fails if a reserved definition
-is unfinished. Lean indexes source ranges, decodes compiler pools, and constructs interpreter
-MIR directly while reading bodies. It retains typed query records, checks
-reference bounds and keeps IDs through execution; it does not retain a generic
-JSON tree or an intermediate MIR value tree. Runtime lookups return checked errors.
-Malformed table definitions are reported before downstream scope validation.
+`lean-miri-mir-exporter --cargo --root main check --manifest-path /path/to/Cargo.toml`
+wraps pinned Cargo/rustc and exports selected primary targets. Exporter `--root`
+options precede the Cargo subcommand; library targets need explicit roots.
+Dependencies are compiled with MIR but do not produce independent exports.
+Each invocation uses a fresh retained run directory beneath the Cargo target
+directory and prints its location. Repeated Cargo exports include dependency
+compilation cost; they do not reuse a prior export-run cache.
+The wrapper continues ordinary metadata/codegen. `MIRI_SYSROOT` selects the target sysroot; optional
+`MIRI_HOST_SYSROOT` selects the sysroot for build tools and proc macros. Host
+tools are not exported. Response-file invocations fail because their exact
+arguments cannot be fingerprinted.
 
-Covariance collection has two phases. During source-demand closure, explicit
-MIR/call-transfer requests and reached vtable receiver requests serialize their
-endpoint types. Serialization retains recursive query-demand suppression for
-query-generated types, while allowing their definitions and referenced compiler
-data to complete the export closure. Relation answers do not drive that closure.
-After convergence, a read-only pass groups all closed pool types by normalized
-identity and combines the distinct ordered pairs in each group with the demanded
-pairs. Exact compiler-type equality deduplicates requests; existing numeric type
-IDs order the rows. Each pair is evaluated once with rustc's covariant relation,
-including successful false answers, before allocation-world capture. Normalization
-failure still aborts export, but is reported during this final pass. The schema
-and query meaning are unchanged; document-local ID assignment can change.
+With `--features miri-reference`, `LEAN_MIRI_RUN_PREPARED_MIRI=1` continues the
+same TyCtxt after export and writes a reference sidecar. It requires the prepared
+allocation-world profile. [build.rs](build.rs) and runtime checks verify the
+pinned rustc commit and, on Linux, the loaded librustc_driver. Artifact hashes
+identify consumed inputs; they do not establish a hermetic build covering every
+macro, include and environment dependency.
 
-A successful export describes the requested compiler data. Runtime values, including a
-virtual call's receiver and vtable, still determine execution. Export success is
-neither a proof of interpreter correspondence nor a proof of UB freedom.
+## Checks
 
-Specify `LEAN_MIRI_PREPARED_ALLOC_ID_WORLD=1` for prepared execution such as
-main. Building with `--features miri-reference` and adding
-`LEAN_MIRI_RUN_PREPARED_MIRI=1` also generates a reference Miri sidecar by
-continuing the same TyCtxt after export. This does not promise the same allocation
-history as vanilla Miri. See [connected tests](../tests/connected/README.md) for
-the distinction between fresh generation and replay of fixed inputs.
-
-[build.rs](build.rs) and runtime checks verify the rustc commit; on Linux they
-also verify the loaded librustc_driver. This boundary fails closed on other OSes.
-`tools/exporter_provenance.py --document INPUT --exporter BINARY --manifest OUTPUT`
-can record SHA-256 of adjacent inputs, but it does not prove a fully hermetic
-build including macros, includes and environment. FNV fingerprints check
-consistency and are not cryptographic hashes.
-
-## Tests
-
-After the toolchain and MIR-enabled sysroot setup above, run from the repository
-root with the same environment:
+`--oracle-output OTHER.json` writes independent rustc answers for the exact
+exported input. Those answers are not part of the execution document or read by
+the interpreter. The oracle uses the closed production identities and actual
+call operands; it does not extend the body graph or enumerate ABI candidate
+combinations. Oracle output cannot be combined with prepared allocation-world
+or reference execution: compiler oracle queries can change allocation history.
+The comparison driver binds the oracle to the input bytes and
+compiler revision before running layout, type-query, ABI and vtable checks:
 
 ```bash
-"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d test --locked --offline --manifest-path exporter/Cargo.toml
+bash tools/export-mir.sh --output scratch/exports/add-one.json \
+  --oracle-output scratch/exports/add-one-oracle.json --root add_one -- \
+  exporter/fixtures/scope/simple.rs --crate-type=lib --crate-name=scoped_closure
+python3 tools/check-source-queries.py \
+  scratch/exports/add-one.json scratch/exports/add-one-oracle.json
 ```
 
-The LLVM no-ABI producer fixture is part of that unittest discovery. After a
-reference-feature release exporter and `native_runner` build, run
-`flock /tmp/lean-miri-ci-guest.lock python3 tests/llvm_no_abi/check.py --output scratch/llvm-controls-new`
-for fresh reference/guest controls covering arithmetic and pause through both
-C and the actual stdarch LLVM ABI, stdarch AES, missing target
-features, argument count, symbol clashes, invalid vector layouts and unknown
-intrinsics. The latter rejection/Unsupported controls are never counted as safe
-guest execution. `tests/input/LlvmCallEvidence.lean` takes a fresh export of
-`exporter/fixtures/fail_closed/llvm_no_abi.rs` (`--root identity`) and checks strict
-ABI evidence validation, current pooled-fixture acceptance, and rejection of
-older root schema versions.
+Run Rust units and exporter fixture suites with the pinned environment:
 
-This runs the Rust unit tests, Python unittest discovery under `exporter/tests/`,
-all four `test-*.sh` fixture scripts, and four producer checks, using Cargo's
-executable for the selected
-profile and target directory. Failures include the child process output. Fixture
-tests require bash, Python 3, the pinned toolchain and a matching MIR-enabled
-sysroot; missing prerequisites fail with setup instructions rather than skip.
-Run `bash tools/setup-rustc-exporter.sh` and `bash tools/setup-miri-reference.sh`
-from the repository root to prepare them (see the development guide).
-
-The shell scripts remain available for focused checks. `test-fixture.sh` also
-calls the variadic and call-transfer scripts, preserving its standalone coverage;
-Cargo additionally exposes those two as individually selectable tests. For example,
-append `--test suites call_transfer_fixture` to the Cargo command above. Cargo
-passes `EXPORTER_BIN` so fixture scripts do not rebuild the exporter; standalone
-scripts can also use this override. Each fixture uses temporary output directories.
-
-The producer checks cover input settings and consumed artifact hashes, exact
-u128/niche ranges, function/vtable allocator-world crosswalks, and static/TypeId
-crosswalks. Their validators live under `exporter/`. The allocator-world Rust
-fixtures shared with Lean input checks live under `tests/fixtures/`. Run one
-with `--test suites producer_settings`, `primitive_ranges`, `selected_alloc_world`
-or `selected_static_typeid`. For standalone use, after building the exporter,
-run `bash exporter/tests/run-producer.sh NAME` (`settings` selects the settings
-check). An optional second argument supplies an output JSON path; the Lean
-primitive-range driver uses this to consume the same checked export.
-
-Lean decoder, frontend and execution comparisons under root `tests/` remain
-separate integration checks; this command does not run the entire repository suite.
-
-Prepared allocator snapshots distinguish complete byte-memory keys from
-`non_exhaustive_key_families`: function, vtable, static, TypeId, and general
-constant-memory keys. This is coverage metadata, not a failed query result.
-Every imported function/vtable/static/TypeId global must have its exact selected
-key outcome; functions and vtables require all 32 salts. The decoder rejects
-missing keys or truncated salts, and runtime lookup rejects keys outside the
-validated selected domain. Unrequested compiler globals may reserve opaque raw
-IDs, but cannot point to an imported or failed semantic allocation. General
-constant-memory keys have no selected-key support; requests remain explicit
-runtime errors. This snapshot contract does not assert completeness of arbitrary
-runtime key discovery. Salt rows record the actual dedup allocation identities in
-the prepared post-export TCX; they do not record whether a lookup populated a
-previously absent entry. Snapshot and closure sentinels remain reserved source
-IDs, and the final sentinel fixes the next runtime allocation ID.
-
-After building the pinned exporter and Lean decoder, this boundary check uses a
-fresh prepared snapshot (not a saved historical input):
-
-```sh
-EXPORTER_BIN=exporter/target/release/lean-miri-mir-exporter \
-  bash exporter/tests/run-producer.sh selected_alloc_world scratch/selected-keys.json
-lake env lean --run tests/input/SelectedKeyCoverageStrict.lean scratch/selected-keys.json
-lake env lean --run tests/input/AllocWorldRuntime161.lean scratch/selected-keys.json
+```bash
+"$CARGO_HOME/bin/cargo" +miri-exporter-8144389c895d test --locked --offline \
+  --manifest-path exporter/Cargo.toml
 ```
+
+Lean integration and theorem checks are separate. `tools/check-empty-function.sh`
+checks concrete providers for its fixture and then the kernel theorem/axiom
+closure. [STATUS.md](../STATUS.md) records current validation gaps; historical
+fixture and CI successes do not establish schema-13 execution. Whole-pipeline
+performance comparisons use identical Rust inputs and fixed artifacts via
+`tools/measure-pipeline.py`, as described in [PROFILING](../tools/PROFILING.md).

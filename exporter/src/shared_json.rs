@@ -14,18 +14,6 @@ impl<T> From<T> for Shared<T> {
         Self::Value(value)
     }
 }
-impl<T> Shared<T> {
-    pub(super) fn try_map<U>(
-        self,
-        f: impl FnOnce(T) -> Result<U, String>,
-    ) -> Result<Shared<U>, String> {
-        match self {
-            Self::Value(value) => Ok(Shared::Value(f(value)?)),
-            Self::Reference(_) => Err("payload pooled before semantic resolution".into()),
-        }
-    }
-}
-
 pub(super) struct Payloads<T> {
     // Complete serialization is the equality key, not a digest. No collision can
     // merge unequal payloads, including reference IDs, nulls and explicit false.
@@ -68,14 +56,10 @@ impl<T: Serialize> Payloads<T> {
 
 #[derive(Default, Serialize)]
 pub(super) struct Values {
-    layout_values: Payloads<crate::pool_layout::Layout>,
-    abi_arguments: Payloads<crate::pool_layout::ArgAbi>,
-    boolean_queries: Payloads<crate::pool_type::BooleanQueries>,
-    discriminants: Payloads<crate::pool_type::Discriminants>,
     initialization_ranges: Payloads<Vec<crate::allocation_values::InitializationRange>>,
     relocations: Payloads<Vec<crate::allocation_values::Relocation>>,
     backtrace_spans: Payloads<Vec<crate::pool_body::BacktraceSpan>>,
-    statement_kinds: Payloads<crate::pool_body::StatementKind<u64>>,
+    statement_kinds: Payloads<crate::pool_body::StatementKind>,
     source_infos: Payloads<crate::pool_body::SourceInfo>,
 }
 impl Values {
@@ -90,23 +74,6 @@ impl Values {
 /// relocation targets and statement query IDs participate in exact equality.
 pub(super) fn freeze(document: &mut crate::ExportDocument) -> Result<(), String> {
     let pools = &mut document.shared_values;
-    for layout in &mut document.layouts {
-        pools.layout_values.share(layout)?;
-    }
-    for abi in &mut document.fn_abis {
-        pools.abi_arguments.share(&mut abi.ret)?;
-        for argument in &mut abi.arguments {
-            pools.abi_arguments.share(argument)?;
-        }
-    }
-    for ty in &mut document.types {
-        pools
-            .boolean_queries
-            .share(&mut ty.compiler_facts.boolean_queries)?;
-        pools
-            .discriminants
-            .share(&mut ty.compiler_facts.discriminants)?;
-    }
     for entry in &mut document.allocations {
         if let crate::allocation_values::Entry::Single(allocation) = entry {
             use crate::allocation_values::AllocationData;
@@ -340,10 +307,6 @@ mod semantic_tests {
     fn empty_document_still_emits_every_payload_pool() {
         let serialized = serde_json::to_value(Values::default()).unwrap();
         for field in [
-            "layout_values",
-            "abi_arguments",
-            "boolean_queries",
-            "discriminants",
             "initialization_ranges",
             "relocations",
             "backtrace_spans",

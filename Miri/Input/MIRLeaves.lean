@@ -655,7 +655,6 @@ private structure CallEvidenceFields where
   instance_id : Option (Option Nat) := none
   function_type : Option (Nat) := none
   dispatch_slot : Option (Option Nat) := none
-  fn_abi : Option (Nat) := none
 
 def callEvidence : Parser (CallResolutionEvidence) := do
   let v ← object ({} : CallEvidenceFields) fun v key => do
@@ -664,7 +663,6 @@ def callEvidence : Parser (CallResolutionEvidence) := do
     | "instance_id" => return { v with instance_id := some (← nullable natural) }
     | "function_type" => return { v with function_type := some (← natural) }
     | "dispatch_slot" => return { v with dispatch_slot := some (← nullable natural) }
-    | "fn_abi" => return { v with fn_abi := some (← natural) }
     | _ => skipValue; pure v
   let kind ← match (← required v.kind "kind") with
     | "llvm_intrinsic" => pure CallResolutionKind.llvmIntrinsic
@@ -675,65 +673,9 @@ def callEvidence : Parser (CallResolutionEvidence) := do
   let instanceId ← if kind == .indirect then pure none else some <$> (required (← required v.instance_id "instance_id") "non-null instance_id")
   let dispatchSlot ← if kind == .virtualDispatch then some <$> (required (← required v.dispatch_slot "dispatch_slot") "non-null dispatch_slot") else pure none
   let abi ← if kind == .llvmIntrinsic then do
-      unless v.fn_abi.isNone do fail "LLVM intrinsic must not carry an ordinary fn_abi"
       unless v.dispatch_slot.isNone do fail "LLVM intrinsic must not carry a dispatch slot"
       pure CallAbiEvidence.llvmIntrinsic
-    else pure (.normal (← required v.fn_abi "fn_abi"))
+    else pure .normal
   return { kind, instanceId, dispatchSlot, functionType := some (← required v.function_type "function_type"), abi }
-
-private structure SupertraitQueryFields where
-  query_kind : Option (String) := none
-  typing_env : Option (String) := none
-  input_source : Option (Nat) := none
-  input_target : Option (Nat) := none
-
-def supertraitQuery : Parser (Nat × Nat) := do
-  let v ← object ({} : SupertraitQueryFields) fun v key => do
-    match key with
-    | "query_kind" => return { v with query_kind := some (← string) }
-    | "typing_env" => return { v with typing_env := some (← string) }
-    | "input_source" => return { v with input_source := some (← natural) }
-    | "input_target" => return { v with input_target := some (← natural) }
-    | _ => skipValue; pure v
-  unless (← required v.query_kind "query_kind") == "supertrait_slot" && (← required v.typing_env "typing_env") == "fully_monomorphized" do
-    fail "invalid dynamic vtable query metadata"
-  return ((← required v.input_source "input_source"), (← required v.input_target "input_target"))
-
-private structure UpcastDescriptorFields where
-  kind : Option (String) := none
-  runtime_vtable : Option (String) := none
-  supertrait_slot_query : Option (Nat × Nat) := none
-  source_type : Option (Nat) := none
-  target_type : Option (Nat) := none
-  source_pointee_type : Option (Nat) := none
-  target_pointee_type : Option (Nat) := none
-  source_tail_type : Option (Nat) := none
-  target_tail_type : Option (Nat) := none
-
-def upcastDescriptor : Parser (Option DynamicUpcastEvidence) := do
-  let v ← object ({} : UpcastDescriptorFields) fun v key => do
-    match key with
-    | "kind" => return { v with kind := some (← string) }
-    | "runtime_vtable" => return { v with runtime_vtable := some (← string) }
-    | "supertrait_slot_query" => return { v with supertrait_slot_query := some (← supertraitQuery) }
-    | "source_type" => return { v with source_type := some (← natural) }
-    | "target_type" => return { v with target_type := some (← natural) }
-    | "source_pointee_type" => return { v with source_pointee_type := some (← natural) }
-    | "target_pointee_type" => return { v with target_pointee_type := some (← natural) }
-    | "source_tail_type" => return { v with source_tail_type := some (← natural) }
-    | "target_tail_type" => return { v with target_tail_type := some (← natural) }
-    | _ => skipValue; pure v
-  let kind ← required v.kind "kind"
-  if kind != "dynamic_vtable_upcast" then return none
-  unless (← required v.runtime_vtable "runtime_vtable") == "source_operand_metadata" do fail "invalid dynamic vtable query metadata"
-  let query ← required v.supertrait_slot_query "supertrait_slot_query"
-  return some {
-    operandType := 0, castTarget := 0, sourceType := (← required v.source_type "source_type"),
-    targetType := (← required v.target_type "target_type"), sourcePointeeType := (← required v.source_pointee_type "source_pointee_type"),
-    targetPointeeType := (← required v.target_pointee_type "target_pointee_type"), sourceTailType := (← required v.source_tail_type "source_tail_type"),
-    targetTailType := (← required v.target_tail_type "target_tail_type"), querySource := query.1, queryTarget := query.2 }
-
-def upcast : Parser (Option DynamicUpcastEvidence) := do
-  return (← nullable upcastDescriptor).join
 
 end Miri.Input.DecodeMIR

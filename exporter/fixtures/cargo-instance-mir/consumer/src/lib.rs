@@ -22,3 +22,17 @@ pub const FREE_RESULT: u32 = ctfe_producer_types::compile_time_add(35, 7);
 /// CTFE initializer whose MIR contains a direct call to an external
 /// always-const associated function.
 pub const ASSOCIATED_RESULT: u32 = Opcode::compile_time_xor(35, 0x5a);
+
+pub fn constants() -> (u32, u32) {
+    (FREE_RESULT, ASSOCIATED_RESULT)
+}
+
+fn invoke<F: FnOnce() -> u32>(function: F) -> u32 {
+    function()
+}
+
+pub fn call_once_shim() -> u32 {
+    let function = || 42;
+    let _ = function();
+    invoke(function)
+}

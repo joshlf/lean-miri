@@ -9,7 +9,7 @@ from mir_json import load_mir_inspection_document as load_mir_document, pool_ent
 
 doc = load_mir_document(sys.argv[1])
 assert doc["schema"] == "lean-miri-rustc-mir"
-assert doc["schema_version"] == 12
+assert doc["schema_version"] == 13
 assert doc["compiler_coroutine_coverage"]["body_coroutines"] == [False] * len(doc["bodies"])
 assert doc["compiler_coroutine_coverage"]["coroutines"] == []
 assert doc["compiler_coroutine_coverage"]["auxiliary_bodies"] == []
@@ -29,12 +29,9 @@ for body in doc["bodies"]:
 type_nodes = {node["type_id"]: node for node in doc["types"]}
 assert type_nodes, "compilation-scoped type graph missing"
 assert sorted(type_nodes) == list(range(len(type_nodes))), "type IDs must be session-local monotonic IDs"
-assert all("shape" in node and "layout" in node for node in type_nodes.values())
+assert all("shape" in node and "source_layout" in node and "layout" not in node for node in type_nodes.values())
 for node in type_nodes.values():
-    assert "input_type" not in node["compiler_facts"]
-    assert "query_input_type" not in node["compiler_facts"]
-    query_input = node.get("layout_query_input_type")
-    assert query_input is None or (type(query_input) is int and query_input in type_nodes)
+    assert node["source_layout"]["normalized_type"] in type_nodes
     if node["shape"].get("kind") == "adt":
         representation = node["shape"]["representation"]
         assert type(representation["flags_bits"]) is int
@@ -46,25 +43,9 @@ assert {node["shape"].get("adt_kind") for node in type_nodes.values() if node["s
 }
 assert any(node["shape"].get("unsigned_kind") == "u32" for node in type_nodes.values())
 assert any(node["shape"].get("signed_kind") == "isize" for node in type_nodes.values())
-tag_encodings = [
-    pool_entry(doc, "layouts", node["layout"])["variants"]["tag_encoding"]
-    for node in type_nodes.values()
-    if node["layout"] is not None
-    and pool_entry(doc, "layouts", node["layout"]).get("variants", {}).get("kind") == "multiple"
-]
-assert tag_encodings and all("status" not in tag for tag in tag_encodings)
-assert any(tag["kind"] == "direct" for tag in tag_encodings), "direct enum tag encoding missing"
-niche_tags = [tag for tag in tag_encodings if tag["kind"] == "niche"]
-assert niche_tags, "niche enum tag encoding missing"
-assert all(
-    isinstance(tag["untagged_variant"], int)
-    and set(tag["niche_variants"]) == {"start", "end"}
-    and isinstance(tag["niche_variants"]["start"], int)
-    and isinstance(tag["niche_variants"]["end"], int)
-    and isinstance(tag["niche_start"], str)
-    and tag["niche_start"].isdecimal()
-    for tag in niche_tags
-), "niche tag payload must preserve exact range indices and u128 value"
+enum_sources = [node for node in type_nodes.values() if node["shape"].get("adt_kind") == "enum"]
+assert enum_sources and all(node["source_layout"]["variant_discriminants"] for node in enum_sources)
+assert not {"layouts", "fn_abis", "compiler_vtable_queries"} & doc.keys()
 
 TYPE_REF_FIELDS = {"type", "element", "pointee", "base", "self_type", "source_type",
                    "target_type", "input_type", "output_type", "return_type", "function_type"}
@@ -92,8 +73,6 @@ def check_scalar_widths(value):
             size = value["size_bytes"]
             assert type(size) is int and size > 0, "scalar byte width must be positive"
             assert 0 <= int(value["bits_unsigned"]) < 2 ** (8 * size), "scalar bits exceed byte width"
-            layout = pool_entry(doc, "layouts", type_nodes[value["type"]]["layout"])
-            assert size == layout["size_bytes"], "scalar byte width differs from compiler type layout"
         for child in value.values():
             check_scalar_widths(child)
     elif isinstance(value, list):
@@ -108,20 +87,14 @@ bodies = {root["def_path"]: root for root in doc["body_roots"]}
 assert {
     "exercise", "make_link", "direct_tag_value", "promoted_ref", "byte_string", "pointer_slice",
     "as_trait_object", "as_drop_trait_object", "call_trait_object",
-    "STATIC_DATA", "TLS_WORD", "read_tls",
+    "read_tls",
 }.issubset(bodies)
 assert bodies["promoted_ref"]["promoted_bodies"], "promoted MIR body missing"
-assert bodies["STATIC_DATA"]["is_static"] and not bodies["STATIC_DATA"]["thread_local_static"]
-assert bodies["TLS_WORD"]["is_static"] and bodies["TLS_WORD"]["thread_local_static"]
-
 exercise = pool_entry(doc, "bodies", bodies["exercise"]["body"])
 assert exercise["locals"]
 for local in exercise["locals"]:
-    # Schema 11 pool_body::Local retains the type ID, not a redundant layout.
     assert set(local) == {"local", "type", "source_info"}
-    layout_id = type_nodes[local["type"]]["layout"]
-    assert type(layout_id) is int
-    assert isinstance(pool_entry(doc, "layouts", layout_id), dict)
+    assert local["type"] in type_nodes
 assert "status" not in exercise["phase"]
 assert exercise["phase"]["kind"] in ("built", "analysis", "runtime")
 terminators = [bb["terminator"]["kind"] for bb in exercise["basic_blocks"] if bb["terminator"]]
@@ -139,12 +112,10 @@ assert all(
 resolutions = [term["resolution"] for term in calls]
 assert any(r.get("kind") == "resolved_instance" and pool_entry(doc, "instances", r["instance_id"]).get("def_path") == "id" for r in resolutions), "generic id::<u32> instance missing"
 atomic = [r for r in resolutions if r.get("kind") == "resolved_instance" and "fetch_add" in pool_entry(doc, "instances", r["instance_id"]).get("def_path", "")]
-assert atomic and pool_entry(doc, "fn_abis", atomic[0]["fn_abi"])["arguments"], "atomic call and FnAbi missing"
-assert pool_entry(doc, "fn_abis", atomic[0]["fn_abi"])["calling_convention"] == {"kind": "rust"}
-for argument in [pool_entry(doc, "fn_abis", atomic[0]["fn_abi"])["return"], *pool_entry(doc, "fn_abis", atomic[0]["fn_abi"])["arguments"]]:
-    mode = argument["mode"]
-    if mode["kind"] == "Direct":
-        assert "status" not in mode["attributes"]["arg_extension"]
+assert atomic, "atomic call missing"
+for call in atomic:
+    source = doc["source_abi"]["definitions"][call["instance_id"]]
+    assert source and source["signature"]["abi"]["kind"] == "rust"
 instances = {instance["instance_id"]: instance for instance in doc["instances"]}
 assert len(instances) == len(doc["instances"]), "instance IDs must be unique"
 assert all(r.get("instance_id") in instances for r in resolutions if r.get("kind") == "resolved_instance")
@@ -184,7 +155,7 @@ assert any(
     instance.get("kind") == "virtual_dispatch_target"
     and "status" not in instance
     and instance.get("body_status") == "not_applicable"
-    and "status" not in pool_entry(doc, "fn_abis", instance["virtual_identity"]["fn_abi"])
+    and instance["virtual_identity"]["function_type"] in type_nodes
     for instance in instances.values()
 ), "virtual dispatch must retain exact non-body identity and ABI evidence"
 
@@ -251,7 +222,7 @@ def has_cycle(type_id, active, visited):
 assert any(has_cycle(type_id, set(), set()) for type_id in type_nodes), "recursive ADT type graph cycle missing"
 assert "type_display" not in serialized, "ADT fields must carry structured type nodes"
 assert '"field_shuffle_seed":' in json.dumps(type_nodes), "repr/layout randomization input missing"
-assert '"regular_bits":' in json.dumps(doc["fn_abis"]), "FnAbi attributes must be structurally represented"
+assert doc["source_abi"]["definitions"], "ABI source signatures must be present"
 assert '"attributes_debug":' not in serialized, "FnAbi attributes must not rely on debug-only strings"
 def check_attribute_fields(value):
     if isinstance(value, dict):
@@ -287,27 +258,16 @@ assert any(
     for allocation in memory_allocations
     for relocation in allocation["relocations"]
 ), "CtfeProvenance flags missing from allocation relocation"
-static = next(allocation for allocation in allocations.values() if allocation.get("kind") == "static")
+static = next(allocation for allocation in allocations.values() if allocation.get("kind") == "static" and allocation["def_path"] == "VTABLE_ROOT")
 assert static["thread_local"] is False
-assert doc["byte_images"][static["initializer"]["byte_image_id"]] == "0b0000000d000000"
-vtable_queries = [
-    query["vtable_metadata"]
-    for query in doc["compiler_vtable_queries"]
-    if query.get("vtable_metadata", {}).get("entries") is not None
-]
-assert any(
-    entry.get("kind") == "method" and pool_entry(doc, "instances", entry["instance_id"]).get("def_path") == "<ValueCell as ValueSource>::get"
-    for vtable in vtable_queries for entry in vtable["entries"]
-)
-drop_entry = next(
-    entry
-    for vtable in vtable_queries for entry in vtable["entries"]
-    if entry.get("kind") == "drop_in_place"
-)
-drop_glue = instances[drop_entry["instance_id"]]
-assert drop_glue["instance_kind"]["kind"] == "shim"
-assert drop_glue["instance_kind"]["shim_kind"] == "drop_glue"
-assert "status" not in drop_glue and drop_glue["kind"] == "instance_mir"
+assert static["initializer"]["size_bytes"] == 16
+assert static["initializer"]["relocations"], "reachable static trait-object provenance missing"
+assert not any(a.get("def_path") == "STATIC_DATA" for a in allocations.values()), "unreferenced static was exported"
+bindings = doc["source_vtables"]["bindings"]
+assert any(method["instance_id"] is not None and instances[method["instance_id"]]["def_path"] == "<ValueCell as ValueSource>::get"
+           for binding in bindings for method in binding["methods"])
+assert any(instances[binding["drop_instance"]]["instance_kind"].get("shim_kind") == "drop_glue"
+           and instances[binding["drop_instance"]]["kind"] == "instance_mir" for binding in bindings)
 
 # A TLS `ThreadLocalRef` contains exact compiler metadata. Runtime allocation
 # and destruction are interpreter semantics, not synthetic exporter payload.

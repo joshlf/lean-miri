@@ -61,7 +61,6 @@ structure TargetFeature where
 
 structure RuntimeInstance where
   instanceId : InstanceId
-  requiresCallerLocation : Bool
   display : String
   inlineNever : Bool
   targetFeatures : Array TargetFeature
@@ -71,29 +70,6 @@ structure RuntimeInstance where
   itemName : Option String
   codegenSymbolName : Option (Option String)
   symbolName : Option String
-  deriving Repr, DecidableEq
-
-structure RuntimeType where
-  inputType : TypeId
-  mutPointerType : TypeId
-  mutReferenceType : TypeId
-  dropGlue : Option InstanceId
-  deriving Repr, DecidableEq
-
-structure VtableRef where
-  inputType : TypeId
-  inputPredicates : Array PredicateId
-  queryId : Nat
-  deriving Repr, DecidableEq
-
-structure RuntimeVirtual where
-  originalInstance : InstanceId
-  methodDefinition : DefinitionRef
-  parentTrait : DefinitionRef
-  concreteType : TypeId
-  rebasedArgs : Array Miri.MIR.GenericArg
-  resolved : InstanceId
-  vtableQuery : VtableRef
   deriving Repr, DecidableEq
 
 structure Startup where
@@ -111,11 +87,8 @@ structure ExternDeclaration where
   definition : DefinitionRef
   symbol : String
   typeId : TypeId
-  layoutId : LayoutId
   importLinkage : ImportLinkage
   definitionMutability : MemoryMutability
-  typeIsFreeze : Bool
-  declIsMut : Bool
   deriving Repr, DecidableEq
 
 structure ForeignCandidate where
@@ -165,8 +138,6 @@ structure ForeignSymbols where
 
 structure Runtime where
   startup : Option Startup
-  types : Array RuntimeType
-  virtualQueries : Array RuntimeVirtual
   instances : Array RuntimeInstance
   foreignSymbols : ForeignSymbols
   deriving Repr, DecidableEq
@@ -174,44 +145,6 @@ structure Runtime where
 structure FrameMetadata where
   localCrate : Nat
   crates : Array (Nat × String)
-  deriving Repr, DecidableEq
-
-structure InstanceAbi where
-  instanceId : InstanceId
-  extraArgumentTypes : Array TypeId
-  abiId : FunctionAbiId
-  deriving Repr, DecidableEq
-
-structure FunctionType where
-  typeId : TypeId
-  instanceId : Option InstanceId
-  signature : Signature
-  deriving Repr, DecidableEq
-
-structure PointerAbi where
-  typeId : TypeId
-  extraArgumentTypes : Array TypeId
-  abiId : FunctionAbiId
-  deriving Repr, DecidableEq
-
-structure HelperSignature where
-  signature : Signature
-  splatted : Bool
-  abiId : FunctionAbiId
-  deriving Repr, DecidableEq
-
-structure FunctionFacts where
-  types : Array FunctionType
-  pointerAbis : Array PointerAbi
-  helperSignatures : Array HelperSignature
-  deriving Repr, DecidableEq
-
-inductive CastQuery where
-  | resolveFnPtr (input : TypeId) (argsNoBoundVars : Bool) (instanceId : Option InstanceId)
-  | resolveClosureFnOnce (input : TypeId) (argsNoBoundVars : Bool) (instanceId : InstanceId)
-  | supertraitSlot (source target : TypeId) (slot : Option Nat)
-  | lockstepTails (source target sourceTail targetTail : TypeId)
-  | boxType (input output : TypeId)
   deriving Repr, DecidableEq
 
 structure TypeName where
@@ -243,12 +176,6 @@ structure NativeSignature where
 structure RetagQuery where
   definition : DefinitionRef
   rustcNoWritable : Bool
-  deriving Repr, DecidableEq
-
-structure CovarianceQuery where
-  sourceType : TypeId
-  targetType : TypeId
-  value : Bool
   deriving Repr, DecidableEq
 
 structure GlobalByteCandidate where
@@ -330,17 +257,6 @@ structure Primitives where
   orderingEnum : Option TypeId
   deriving Repr, DecidableEq
 
-structure VtableQuery where
-  queryId : Nat
-  inputType : TypeId
-  inputPredicates : Array PredicateId
-  outputType : TypeId
-  outputPredicates : Array PredicateId
-  outputTypeMonomorphic : Bool
-  outputPredicatesMonomorphic : Bool
-  vtableAllocation : Option AllocationId
-  metadata : VtableAllocation
-
 structure ShimSignature where
   callingConvention : String
   arguments : Array String
@@ -352,7 +268,6 @@ structure ShimAbi where
   signature : ShimSignature
   inputTypes : Array TypeId
   outputType : TypeId
-  abiId : FunctionAbiId
   deriving Repr, DecidableEq
 
 structure NamedShimAbi where
@@ -390,19 +305,14 @@ structure Queries where
   session : Session
   runtime : Runtime
   frameMetadata : FrameMetadata
-  instanceAbis : Array InstanceAbi
-  functionFacts : FunctionFacts
-  casts : Array CastQuery
   typeNames : Array TypeName
   panic : Array PanicQuery
   nativeSignatures : Array NativeSignature
   retag : Array RetagQuery
-  covariance : Array CovarianceQuery
   globalBytes : GlobalBytes
   callerLocations : Array CallerLocation
   main : Main
   primitives : Primitives
-  vtables : Array VtableQuery
   namedTypes : Option (Array (String × TypeId))
   shimAbis : Option (Array ShimAbi)
   namedShimAbis : Option (Array NamedShimAbi)

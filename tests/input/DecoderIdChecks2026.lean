@@ -5,7 +5,7 @@ open Miri.Input
 private def accepted : List String := ["valid-dense", "valid-allocation-reference", "nested-debug-payload-skips-references"]
 
 private def rejected : List String := [
-  "missing-type-shape-kind", "missing-type-layout-size", "permuted-type-rows",
+  "missing-type-shape-kind", "missing-normalized-type", "permuted-type-rows",
   "duplicate-and-range-first", "out-of-range-type-id", "negative-type-id",
   "malformed-table-type-id", "dangling-type", "dangling-allocation", "dangling-instance",
   "malformed-type-reference", "malformed-allocation-reference", "malformed-instance-reference",

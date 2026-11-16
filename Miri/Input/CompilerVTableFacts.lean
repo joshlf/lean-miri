@@ -8,12 +8,8 @@ namespace Miri.Input.CompilerVTableFacts
 open Lean Miri.Memory Miri.Interpreter
 abbrev Result := Except String
 private def evidence (prepared : CompilerFactAdapters.Prepared) (id : Nat) : Result CompilerPredicateEvidence := do
-  let entries := prepared.context.program.input.compilerPredicates.filter (·.id == id)
-  let some entry := entries[0]? | throw "compiler predicate query identity missing"
-  unless entry.typingEnvironment == "fully_monomorphized" do throw "compiler predicate typing environment mismatch"
-  unless entries.all (fun other => other.original == entry.original && other.normalizedId == entry.normalizedId && other.stableKey == entry.stableKey && other.autoTrait == entry.autoTrait) do throw "conflicting compiler predicate evidence"
-  let actualId := entry.original
-  unless actualId == id do throw "compiler predicate original/query key mismatch"
+  let some entry := prepared.context.program.input.compilerPredicates[id]?
+    | throw "predicate normalization identity is absent"
   pure entry
 
 def predicates (prepared : CompilerFactAdapters.Prepared) (values : PredicateList) : Result (Array VTablePredicate) := do
@@ -23,9 +19,7 @@ def predicates (prepared : CompilerFactAdapters.Prepared) (values : PredicateLis
 
 def normalizePredicate (prepared : CompilerFactAdapters.Prepared) (predicate : VTablePredicate) : Result Nat := do
   let entry ← evidence prepared predicate.id
-  unless entry.stableKey == predicate.stableKey && entry.autoTrait == predicate.autoTrait do throw "predicate compiler comparison evidence mismatch"
   let some id := entry.normalizedId | throw "compiler predicate normalization has no result identity"
-  let _ ← evidence prepared id
   pure id
 
 private def lift (result : Result A) : EStateM StepError S A :=

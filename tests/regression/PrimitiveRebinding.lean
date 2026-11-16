@@ -29,11 +29,14 @@ def main (args : List String) : IO Unit := do
 
   let firstOwnCaller := firstProvider.callerLocationType
   let secondOwnCaller := secondProvider.callerLocationType
-  check (firstOwnCaller.toOption == some 21 && secondOwnCaller.toOption == some 22)
+  check (firstOwnCaller.toOption == firstDecoded.document.queries.primitives.callerLocationType &&
+    secondOwnCaller.toOption == secondDecoded.document.queries.primitives.callerLocationType &&
+    firstOwnCaller.isOk && secondOwnCaller.isOk)
     "genuine source caller-location IDs changed"
   let firstUsize := firstProvider.primitiveLayout "usize"
   let secondUsize := secondProvider.primitiveLayout "usize"
-  check (firstUsize.toOption.map (·.ty) == some 13 && secondUsize.toOption.map (·.ty) == some 14)
+  check (firstUsize.toOption.map (·.ty) == some firstDecoded.document.queries.primitives.usize &&
+    secondUsize.toOption.map (·.ty) == some secondDecoded.document.queries.primitives.usize)
     "genuine source usize identities changed"
 
   check (renderResult (CompilerPrimitiveFacts.primitiveLayout secondProvider.runtime "usize") ==

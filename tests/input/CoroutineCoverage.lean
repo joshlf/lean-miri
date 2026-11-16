@@ -27,15 +27,17 @@ private def invalidCoverage (document : ImportDocument) (value : CoroutineCovera
 exports nor evidence of safe coroutine execution. -/
 private def componentChecks (original : ImportDocument) : IO Unit := do
   let some owner := original.bodies[0]? | throw (IO.userError "missing fixture body")
-  let some ownerInstance := original.instances[owner.instanceId]? | throw (IO.userError "missing fixture instance")
-  let .Item definition := ownerInstance.instanceKind | throw (IO.userError "fixture owner is not Item")
+  let some sourceInstance := original.instances[owner.instanceId]? | throw (IO.userError "missing fixture instance")
+  let some definition := owner.definitionId | throw (IO.userError "missing fixture definition")
+  let ownerInstance := {sourceInstance with instanceKind := .Item definition}
   let some sourceType := original.types[0]? | throw (IO.userError "missing fixture type")
-  let facts : TypeCompilerFacts := {
-    typingEnvironment := "fully_monomorphized", booleanQueries := #[], typeQueries := #[]
-    projectionQueries := some ⟨"fully_monomorphized", #[⟨none, sourceType.layoutId, #[]⟩]⟩
-    discriminants := some ⟨true, none, (Array.range 3).map fun index => ⟨index, 0, index⟩⟩ }
-  let ty := {sourceType with shape := .coroutine definition ownerInstance.genericArgs, compilerFacts := some facts}
-  let document := {original with types := original.types.set! 0 ty}
+  let material : SourceCoroutineLayout := ⟨#[], #[], #[], #[#[], #[], #[]], #[], 0⟩
+  let ty := {sourceType with
+    shape := .coroutine definition ownerInstance.genericArgs
+    sourceLayout := {normalizedType := 0, coroutine := some material}}
+  let document := {original with
+    types := original.types.set! 0 ty
+    instances := original.instances.set! owner.instanceId ownerInstance}
   let source : Miri.Input.SourceInfo := ⟨owner.spanId, 0⟩
   let row : CoroutineEvidence := ⟨0, 0, .Coroutine .Movable, none, none,
     ⟨#[], #[#[], #[], #[]], #[source, source, source], #[]⟩, some 0, none, some 1⟩
@@ -78,88 +80,65 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
   invalidCoverage {document with bodies := document.bodies.set! 0 residual} coverage "unlowered terminator"
   invalidCoverage document {coverage with auxiliaryBodies := #[{sync with body := {residual with mir := {residual.mir with phase := .Runtime .Initial}}}, proxy]} "unlowered terminator"
   invalidCoverage document {coverage with auxiliaryBodies := #[{sync with body := {sync.body with definitionId := none}}, proxy]} "auxiliary source kind differs from body definition"
-  -- A constructed four-state physical layout: the first three states have no
-  -- saved locals; state 3 stores one u8 at offset 1. The root's u8 tag has a
-  -- narrowed range, so its query layout deliberately differs from plain u8.
-  let some baseLayout := original.layouts[sourceType.layoutId]? | throw (IO.userError "missing fixture layout")
-  let some backend := baseLayout.backendRepresentation | throw (IO.userError "missing fixture backend")
-  let emptyFields : FieldShape := ⟨.arbitrary, 0, none, none, #[], #[]⟩
-  let savedFields : FieldShape := ⟨.arbitrary, 1, none, none, #[1], #[0]⟩
-  let rootFields : FieldShape := ⟨.arbitrary, 1, none, none, #[0], #[0]⟩
-  let tag : ScalarLayout := ⟨.initialized, ⟨.integer, 1, some (.known .u8), some false, none, none⟩, some (0, 3)⟩
-  let variants : Array LayoutVariant := (Array.range 4).map fun index =>
-    ⟨(if index == 3 then savedFields else emptyFields), none, index, 2, backend,
-      (if index == 3 then #[1] else #[]), false⟩
-  let root := {baseLayout with
-    fields := some rootFields
-    fieldOffsetsBytes := .explicit #[0]
-    sizeBytes := some 2
-    variantsKind := some .multiple
-    variantsLayout := some ⟨.multiple, none, some tag, some ⟨.direct, none, none, none⟩, some 0, variants⟩
-    randomizationSeed := 43}
-  let selected := (Array.range 4).map fun index => {root with
-    fields := some (if index == 3 then savedFields else emptyFields)
-    fieldOffsetsBytes := .explicit (if index == 3 then #[1] else #[])
-    variantsKind := some .single
-    variantsLayout := some ⟨.single, some index, none, none, none, #[]⟩
-    randomizationSeed := 0}
-  let tagLayout := {baseLayout with
-    sizeBytes := some 1
-    backendReprKind := some .scalar
-    backendRepresentation := some ⟨.scalar, none, some tag, none, none, none, none, none, none⟩}
-  let rootId := original.layouts.size
-  let tagId := rootId + 5
-  let parents : Array ProjectionParent := #[⟨none, rootId, #[⟨0, 1, tagId⟩]⟩] ++
-    (Array.range 4).map fun index => ⟨some index, rootId + index + 1,
-      (if index == 3 then #[⟨0, 1, 1⟩] else #[])⟩
-  let multiFacts := {facts with
-    projectionQueries := some ⟨"fully_monomorphized", parents⟩
-    discriminants := some ⟨true, none, (Array.range 4).map fun index => ⟨index, 0, index⟩⟩}
-  let multiType := {ty with layoutId := rootId, compilerFacts := some multiFacts}
-  let multiDocument := {document with
-    layouts := original.layouts ++ #[root] ++ selected ++ #[tagLayout]
-    types := document.types.set! 0 multiType}
+  -- Physical layouts now come from source material; there is no selected-layout
+  -- or field-query row to forge. Check the computed tag and state through the
+  -- same provider used during execution, then reject disagreeing source material.
+  let multiMaterial : SourceCoroutineLayout := ⟨#[1], #[1], #[], #[#[], #[], #[], #[0]], #[#[]], 43⟩
+  let multiType := {ty with sourceLayout := {ty.sourceLayout with coroutine := some multiMaterial}}
+  let multiDocument := {document with types := document.types.set! 0 multiType}
   let multiRow := {row with layout := ⟨#[⟨1, source, false, none⟩],
     #[#[], #[], #[], #[0]], #[source, source, source, source], #[#[]]⟩}
   let multiCoverage := {coverage with coroutines := #[multiRow]}
   let _ ← must (CoroutineCoverageCodec.validate multiDocument multiCoverage)
-  let some stateParent := parents[4]? | throw (IO.userError "missing state query")
-  let some stateLayout := selected[3]? | throw (IO.userError "missing selected layout")
-  let wrongSize := {stateLayout with sizeBytes := some 3}
-  let badId := multiDocument.layouts.size
-  let wrongParents := parents.set! 4 {stateParent with layoutId := badId}
-  let wrongFacts := {multiFacts with projectionQueries := some ⟨"fully_monomorphized", wrongParents⟩}
-  let wrongType := {multiType with compilerFacts := some wrongFacts}
-  let wrongDocument := {multiDocument with
-    layouts := multiDocument.layouts.push wrongSize
-    types := multiDocument.types.set! 0 wrongType}
-  invalidCoverage wrongDocument multiCoverage "selected query differs from exact physical variant"
-  let wrongOffset := {stateLayout with fields := some rootFields, fieldOffsetsBytes := .explicit #[0]}
-  invalidCoverage {wrongDocument with layouts := wrongDocument.layouts.set! badId wrongOffset}
-    multiCoverage "selected query differs from exact physical variant"
-  let phantomParent := {stateParent with fields := #[⟨0, 1, tagId⟩]}
-  let phantomFacts := {multiFacts with projectionQueries := some ⟨"fully_monomorphized", parents.set! 4 phantomParent⟩}
-  let phantomType := {multiType with compilerFacts := some phantomFacts}
-  invalidCoverage {multiDocument with types := multiDocument.types.set! 0 phantomType}
-    multiCoverage "saved field query layout differs from exact type layout"
+  let runtime ← must (RuntimeMetadata.ofDocument multiDocument |>.mapError toString)
+  let root ← must (runtime.lookup 0 |>.mapError toString)
+  check (root.layout.size.bytes == 2 && root.layout.randomizationSeed == 43) "computed coroutine root geometry/seed differs"
+  let .Multiple tag .Direct tagIndex states := root.layout.variants |
+    throw (IO.userError "computed coroutine did not retain direct state variants")
+  check (tagIndex == 0 && states.size == 4) "computed coroutine tag/state count differs"
+  check ((← must (tag.validRange runtime.target |>.mapError reprStr)) == ⟨0,3⟩) "computed coroutine tag range differs"
+  let tagField ← must (runtime.field root 0 |>.mapError toString)
+  let plainU8 ← must (runtime.lookup 1 |>.mapError toString)
+  check (tagField.ty == plainU8.ty && tagField.layout != plainU8.layout) "computed tag lost its narrowed scalar range"
+  for state in [:4] do
+    let selected ← must (runtime.forVariant root state |>.mapError toString)
+    check (selected.layout.size.bytes == 2) "computed state size differs from prefix storage"
+    check (selected.layout.fields.count == (if state == 3 then 1 else 0)) "computed state field count differs"
+    if state == 3 then
+      let offset ← must (selected.layout.fields.offset 0 |>.mapError reprStr)
+      check (offset.bytes == 1) "computed saved-field offset differs"
+      let savedField ← must (runtime.field selected 0 |>.mapError toString)
+      check (savedField == plainU8) "computed saved field differs from exact type layout"
+  let noMaterial := {multiType with sourceLayout := {multiType.sourceLayout with coroutine := none}}
+  invalidCoverage {multiDocument with types := multiDocument.types.set! 0 noMaterial}
+    multiCoverage "missing source layout material"
+  for badMaterial in #[
+      {multiMaterial with savedTypes := #[2]},
+      {multiMaterial with variants := #[#[], #[], #[], #[]]},
+      {multiMaterial with conflicts := #[#[0]]}] do
+    let wrongType := {multiType with sourceLayout := {multiType.sourceLayout with coroutine := some badMaterial}}
+    invalidCoverage {multiDocument with types := multiDocument.types.set! 0 wrongType}
+      multiCoverage "source layout differs from saved-local evidence"
   IO.println "PASS constructed coroutine ownership/type/index/conflict/phase/role/residual negatives"
 
-/-- Finite decoder contract checks. The fixed schema-11 input is read, never
-rewritten; schema-12 mutations exist only in memory and establish no guest safety. -/
+/-- Finite schema-13 decoder controls and constructed source-layout witnesses;
+these checks do not execute a Rust coroutine or establish guest safety. -/
 def main : IO Unit := do
-  let legacy ← IO.FS.readFile "examples/empty_function/input.json"
-  let decoded ← must (decodeJson legacy)
-  check decoded.document.coroutineCoverage.isNone "legacy input acquired fabricated coroutine evidence"
+  let input ← IO.FS.readFile "tests/input/fixtures/strict-unit.json"
+  let decoded ← must (decodeJson input)
+  check decoded.document.coroutineCoverage.isSome "schema 13 lost typed coroutine coverage"
   let count := decoded.document.bodies.size
   let markers := "[" ++ String.intercalate "," (List.replicate count "false") ++ "]"
   let catalog := object [("body_coroutines", markers), ("coroutines", "[]"), ("auxiliary_bodies", "[]")]
-  let newVersion ← must (setField legacy "schema_version" "12")
-  let valid ← must (setField newVersion "compiler_coroutine_coverage" catalog)
+  let valid ← must (setField input "compiler_coroutine_coverage" catalog)
   let newDecoded ← must (decodeJson valid)
-  check newDecoded.document.coroutineCoverage.isSome "schema 12 failed to retain typed coverage"
-  rejected (← must (setField legacy "compiler_coroutine_coverage" catalog)) "schema 11 forbids"
-  rejected newVersion "schema 12 requires"
-  rejected (← must (setField valid "schema_version" "13")) "unsupported schema version"
+  check newDecoded.document.coroutineCoverage.isSome "schema 13 failed to retain typed coverage"
+  for version in ["11", "12", "14"] do
+    rejected (← must (setField valid "schema_version" version)) "unsupported schema version"
+  let fields ← must ((← must (JsonFixtures.parse valid)).object)
+  let missingCoverage := object ((fields.filterMap fun (name, value) =>
+    if name == "compiler_coroutine_coverage" then none else some (name,value.text)).toList)
+  rejected missingCoverage "source coverage is absent"
   rejected (← must (setField valid "compiler_coroutine_coverage" (object [("auxiliary_bodies", "[]"), ("coroutines", "[]")]))) "body_coroutines"
   let badMarkers ← must (setField catalog "body_coroutines" "[]")
   rejected (← must (setField valid "compiler_coroutine_coverage" badMarkers)) "incomplete body markers"
@@ -185,7 +164,7 @@ def main : IO Unit := do
   let pools ← must (JsonReader.run (do
     let pools ← readSharedPools
     JsonReader.skipValue
-    pure pools) legacy)
+    pure pools) input)
   let layout := object [("field_tys", "[{\"type\":0,\"source_info\":0,\"ignore_for_traits\":false,\"debuginfo_name\":null}]"),
     ("variant_fields", "[[],[],[]]"), ("variant_source_info", "[]"), ("storage_conflicts", "[[]]")]
   let witness := object [("owner_body", "0"), ("coroutine_type", "0"),
@@ -202,4 +181,4 @@ def main : IO Unit := do
   let badCatalog ← must (setField catalog "coroutines" ("[" ++ badWitness ++ "]"))
   rejected (← must (setField valid "compiler_coroutine_coverage" badCatalog)) "dangling source-info pool reference"
   componentChecks decoded.document
-  IO.println "PASS strict schema-11/12 coroutine coverage, retained evidence and malformed/missing/unknown guards"
+  IO.println "PASS strict schema-13 coroutine coverage, computed layouts and malformed/missing/unknown guards"

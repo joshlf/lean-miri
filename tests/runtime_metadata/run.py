@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise metadata operations on fresh pinned compiler query results."""
+"""Exercise on-demand metadata operations on fresh concrete source material."""
 import json
 import os
 from pathlib import Path

@@ -203,27 +203,6 @@ private def sourceBounds (document : ImportDocument) (owner : Body) (info : Sour
   unless info.spanId < document.spans.size && info.scope < owner.sourceScopes.size do
     throw "coroutine coverage: dangling source info"
 
-/-- Pinned rustc_middle::ty::layout::ty_and_layout_for_variant and
-rustc_abi/layout/simple.rs::LayoutData::for_variant. Root attributes are retained;
-only the selected physical variant fields and seed are replaced. This validates
-query evidence and does not change the runtime's projection implementation. -/
-private def physicalVariant (root : Miri.ABI.LayoutData) (index : Nat) : Except String Miri.ABI.LayoutData := do
-  match root.variants with
-  | .Single actual =>
-    unless actual == index do throw "coroutine coverage: invalid single variant query"
-    pure root
-  | .Multiple _ _ _ variants =>
-    let some variant := variants[index]? | throw "coroutine coverage: missing physical variant"
-    pure {root with
-      fields := .Arbitrary variant.fieldOffsets variant.fieldsInMemoryOrder
-      variants := .Single index
-      backendRepr := variant.backendRepr
-      largestNiche := variant.largestNiche
-      uninhabited := variant.uninhabited
-      size := variant.size
-      randomizationSeed := 0}
-  | .Empty => throw "coroutine coverage: unexpected empty variant query"
-
 /-- Validate evidence without ever adding auxiliary bodies to the callable graph. -/
 def validate (document : ImportDocument) (coverage : CoroutineCoverage) : Except String Unit := do
   unless coverage.bodyCoroutines.size == document.bodies.size do
@@ -273,66 +252,25 @@ def validate (document : ImportDocument) (coverage : CoroutineCoverage) : Except
           throw "coroutine coverage: invalid or duplicate saved field index"
         unless conflicts.contains index do
           throw "coroutine coverage: asymmetric storage conflicts"
-    let some projections := coroutineType.compilerFacts.bind (·.projectionQueries) |
-      throw "coroutine coverage: absent exact coroutine projection queries"
-    let some discriminants := coroutineType.compilerFacts.bind (·.discriminants) |
-      throw "coroutine coverage: missing compiler state discriminants"
-    unless discriminants.hasDiscriminants && discriminants.values.size == row.layout.variants.size &&
-        (discriminants.values.map (·.variant)) == Array.range row.layout.variants.size do
-      throw "coroutine coverage: state discriminants differ from layout variants"
-    let some physical := document.layouts[coroutineType.layoutId]? >>= (·.variantsLayout) |
-      throw "coroutine coverage: absent physical coroutine variants"
-    let some targetEvidence := document.runtimeTargetDataLayout |
-      throw "coroutine coverage: missing target data layout"
-    let target ← RuntimeMetadata.importTarget targetEvidence |>.mapError toString
-    let some rootSource := document.layouts[coroutineType.layoutId]? |
-      throw "coroutine coverage: missing root physical layout"
-    let rootLayout ← RuntimeMetadata.layout target rootSource |>.mapError toString
-    let requiredVariants := if physical.kind == .multiple then physical.variants.size else 0
-    unless projections.typingEnvironment == "fully_monomorphized" &&
-        projections.parents.size == requiredVariants + 1 &&
-        (projections.parents.filter (·.variant.isNone)).size == 1 &&
-        ((projections.parents.find? (·.variant.isNone)).map (·.layoutId)) == some coroutineType.layoutId do
-      throw "coroutine coverage: incomplete exact projection parents"
-    if physical.kind == .multiple then
-      unless requiredVariants == row.layout.variants.size &&
-          (projections.parents.filterMap (·.variant)) == Array.range requiredVariants do
-        throw "coroutine coverage: physical variants differ from state mapping"
-    for parent in projections.parents do
-      if let some variant := parent.variant then
-        let some querySource := document.layouts[parent.layoutId]? |
-          throw "coroutine coverage: missing selected physical layout"
-        let actual ← RuntimeMetadata.layout target querySource |>.mapError toString
-        let expected ← physicalVariant rootLayout variant
-        unless actual == expected do
-          throw "coroutine coverage: selected query differs from exact physical variant"
-      let some queryFields := document.layouts[parent.layoutId]? >>= (·.fields) |
-        throw "coroutine coverage: absent projection field layout"
-      unless queryFields.fieldCount == parent.fields.size do
-        throw "coroutine coverage: query fields differ from physical layout"
-      unless (parent.fields.map (·.index)) == Array.range parent.fields.size do
-        throw "coroutine coverage: field query indices are not canonical"
-      let selected := match parent.variant, physical.kind with
-        | some variant, _ => some variant
-        | none, .single => physical.variantIndex
-        | _, _ => none
-      if let some variant := selected then
-        let some mapping := row.layout.variants[variant]? |
-          throw "coroutine coverage: dangling projection variant"
-        unless parent.fields.size == mapping.size do
-          throw "coroutine coverage: projection/state field count mismatch"
-        for (field, index) in parent.fields.toList.zipIdx do
-          let some saved := mapping[index]? >>= (fields[·]?) |
-            throw "coroutine coverage: missing saved field"
-          unless field.typeId == saved.typeId do
-            throw "coroutine coverage: projection/saved field type mismatch"
-          let some savedType := document.types[saved.typeId]? |
-            throw "coroutine coverage: missing saved field type"
-          -- Selected state fields use TyMaybeWithLayout::Ty -> layout_of.
-          -- Root Multiple's synthetic tag_layout is deliberately not subject
-          -- to this canonical type-layout equality (pinned ty/layout.rs:859).
-          unless field.layoutId == savedType.layoutId do
-            throw "coroutine coverage: saved field query layout differs from exact type layout"
+    let some material := coroutineType.sourceLayout.coroutine |
+      throw "coroutine coverage: missing source layout material"
+    unless material.savedTypes == fields.map (·.typeId) && material.variants == row.layout.variants &&
+        material.conflicts == row.layout.storageConflicts do
+      throw "coroutine coverage: source layout differs from saved-local evidence"
+    let runtime ← RuntimeMetadata.ofDocument document |>.mapError toString
+    let root ← runtime.lookup row.coroutineType |>.mapError toString
+    let .Multiple _ _ _ variants := root.layout.variants |
+      throw "coroutine coverage: computed coroutine lacks its state variants"
+    unless variants.size == row.layout.variants.size do
+      throw "coroutine coverage: computed state count differs from saved-local mapping"
+    for (mapping,index) in row.layout.variants.toList.zipIdx do
+      let selected ← runtime.forVariant root index |>.mapError toString
+      unless selected.layout.fields.count == mapping.size do
+        throw "coroutine coverage: computed state field count differs from saved-local mapping"
+      for (saved,field) in mapping.toList.zipIdx do
+        let actual ← runtime.field selected field |>.mapError toString
+        unless material.savedTypes[saved]? == some actual.ty do
+          throw "coroutine coverage: computed state field type differs from saved-local mapping"
     unless row.dropSync.isSome != row.dropAsync.isSome && row.dropProxyAsync.isSome == row.dropSync.isSome do
       throw "coroutine coverage: inconsistent drop roles"
     for (reference, role) in [(row.dropSync, CoroutineAuxiliaryRole.sync),

@@ -37,8 +37,6 @@ fn query<'tcx>(
         {
             return Err("Windows type path did not resolve to a closed monomorphic type".into());
         }
-        tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty))
-            .map_err(|error| format!("rustc layout_of failed for windows::{name}: {error:?}"))?;
         Ok(type_json(context, tcx, ty)?)
     })();
     Ok::<_, String>(match result {

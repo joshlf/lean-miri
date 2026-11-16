@@ -49,6 +49,25 @@ class FailClosedExportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         document = load_mir_document(self.output)
         self.assertNotIn("completeness", document)
+        self.assertEqual(document["schema_version"], 13)
+        for name in ("layouts", "layout_values", "fn_abis", "abi_arguments", "boolean_queries",
+                     "discriminants", "compiler_instance_abis", "compiler_function_facts",
+                     "compiler_covariance_queries", "compiler_vtable_queries", "compiler_cast_queries"):
+            self.assertNotIn(name, document)
+        for node in document["types"]:
+            self.assertFalse({"layout", "layout_query_input_type", "compiler_facts"} & node.keys())
+        for intrinsic in document["instances"]:
+            if intrinsic["instance_kind"]["kind"] != "intrinsic":
+                continue
+            items = [row for row in document["instances"]
+                     if row["instance_kind"]["kind"] == "item"
+                     and row["def_id"] == intrinsic["def_id"]
+                     and row["generic_args"] == intrinsic["generic_args"]]
+            self.assertEqual(len(items), 1, "Miri intrinsic ABI needs its exact Item identity")
+            item = items[0]
+            self.assertIsNotNone(document["source_abi"]["definitions"][item["instance_id"]])
+            if intrinsic["fallback_instance"] is None:
+                self.assertEqual(item["kind"], "identity_only", "ABI-only Item must not emit MIR")
         seen = set()
 
         def check(value):
@@ -69,7 +88,7 @@ class FailClosedExportTests(unittest.TestCase):
         check(document)
         return document
 
-    def test_llvm_intrinsics_have_typed_no_abi_evidence(self):
+    def test_llvm_intrinsics_keep_exact_identity_without_abi_results(self):
         document = self.accepted("llvm_no_abi")
         calls = [block["terminator"]["kind"]["resolution"]
                  for body in document["bodies"] for block in body["basic_blocks"]
@@ -79,63 +98,49 @@ class FailClosedExportTests(unittest.TestCase):
         ids = {call["instance_id"] for call in llvm}
         for call in llvm:
             self.assertNotIn("fn_abi", call)
-            self.assertNotIn("dispatch_slot", call)
             instance = document["instances"][call["instance_id"]]
             self.assertEqual(instance["instance_kind"]["kind"], "llvm_intrinsic")
-        queries = document["compiler_instance_abis"]
-        self.assertFalse(ids & {row["instance_id"] for row in queries})
+        self.assertFalse(ids & {row["instance_id"] for row in document["source_abi"]["definitions"]})
 
-    def test_source_llvm_abi_keeps_signature_without_synthetic_normal_abi(self):
+    def test_source_llvm_abi_keeps_its_original_signature(self):
         for fixture in ("llvm_source_abi", "llvm_stdarch_abi"):
             with self.subTest(fixture=fixture):
                 document = self.accepted(fixture)
-                facts = document["compiler_function_facts"]
-                llvm = [row for row in facts["types"]
-                        if row["signature_query"]["abi"]["kind"] == "llvm_intrinsic"]
-                self.assertTrue(llvm, "fixture must use the actual stdarch LLVM ABI")
-                helpers = facts["helper_signatures"]
-                self.assertFalse(any(row["signature"]["abi"]["kind"] == "llvm_intrinsic" for row in helpers))
-                for row in llvm:
-                    signature = row["signature_query"]
-                    self.assertTrue(any(helper["signature"]["abi"]["kind"] == "rust"
-                                        and helper["signature"]["inputs"] == signature["inputs"]
-                                        and helper["signature"]["output"] == signature["output"]
-                                        for helper in helpers), "valid Rust helper candidate was dropped")
+                signatures = [row["shape"]["signature"] for row in document["types"]
+                              if row["shape"].get("kind") in ("function_definition", "function_pointer")]
+                self.assertTrue(any(signature["abi"]["kind"] == "llvm_intrinsic"
+                                    for signature in signatures))
 
-    def test_uncalled_llvm_pointer_preserves_metadata_without_undefined_abi(self):
+    def test_uncalled_llvm_pointer_keeps_source_type(self):
         document = self.accepted("llvm_pointer_metadata")
-        facts = document["compiler_function_facts"]
-        pointers = {row["type_id"] for row in facts["types"]
-                    if row["function_kind"]["kind"] == "function_pointer"
-                    and row["signature_query"]["abi"]["kind"] == "llvm_intrinsic"}
-        self.assertTrue(pointers, "fixture must retain the LLVM ABI pointer type")
-        self.assertFalse(pointers & {row["type_id"] for row in facts["pointer_abis"]})
-        for ty in pointers:
-            self.assertIsInstance(document["types"][ty]["layout"], int)
+        pointers = [row for row in document["types"]
+                    if row["shape"].get("kind") == "function_pointer"
+                    and row["shape"]["signature"]["abi"]["kind"] == "llvm_intrinsic"]
+        self.assertTrue(pointers)
+        for pointer in pointers:
+            self.assertIsInstance(pointer["source_layout"]["normalized_type"], int)
 
-    def test_demanded_llvm_pointer_abi_fails_closed_without_panicking(self):
-        result = self.export("llvm_pointer_call")
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertIn("FnPtr ABI query is not defined for LLVM intrinsic signatures", result.stderr)
-        self.assertNotIn("panicked", result.stderr)
-        self.assertFalse(self.output.exists())
+    def test_llvm_pointer_call_defers_abi_to_the_consumer(self):
+        document = self.accepted("llvm_pointer_call")
+        calls = [block["terminator"]["kind"]["resolution"]
+                 for body in document["bodies"] for block in body["basic_blocks"]
+                 if block["terminator"]["kind"].get("variant") == "Call"]
+        self.assertTrue(any(call["kind"] == "indirect_function_pointer"
+                            and call["signature"]["abi"]["kind"] == "llvm_intrinsic"
+                            for call in calls))
 
-    def test_layout_query_types_keep_runtime_query_demands(self):
+    def test_normalized_runtime_views_are_defined_source_types(self):
         source = ROOT / "upstream/miri-source/tests/pass/unops.rs"
         result = subprocess.run(
             [str(self.exporter), "--output", str(self.output), "--root", "main", "--",
-             str(source), "--crate-type=lib", "--crate-name=layout_query_demand"],
+             str(source), "--crate-type=lib", "--crate-name=normalization_material"],
             cwd=ROOT, env=self.environment, capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         document = load_mir_document(self.output)
-        demands = {row["input_type_id"] for row in document["compiler_runtime_queries"]["types"]}
-        erased_demands = {
-            row["layout_query_input_type"] for row in document["types"]
-            if row.get("layout_query_input_type") is not None
-        }
-        self.assertTrue(erased_demands)
-        self.assertFalse(erased_demands - demands, "canonical layout-query types lost runtime demand rows")
+        for node in document["types"]:
+            normalized = pool_entry(document, "types", node["source_layout"]["normalized_type"])
+            self.assertEqual(normalized["source_layout"]["normalized_type"], normalized["type_id"])
 
     def test_nested_foreign_block_is_not_an_ambiguous_mir_root(self):
         self.accepted("nested_foreign_root")
@@ -143,16 +148,16 @@ class FailClosedExportTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('did not resolve to a local MIR body', result.stderr)
 
-    def test_foreign_repr_c_transfer_records_exact_false_covariance(self):
+    def test_foreign_repr_c_transfer_preserves_nominal_type_difference(self):
         document = self.accepted("foreign_repr_c_transfer", crate_type="bin")
-        types = {row['display']: row['type_id'] for row in document['types']}
-        source, target = types['CallerType'], types['implementation::CalleeType']
-        rows = [row for row in document['compiler_covariance_queries']
-                if row['source_type'] == source and row['target_type'] == target]
-        self.assertEqual(len(rows), 1)
-        self.assertIs(rows[0]['value'], False)
+        types = {row["display"]: row for row in document["types"]}
+        source, target = types["CallerType"], types["implementation::CalleeType"]
+        self.assertNotEqual(source["shape"]["def_id"], target["shape"]["def_id"])
+        for node in (source, target):
+            self.assertTrue(node["shape"]["representation"]["flags_bits"] & 1)
+            self.assertEqual(len(node["shape"]["variants"][0]["fields"]), 1)
 
-    def test_shared_reborrow_records_exact_false_covariance(self):
+    def test_shared_reborrow_keeps_both_nominal_type_definitions(self):
         document = self.accepted("shared_reborrow")
         reborrows = []
         def visit(value):
@@ -165,30 +170,29 @@ class FailClosedExportTests(unittest.TestCase):
                 for child in value:
                     visit(child)
         visit(document["bodies"])
-        self.assertTrue(reborrows, "fixture did not exercise shared Reborrow")
+        self.assertTrue(reborrows)
         for value in reborrows:
-            source, target = value["place"]["type"], value["type"]
-            self.assertNotEqual(source, target)
-            rows = [row for row in document["compiler_covariance_queries"]
-                    if row["source_type"] == source and row["target_type"] == target]
-            self.assertEqual(len(rows), 1)
-            self.assertIs(rows[0]["value"], False, "same layout must not fabricate subtyping")
+            source = pool_entry(document, "types", value["place"]["type"])
+            target = pool_entry(document, "types", value["type"])
+            self.assertNotEqual(source["shape"]["def_id"], target["shape"]["def_id"])
+            self.assertEqual(source["source_layout"]["variances"],
+                             [{"kind": "covariant"}, {"kind": "invariant"}])
+            self.assertEqual(target["source_layout"]["variances"],
+                             [{"kind": "covariant"}, {"kind": "covariant"}])
 
-    def test_no_std_keeps_negative_and_optional_query_answers(self):
+    def test_no_std_keeps_negative_and_optional_declaration_fields(self):
         document = self.accepted("no_std")
         self.assertNotIn("compiler_named_constants", document)
         self.assertNotIn("startup", document["compiler_runtime_queries"])
         unsigned = next(node for node in document["types"]
                         if node["shape"].get("unsigned_kind") == "u32")
-        facts = unsigned["compiler_facts"]
-        self.assertEqual(facts["boolean_queries"]["is_dynamic"],
-                         False)
-        self.assertEqual(facts["type_queries"]["boxed_type"],
-                         None)
+        self.assertIs(unsigned["source_layout"]["is_box"], False)
+        self.assertIsNone(unsigned["source_layout"]["simd"])
+        self.assertEqual(unsigned["source_layout"]["normalized_type"], unsigned["type_id"])
 
     def test_no_main_binary_exports_startup_facts(self):
         result = subprocess.run(
-            [str(self.exporter), "--output", str(self.output), "--",
+            [str(self.exporter), "--output", str(self.output), "--root", "miri_start", "--",
              str(ROOT / "tests/connected/fixtures/203-upcast-a-prefix.rs"),
              "--crate-type=bin", "--crate-name=custom_entry_startup", "-Cpanic=abort"],
             cwd=ROOT, env=self.environment, capture_output=True, text=True,
@@ -205,41 +209,33 @@ class FailClosedExportTests(unittest.TestCase):
         self.assertIsInstance(pool_entry(document, "definitions", sentinel["definition"])["crate"], int)
         self.assertIsInstance(pool_entry(document, "definitions", sentinel["definition"])["index"], int)
 
-    def test_function_pointer_query_keeps_direct_instance_identity(self):
+    def test_function_pointer_material_keeps_direct_instance_identity(self):
         document = self.accepted("function_pointer")
-        resolutions = [record for record in document["compiler_cast_queries"]
-                       if record["query_kind"] == "resolve_fn_ptr"]
+        resolutions = [record for record in document["source_cast_targets"]
+                       if record["kind"] == "function_pointer"]
         self.assertTrue(resolutions)
         for record in resolutions:
-            self.assertNotIn("value", record)
-            self.assertEqual(record["resolution_kind"], "instance")
             self.assertIsInstance(record["instance_id"], int)
             instance = pool_entry(document, "instances", record["instance_id"])
             self.assertIn("instance_kind", instance)
             self.assertIn("generic_args", instance)
             self.assertNotIn("instance_kind", record)
-            self.assertNotIn("generic_args", record)
 
-    def test_std_main_box_constructor_retains_numeric_result(self):
+    def test_std_main_keeps_finite_box_type_material(self):
         result = subprocess.run(
-            [str(self.exporter), "--output", str(self.output), "--",
+            [str(self.exporter), "--output", str(self.output), "--root", "main", "--",
              str(ROOT / "tests/repro/startup/empty-main.rs"), "--crate-type=bin",
-             "--crate-name=box_query_main", "-Cpanic=abort"],
+             "--crate-name=box_material_main", "-Cpanic=abort"],
             cwd=ROOT, env=self.environment, capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         document = load_mir_document(self.output)
-        queries = [row for row in document["compiler_cast_queries"]
-                   if row["query_kind"] == "box_type"]
-        self.assertTrue(queries)
-        for row in queries:
-            self.assertIsInstance(row["type"], int)
-            self.assertIsInstance(row["input_type"], int)
-            boxed = pool_entry(document, "types", row["type"])
-            self.assertEqual(boxed["shape"]["kind"], "adt")
-            self.assertIn("Box", boxed["shape"]["def_path"])
+        boxes = [node for node in document["types"] if node["source_layout"]["is_box"]]
+        self.assertTrue(boxes)
+        self.assertTrue(all(node["shape"]["kind"] == "adt" and node["shape"]["generic_args"]
+                            for node in boxes))
 
-    def test_result_main_has_exact_bootstrap_caller_signature(self):
+    def test_result_main_has_exact_bootstrap_source_signature(self):
         document = self.accepted("start_result", "main", "bin")
         main = next(row for row in document["compiler_main_queries"]["entries"]
                     if row["signature_query"]["compiler_selected_entry"])
@@ -251,28 +247,30 @@ class FailClosedExportTests(unittest.TestCase):
                         and row["shape"]["mutability"]["kind"] == "immutable"
                         and row["shape"]["pointee"] == ty)
         argv = const_pointer_to(const_pointer_to(primitive["u8"]))
-        expected = [main["signature_query"]["function_pointer_type"],
+        entry_pointer = types[main["signature_query"]["function_pointer_type"]]["source_layout"]["normalized_type"]
+        expected = [entry_pointer,
                     primitive["isize"], argv, primitive["u8"]]
-        rows = document["compiler_function_facts"]["helper_signatures"]
-        exact = [row for row in rows if row["signature"]["inputs"] == expected
-                 and row["signature"]["output"] == primitive["isize"]
-                 and row["signature"]["abi"]["kind"] == "rust"
-                 and row["signature"]["safety"]["kind"] == "safe"
-                 and not row["signature"]["c_variadic"]]
-        self.assertTrue(exact, "source call_main dummy signature was not queried")
-        self.assertTrue(all(isinstance(row["abi_query"], int) for row in exact))
+        start = main["signature_query"]["start_resolution"]["instance_id"]
+        signature = next(row["signature"] for row in document["source_abi"]["definitions"]
+                         if row["instance_id"] == start)
+        self.assertEqual(signature["inputs"], expected)
+        self.assertEqual(signature["output"], primitive["isize"])
+        self.assertEqual(signature["abi"]["kind"], "rust")
+        self.assertFalse(signature["c_variadic"])
 
-    def test_weak_static_function_demands_retain_exact_named_queries(self):
+    def test_weak_static_function_demands_keep_exact_source_recipes(self):
         for fixture, name, args, ret in [
             ("weak_getrandom", "getrandom", ["pointer", "usize", "u32"], "isize"),
             ("weak_cxa", "__cxa_thread_atexit_impl", ["pointer"] * 3, "i32"),
         ]:
             with self.subTest(fixture=fixture):
                 document = self.accepted(fixture)
-                row = next(row for row in document["compiler_named_shim_abis"] if row["name"] == name)
-                self.assertEqual(row["recipe"]["signature"]["arguments"], args)
-                self.assertEqual(row["recipe"]["signature"]["return"], ret)
-                self.assertIsInstance(row["recipe"]["query"]["abi_query"], int)
+                recipe = next(row["recipe"] for row in document["compiler_named_shim_abis"]
+                              if row["name"] == name)
+                self.assertEqual(recipe["signature"]["arguments"], args)
+                self.assertEqual(recipe["signature"]["return"], ret)
+                self.assertEqual(len(recipe["input_types"]), len(args))
+                self.assertIsInstance(recipe["output_type"], int)
 
     def test_unknown_weak_static_does_not_synthesize_named_shim(self):
         document = self.accepted("weak_unknown")
@@ -318,12 +316,12 @@ class FailClosedExportTests(unittest.TestCase):
 
     def test_coroutine_metadata_retains_exact_coverage_and_runtime_abi(self):
         document = self.accepted("coroutine", "root")
-        self.assertEqual(document["schema_version"], 12)
+        self.assertEqual(document["schema_version"], 13)
         coverage = document["compiler_coroutine_coverage"]
         self.assertTrue(coverage["coroutines"])
         self.assertEqual(len(coverage["body_coroutines"]), len(document["bodies"]))
         owners = {document["bodies"][row["owner_body"]]["instance_id"] for row in coverage["coroutines"]}
-        self.assertTrue(owners <= {row["instance_id"] for row in document["compiler_instance_abis"]})
+        self.assertTrue(owners <= {row["instance_id"] for row in document["source_abi"]["definitions"]})
         self.assertFalse(owners & {row["instance_id"] for row in document["compiler_native_signature_queries"]})
         for row in coverage["coroutines"]:
             self.assertIsNone(row["yield_type"])
@@ -364,87 +362,61 @@ class FailClosedExportTests(unittest.TestCase):
             inspect(body)
         self.assertTrue(evaluated_layouts, "Box::new must retain its compiler-evaluated Layout operand")
 
-    def test_unknown_generic_runtime_constant_aborts_without_output(self):
-        result = self.export("generic_runtime_constant", "root")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(self.output.exists())
-        self.assertIn("generic", result.stderr.lower())
-        self.assertNotIn("panicked at", result.stderr)
+    def test_generic_root_does_not_evaluate_symbolic_runtime_constants(self):
+        document = self.accepted("generic_runtime_constant", "root")
+        self.assertEqual(document["bodies"], [])
+        self.assertEqual(document["root_declarations"][0]["def_path"], "root")
 
-    def test_concrete_async_return_abi_exports_before_polling_coroutine(self):
+    def test_concrete_async_constructor_keeps_its_normalized_source_signature(self):
         document = self.accepted("runtime_async_abi", "root")
-        instance = next(row for row in document["instances"]
-                        if row["def_path"] == "make_future")
-        queries = [row for row in document["compiler_instance_abis"]
-                   if row["instance_id"] == instance["instance_id"]
-                   and row["extra_argument_types"] == []]
-        self.assertEqual(len(queries), 1)
-        self.assertEqual(queries[0]["typing_env"], "fully_monomorphized")
-        abi = pool_entry(document, "fn_abis", queries[0]["abi_query"])
-        returned = pool_entry(document, "types", abi["return"]["type"])
+        instance = next(row for row in document["instances"] if row["def_path"] == "make_future")
+        definition = next(row for row in document["source_abi"]["definitions"]
+                          if row["instance_id"] == instance["instance_id"])
+        returned = pool_entry(document, "types", definition["signature"]["output"])
         self.assertEqual(returned["shape"]["kind"], "coroutine")
         root = pool_entry(document, "bodies", document["body_roots"][0]["body"])
         calls = [block["terminator"]["kind"] for block in root["basic_blocks"]
                  if block["terminator"]["kind"].get("variant") == "Call"]
-        calls = [call for call in calls
-                 if call["resolution"].get("instance_id") == instance["instance_id"]]
-        self.assertTrue(calls, "fixture must call the concrete async constructor")
-        self.assertTrue(all(call["resolution"]["fn_abi"] == queries[0]["abi_query"]
+        self.assertTrue(any(call["resolution"].get("instance_id") == instance["instance_id"]
                             for call in calls))
 
-    def test_nested_signature_regions_keep_source_identity_and_closed_query_view(self):
+    def test_nested_signature_regions_keep_source_binders_and_normalized_view(self):
         document = self.accepted("higher_ranked_variadic", "root")
         enclosing = [row for row in document["types"]
                      if row["shape"].get("kind") == "reference"
                      and row["shape"]["region"].get("kind") == "bound"
                      and row["shape"]["region"]["index_kind"]["debruijn_index"] == 1
                      and "va_arg::" in row["shape"]["region"]["bound_kind"].get("def_path", "")]
-        self.assertTrue(enclosing, "fixture must preserve the enclosing VaList region Binder")
-        function_facts = {row["type_id"] for row in document["compiler_function_facts"]["types"]}
-        runtime_demands = {row["input_type_id"]
-                           for row in document["compiler_runtime_queries"]["types"]}
+        self.assertTrue(enclosing)
         for source in enclosing:
-            query_id = source["layout_query_input_type"]
-            query = pool_entry(document, "types", query_id)
-            self.assertNotEqual(source["type_id"], query_id)
-            self.assertEqual(query["shape"]["region"], {"kind": "erased"})
-            self.assertEqual(source["layout"], query["layout"])
-            self.assertEqual(source["compiler_facts"], query["compiler_facts"])
-            self.assertIn(query_id, runtime_demands)
+            runtime_id = source["source_layout"]["normalized_type"]
+            runtime = pool_entry(document, "types", runtime_id)
+            self.assertNotEqual(source["type_id"], runtime_id)
+            self.assertEqual(runtime["shape"]["region"], {"kind": "erased"})
             pointers = [row for row in document["types"]
                         if row["shape"].get("kind") == "function_pointer"
                         and row["shape"]["signature"]["output"] == source["type_id"]]
-            self.assertTrue(pointers, "source signature must still reference its original bound region")
+            self.assertTrue(pointers)
             for pointer in pointers:
-                closed_id = pointer["layout_query_input_type"]
-                closed = pool_entry(document, "types", closed_id)
-                self.assertEqual(closed["shape"]["signature"]["output"], query_id)
-                self.assertNotIn(pointer["type_id"], function_facts)
-                self.assertIn(closed_id, function_facts)
-                self.assertIn(closed_id, runtime_demands)
+                closed = pool_entry(document, "types", pointer["source_layout"]["normalized_type"])
+                self.assertEqual(closed["shape"]["signature"]["output"], runtime_id)
 
-    def test_variadic_fixed_count_mismatch_keeps_target_extra_argument_abi(self):
-        # This guest would be UB. Export must retain the exact query needed
-        # to report that mismatch, rather than stopping at missing metadata.
+    def test_variadic_fixed_count_mismatch_keeps_exact_call_inputs(self):
         document = self.accepted("variadic_fixed_count_mismatch", "root")
-        callee = next(row for row in document["instances"]
-                      if row["def_path"] == "callee")
-        rows = [row for row in document["compiler_instance_abis"]
-                if row["instance_id"] == callee["instance_id"]
-                and len(row["extra_argument_types"]) == 1]
-        self.assertEqual(len(rows), 1)
-        extra = pool_entry(document, "types", rows[0]["extra_argument_types"][0])
+        callee = next(row for row in document["instances"] if row["def_path"] == "callee")
+        signature = next(row["signature"] for row in document["source_abi"]["definitions"]
+                         if row["instance_id"] == callee["instance_id"])
+        self.assertTrue(signature["c_variadic"])
+        self.assertEqual(len(signature["inputs"]), 1)
+        calls = [block["terminator"]["kind"]["resolution"]
+                 for body in document["bodies"] for block in body["basic_blocks"]
+                 if block["terminator"]["kind"].get("variant") == "Call"]
+        caller = next(call for call in calls if call["kind"] == "indirect_function_pointer")
+        self.assertTrue(caller["signature"]["c_variadic"])
+        self.assertEqual(caller["signature"]["inputs"], [])
+        self.assertEqual(len(caller["extra_argument_types"]), 1)
+        extra = pool_entry(document, "types", caller["extra_argument_types"][0])
         self.assertEqual(extra["shape"], {"kind": "int", "signed_kind": "i32"})
-        callee_abi = pool_entry(document, "fn_abis", rows[0]["abi_query"])
-        self.assertTrue(callee_abi["c_variadic"])
-        self.assertEqual(callee_abi["fixed_count"], 1)
-        self.assertEqual(len(callee_abi["arguments"]), 2)
-        caller_rows = [row for row in document["compiler_function_facts"]["pointer_abis"]
-                       if row["extra_argument_types"] == rows[0]["extra_argument_types"]]
-        caller_abis = [pool_entry(document, "fn_abis", row["abi_query"]) for row in caller_rows]
-        self.assertTrue(any(abi["c_variadic"] and abi["fixed_count"] == 0
-                            and len(abi["arguments"]) == 1 for abi in caller_abis),
-                        "the actual caller/callee fixed-count mismatch must remain visible")
 
     def test_resolved_generic_has_one_body_and_no_source_constant_payload(self):
         document = self.accepted("resolved_generic", "root")
@@ -471,6 +443,67 @@ class FailClosedExportTests(unittest.TestCase):
                     inspect(child)
 
         inspect(document)
+
+    def test_concrete_closure_excludes_query_only_functions_and_drops(self):
+        document = self.accepted("concrete_closure", "root")
+        executable = [instance for instance in document["instances"]
+                      if instance["kind"] == "instance_mir"]
+        self.assertEqual({instance["def_path"] for instance in executable},
+                         {"root", "identity"})
+        identity = next(instance for instance in executable
+                        if instance["def_path"] == "identity")
+        self.assertEqual(len(identity["generic_args"]), 1)
+        argument = identity["generic_args"][0]
+        self.assertEqual(argument["kind"], "type")
+        self.assertEqual(pool_entry(document, "types", argument["value"])["shape"],
+                         {"kind": "uint", "unsigned_kind": "u32"})
+        self.assertEqual(len(document["bodies"]), 2)
+
+    def test_concrete_closure_keeps_actual_function_pointer_targets(self):
+        document = self.accepted("concrete_closure", "pointer_root")
+        executable = [instance for instance in document["instances"]
+                      if instance["kind"] == "instance_mir"]
+        self.assertEqual({instance["def_path"] for instance in executable},
+                         {"pointer_root", "uncalled"})
+
+    def test_library_export_requires_explicit_roots(self):
+        result = subprocess.run(
+            [str(self.exporter), "--output", str(self.output), "--",
+             str(ROOT / "exporter/fixtures/fail_closed/concrete_closure.rs"),
+             "--crate-type=lib", "--crate-name=explicit_roots"],
+            cwd=ROOT, env=self.environment, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires at least one --root", result.stderr)
+        self.assertFalse(self.output.exists())
+
+    def test_generic_root_exports_only_its_declaration(self):
+        document = self.accepted("concrete_closure", "identity")
+        self.assertEqual(document["bodies"], [])
+        self.assertEqual(document["body_roots"], [])
+        declarations = document["root_declarations"]
+        self.assertEqual(len(declarations), 1)
+        self.assertEqual(declarations[0]["def_path"], "identity")
+        self.assertEqual(declarations[0]["generic_parameters"], ["type"])
+
+    def test_concrete_vtable_bindings_reach_supertrait_methods(self):
+        document = self.accepted("concrete_vtable", "root")
+        source = document["source_vtables"]
+        principals = {pool_entry(document, "predicates", item["principal"])["def_path"]
+                      for item in source["object_traits"]}
+        self.assertEqual(principals, {"Both", "Base", "Side", "core::marker::MetaSized"})
+        self.assertEqual(len(source["bindings"]), 4)
+        methods = [method for binding in source["bindings"]
+                   for method in binding["methods"]]
+        self.assertEqual(len(methods), 2)
+        self.assertTrue(all(method["instance_id"] is not None for method in methods))
+        for method in methods:
+            instance = pool_entry(document, "instances", method["instance_id"])
+            self.assertEqual(instance["kind"], "instance_mir")
+        for binding in source["bindings"]:
+            drop = pool_entry(document, "instances", binding["drop_instance"])
+            self.assertEqual(drop["instance_kind"]["shim_kind"], "drop_glue")
+            self.assertEqual(drop["kind"], "instance_mir")
 
     def test_ignored_body_fields_are_not_serialized(self):
         document = self.accepted("resolved_generic", "root")

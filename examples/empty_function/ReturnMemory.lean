@@ -231,7 +231,7 @@ structure Fields (config : WholeCall.Config) : Prop where
     leaves (remaining+1) metadata.construction s.cfg outer
   have compatible : s.cfg.copy.compatible s.abi.ret.layout s.abi.ret.layout = .ok true := by
     rw [fields.compatible]
-    simp [CompilerCovariance.compatible,CompilerCovariance.relation,CompilerCovariance.relationWithIndex,
+    simp [CompilerCovariance.compatible,CompilerCovariance.relation,
       profile.debug,Except.mapError,bind,Except.bind,pure,Except.pure]
   have padding : s.cfg.copy.hasPadding s.abi.ret.layout = .ok true := by
     rw [fields.padding]

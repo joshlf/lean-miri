@@ -21,7 +21,7 @@ def main : IO Unit := do
   let input ← must (decodeJson source.compress)
   let some firstType := input.document.types[0]? | throw (IO.userError "missing first type")
   let some firstInstance := input.document.instances[0]? | throw (IO.userError "missing first instance")
-  check (firstType.layoutId == 0 && firstInstance.id == 0)
+  check (firstType.id == 0 && firstInstance.id == 0)
     "different pool spaces did not preserve index zero"
   let recursive ← must (Json.parse "{\"kind\":\"expression\",\"expression_kind\":\"function_call\",\"arguments\":[{\"kind\":\"const\",\"value\":0}]}")
   let recursiveInput ← must (set source "type_constants" (.arr #[recursive]))
@@ -31,10 +31,6 @@ def main : IO Unit := do
   reject (← must (set source "type_constants" (.arr #[recursive, recursive]))) "duplicate canonical constant definitions"
   let definitions ← must ((source.getObjVal? "definitions").bind Json.getArr?)
   reject (← must (set source "definitions" (.arr (definitions.push definitions[0]!)))) "duplicate compiler definition identities"
-  let layouts ← must ((source.getObjVal? "layouts").bind Json.getArr?)
-  let equalLayouts ← must (set source "layouts" (.arr (layouts.push layouts[0]!)))
-  let equalLayouts ← must (decodeJson equalLayouts.compress)
-  check (equalLayouts.document.layouts.size == layouts.size + 1) "equal physical payloads collapsed distinct layout IDs"
   let dangling ← must (Json.parse "{\"kind\":\"alias\",\"rigidity\":\"rigid\",\"alias_kind\":\"free\",\"def_id\":0,\"generic_args\":[{\"kind\":\"const\",\"value\":42}]}")
   reject (← must (set source "type_constants" (.arr #[dangling]))) "unused out of bounds constant definition"
   let badDefinition ← must (Json.parse "{\"kind\":\"alias\",\"rigidity\":\"rigid\",\"alias_kind\":\"free\",\"def_id\":99999,\"generic_args\":[]}")
@@ -67,9 +63,10 @@ def main : IO Unit := do
     "equal bytes collapsed distinct allocations"
   let types ← must ((source.getObjVal? "types").bind Json.getArr?)
   for invalid in #[toJson (types.size + 10), .str "bad", toJson (-1 : Int), Json.mkObj [("layout_id", toJson (0 : Nat))]] do
-    let bad ← must (set types[0]! "layout" invalid)
-    reject (← must (set source "types" (.arr (types.set! 0 bad)))) "invalid layout reference"
-  reject (← must (set source "fn_abis" (.arr #[Json.mkObj []]))) "unused malformed ABI definition"
+    let attrs ← must (types[0]!.getObjVal? "source_layout")
+    let attrs ← must (set attrs "normalized_type" invalid)
+    let bad ← must (set types[0]! "source_layout" attrs)
+    reject (← must (set source "types" (.arr (types.set! 0 bad)))) "invalid normalization reference"
   reject (← must (set source "spans" (.arr #[Json.mkObj []]))) "unused malformed span definition"
   let spans ← must ((source.getObjVal? "spans").bind Json.getArr?)
   let firstSpan := spans[0]!

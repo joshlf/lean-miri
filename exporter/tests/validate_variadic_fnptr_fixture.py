@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that variadic FnPtr ABI metadata is exported without querying an
+"""Check that variadic FnPtr ABI test oracle covers an actual call without querying an
 unrelated nonvariadic function-pointer candidate with variadic extras.
 """
 import json
@@ -17,8 +17,10 @@ def require(condition, message):
 
 document = load_mir_document(sys.argv[1])
 types = {item["type_id"]: item for item in document["types"]}
-function_facts = document["compiler_function_facts"]
-pointer_abis = function_facts["pointer_abis"]
+oracle = json.loads(Path(sys.argv[2]).read_text())
+pointer_abis = oracle["abi"]["pointers"]
+require("compiler_function_facts" not in document and "fn_abis" not in document,
+        "normal execution input contains eager ABI answer tables")
 
 nonvariadic = [
     item for item in types.values()
@@ -50,11 +52,11 @@ extra_rows = [
 require(extra_rows, "variadic FnPtr has no ABI query row with one i32 extra")
 require(
     any(
-        pool_entry(document, "fn_abis", row["abi_query"]).get("c_variadic") is not None
-        and pool_entry(document, "fn_abis", row["abi_query"]).get("c_variadic") is True
+        row["abi"].get("c_variadic") is not None
+        and row["abi"].get("c_variadic") is True
         for row in extra_rows
     ),
-    "variadic extra-i32 ABI query is not supported/c_variadic",
+    "test oracle did not capture the actual variadic extra-i32 ABI",
 )
 
 nonvariadic_rows = [row for row in pointer_abis if row.get("type_id") == nonvariadic_id]
@@ -65,8 +67,8 @@ require(
 )
 require(
     any(
-        pool_entry(document, "fn_abis", row["abi_query"]).get("c_variadic") is not None
-        and pool_entry(document, "fn_abis", row["abi_query"]).get("c_variadic") is False
+        row["abi"].get("c_variadic") is not None
+        and row["abi"].get("c_variadic") is False
         for row in nonvariadic_rows
     ),
     "nonvariadic candidate has no supported empty-extra nonvariadic ABI row",

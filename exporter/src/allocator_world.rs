@@ -154,12 +154,12 @@ impl<'tcx> SelectedKeyProbes<'tcx> {
 
         new_vtables.extend(
             context
-                .vtable_query_requests
+                .vtable_demands
                 .suffix(self.vtable_cursor)
                 .iter()
                 .copied(),
         );
-        self.vtable_cursor = context.vtable_query_requests.len();
+        self.vtable_cursor = context.vtable_demands.len();
         let vtables = new_vtables
             .into_iter()
             .map(|key| tcx.erase_and_anonymize_regions(key))

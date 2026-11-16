@@ -227,7 +227,6 @@ impl<K: Clone + Eq + Hash> OrderedSet<K> {
         self.order.push(key);
         true
     }
-    pub(super) fn contains(&self, key: &K) -> bool { self.seen.contains_key(key) }
     pub(super) fn get_index(&self, index: usize) -> Option<&K> { self.order.get(index) }
     pub(super) fn suffix(&self, cursor: usize) -> &[K] { &self.order[cursor..] }
     pub(super) fn iter(&self) -> std::slice::Iter<'_, K> {

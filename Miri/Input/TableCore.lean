@@ -15,8 +15,7 @@ open Lean
 def expectedMiriCommit : String := "7fa591d7d4dd9af8154becbc8332f8096f8323b1"
 def expectedRustcCommit : String := "8144389c895da997dbdecaa635e41d6a50be6ffd"
 def expectedSchema : String := "lean-miri-rustc-mir"
-def expectedSchemaVersion : Nat := 12
-def expectedCompilerAbiLayoutSchema : String := "physical_ty_and_layout_v1"
+def expectedSchemaVersion : Nat := 13
 
 def escapePathKey (key : String) : String :=
   key.toList.foldl (fun out char => out ++ match char with
@@ -593,22 +592,27 @@ private structure parseFunctionSignatureFields where
   «safety» : Option (TaggedNode) := none
   «abi» : Option (Miri.ABI.ExternAbi) := none
   «c_variadic» : Option (Bool) := none
+  splatted : Option (Option Nat) := none
 
 def parseFunctionSignature (path : String := "$parseFunctionSignature") : Parser (FunctionSignature) := do
-  let s ← object (parseFunctionSignatureFields.mk none none none none none) fun s key => do
+  let s ← object ({} : parseFunctionSignatureFields) fun s key => do
     match key with
     | "inputs" => return { s with «inputs» := some (← array (natural)) }
     | "output" => return { s with «output» := some (← natural) }
     | "safety" => return { s with «safety» := some (← parseAbiTag) }
     | "abi" => return { s with «abi» := some (← CompilerExternAbi.decode) }
     | "c_variadic" => return { s with «c_variadic» := some (← boolean) }
+    | "splatted" =>
+      let value ← nullable natural
+      if value.any (· >= 256) then fail "function signature splatted index exceeds u8"
+      return { s with splatted := some value }
     | _ => skipValue; pure s
   let safety ← match (← required s.«safety» "safety").tag with
     | "safe" => pure Miri.MIR.Safety.Safe
     | "unsafe" => pure .Unsafe
     | _ => fail s!"{path}: unknown function signature safety"
   return {
-    inputs := (← required s.«inputs» "inputs"), output := (← required s.«output» "output"), safety, abi := (← required s.«abi» "abi"), cVariadic := (← required s.«c_variadic» "c_variadic") }
+    inputs := (← required s.«inputs» "inputs"), output := (← required s.«output» "output"), safety, abi := (← required s.«abi» "abi"), cVariadic := (← required s.«c_variadic» "c_variadic"), splatted := ← required s.splatted "splatted" }
 
 private structure decodeCompilerPredicateEvidenceFields where
   «predicate_id» : Option (Nat) := none
@@ -616,21 +620,24 @@ private structure decodeCompilerPredicateEvidenceFields where
   «stable_key» : Option (Nat) := none
   «auto_trait» : Option (Bool) := none
   «normalization» : Option (Option (Nat)) := none
+  erased : Option Nat := none
   «original» : Option (Nat) := none
 
 def decodeCompilerPredicateEvidence  : Parser (CompilerPredicateEvidence) := do
-  let s ← object (decodeCompilerPredicateEvidenceFields.mk none none none none none none) fun s key => do
+  let s ← object ({} : decodeCompilerPredicateEvidenceFields) fun s key => do
     match key with
     | "predicate_id" => return { s with «predicate_id» := some (← natural) }
     | "typing_env" => return { s with «typing_env» := some (← string) }
     | "stable_key" => return { s with «stable_key» := some (← natural) }
     | "auto_trait" => return { s with «auto_trait» := some (← boolean) }
     | "normalization" => return { s with «normalization» := some (← nullable (natural)) }
+    | "erased" => return {s with erased := some (← natural)}
     | "original" => return { s with «original» := some (← natural) }
     | _ => skipValue; pure s
   return {
     id := (← required s.«predicate_id» "predicate_id"), typingEnvironment := (← required s.«typing_env» "typing_env"), stableKey := (← required s.«stable_key» "stable_key"),
-    autoTrait := (← required s.«auto_trait» "auto_trait"), normalizedId := (← required s.«normalization» "normalization"), original := (← required s.«original» "original") }
+    autoTrait := (← required s.«auto_trait» "auto_trait"), normalizedId := (← required s.«normalization» "normalization"),
+    erasedId := ← required s.erased "erased", original := (← required s.«original» "original") }
 
 private structure decodeCompilerPatternFields where
   «kind» : Option (String) := none
@@ -655,164 +662,6 @@ partial def decodeCompilerPattern  : Parser (CompilerPattern) := do
   | "or" => return .or (← required s.«patterns» "patterns")
   | "not_null" => pure .notNull
   | _ => fail "unknown compiler PatternKind"
-
-private structure projectionFieldFields where
-  «index» : Option (Nat) := none
-  «type» : Option (Nat) := none
-  «layout» : Option (Nat) := none
-
-private def projectionField  : Parser (ProjectionField) := do
-  let s ← object (projectionFieldFields.mk none none none) fun s key => do
-    match key with
-    | "index" => return { s with «index» := some (← natural) }
-    | "type" => return { s with «type» := some (← natural) }
-    | "layout" => return { s with «layout» := some (← natural) }
-    | _ => skipValue; pure s
-  return {
-    index := (← required s.«index» "index"), typeId := (← required s.«type» "type"), layoutId := (← required s.«layout» "layout") }
-
-private structure projectionParentFields where
-  «variant» : Option (Option (Nat)) := none
-  «layout» : Option (Nat) := none
-  «fields» : Option (Array (ProjectionField)) := none
-
-private def projectionParent  : Parser (ProjectionParent) := do
-  let s ← object (projectionParentFields.mk none none none) fun s key => do
-    match key with
-    | "variant" => return { s with «variant» := some (← nullable (natural)) }
-    | "layout" => return { s with «layout» := some (← natural) }
-    | "fields" => return { s with «fields» := some (← array (projectionField)) }
-    | _ => skipValue; pure s
-  return {
-    variant := s.variant.join, layoutId := (← required s.«layout» "layout"), fields := (← required s.«fields» "fields") }
-
-private structure parseProjectionQueriesFields where
-  «typing_env» : Option (String) := none
-  «parents» : Option (Array (ProjectionParent)) := none
-
-private def parseProjectionQueries (_path : String := "$parseProjectionQueries") : Parser (ProjectionQueries) := do
-  let s ← object (parseProjectionQueriesFields.mk none none) fun s key => do
-    match key with
-    | "typing_env" => return { s with «typing_env» := some (← string) }
-    | "parents" => return { s with «parents» := some (← array (projectionParent)) }
-    | _ => skipValue; pure s
-  return {
-    typingEnvironment := (← required s.«typing_env» "typing_env"), parents := (← required s.«parents» "parents") }
-
-private structure discriminantFields where
-  «variant» : Option (Nat) := none
-  «bits» : Option (String) := none
-  «type» : Option (Nat) := none
-
-private def discriminant  : Parser (DiscriminantValue) := do
-  let s ← object (discriminantFields.mk none none none) fun s key => do
-    match key with
-    | "variant" => return { s with «variant» := some (← natural) }
-    | "bits" => return { s with «bits» := some (← string) }
-    | "type" => return { s with «type» := some (← natural) }
-    | _ => skipValue; pure s
-  let variant := (← required s.«variant» "variant")
-  unless variant < 2^32 do fail "compiler variant index exceeds u32"
-  let bits ← liftExcept (decimalNat (← required s.«bits» "bits") "$discriminant")
-  unless bits < 2^128 do fail "compiler discriminant exceeds u128"
-  return {
-    variant, typeId := (← required s.«type» "type"), bits }
-
-private structure parseDiscriminantsFields where
-  «has_discriminants» : Option (Bool) := none
-  «adt_variant_count» : Option (Option (Nat)) := none
-  «values» : Option (Array (DiscriminantValue)) := none
-
-def parseDiscriminants (_path : String := "$parseDiscriminants") : Parser (DiscriminantInfo) := do
-  let s ← object (parseDiscriminantsFields.mk none none none) fun s key => do
-    match key with
-    | "has_discriminants" => return { s with «has_discriminants» := some (← boolean) }
-    | "adt_variant_count" => return { s with «adt_variant_count» := some (← nullable (natural)) }
-    | "values" => return { s with «values» := some (← array (discriminant)) }
-    | _ => skipValue; pure s
-  return {
-    hasDiscriminants := (← required s.«has_discriminants» "has_discriminants"), adtVariantCount := s.adt_variant_count.join, values := (← required s.«values» "values") }
-
-private structure adtFactsFields where
-  «definition» : Option (Nat) := none
-  «item_name» : Option (String) := none
-  «nonnull_optimization_guaranteed» : Option (Bool) := none
-
-private def adtFacts  : Parser (AdtCompilerFacts) := do
-  let s ← object (adtFactsFields.mk none none none) fun s key => do
-    match key with
-    | "definition" => return { s with «definition» := some (← natural) }
-    | "item_name" => return { s with «item_name» := some (← string) }
-    | "nonnull_optimization_guaranteed" => return { s with «nonnull_optimization_guaranteed» := some (← boolean) }
-    | _ => skipValue; pure s
-  return {
-    definitionId := (← required s.«definition» "definition"), itemName := (← required s.«item_name» "item_name"), nonnullOptimizationGuaranteed := (← required s.«nonnull_optimization_guaranteed» "nonnull_optimization_guaranteed") }
-
-private structure simdShapeFields where
-  «count» : Option (Nat) := none
-  «element» : Option (Nat) := none
-
-private def simdShape  : Parser (Nat × TypeId) := do
-  let s ← object (simdShapeFields.mk none none) fun s key => do
-    match key with
-    | "count" => return { s with «count» := some (← natural) }
-    | "element" => return { s with «element» := some (← natural) }
-    | _ => skipValue; pure s
-  let count := (← required s.«count» "count")
-  unless count < 2^64 do fail "SIMD lane count exceeds u64"
-  return (count, (← required s.«element» "element"))
-
-def booleanQueries : Parser (Array (String × Bool)) :=
-  object #[] fun out key => do return out.push (key, ← boolean)
-
-private def typeQueries : Parser (Array (String × Option Nat)) :=
-  object #[] fun out key => do return out.push (key, ← nullable natural)
-
-private structure decodeTypeCompilerFactsFields where
-  «typing_env» : Option (String) := none
-  «boolean_queries» : Option (Array (String × Bool)) := none
-  «type_queries» : Option (Array (String × Option Nat)) := none
-  «capture_names» : Option (Option (Array (Option String))) := none
-  «adt» : Option (Option (AdtCompilerFacts)) := none
-  «projection_queries» : Option (Option (ProjectionQueries)) := none
-  «simd_size_and_type» : Option (Option (Nat × TypeId)) := none
-  «discriminants» : Option (Option (DiscriminantInfo)) := none
-  «type_id_hash» : Option (String) := none
-  «definition» : Option (Option (Nat)) := none
-
-def decodeTypeCompilerFacts (path : String := "$decodeTypeCompilerFacts")
-    (booleanPool : Array (Array (String × Bool)) := #[])
-    (discriminantPool : Array DiscriminantInfo := #[]) : Parser TypeCompilerFacts := do
-  let s ← object (decodeTypeCompilerFactsFields.mk none none none none none none none none none none) fun s key => do
-    match key with
-    | "typing_env" => return { s with «typing_env» := some (← string) }
-    | "boolean_queries" =>
-      let id ← natural
-      let some value := booleanPool[id]? | fail s!"{path}.boolean_queries: out of bounds shared boolean query set {id}"
-      return { s with «boolean_queries» := some value }
-    | "type_queries" => return { s with «type_queries» := some (← typeQueries) }
-    | "capture_names" => return { s with «capture_names» := some (← nullable (array (nullable string))) }
-    | "adt" => return { s with «adt» := some (← nullable (adtFacts)) }
-    | "projection_queries" => return { s with «projection_queries» := some (← nullable (parseProjectionQueries)) }
-    | "simd_size_and_type" => return { s with «simd_size_and_type» := some (← nullable (simdShape)) }
-    | "discriminants" =>
-      let id ← nullable natural
-      let value ← id.mapM fun id => do
-        let some value := discriminantPool[id]? | fail s!"{path}.discriminants: out of bounds shared discriminants {id}"
-        pure value
-      return { s with «discriminants» := some value }
-    | "type_id_hash" => return { s with «type_id_hash» := some (← string) }
-    | "definition" => return { s with «definition» := some (← nullable (natural)) }
-    | _ => skipValue; pure s
-  let typeIdHash ← s.type_id_hash.mapM fun text => do
-    let bits ← liftExcept (decimalNat text path)
-    unless bits < 2^128 do fail s!"{path}: compiler TypeId hash exceeds u128"
-    pure bits
-  return {
-    typingEnvironment := (← required s.«typing_env» "typing_env"), booleanQueries := (← required s.«boolean_queries» "boolean_queries"), typeQueries := (← required s.«type_queries» "type_queries"),
-    captureNames := s.capture_names.join, adt := (← required s.«adt» "adt"), projectionQueries := (← required s.«projection_queries» "projection_queries"),
-    simdSizeAndType := (← required s.«simd_size_and_type» "simd_size_and_type"), discriminants := (← required s.«discriminants» "discriminants"),
-    typeIdHash, definitionId := s.definition.join }
 
 private structure reprIntegerFields where
   «kind» : Option (String) := none
@@ -1076,29 +925,101 @@ private def parseTypeShape (path : String := "$parseTypeShape") : Parser (TypeSh
     return .alias payload.2 definition (← required s.«generic_args» "generic_args")
   | tag => fail s!"{path}: unrecognized type shape `{tag}`"
 
-private structure parseTypeNodeFields where
-  «layout_query_input_type» : Option (Option (Nat)) := none
-  «compiler_facts» : Option (TypeCompilerFacts) := none
-  «type_id» : Option (Nat) := none
-  «display» : Option (String) := none
-  «shape» : Option (TypeShape) := none
-  «layout» : Option (Nat) := none
-
-def parseTypeNode (path : String := "$parseTypeNode")
-    (booleanPool : Array (Array (String × Bool)) := #[])
-    (discriminantPool : Array DiscriminantInfo := #[]) : Parser TypeNode := do
-  let s ← object (parseTypeNodeFields.mk none none none none none none) fun s key => do
+private def parseSourceSimd : Parser SourceSimd := do
+  let (count,element) ← object (none,none) fun s key => do
     match key with
-    | "layout_query_input_type" => return { s with «layout_query_input_type» := some (← nullable (natural)) }
-    | "compiler_facts" => return { s with «compiler_facts» := some (← decodeTypeCompilerFacts (path ++ ".compiler_facts") booleanPool discriminantPool) }
-    | "type_id" => return { s with «type_id» := some (← natural) }
-    | "display" => return { s with «display» := some (← string) }
-    | "shape" => return { s with «shape» := some (← parseTypeShape) }
-    | "layout" => return { s with «layout» := some (← natural) }
+    | "count" => return (some (← natural),s.2)
+    | "element" => return (s.1,some (← natural))
+    | _ => skipValue; pure s
+  return ⟨← required count "count",← required element "element"⟩
+
+private def parseSourceCoroutine : Parser SourceCoroutineLayout := do
+  let (locals,saved,prefixTypes,variants,conflicts,seed) ← object (none,none,none,none,none,none) fun s key => do
+    match key with
+    | "locals" => return (some (← array natural),s.2.1,s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
+    | "saved_types" => return (s.1,some (← array natural),s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
+    | "prefix" => return (s.1,s.2.1,some (← array natural),s.2.2.2.1,s.2.2.2.2.1,s.2.2.2.2.2)
+    | "variants" => return (s.1,s.2.1,s.2.2.1,some (← array (array natural)),s.2.2.2.2.1,s.2.2.2.2.2)
+    | "conflicts" => return (s.1,s.2.1,s.2.2.1,s.2.2.2.1,some (← array (array natural)),s.2.2.2.2.2)
+    | "seed" => return (s.1,s.2.1,s.2.2.1,s.2.2.2.1,s.2.2.2.2.1,some (← natural))
+    | _ => skipValue; pure s
+  return ⟨← required locals "locals",← required saved "saved_types",← required prefixTypes "prefix",
+    ← required variants "variants",← required conflicts "conflicts",← required seed "seed"⟩
+
+private def parseSourceTypeLayout : Parser SourceTypeLayout := do
+  let (source,seen) ← object (({normalizedType := 0} : SourceTypeLayout),(#[] : Array String)) fun state key => do
+    let s : SourceTypeLayout := state.1
+    let seen : Array String := state.2
+    let next : SourceTypeLayout ← do
+      match key with
+      | "normalized_type" => pure {s with normalizedType := ← natural}
+      | "closure_upvars" => pure {s with closureUpvars := ← array natural}
+      | "variant_discriminants" =>
+        let values ← array do
+          let text ← string
+          let some value := text.toInt? | fail "invalid source discriminant"
+          pure value
+        pure {s with discriminants := values}
+      | "simd" => pure {s with simd := ← nullable parseSourceSimd}
+      | "coroutine" => pure {s with coroutine := ← nullable parseSourceCoroutine}
+      | "special_float" => pure {s with specialFloat := ← nullable (do JsonReader.liftExcept (floatTypeTag (← string)))}
+      | "scalable_vectors" => pure {s with scalableVectors := ← nullable natural}
+      | "variances" =>
+        let values ← array do
+          let kind ← object (none : Option String) fun kind key => do
+            if key == "kind" then return some (← string)
+            skipValue; pure kind
+          match ← required kind "kind" with
+          | "covariant" => pure MIR.Variance.Covariant
+          | "contravariant" => pure MIR.Variance.Contravariant
+          | "invariant" => pure MIR.Variance.Invariant
+          | "bivariant" => pure MIR.Variance.Bivariant
+          | _ => fail "invalid declaration variance"
+        pure {s with variances := values}
+      | "has_destructor" => pure {s with hasDestructor := ← boolean}
+      | "is_dyn_metadata" => pure {s with isDynMetadata := ← boolean}
+      | "type_id_hash" => pure {s with typeIdHash := ← nullable (parseU128Natural "source type identity hash")}
+      | "is_unsafe_cell" => pure {s with isUnsafeCell := ← boolean}
+      | "is_unsafe_pinned" => pure {s with isUnsafePinned := ← boolean}
+      | "is_manually_drop" => pure {s with isManuallyDrop := ← boolean}
+      | "is_maybe_uninit" => pure {s with isMaybeUninit := ← boolean}
+      | "is_phantom_data" => pure {s with isPhantomData := ← boolean}
+      | "is_box" => pure {s with isBox := ← boolean}
+      | "is_global_allocator" => pure {s with isGlobalAllocator := ← boolean}
+      | "is_c_void" => pure {s with isCVoid := ← boolean}
+      | "is_maybe_dangling" => pure {s with isMaybeDangling := ← boolean}
+      | "nonnull_optimization_guaranteed" => pure {s with nonnullOptimizationGuaranteed := ← boolean}
+      | "definition" => pure {s with definition := ← nullable natural}
+      | "item_name" => pure {s with itemName := ← nullable string}
+      | "capture_names" => pure {s with captureNames := ← nullable (array (nullable string))}
+      | _ => skipValue; pure s
+    pure (next,seen.push key)
+  for key in #["normalized_type","closure_upvars","variant_discriminants",
+      "simd","coroutine","special_float","scalable_vectors","variances",
+      "has_destructor","is_dyn_metadata","type_id_hash","is_unsafe_cell","is_unsafe_pinned",
+      "is_manually_drop","is_maybe_uninit","is_phantom_data","is_box","is_global_allocator","is_c_void",
+      "is_maybe_dangling","nonnull_optimization_guaranteed","definition","item_name","capture_names"] do
+    unless seen.contains key do fail s!"missing source declaration field `{key}`"
+  pure source
+
+private structure parseTypeNodeFields where
+  sourceLayout : Option SourceTypeLayout := none
+  typeId : Option Nat := none
+  display : Option String := none
+  shape : Option TypeShape := none
+
+def parseTypeNode (path : String := "$parseTypeNode") : Parser TypeNode := do
+  let s ← object ({} : parseTypeNodeFields) fun s key => do
+    match key with
+    | "source_layout" => return {s with sourceLayout := some (← parseSourceTypeLayout)}
+    | "type_id" => return {s with typeId := some (← natural)}
+    | "display" => return {s with display := some (← string)}
+    | "shape" => return {s with shape := some (← parseTypeShape)}
     | _ => skipValue; pure s
   let node : TypeNode := {
-    layoutQueryInputTypeId := (← required s.«layout_query_input_type» "layout_query_input_type"), compilerFacts := s.compiler_facts,
-    id := (← required s.«type_id» "type_id"), display := (← required s.«display» "display"), shape := (← required s.«shape» "shape"), layoutId := (← required s.«layout» "layout") }
+    sourceLayout := ← required s.sourceLayout "source_layout"
+    id := ← required s.typeId "type_id", display := ← required s.display "display"
+    shape := ← required s.shape "shape" }
   liftExcept (LocalValidation.validateType node)
   pure node
 

@@ -38,7 +38,7 @@ private def replaceBodyNode (fixture : String) (kind : String) (terminator : Boo
 def main : IO Unit := do
   let fixture ← IO.FS.readFile "tests/input/fixtures/strict-unit.json"
   let full ← must (decodeJson fixture)
-  unless full.document.types.size == 20 && full.document.layouts.size == 20 do
+  unless full.document.types.size == 20 do
     throw (IO.userError "typed table definitions were discarded")
   let types ← must (array (← must (get fixture "types")))
   let some firstType := types[0]? | throw (IO.userError "fixture has no type")
@@ -53,8 +53,10 @@ def main : IO Unit := do
   let some firstInstance := instances[0]? | throw (IO.userError "fixture has no instance")
   rejects (JsonReader.run (parseInstance "$instance") (← must (set firstInstance "def_id" "99999")))
     "row-local instance definition identity"
-  let badType ← must (set firstType "layout" "99999")
-  rejects (decodeJson (← must (set fixture "types" (arr (types.set! 0 badType))))) "out of bounds layout"
+  let attrs ← must (get firstType "source_layout")
+  let attrs ← must (set attrs "normalized_type" "99999")
+  let badType ← must (set firstType "source_layout" attrs)
+  rejects (decodeJson (← must (set fixture "types" (arr (types.set! 0 badType))))) "out of bounds normalization"
   let invalidScope := object [("kind",string "future_scope"),
     ("semantics",string "structural_export_closure_only"),("roots","[]")]
   let invalidScopeInput ← must (set fixture "selected_scope" invalidScope)
@@ -97,7 +99,7 @@ def main : IO Unit := do
   rejects (integerTypeTag "u256") "integer kind"
   rejects (layoutVariantsKind "future_layout") "layout variant"
   rejects (backendReprKind "future_backend") "backend representation"
-  rejects (canonicalAbiKind "future_abi") "ABI"
+  rejects (JsonReader.run CompilerExternAbi.decode (string "future_abi")) "ABI"
   rejects (JsonReader.run (parseAbiTag "$abi") "{\"kind\":\"Rust\",\"variant\":\"C\"}") "ambiguous ABI tag"
   rejects (allocationKind "future_allocation") "allocation"
   rejects (JsonReader.run (parseTagEncoding "$tag") (string "legacy debug")) "legacy tag encoding"

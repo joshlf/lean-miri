@@ -320,10 +320,10 @@ private def readBool (m : Metadata) (operand : MIR.Operand) : Exec Bool := do
 
 
 private structure ArgABI where
-  source : Input.AbiArgument
+  source : ABI.ArgAbi MIR.TyId
   layout : LocalLayout
 private structure FnABI where
-  source : Input.FunctionAbi
+  source : ABI.FnAbi MIR.TyId
   args : Array ArgABI
   ret : ArgABI
 private structure Program where
@@ -399,20 +399,19 @@ private def resolutionFor (p : Program) (fnInstance : CallInstance) : Except Ste
       | _ => pure ()
   throw (.unsupported "instance has no exported resolution query")
 private def getAbi (p : Program) (fnInstance : CallInstance) : Exec FnABI := do
-  let (resolution,_) ← lift (resolutionFor p fnInstance)
-  let .normal abiId := resolution.abi | throw (.unsupported "LLVM intrinsic has no ordinary compiler FnABI")
-  let source ← lift (p.lowered.input.functionAbis[abiId]?.toExcept (.unsupported "compiler FnABI"))
-  if source.callingConvention.kind != .rust || source.cVariadic then
+  let (resolution, id) ← lift (resolutionFor p fnInstance)
+  let .normal := resolution.abi | throw (.unsupported "LLVM intrinsic has no ordinary FnABI")
+  let source ← lift ((Input.SourceAbiRuntime.ofInstance ⟨p.metadata, p.lowered, none⟩ id #[])
+    |>.mapError StepError.unsupported)
+  if source.conv != .Rust || source.cVariadic then
     block "unsupported calling convention or varargs"
-  let arg (source : Input.AbiArgument) : Except StepError ArgABI := do
-    if source.mode.kind != .direct then throw (.unsupported "non-Direct u32 argument ABI")
-    let physical ← compiler (p.metadata.layoutById source.layoutId)
-    let layout := (⟨source.typeId,physical⟩ : TyAndLayout MIR.TyId)
-    let node ← node p.metadata source.typeId
+  let arg (source : ABI.ArgAbi MIR.TyId) : Except StepError ArgABI := do
+    if !source.mode.isDirect then throw (.unsupported "non-Direct u32 argument ABI")
+    let node ← node p.metadata source.layout.ty
     if node.shapeKind != .uint || node.shapeMetadata.unsignedKind != some (.known .u32) then
       throw (.unsupported "non-u32 call ABI")
-    return ⟨source, layout⟩
-  return ⟨source, ← lift (source.arguments.mapM arg), ← lift (arg source.returnValue)⟩
+    return ⟨source, source.layout⟩
+  return ⟨source, ← lift (source.args.mapM arg), ← lift (arg source.ret)⟩
 
 private def alwaysLive (body : MIR.Body) : Array MIR.LocalId := Id.run do
   let scheduled := body.basicBlocks.foldl (fun locals block =>
@@ -561,14 +560,14 @@ private def callHooks (p : Program) : CallHooks CtfeProvenance State Unit Nat Un
   callerLocation := block "implicit caller location"
   abiCanUnwind := fun abi => abi.source.canUnwind
   abiVariadic := fun abi => abi.source.cVariadic
-  abiFixedCount := fun abi => abi.source.fixedCount
+  abiFixedCount := fun abi => abi.source.fixedCount.toNat
   abiArgs := FnABI.args
   abiReturn := FnABI.ret
-  sameConvention := fun a b => a.source.callingConvention == b.source.callingConvention
+  sameConvention := fun a b => a.source.conv == b.source.conv
   isRustCall := fun abi => abi == .RustCall
   rustAbi := p.rustAbi
   argLayout := ArgABI.layout
-  argIsIgnore := fun arg => arg.source.mode.kind == .ignore
+  argIsIgnore := fun arg => arg.source.mode.isIgnore
   isOneZst := fun layout => layout.layout.is1zst
   checkArgumentCompat := fun _ a b => do
     event "argumentCompat"

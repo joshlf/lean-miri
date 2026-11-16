@@ -117,7 +117,6 @@ pub(super) enum InstanceData {
 #[derive(Serialize)]
 pub(super) struct VirtualIdentity {
     pub function_type: u64,
-    pub fn_abi: u64,
 }
 #[derive(Serialize)]
 pub(super) struct PromotedBody {

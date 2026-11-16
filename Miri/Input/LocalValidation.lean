@@ -29,41 +29,6 @@ def validateBackendRepr (repr : BackendRepr) (path : String) : Except String Uni
     | none => pure ()
   return ()
 
-def validateCanonicalAbi (abi : CanonicalAbi) (path : String) : Except String Unit := do
-  match abi.kind with
-  | .arm =>
-    match abi.armCall with
-    | none => throw (joinPath path "arm_call" ++ ": " ++ "ARM calling convention is missing its call kind")
-    | _ => pure ()
-  | .interrupt =>
-    match abi.interruptKind with
-    | none => throw (joinPath path "interrupt_kind" ++ ": " ++ "interrupt calling convention is missing its interrupt kind")
-    | _ => pure ()
-  | .x86 =>
-    match abi.x86Call with
-    | none => throw (joinPath path "x86_call" ++ ": " ++ "x86 calling convention is missing its call kind")
-    | _ => pure ()
-  | _ => pure ()
-  return ()
-
-def validateAbiRegister (reg : AbiRegister) (path : String) : Except String Unit := do
-  match reg.kind with
-  | .vector =>
-    match reg.hintElement with
-    | none => throw (joinPath path "kind.hint_element" ++ ": " ++ "vector ABI register is missing its element hint")
-    | some _ => pure ()
-  | _ => pure ()
-  return ()
-
-def validateAbiPassMode (mode : AbiPassMode) (path : String) : Except String Unit := do
-  match mode.castTarget with
-  | some target =>
-    for (register, index) in target.prefixRegisters.toList.zipIdx do
-      validateAbiRegister register s!"{path}.target.prefix_registers[{index}]"
-    validateAbiRegister target.restRegister (joinPath path "target.rest_register")
-  | none => pure ()
-  return ()
-
 def validateAllocationMemory (memory : AllocationMemory) (path : String) : Except String Unit := do
   match memory.mutability with
   | .mutable | .immutable => pure ()
@@ -165,11 +130,6 @@ def validateInstance (node : InstanceNode) : Except String Unit := do
     if node.bodyId.isSome then
       throw (s!"instances[{node.id}].body" ++ ": " ++ "symbol identity catalog row must not provide an executable MIR body")
   validatePromotedBody node.promotedBodies s!"instances[{node.id}].promoted_bodies"
-
-def validateFunctionAbi (abi : FunctionAbi) (path : String) : Except String Unit := do
-  validateCanonicalAbi abi.callingConvention (path ++ ".calling_convention")
-  for (arg, index) in (abi.arguments.push abi.returnValue).toList.zipIdx do
-    validateAbiPassMode arg.mode s!"{path}.arguments[{index}].mode"
 
 def validateLayout (layout : Layout) (path : String) : Except String Unit := do
   match layout.backendRepresentation with

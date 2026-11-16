@@ -7,21 +7,30 @@ namespace Miri.Input.CompilerNamedShimAbi
 open Lean Miri.ABI Miri.Interpreter
 structure Entry where
   name : String
-  abi : Nat
+  source : FunctionSignature
 structure Prepared where
   runtime : RuntimeMetadata
+  program : LoweredProgram
   entries : Array Entry
-def prepare (runtime : RuntimeMetadata) : Except String Prepared := do
+def prepare (runtime : RuntimeMetadata) (program : LoweredProgram) : Except String Prepared := do
   let mut entries := #[]
   for record in runtime.source.queries.namedShimAbis.getD #[] do
     unless !(entries.any (·.name == record.name)) do throw "duplicate named compiler shim query"
-    entries := entries.push ⟨record.name, record.recipe.abiId⟩
-  pure ⟨runtime, entries⟩
+    let abi ← match record.recipe.signature.callingConvention with
+      | "Rust" => pure ABI.ExternAbi.Rust
+      | "C" => pure (.C false)
+      | "System" => pure (.System false)
+      | _ => throw "unsupported named source shim convention"
+    let signature : FunctionSignature := {
+      inputs := record.recipe.inputTypes, output := record.recipe.outputType, safety := .Safe
+      abi, cVariadic := record.recipe.signature.cVariadic }
+    entries := entries.push ⟨record.name, signature⟩
+  pure ⟨runtime, program, entries⟩
 
 def expectedAbi (prepared : Prepared) (name : String) : Except String (FnAbi MIR.TyId) := do
   let some entry := prepared.entries.find? (·.name == name)
     | throw s!"missing exact named compiler shim ABI query {name}"
-  CallResolution.functionAbiId prepared.runtime entry.abi
+  SourceAbiRuntime.ofSignature ⟨prepared.runtime, prepared.program, none⟩ entry.source
 
 def query (prepared : Prepared) (name : String) : EStateM StepError S (FnAbi MIR.TyId) :=
   match expectedAbi prepared name with

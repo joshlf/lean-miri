@@ -15,7 +15,7 @@ except ImportError:
     from shared_json_pools import SHARED_POOLS, expand_document
     from coroutine_json import validate_catalog
 
-POOL_NAMES = frozenset({"types", "allocations", "instances", "fn_abis", "spans",
+POOL_NAMES = frozenset({"types", "allocations", "instances", "spans",
                         "definitions", "type_constants", "bodies", "predicates"})
 
 
@@ -28,16 +28,13 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
         raise MirJSONError("MIR document root must be an object")
     if document.get("schema") != "lean-miri-rustc-mir":
         raise MirJSONError("document is not a lean-miri-rustc-mir export")
-    if type(document.get("schema_version")) is not int or document["schema_version"] not in (11, 12):
-        raise MirJSONError("MIR root schema_version must be 11 or 12")
+    if type(document.get("schema_version")) is not int or document["schema_version"] != 13:
+        raise MirJSONError("MIR root schema_version must be 13")
     for name in sorted(POOL_NAMES):
         if not isinstance(document.get(name), list):
             raise MirJSONError(f"{name} must be a pool array")
         if any(not isinstance(row, dict) for row in document[name]):
             raise MirJSONError(f"{name} definitions must be objects")
-    layouts = document.get("layouts")
-    if not isinstance(layouts, list) or any(type(index) is not int or index < 0 for index in layouts):
-        raise MirJSONError("layouts must be a nonnegative reference array")
     for name, row_type in SHARED_POOLS.items():
         rows = document.get(name)
         if not isinstance(rows, list) or any(not isinstance(row, row_type) for row in rows):
@@ -48,25 +45,20 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
     images = document.get("byte_images")
     if not isinstance(images, list) or any(not isinstance(image, str) for image in images):
         raise MirJSONError("byte_images must be a string array")
-    if document["schema_version"] == 11:
-        if "compiler_coroutine_coverage" in document:
-            raise MirJSONError("schema 11 forbids compiler_coroutine_coverage")
-    else:
-        try:
-            validate_catalog(document)
-        except (ValueError, KeyError, TypeError) as exc:
-            raise MirJSONError(f"invalid compiler_coroutine_coverage: {exc}") from exc
+    for name in ("source_trait_material", "source_vtables", "source_abi"):
+        if not isinstance(document.get(name), dict):
+            raise MirJSONError(f"{name} must be an object")
+    for name in ("source_cast_targets", "root_declarations"):
+        if not isinstance(document.get(name), list) or any(not isinstance(row, dict) for row in document[name]):
+            raise MirJSONError(f"{name} must be an object array")
+    try:
+        validate_catalog(document)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise MirJSONError(f"invalid compiler_coroutine_coverage: {exc}") from exc
     return document
 
 
 def pool_entry(document: dict[str, Any], pool: str, index: Any) -> Any:
-    if pool == "layouts":
-        references = document.get("layouts", [])
-        if type(index) is not int or index < 0 or index >= len(references):
-            raise MirJSONError(f"layouts reference {index!r} is out of range")
-        if isinstance(references[index], dict):
-            return references[index]  # Explicit semantic inspection view.
-        return pool_entry(document, "layout_values", references[index])
     if pool not in POOL_NAMES and pool not in SHARED_POOLS:
         raise MirJSONError(f"unknown MIR pool {pool!r}")
     rows = document.get(pool)

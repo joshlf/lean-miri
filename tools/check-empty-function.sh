@@ -36,6 +36,7 @@ cp examples/empty_function/SHA256SUMS "$out/input-SHA256SUMS"
 find Miri -name '*.lean' -print0 | sort -z | xargs -0 sha256sum > "$out/library-SHA256SUMS"
 mapfile -t library_modules < "$out/library-modules"
 flock --no-fork /tmp/lean-miri-lake-build.lock lake build "${library_modules[@]}"
+lake env lean -j1 --run tests/input/EmptyFunctionQueries.lean examples/empty_function/input.json
 base="$(lake env printenv LEAN_PATH)"
 export LEAN_PATH="$out:$base"
 while IFS= read -r module; do

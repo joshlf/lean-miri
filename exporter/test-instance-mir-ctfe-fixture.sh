@@ -15,7 +15,7 @@ fi
 TARGET="$(mktemp -d "${TMPDIR:-/tmp}/lean-miri-instance-mir-XXXXXX")"
 trap 'rm -rf "$TARGET"' EXIT
 
-CARGO_TARGET_DIR="$TARGET" "$EXPORTER" --cargo build --offline \
+CARGO_TARGET_DIR="$TARGET" "$EXPORTER" --cargo --root make_pair --root make_token --root constants --root call_once_shim --root invoke build --lib -p ctfe-consumer --offline \
   --manifest-path "$ROOT/exporter/fixtures/cargo-instance-mir/Cargo.toml"
 JSON="$(find "$TARGET/lean-miri-exporter-8144389c895d" -type f \
   -path '*/lean-miri-mir/ctfe_consumer-*.json' -print -quit)"

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Validate exact compiler transfer facts from the small call-transfer fixture.
+"""Recover exact MIR transfer edges and pinned covariance expectations.
 
-The checks establish that these source edges caused relevant metadata to be
-emitted. They make no claim that the finite function-pointer candidate pool is
-an exhaustive runtime points-to set.
+The paired Lean check evaluates these exact type IDs using the typed source
+materials. The fixture is intentionally ABI-compatible but not executed.
 """
 import json
 import sys
@@ -20,23 +19,9 @@ def require(condition, message):
 
 document = load_mir_document(sys.argv[1])
 types = {item["type_id"]: item for item in document["types"]}
-queries = document["compiler_runtime_queries"]
-virtual_rows = queries["virtual"]
-covariance = document["compiler_covariance_queries"]
-
-# The catalog is a projection of the final pool. Each exact ordered pair must
-# occur once, retain both boolean answers, and reference fully emitted types.
-pair_keys = [(row["source_type"], row["target_type"]) for row in covariance]
-require(pair_keys == sorted(set(pair_keys)),
-        "covariance pairs are duplicated or not in numeric type-ID order")
-for row in covariance:
-    require(row["source_type"] in types and row["target_type"] in types,
-            "covariance pair references a missing type definition")
-    require(row["source_type"] != row["target_type"],
-            "covariance catalog contains a redundant reflexive pair")
-    require(type(row["value"]) is bool,
-            "covariance answer is not a compiler boolean")
-
+checks = []
+require("compiler_covariance_queries" not in document, "producer emitted covariance answer catalog")
+require("virtual" not in document["compiler_runtime_queries"], "producer emitted virtual query answer catalog")
 
 
 def display(type_ref):
@@ -51,28 +36,18 @@ def type_id(type_ref):
 
 
 def relation_ids(source_ref, target_ref):
-    source_id = type_id(source_ref)
-    target_id = type_id(target_ref)
-    return any(
-        type_id(row.get("source_type")) == source_id
-        and type_id(row.get("target_type")) == target_id
-        for row in covariance
-    )
+    return source_ref in types and target_ref in types
 
 
 def require_false_relation(source_ref, target_ref, label):
-    rows = [row for row in covariance
-            if row["source_type"] == source_ref and row["target_type"] == target_ref]
-    require(len(rows) == 1 and rows[0]["value"] is False,
-            f"{label}: exact negative covariance answer was lost")
+    require(source_ref in types and target_ref in types, f"{label}: source material missing")
+    checks.append({"source_type": source_ref, "target_type": target_ref,
+                   "expected": False, "label": label})
 
 
 def require_transfer(source_ref, target_ref, label):
-    require(source_ref is not None and target_ref is not None,
-            f"{label}: source/destination type ID is missing")
-    if type_id(source_ref) != type_id(target_ref):
-        require(relation_ids(source_ref, target_ref),
-                f"{label}: exact source/destination covariance query is absent")
+    require(source_ref in types and target_ref in types,
+            f"{label}: exact source/destination type material is missing")
 
 
 def body_payload(row):
@@ -114,8 +89,8 @@ def body_by_path(fragment):
 
 
 # Recover the exact call operand/destination and the candidate's substituted
-# MIR locals. Compare those IDs with covariance rows rather than accepting an
-# unrelated catalog row with similar printed type names.
+# MIR locals. Retain those exact IDs rather than selecting expectations
+# from unrelated types with similar printed names.
 indirect_bodies = body_by_path("indirect_pointer_call")
 require(indirect_bodies, "indirect_pointer_call body is absent")
 indirect_call = next(
@@ -149,27 +124,19 @@ require(type_id(argument_source) != type_id(argument_target),
 require(type_id(return_source) != type_id(return_target),
         "indirect FnPtr return fixture did not preserve its distinct MIR types")
 require_transfer(argument_source, argument_target, "indirect FnPtr argument")
+require_false_relation(argument_source, argument_target, "indirect argument pointer mutability")
 require_transfer(return_source, return_target, "indirect FnPtr return")
+require_false_relation(return_source, return_target, "indirect return pointer mutability")
 
 # Rust's virtual call passes the concrete receiver pointer into the
 # instantiated method's receiver local. Find a validated virtual resolution
-# for this fixture's trait method, then require its concrete receiver transfer.
-resolved_virtual = [
-    row
-    for row in virtual_rows
-    if isinstance(row.get("resolved"), int)
-]
-require(resolved_virtual, "TransferObject::get has no validated virtual target row")
+# for this fixture's trait method, then retain its concrete receiver transfer.
 instance_by_id = {item["instance_id"]: item for item in document["instances"]}
-fixture_virtual_targets = [
-    instance_by_id.get(row.get("resolved"), {})
-    for row in resolved_virtual
-]
-fixture_virtual_targets = [
-    item for item in fixture_virtual_targets
-    if "ConcreteObject as TransferObject" in item.get("def_path", "")
-    and item.get("def_path", "").endswith("::get")
-]
+fixture_virtual_targets = [instance_by_id[method["instance_id"]]
+    for binding in document["source_vtables"]["bindings"] for method in binding["methods"]
+    if method["instance_id"] is not None
+    and "ConcreteObject as TransferObject" in instance_by_id[method["instance_id"]]["def_path"]
+    and instance_by_id[method["instance_id"]]["def_path"].endswith("::get")]
 require(
     fixture_virtual_targets,
     "TransferObject::get has no validated concrete virtual target row",
@@ -209,7 +176,7 @@ receiver_target = local_type_ref(virtual_target_body, 1)
 require(receiver_source is not None and receiver_target is not None and relation_ids(receiver_source, receiver_target),
         "exact virtual receiver transfer from *mut ConcreteObject to callee local is absent")
 # Receiver ABI compatibility does not make a raw pointer covariant with a
-# reference. Demand discovery must preserve this negative compiler answer.
+# reference. The typed relation must preserve this negative expectation.
 require_false_relation(receiver_source, receiver_target, "virtual receiver")
 virtual_argument_source = operand_type_ref(virtual_callsite.get("args", [{}, {}])[1].get("operand"))
 virtual_argument_target = local_type_ref(virtual_target_body, 2)
@@ -222,7 +189,7 @@ require_transfer(virtual_return_source, virtual_return_target,
 
 # pthread_create's generated callback call takes the registration data pointer
 # and returns through Miri's source *mut () destination. This exact compiler
-# relation is distinct from the C registration function's own FnAbi row.
+# relation is distinct from the C registration function's own signature.
 pthread_callsite = next(
     (
         call
@@ -302,6 +269,8 @@ pthread_instances = [
     or item.get("symbol_name") == "pthread_create"
 ]
 require(pthread_instances, "pthread_create foreign instance/candidate is absent")
+
+Path(sys.argv[2]).write_text(json.dumps({"checks": checks}))
 
 print(
     "validated typed indirect FnPtr pointer transfer, a resolved virtual target, "

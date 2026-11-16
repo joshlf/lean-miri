@@ -14,7 +14,6 @@ import Miri.Input.CompilerContextSpan
 import Miri.Input.CompilerPrimitiveFacts
 import Miri.Input.CompilerExternStatic
 import Miri.Input.CompilerForeignSymbolTables
-import Miri.Input.CompilerQueryIndices
 
 /-! One compilation-local provider assembly. Source queries are the pinned
 step.rs/call.rs/operand.rs/stack.rs/traits.rs query sites documented by the
@@ -41,8 +40,6 @@ structure Prepared where
   /-- Immutable compiler export table. Errors remain stored so source
   consumers retain their original demand-local failure boundary. -/
   foreignSymbols : Except String CompilerForeignSymbolTables.Prepared
-  covarianceIndex : CompilerQueryIndices.Covariance
-  signatureAbiIndex : CompilerQueryIndices.SignatureAbi
   /-- Initial persistent interner. Runtime execution must thread its updated World. -/
   initialArrays : Except String RuntimeArrayTypes.World
   tls : Except String (Array CompilerThreadLocal.Entry)
@@ -106,13 +103,9 @@ def prepareProfiled (profile : Lean.Options) (input : LoweredProgram) : Except S
   let lifecycle := profileit "preparation.providers.rebind_lifecycle" profile fun _ => rebindLifecycle lifecycle program
   let pointers ← profileit "preparation.providers.function_pointers" profile fun _ => CompilerFunctionPointers.prepare lifecycle.calls
   let vtables ← profileit "preparation.providers.vtable_machine" profile fun _ => CompilerVTableMachine.prepare lifecycle.calls
-  let namedAbi ← profileit "preparation.providers.named_shim_abi" profile fun _ => CompilerNamedShimAbi.prepare runtime
+  let namedAbi ← profileit "preparation.providers.named_shim_abi" profile fun _ => CompilerNamedShimAbi.prepare runtime program
   let foreignSymbols := profileit "preparation.providers.foreign_symbols" profile fun _ =>
     CompilerForeignSymbolTables.prepare lifecycle.calls.symbols
-  let covarianceIndex := profileit "preparation.providers.covariance_index" profile fun _ =>
-    CompilerQueryIndices.covariance program.input.queries.covariance
-  let signatureAbiIndex := profileit "preparation.providers.signature_abi_index" profile fun _ =>
-    CompilerQueryIndices.signatureAbi program.input.queries.functionFacts.helperSignatures
   let arrays := profileit "preparation.providers.runtime_arrays" profile fun _ =>
     RuntimeArrayTypes.create runtime |>.mapError reprStr
   let tls := profileit "preparation.providers.thread_local" profile fun _ => CompilerThreadLocal.ofProgram program
@@ -131,8 +124,6 @@ def prepareProfiled (profile : Lean.Options) (input : LoweredProgram) : Except S
     vtables
     namedAbi
     foreignSymbols
-    covarianceIndex
-    signatureAbiIndex
     initialArrays := arrays
     tls }
 
