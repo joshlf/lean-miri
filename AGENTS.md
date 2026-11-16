@@ -11,6 +11,13 @@ logs and generated inventories under ignored scratch/ or upload them as CI artif
 
 * Inspect the pinned upstream rule before changing a port. Preserve provenance,
   initialization, allocation identity, permissions, concurrency and relevant UB checks.
+* Treat a Miri pin update as an update to its matching rustc (`rust-version`).
+  Audit compiler semantics and source materials used by the Lean layout, ABI,
+  trait, vtable, coroutine, CTFE and instance ports. Compare the actual Miri
+  queries, typing environment, phase, normalization and attribute policy, not
+  only API or data shapes. Rebuild the matched exporter, reference Miri and
+  sysroot, and validate fresh inputs with affected query comparisons, connected
+  executions and proofs; earlier-pin results do not validate the update.
 * Never substitute a successful no-op for missing semantics or count Unsupported,
   fuel exhaustion, an interpreter error or a failed process as safe execution.
 * Distinguish finite comparisons, local component proofs and whole-machine proofs.
