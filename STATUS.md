@@ -24,7 +24,7 @@ empty-function proof modules and the 78,057-declaration axiom audit, and its
 fresh standard-library startup export executes with exit code zero. Historical
 results explicitly naming `c8daa215` retain their original scope.
 
-Schema 14 exports concrete instance/promoted MIR from selected roots, evaluated
+Schema 15 exports concrete instance/promoted MIR from selected roots, evaluated
 constants, concrete type structure and finite declaration material. Executables
 default to their entry function; libraries require explicit roots. Repeated
 `--root` options select multiple definitions. Generic roots contribute
@@ -42,8 +42,8 @@ export. Historical schema-7 through schema-12 results below do not validate this
 breaking input/provider change.
 
 rustc MIR transformation, normalization and constant evaluation remain trusted.
-Additional trusted finite facts include target/declaration attributes, inferred
-variance, type identity and bound-variable flags, compiler coroutine state
+Additional trusted finite facts include target/declaration attributes, source-map
+expansion/remap/display positions, inferred variance, type identity and bound-variable flags, compiler coroutine state
 material, predicate normalization/erasure/order, actual cast
 resolution and concrete vtable/drop/method bindings. ABI follows Miri's
 `fn_abi_of_instance_no_deduced_attrs` policy; codegen-only parameter-use summaries
@@ -59,6 +59,16 @@ memory/entries and layout. Prepared allocation-world input retains all 32 salted
 identities for reached function/vtable constructors and the source-ID frontier;
 this finite identity history remains trusted. General preservation of pointer
 meaning, runtime constructor containment and agreement with Rust are unproved.
+
+Schema-15 caller-location execution passes nine fresh same-TyCtxt comparisons:
+all eight location-detail policies and Unicode path remapping, with macro,
+Unicode/tab display columns and track-caller forwarding. The 27 root/filename
+raw-ID events and their order match Miri's guest-visible diagnostic output;
+27 CTFE payload comparisons match bytes, initialization, provenance flags,
+alignment and mutability. Repeated calls get fresh roots and reuse an ordinary
+filename constant through byte/salt dedup. Synthetic trailing padding remains
+uninitialized. These are finite comparisons; the empty-function proof checks the
+new input path and does not prove general caller-location constructor equivalence.
 
 Fresh schema-14 ordinary-std startup and dynamic-upcast/provenance guests complete
 with `finalized_exit code=0`; both also match their same-TyCtxt references.
@@ -98,9 +108,9 @@ The proof covers the diagnostic-off profile; collection-enabled UI executions
 are separate finite comparisons. The Rust source, target theorem and caller-domain
 premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
 all 268 proof modules and the 77,958-declaration transitive axiom audit.
-Separately, the schema-14 fixture passes the canonical checker on its actual
+Separately, the schema-15 fixture passes the canonical checker on its actual
 input path with the current compiler/Miri pins: all 268 modules, the final
-`target`/`noUB` types, and 78,305 imported declarations including private/generated
+`target`/`noUB` types, and 78,272 imported declarations including private/generated
 declarations. Only `propext`, `Classical.choice` and `Quot.sound` occur.
 Input, example and library-source hashes remained unchanged during the successful
 check; the compiled proof artifacts are recorded separately.
@@ -804,39 +814,45 @@ fixed input hashes. Rust/MIR bytes, SHA records, claims and budgets are unchange
 ### Performance and optimization assurance
 
 The final-artifact comparison uses `tests/repro/startup/empty-main.rs`, main
-`08879436` and this schema-14 implementation, with identical `--root main`,
-`--crate-name=empty_main`, `--edition=2021`, pinned prepared sysroot and diagnostic
-seed zero. Three alternating pairs run sequentially on CPU 0 with one Lean
-thread, profiling and oracle output disabled, and no concurrent builds/checks.
-All six trials finish with `finalized_exit code=0` and choice cursor 1608.
+`0939bd70` and the runtime caller-location implementation, with identical
+`--root main`, `--crate-name=empty_main`, `--edition=2021`, pinned prepared sysroot
+and diagnostic seed zero. Three alternating pairs run sequentially on CPU 0 with
+one Lean thread, profiling and oracle output disabled, and no concurrent checks.
+All six trials finish with `finalized_exit code=0`, choice cursor 1608 and exactly
+the same diagnostic runtime profile.
 
-| Metric | main | Schema 14 |
+| Metric | main | Runtime caller locations |
 | --- | --- | --- |
-| Export-to-result wall median, seconds (min–max) | 15.006 (14.964–15.275) | 9.452 (9.322–9.756) |
-| Total process CPU median, seconds | 14.818 | 9.331 |
-| Export wall median, seconds | 5.393 | 2.632 |
-| Lean runner wall median, seconds | 9.673 | 6.870 |
-| Exported bytes | 116,485,200 | 85,115,048 |
-| Maximum exporter child RSS, bytes | 524,337,152 | 407,146,496 |
-| Maximum runner child RSS, bytes | 708,554,752 | 580,603,904 |
+| Export-to-result wall median, seconds (min–max) | 9.131 (8.820–9.687) | 6.820 (6.668–6.966) |
+| Total process CPU median, seconds | 9.013 | 6.730 |
+| Export wall median, seconds | 2.562 | 1.748 |
+| Lean runner wall median, seconds | 6.463 | 5.082 |
+| Exported bytes | 85,115,048 | 67,344,503 |
+| Maximum exporter child RSS, bytes | 407,384,064 | 329,011,200 |
+| Maximum runner child RSS, bytes | 580,308,992 | 473,317,376 |
 
-The observed median reductions are 37.01% wall time, 37.03% CPU time and 26.93%
+The observed median reductions are 25.31% wall time, 25.33% CPU time and 20.88%
 serialized size for this input. Source and per-variant input hashes are stable.
-Same-CPU steal is recorded (5–43 ticks per phase); no cgroup throttling is
-observed. These three-pair shared-host samples do not establish a general
-speedup. Tested exporter/runner SHA-256 prefixes are `23a044e868d3`/`ac924c216cd5`
-for main and `bc69674bdec8`/`c2e2a27f6123` for schema 14.
+Same-CPU steal is recorded (1–13 ticks per phase); no cgroup throttling is observed.
+These three-pair shared-host samples do not establish a general speedup. Tested
+exporter/runner SHA-256 prefixes are `bc69674bdec8`/`c2e2a27f6123` for main and
+`3be1d4582636`/`baadb4633a7f` for runtime caller locations.
 `tools/measure-pipeline.py` freezes artifacts and records raw trials, counters,
 hashes and outcome gates. Build time and input hashing are outside the measured
-export-to-result interval.
+export-to-result interval. The collector requires stable cursors within each
+variant and supports explicit expected values. An initial run was rejected for
+expecting the UI profile's cursor 1837 in the diagnostic profile; its timings are
+excluded. UI comparisons use their own matching profile and remain separate.
 
 Remaining performance work includes residual equality and validation work,
 and preparation outside typed input decoding and the optimized call-resolution
-lookup. Caller-location still scans its catalog; optimization must retain
-source-order diagnostics, malformed-row handling and fresh Location allocations.
-The exporter also still evaluates caller-location constants for all collected
-spans. This finite pass remains an optimization opportunity separate from the
-removed type/generic result matrices.
+lookup. Caller locations now use source-map expansion positions and session
+redaction policy; the intrinsic creates filename storage and fresh Location
+roots on demand. The old all-span hook pass and constant catalog are removed.
+The source-map projection remains trusted compiler material. Finite allocation
+comparisons cover the pinned Linux x86_64 target; they do not establish general
+constructor equivalence or arbitrary-program safety. The storage-failure prefix
+was checked against source order, not exercised through an injected host OOM.
 Measure current immutable artifacts with the protocol in [AGENTS](AGENTS.md);
 old timings and shared-host samples do not establish a general speedup.
 At `6a76fcbd`, hosted `pass/btreemap.rs@tree` exceeded its 900-second execution

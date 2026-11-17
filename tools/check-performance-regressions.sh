@@ -22,10 +22,10 @@ rustup run "$performance_toolchain" cargo build --locked --offline --manifest-pa
 exporter/target/debug/lean-miri-mir-exporter \
   --output scratch/decoder-id-inputs/genuine-mir-features.json --root direct_tag_value --root get_vtable_root --root as_trait_object --root as_drop_trait_object --root call_trait_object --root make_link --root promoted_ref --root byte_string --root pointer_slice --root read_tls --root id --root array_len --root exercise exporter/fixtures/mir_features.rs \
   --crate-type=lib --crate-name=mir_features
-# The tracked helper supplies real caller-location constants for indexed lookup.
+# Retain exact type-name catalog controls alongside indexed preparation checks.
 exporter/target/debug/lean-miri-mir-exporter \
   --output scratch/decoder-id-inputs/genuine-fresh.json --root root -- \
-  exporter/fixtures/source126_compact.rs --crate-type=lib --crate-name=performance_caller \
+  tests/fixtures/caller_location/type_name.rs --crate-type=lib --crate-name=performance_type_name \
   -Cpanic=abort --edition=2021 -Zmir-opt-level=0 --sysroot "$MIRI_SYSROOT" \
   --cfg=miri -Zalways-encode-mir
 for test in DefinitionLookup2026 DecoderProfile2026 PreparationProfile2026 RuntimeStartupProfileIdentity2026 FinalizationProfileIdentity2026 CompilerForeignSymbolTables; do
@@ -43,5 +43,5 @@ for test in AllocatorIds MemoryState GlobalMutationPrefixes; do
 done
 lake env lean MiriTests/AxiomAudit.lean
 
-lake env lean --run tests/input/CallerLocationIndex2026.lean scratch/decoder-id-inputs/genuine-fresh.json
+lake env lean --run tests/input/TypeNameConstants2026.lean scratch/decoder-id-inputs/genuine-fresh.json
 .lake/build/bin/source_abi_boundary_tests scratch/decoder-id-inputs/genuine-mir-features.json

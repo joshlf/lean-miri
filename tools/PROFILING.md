@@ -119,11 +119,11 @@ The progress summarizer lists the slowest reported iterations separately from
 sampled before/after completion boundaries. Below-threshold iterations are
 absent, so the reported duration sum is incomplete.
 
-Compiler metadata uses separate typed tables for types, layouts, function ABIs,
-allocations, instances, spans, definitions and type constants. Import retains
-numeric references. The runtime validates and reads the corresponding table
-when an operation needs its compiler value. There is no generic JSON payload
-graph or shared decoding cache.
+The input boundary validates type and declaration material, allocations,
+instances, spans and their references once, retaining typed numeric identities.
+The runtime computes layouts and function ABIs from that material and uses
+per-run caches. There is no retained generic JSON tree or cache shared between
+executions.
 
 Measure decoding, preparation and execution together as well as separately.
 Changes that move work between these phases can improve one span without
@@ -165,3 +165,10 @@ proof. Add `--profile` to record Lean's internal spans; leave it off for ordinar
 execution measurements. Use `measure.py` on each exported input separately when
 detailed phase attribution is needed. Keep other builds out of the measured trials and inspect
 sample spread and host counters before interpreting differences.
+
+Pipeline comparisons require a stable choice cursor within each variant. Use
+`--baseline-expected-cursor N --candidate-expected-cursor M` to bind the observed
+cursors explicitly; allocation-history changes can make N and M differ.
+
+The `--seed` diagnostic runner profile differs from the `--ui-source`/`--ui-flags`
+upstream-comparison profile. Take expected cursors from the profile being measured.

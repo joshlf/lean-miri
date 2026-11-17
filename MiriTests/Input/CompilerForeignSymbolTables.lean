@@ -25,11 +25,11 @@ private def document (symbols : Catalog.ForeignSymbols) : ImportDocument := {
   types := #[], allocations := #[], instances := #[], selectedScope := none
   bodies := #[], producerSettings := unusedSettings
   queries := {
-    session := ⟨#[], false, "test", 0, #[]⟩
+    session := ⟨#[], false, "test", 0, #[], ⟨true,true,true⟩⟩
     runtime := ⟨none, #[], symbols⟩
     frameMetadata := ⟨0, #[]⟩, typeNames := #[], panic := #[]
     nativeSignatures := #[], retag := #[]
-    globalBytes := ⟨0, 0, #[], #[]⟩, callerLocations := #[]
+    globalBytes := ⟨0, 0, #[], #[]⟩
     main := ⟨none, none, none, #[], none⟩, primitives := unusedPrimitives
     namedTypes := none, shimAbis := none, namedShimAbis := none
     libcTypeLayouts := none, windowsTypeLayouts := none, namedConstants := none, namedStatics := none } }
@@ -58,7 +58,7 @@ private def prepare (symbols : Catalog.ForeignSymbols) (definitions : Array Defi
   let source : ImportDocument := {
     base with
     definitions, instances := #[instanceNode 0, instanceNode 1], files := #["test.rs"]
-    spans := #[{ lo := 0, hi := 1, start := ⟨1,0⟩, «end» := ⟨1,1⟩, context := "root", file := 0 }] }
+    spans := #[{ lo := 0, hi := 1, start := ⟨1,0⟩, «end» := ⟨1,1⟩, context := "root", file := 0, expansionLocation := ⟨0,1,1⟩ }] }
   let program : LoweredProgram := ⟨⟨#[], #[], definitions, #[]⟩, #[], #[], #[], source⟩
   let runtime : RuntimeMetadata := { source, target }
   let context : CompilerFacts.Context := { runtime, program }

@@ -67,6 +67,7 @@ def main():
     for version in ('baseline', 'candidate'):
         parser.add_argument(f'--{version}-exporter', type=Path, required=True)
         parser.add_argument(f'--{version}-runner', type=Path, required=True)
+        parser.add_argument(f'--{version}-expected-cursor', type=int)
     parser.add_argument('--rustc-toolchain', type=Path, required=True)
     parser.add_argument('--miri-sysroot', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
@@ -80,6 +81,9 @@ def main():
     args = parser.parse_args()
     if args.cpu not in os.sched_getaffinity(0) or args.pairs < 1 or args.timeout <= 0:
         parser.error('select an available CPU, positive pair count and positive timeout')
+    if any(getattr(args, f'{v}_expected_cursor') is not None and
+           getattr(args, f'{v}_expected_cursor') < 0 for v in ('baseline', 'candidate')):
+        parser.error('expected cursors must be nonnegative')
     if not 0 <= args.seed < 2**64:
         parser.error('seed must be an unsigned u64')
     source = args.source.resolve()
@@ -124,7 +128,9 @@ def main():
         'collector_sha256': digest(Path(__file__)),
         'counter_collector_sha256': digest(collector),
         'clock_ticks_per_second': os.sysconf('SC_CLK_TCK'),
-        'expected_terminal': args.expected_terminal, 'trials': []}
+        'expected_terminal': args.expected_terminal,
+        'expected_cursors': {v: getattr(args, f'{v}_expected_cursor')
+                             for v in ('baseline', 'candidate')}, 'trials': []}
     for pair in range(args.pairs):
         order = ('baseline', 'candidate') if pair % 2 == 0 else ('candidate', 'baseline')
         for version in order:
@@ -161,7 +167,11 @@ def main():
                             'seconds': float(span[3]) / (1000 if span[4] == 'ms' else 1)})
                 trial['terminal_line'] = terminal[-1] if terminal else None
                 trial['terminal_outcome'] = terminal[-1].partition(';')[0].strip() if terminal else None
-                trial['accepted'] = trial['run']['returncode'] == 0 and (
+                cursor = re.search(r'; choice_cursor=([0-9]+)(?:;|$)', trial['terminal_line'] or '')
+                trial['choice_cursor'] = int(cursor[1]) if cursor else None
+                expected = getattr(args, f'{version}_expected_cursor')
+                trial['accepted'] = trial['choice_cursor'] is not None and (
+                    expected is None or trial['choice_cursor'] == expected) and trial['run']['returncode'] == 0 and (
                     trial['terminal_outcome'] == args.expected_terminal)
             else:
                 trial['accepted'] = False
@@ -172,7 +182,13 @@ def main():
             (output / 'results.json').write_text(json.dumps(result, indent=2) + '\n')
             print(f"{name}: accepted={trial['accepted']} wall={trial['total_wall_seconds']:.3f}s",
                   flush=True)
-    result['accepted'] = all(trial['accepted'] for trial in result['trials'])
+    # Allocation history can change choice consumption between implementations.
+    result['cursor_stable'] = {v: len({t.get('choice_cursor') for t in result['trials']
+        if t['version'] == v}) == 1 and all(t.get('choice_cursor') is not None
+        for t in result['trials'] if t['version'] == v)
+        for v in ('baseline', 'candidate')}
+    result['accepted'] = all(trial['accepted'] for trial in result['trials']) and all(
+        result['cursor_stable'].values())
     result['source_unchanged'] = digest(source) == result['source_sha256']
     result['accepted'] = result['accepted'] and result['source_unchanged']
     if result['accepted']:

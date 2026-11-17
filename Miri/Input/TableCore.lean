@@ -15,7 +15,7 @@ open Lean
 def expectedMiriCommit : String := "93c45edea8b148a6b6f05ec9384449a04217143f"
 def expectedRustcCommit : String := "8eb778d04094d3af4b26580cab327e0413eb1e02"
 def expectedSchema : String := "lean-miri-rustc-mir"
-def expectedSchemaVersion : Nat := 14
+def expectedSchemaVersion : Nat := 15
 
 def escapePathKey (key : String) : String :=
   key.toList.foldl (fun out char => out ++ match char with
@@ -144,6 +144,19 @@ def parseSourcePosition (_path : String := "$parseSourcePosition") : Parser (Sou
     | _ => skipValue; pure s
   return ⟨(← required s.«line» "line"), (← required s.«column» "column")⟩
 
+private def parseExpansionLocation : Parser ExpansionLocation := do
+  let f ← object ((none, none, none) : Option Nat × Option Nat × Option Nat) fun f key => do
+    match key with
+    | "file" => pure (some (← natural), f.2.1, f.2.2)
+    | "line" => pure (f.1, some (← natural), f.2.2)
+    | "column" => pure (f.1, f.2.1, some (← natural))
+    | _ => skipValue; pure f
+  let file ← required f.1 "expansion_location.file"
+  let line ← required f.2.1 "expansion_location.line"
+  let column ← required f.2.2 "expansion_location.column"
+  unless line < 2^32 && column < 2^32 do fail "expansion location exceeds u32"
+  pure ⟨file, line.toUInt32, column.toUInt32⟩
+
 private structure parseSourceSpanFields where
   «is_dummy» : Option (Bool) := none
   «lo» : Option (Nat) := none
@@ -152,10 +165,12 @@ private structure parseSourceSpanFields where
   «end» : Option (SourcePosition) := none
   «ctxt» : Option (String) := none
   «file» : Option (Nat) := none
+  expansionLocation : Option ExpansionLocation := none
 
 def parseSourceSpan (_path : String := "$parseSourceSpan") : Parser (SourceSpanData) := do
-  let s ← object (parseSourceSpanFields.mk none none none none none none none) fun s key => do
+  let s ← object ({} : parseSourceSpanFields) fun s key => do
     match key with
+    | "expansion_location" => return {s with expansionLocation := some (← parseExpansionLocation)}
     | "is_dummy" => return { s with «is_dummy» := some (← boolean) }
     | "lo" => return { s with «lo» := some (← natural) }
     | "hi" => return { s with «hi» := some (← natural) }
@@ -166,7 +181,7 @@ def parseSourceSpan (_path : String := "$parseSourceSpan") : Parser (SourceSpanD
     | _ => skipValue; pure s
   return {
     isDummy := (← required s.«is_dummy» "is_dummy"), lo := (← required s.«lo» "lo"), hi := (← required s.«hi» "hi"), start := (← required s.«start» "start"),
-    «end» := (← required s.«end» "end"), context := (← required s.«ctxt» "ctxt"), file := (← required s.«file» "file") }
+    «end» := (← required s.«end» "end"), context := (← required s.«ctxt» "ctxt"), file := (← required s.«file» "file"), expansionLocation := ← required s.expansionLocation "expansion_location" }
 
 private structure parseSourceInfoFields where
   «span» : Option (Nat) := none

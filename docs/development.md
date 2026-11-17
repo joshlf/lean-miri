@@ -11,7 +11,7 @@ flock, a C compiler and Rustup/Cargo. Install Rustup/Cargo under `.cargo/bin/`
 Lean is pinned to `leanprover/lean4:v4.35.0` in `lean-toolchain`, Miri to
 `93c45edea8b148a6b6f05ec9384449a04217143f`, and rustc to
 `8eb778d04094d3af4b26580cab327e0413eb1e02`.
-Fresh exports use schema 13; saved schema-11/12 fixtures keep their original pins.
+Fresh exports use schema 15; earlier execution inputs require fresh export.
 `tools/check-upstream-sync.sh --skip-build --output scratch/upstream-sync`
 runs original upstream Rust controls for the changed semantics with same-TyCtxt
 references. `python3 tests/upstream_sync/check.py --output scratch/sync-controls`
@@ -102,7 +102,7 @@ Additional structural regressions are checked with
 `bash tools/check-structural-regressions.sh` (typechecking, kernel examples,
 #eval and executable assertions with pinned unit fixtures or no input). This is
 distinct from running supplemental guest harnesses that need fresh exports. The structural
-checker copies pinned schema-11 unit fixtures without changing their bytes and passes them to
+checker uses the maintained synthetic strict unit fixture and passes them to
 `LowerContext`, `ProviderContext` and `PrimitiveRebinding`, including their runtime
 source/cache and error-order assertions. These are not fresh producer comparisons.
 `tools/prepare-source-audit.py`

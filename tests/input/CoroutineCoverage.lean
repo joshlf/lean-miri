@@ -124,19 +124,19 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
       multiCoverage "source layout differs from saved-local evidence"
   IO.println "PASS constructed coroutine ownership/type/index/conflict/phase/role/residual negatives"
 
-/-- Finite schema-14 decoder controls and constructed source-layout witnesses;
+/-- Finite schema-15 decoder controls and constructed source-layout witnesses;
 these checks do not execute a Rust coroutine or establish guest safety. -/
 def main : IO Unit := do
   let input ← IO.FS.readFile "tests/input/fixtures/strict-unit.json"
   let decoded ← must (decodeJson input)
-  check decoded.document.coroutineCoverage.isSome "schema 14 lost typed coroutine coverage"
+  check decoded.document.coroutineCoverage.isSome "schema 15 lost typed coroutine coverage"
   let count := decoded.document.bodies.size
   let markers := "[" ++ String.intercalate "," (List.replicate count "false") ++ "]"
   let catalog := object [("body_coroutines", markers), ("coroutines", "[]"), ("auxiliary_bodies", "[]")]
   let valid ← must (setField input "compiler_coroutine_coverage" catalog)
   let newDecoded ← must (decodeJson valid)
-  check newDecoded.document.coroutineCoverage.isSome "schema 14 failed to retain typed coverage"
-  for version in ["11", "12", "13", "15"] do
+  check newDecoded.document.coroutineCoverage.isSome "schema 15 failed to retain typed coverage"
+  for version in ["11", "12", "13", "14", "16"] do
     rejected (← must (setField valid "schema_version" version)) "unsupported schema version"
   let fields ← must ((← must (JsonFixtures.parse valid)).object)
   let missingCoverage := object ((fields.filterMap fun (name, value) =>
@@ -184,4 +184,4 @@ def main : IO Unit := do
   let badCatalog ← must (setField catalog "coroutines" ("[" ++ badWitness ++ "]"))
   rejected (← must (setField valid "compiler_coroutine_coverage" badCatalog)) "dangling source-info pool reference"
   componentChecks decoded.document
-  IO.println "PASS strict schema-14 coroutine coverage, computed layouts and malformed/missing/unknown guards"
+  IO.println "PASS strict schema-15 coroutine coverage, computed layouts and malformed/missing/unknown guards"

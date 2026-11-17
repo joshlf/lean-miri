@@ -137,16 +137,28 @@ private def runtimeCheck : Parser (Miri.MIR.RuntimeChecks × Bool) := do
     | _ => fail "unknown compiler runtime-check kind"
   return (check, enabled)
 
+private def locationDetail : Parser LocationDetail := do
+  let f ← object ((none, none, none) : Option Bool × Option Bool × Option Bool) fun f key => do
+    match key with
+    | "file" => pure (some (← boolean), f.2.1, f.2.2)
+    | "line" => pure (f.1, some (← boolean), f.2.2)
+    | "column" => pure (f.1, f.2.1, some (← boolean))
+    | _ => skipValue; pure f
+  pure ⟨← required f.1 "location_detail.file", ← required f.2.1 "location_detail.line",
+    ← required f.2.2 "location_detail.column"⟩
+
 private structure sessionFields where
   internalTargetFeatures : Option (Array (String)) := none
   isLikeWasm : Option (Bool) := none
   targetArch : Option (String) := none
   rootSpan : Option (Nat) := none
   runtimeChecks : Option (Array (Miri.MIR.RuntimeChecks × Bool)) := none
+  locationDetail : Option LocationDetail := none
 
 def session : Parser (Session) := do
   let fields ← object ({} : sessionFields) fun fields key => do
     match key with
+    | "location_detail" => return {fields with locationDetail := some (← locationDetail)}
     | "internal_target_features" => return { fields with internalTargetFeatures := some (← array (string)) }
     | "is_like_wasm" => return { fields with isLikeWasm := some (← boolean) }
     | "target_arch" => return { fields with targetArch := some (← string) }
@@ -163,7 +175,8 @@ def session : Parser (Session) := do
     if seen.contains kind then fail "duplicate compiler runtime-check query"
     seen := seen.push kind
   return {
-    internalTargetFeatures, isLikeWasm, targetArch, rootSpan, runtimeChecks }
+    internalTargetFeatures, isLikeWasm, targetArch, rootSpan, runtimeChecks,
+    locationDetail := ← need fields.locationDetail "location_detail" }
 
 private structure intrinsicFields where
   mustOverride : Option (Bool) := none

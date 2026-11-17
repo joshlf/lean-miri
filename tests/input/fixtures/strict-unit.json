@@ -1,6 +1,6 @@
 {
   "schema": "lean-miri-rustc-mir",
-  "schema_version": 14,
+  "schema_version": 15,
   "producer": {
     "miri_commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
     "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
@@ -847,7 +847,12 @@
       },
       "ctxt": "root",
       "file": 0,
-      "is_dummy": false
+      "is_dummy": false,
+      "expansion_location": {
+        "file": 0,
+        "line": 1,
+        "column": 1
+      }
     }
   ],
   "definitions": [
@@ -875,7 +880,12 @@
     "is_like_wasm": false,
     "target_arch": "x86_64",
     "root_span": 0,
-    "runtime_checks": []
+    "runtime_checks": [],
+    "location_detail": {
+      "file": true,
+      "line": true,
+      "column": true
+    }
   },
   "compiler_runtime_queries": {
     "instances": [],
@@ -906,7 +916,6 @@
   "compiler_panic_queries": [],
   "compiler_native_signature_queries": [],
   "compiler_retag_queries": [],
-  "compiler_caller_location_constants": [],
   "compiler_global_byte_queries": {
     "salt_count": 32,
     "str_type": 18,

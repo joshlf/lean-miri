@@ -39,7 +39,7 @@ class PipelineMeasurementTests(unittest.TestCase):
                 'assert data["affinity"] == sorted(os.sched_getaffinity(0))\n'
                 'assert data["threads"] == os.environ["LEAN_NUM_THREADS"] == "1"\n'
                 'print("decoder.json_parse took 12.5ms")\n'
-                'print("run: finalized_exit code=0; threads=1")\n')
+                'print("run: finalized_exit code=0; choice_cursor=7; threads=1")\n')
             for path in (rustc, exporter, runner):
                 path.chmod(0o700)
             command = [sys.executable, str(COLLECTOR), '--source', str(source),
@@ -66,6 +66,28 @@ class PipelineMeasurementTests(unittest.TestCase):
                     self.assertGreaterEqual(trial[phase]['cpu_seconds'], 0)
                     self.assertIn('selected_cpu_steal_ticks_delta', trial[phase])
                     self.assertIn('cgroup_cpu_delta', trial[phase])
+            candidate = root / 'candidate-runner'
+            candidate.write_text('#!/bin/sh\necho "run: finalized_exit code=0; choice_cursor=9"\n')
+            candidate.chmod(0o700)
+            command[command.index('--candidate-runner') + 1] = str(candidate)
+            command[command.index(str(root / 'success'))] = str(root / 'different-cursors')
+            completed = subprocess.run(command, text=True, capture_output=True, timeout=30)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            command[command.index(str(root / 'different-cursors'))] = str(root / 'mismatch')
+            command[command.index('--'):command.index('--')] = ['--candidate-expected-cursor', '8']
+            completed = subprocess.run(command, text=True, capture_output=True, timeout=30)
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            command[command.index('--candidate-expected-cursor') + 1] = '9'
+            candidate.write_text(f'#!{sys.executable}\nimport pathlib\np=pathlib.Path({str(root / 'count')!r})\nn=int(p.read_text())+1 if p.exists() else 0\np.write_text(str(n))\nprint("run: finalized_exit code=0; choice_cursor="+str(9+n))\n')
+            command[command.index(str(root / 'mismatch'))] = str(root / 'unstable')
+            completed = subprocess.run(command, text=True, capture_output=True, timeout=30)
+            self.assertEqual(completed.returncode, 2, completed.stderr)
+            unstable = json.loads((root / 'unstable/results.json').read_text())
+            self.assertFalse(unstable['cursor_stable']['candidate'])
+            command[command.index('--candidate-runner') + 1] = str(runner)
+            i = command.index('--candidate-expected-cursor')
+            del command[i:i+2]
+            command[command.index(str(root / 'unstable'))] = str(root / 'success')
             old_hash = result['artifacts']['candidate']['runner']['sha256']
             runner.write_text('#!/bin/sh\necho "run: unsupported missing query"\n')
             self.assertEqual(hashlib.sha256(Path(result['artifacts']['candidate']['runner']['path'])
@@ -80,7 +102,7 @@ class PipelineMeasurementTests(unittest.TestCase):
             self.assertTrue(all('--profile' in trial['run']['command'] for trial in result['trials']))
             self.assertNotIn('summary', result)
             self.assertTrue(all(trial['run']['returncode'] == 0 for trial in result['trials']))
-            runner.write_text('#!/bin/sh\necho "run: finalized_exit code=0"\n')
+            runner.write_text('#!/bin/sh\necho "run: finalized_exit code=0; choice_cursor=7"\n')
             missing_output = root / 'missing-output-exporter'
             missing_output.write_text('#!/bin/sh\nexit 0\n')
             missing_output.chmod(0o700)

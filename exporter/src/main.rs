@@ -26,6 +26,8 @@ mod pool_values;
 mod producer;
 mod query_values;
 #[cfg(feature = "miri-reference")]
+mod reference_allocations;
+#[cfg(feature = "miri-reference")]
 mod reference_ui;
 #[cfg(feature = "miri-reference")]
 mod reference_values;
@@ -80,7 +82,7 @@ fn export_failure<T>(context: &str, details: impl std::fmt::Display) -> Result<T
 
 const EXPECTED_RUSTC_COMMIT: &str = "8eb778d04094d3af4b26580cab327e0413eb1e02";
 const MIRI_COMMIT: &str = "93c45edea8b148a6b6f05ec9384449a04217143f";
-const ROOT_SCHEMA_VERSION: u64 = 14;
+const ROOT_SCHEMA_VERSION: u64 = 15;
 
 struct Options {
     output: PathBuf,
@@ -104,6 +106,13 @@ struct SessionQueries {
     target_arch: String,
     root_span: u64,
     runtime_checks: [pool_body::RuntimeCheck; 3],
+    location_detail: LocationDetail,
+}
+#[derive(serde::Serialize)]
+struct LocationDetail {
+    file: bool,
+    line: bool,
+    column: bool,
 }
 #[derive(serde::Serialize)]
 struct RuntimeQueries {
@@ -170,7 +179,6 @@ struct ExportDocument {
     compiler_native_signature_queries: Vec<native_signature_queries::Query>,
     compiler_retag_queries: Vec<retag_queries::Query>,
     compiler_global_byte_queries: global_byte_queries::Queries,
-    compiler_caller_location_constants: Vec<intrinsic_value_queries::CallerLocation>,
     compiler_main_queries: main_queries::Catalog,
     compiler_runtime_primitives: RuntimePrimitives,
     compiler_predicate_queries: Vec<query_values::PredicateQuery>,
@@ -291,13 +299,9 @@ struct ExportContext<'tcx> {
     predicate_ids: Pool<ty::PolyExistentialPredicate<'tcx>, allocation_values::Predicate>,
     predicates_in_progress: HashSet<ty::PolyExistentialPredicate<'tcx>>,
     pending_predicates: Vec<ty::PolyExistentialPredicate<'tcx>>,
-    caller_location_span_set: HashSet<rustc_span::Span>,
-    caller_location_spans: Vec<rustc_span::Span>,
     /// Caller-location construction is a rustc hook, not a memoized query;
     /// each invocation allocates a fresh global. Cache the exact serialized
     /// result once per source span so closure rounds do not invent identities.
-    caller_location_constant_rows:
-        HashMap<rustc_span::Span, intrinsic_value_queries::CallerLocationFact>,
     vtable_demands: OrderedSet<(
         ty::Ty<'tcx>,
         &'tcx ty::List<ty::PolyExistentialPredicate<'tcx>>,
@@ -1508,8 +1512,6 @@ impl ExportCallbacks {
             &mut export_context,
             &mut type_name_state,
         )?;
-        let _caller_location_constants_seed =
-            intrinsic_value_queries::discover_caller_locations(tcx, &mut export_context)?;
         let _predicate_queries_seed =
             compiler_predicate_queries_json(tcx, &mut export_context, &mut predicate_facts)?;
         let _native_signature_queries_seed =
@@ -1551,8 +1553,6 @@ impl ExportCallbacks {
                 export_context.fn_pointer_targets.len(),
                 export_context.runtime_mir_frame_instances.len(),
                 export_context.fn_pointer_cast_inputs.len(),
-                export_context.caller_location_spans.len(),
-                export_context.caller_location_constant_rows.len(),
                 export_context.symbol_only_instances.len(),
             ];
             let foreign_symbols = shim_abi::demanded_symbols(tcx, &export_context);
@@ -1575,7 +1575,6 @@ impl ExportCallbacks {
                 &mut export_context,
                 &mut type_name_state,
             )?;
-            intrinsic_value_queries::discover_caller_locations(tcx, &mut export_context)?;
             instances.extend(export_reachable_instances(tcx, &mut export_context)?);
             if self.prepared_allocator_world {
                 register_backtrace_frame_pointer_demands(tcx, &mut export_context);
@@ -1597,8 +1596,6 @@ impl ExportCallbacks {
                 export_context.fn_pointer_targets.len(),
                 export_context.runtime_mir_frame_instances.len(),
                 export_context.fn_pointer_cast_inputs.len(),
-                export_context.caller_location_spans.len(),
-                export_context.caller_location_constant_rows.len(),
                 export_context.symbol_only_instances.len(),
             ];
             if before == after && export_context.identity_membership_delta.is_empty() {
@@ -1624,8 +1621,6 @@ impl ExportCallbacks {
             native_signature_queries::finish(native_state, &export_context);
         let retag_queries = retag_queries::finish(tcx, &export_context);
         let intrinsic_type_names = intrinsic_value_queries::finish_type_names(type_name_state);
-        let caller_location_constants =
-            intrinsic_value_queries::finish_caller_locations(tcx, &export_context);
         let mut instances = instances
             .into_iter()
             .map(InstanceFact::finish)
@@ -1673,6 +1668,11 @@ impl ExportCallbacks {
             target_arch: tcx.sess.target.arch.to_string(),
             root_span,
             runtime_checks,
+            location_detail: LocationDetail {
+                file: tcx.sess.opts.unstable_opts.location_detail.file,
+                line: tcx.sess.opts.unstable_opts.location_detail.line,
+                column: tcx.sess.opts.unstable_opts.location_detail.column,
+            },
         };
         let selected_scope = Some(SelectedScope {
             kind: "rooted_structural_closure",
@@ -1739,7 +1739,6 @@ impl ExportCallbacks {
             compiler_native_signature_queries: native_signature_queries,
             compiler_retag_queries: retag_queries,
             compiler_global_byte_queries: global_byte_queries,
-            compiler_caller_location_constants: caller_location_constants,
             compiler_main_queries: main_queries,
             compiler_runtime_primitives: runtime_primitives,
             compiler_predicate_queries: predicate_queries,
@@ -1801,6 +1800,7 @@ impl ExportCallbacks {
                 // Drop the large owned snapshot tree before Miri starts using
                 // the same TyCtxt, keeping the reference peak within budget.
                 drop(document);
+                let allocation_trace = reference_allocations::enabled()?;
                 let result = match reference_entry {
                     Some((entry, entry_type)) => run_prepared_miri_reference_entry(
                         tcx,
@@ -1810,6 +1810,9 @@ impl ExportCallbacks {
                     ),
                     None => reference_values::Result::skipped(),
                 };
+                if allocation_trace {
+                    reference_allocations::write(tcx, frontier, &self.output)?;
+                }
                 sidecar_record.status = result.status();
                 let failed = sidecar_record.status == reference_values::Status::Failed;
                 sidecar_record.reference = Some(result);
@@ -2697,7 +2700,6 @@ fn mir_body_json<'tcx>(
             export_failure::<()>("MIR", "coroutine body lacks validated compiler coverage")?;
         }
     }
-    intrinsic_value_queries::collect_spans(tcx, context, body);
     let instance_id = context.register_metadata_instance(instance);
     // Source shim kinds can discover compiler metadata through type_json.
     // Keep that discovery even though the decoder does not consume the kind.
@@ -2807,6 +2809,14 @@ fn span_json<'tcx>(
         let map = tcx.sess.source_map();
         let start = map.lookup_char_pos(span.lo());
         let end = map.lookup_char_pos(span.hi());
+        let expansion = span.ctxt().outer_expn().expansion_cause().unwrap_or(span);
+        let location = map.lookup_char_pos(expansion.lo());
+        let expansion_location = pool_values::SourceLocation {
+            file: context.files.intern(location.file.name
+                .display(rustc_span::RemapPathScopeComponents::MACRO).to_string_lossy().into_owned()),
+            line: location.line as u32,
+            column: location.col_display as u32 + 1,
+        };
         context.spans.define(
             id,
             pool_values::Span {
@@ -2814,6 +2824,7 @@ fn span_json<'tcx>(
                 lo: span.lo().0,
                 hi: span.hi().0,
                 ctxt: format!("{:?}", span.ctxt()),
+                expansion_location,
                 file: context.files.intern(format!("{:?}", start.file.name)),
                 start: pool_values::Position {
                     line: start.line,
