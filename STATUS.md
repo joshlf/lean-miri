@@ -285,6 +285,22 @@ malformed endpoints, including underscores, on both bounds. The full regression 
 in one local run after the Box pointer-material and UI profile changes, before the
 subsequent call-progress fix. A fresh run and hosted rerun remain necessary.
 
+At main `3211f7a8`, the [hosted regression
+run](https://github.com/proofs-rs/lean-miri/actions/runs/44059669104) passed the
+extended and fresh lanes but failed regression and replay. Regression stopped
+at stage 44 because the detached-join fixture omitted the newly required
+`CallHooks.stackIsEmpty` hook. The fixture now rejects that unused hook explicitly,
+consistent with its other unused call hooks. The complete source-extracted
+data-race differential suite passes locally, including all 14 detached-join and
+clock-reuse assertions; the complete regression lane still needs a new run.
+Replay retains the older target-layout rejection described above in canonical,
+ordering and SC-seed inputs. The fresh large-TB execution reaches the expected
+Frozen-write UB at source line 14/MIR bb1[8], but its validator rejects the
+observed 48 diagnostic choices against its retained expectation of 44. The
+choice difference requires review; no input, decoder requirement, semantic
+assertion or execution budget has been relaxed. The corresponding hosted UI
+sweep also fails and remains separate unresolved work.
+
 For the current UI failure cohort, the exporter now retains the exact mutable
 pointer type required by rustc's Box field projection. The unchanged
 `pass/slices.rs@tree_implicit_writes` case passes against both Miri and Lean.
