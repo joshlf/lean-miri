@@ -13,6 +13,12 @@ pub(crate) struct Position {
     pub column: usize,
 }
 #[derive(Clone, Debug, Serialize)]
+pub(crate) struct SourceLocation {
+    pub file: u64,
+    pub line: u32,
+    pub column: u32,
+}
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct Span {
     pub is_dummy: bool,
     pub lo: u32,
@@ -21,6 +27,7 @@ pub(crate) struct Span {
     pub file: u64,
     pub start: Position,
     pub end: Position,
+    pub expansion_location: SourceLocation,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]

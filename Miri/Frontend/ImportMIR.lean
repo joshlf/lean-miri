@@ -129,6 +129,7 @@ deriving instance ToExpr for Input.AllocationKind
 deriving instance ToExpr for Input.InstanceKind
 deriving instance ToExpr for Input.Obligation
 deriving instance ToExpr for Input.SourcePosition
+deriving instance ToExpr for Input.ExpansionLocation
 deriving instance ToExpr for Input.SourceSpanData
 deriving instance ToExpr for Input.SourceInfo
 deriving instance ToExpr for Input.Producer
@@ -213,6 +214,7 @@ deriving instance ToExpr for Input.CompilerPredicateEvidence
 deriving instance ToExpr for Input.Catalog.Signature
 deriving instance ToExpr for Input.Catalog.Artifact
 deriving instance ToExpr for Input.Catalog.ProducerSettings
+deriving instance ToExpr for Input.Catalog.LocationDetail
 deriving instance ToExpr for Input.Catalog.Session
 deriving instance ToExpr for Input.Catalog.IntrinsicMetadata
 deriving instance ToExpr for Input.Catalog.TargetFeature
@@ -229,7 +231,6 @@ deriving instance ToExpr for Input.Catalog.Runtime
 deriving instance ToExpr for Input.Catalog.FrameMetadata
 deriving instance ToExpr for Input.SourceCastTarget
 deriving instance ToExpr for Input.Catalog.TypeName
-deriving instance ToExpr for Input.Catalog.CallerLocation
 deriving instance ToExpr for Input.Catalog.PanicQuery
 deriving instance ToExpr for Input.Catalog.NativeSignature
 deriving instance ToExpr for Input.Catalog.RetagQuery

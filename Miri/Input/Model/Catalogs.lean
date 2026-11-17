@@ -41,12 +41,19 @@ structure ProducerSettings where
   qualification : String
   deriving Repr, DecidableEq
 
+structure LocationDetail where
+  file : Bool
+  line : Bool
+  column : Bool
+  deriving Repr, DecidableEq
+
 structure Session where
   internalTargetFeatures : Array String
   isLikeWasm : Bool
   targetArch : String
   rootSpan : SpanId
   runtimeChecks : Array (Miri.MIR.RuntimeChecks × Bool)
+  locationDetail : LocationDetail
   deriving Repr, DecidableEq
 
 structure IntrinsicMetadata where
@@ -150,12 +157,6 @@ structure FrameMetadata where
 structure TypeName where
   inputType : TypeId
   resultType : TypeId
-  value : Miri.MIR.ConstValue
-  deriving Repr, DecidableEq
-
-structure CallerLocation where
-  span : SpanId
-  resultType : Option TypeId
   value : Miri.MIR.ConstValue
   deriving Repr, DecidableEq
 
@@ -310,7 +311,6 @@ structure Queries where
   nativeSignatures : Array NativeSignature
   retag : Array RetagQuery
   globalBytes : GlobalBytes
-  callerLocations : Array CallerLocation
   main : Main
   primitives : Primitives
   namedTypes : Option (Array (String × TypeId))

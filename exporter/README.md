@@ -56,10 +56,15 @@ prove termination when fresh concrete instantiations keep appearing.
 
 ## Source input
 
-The producer and reader use `lean-miri-rustc-mir` schema 14. Earlier versions
+The producer and reader use `lean-miri-rustc-mir` schema 15. Earlier versions
 require fresh export. The execution document contains no layout, FnAbi or
 covariance answer tables. Table IDs are dense and local to one document;
-allocation source IDs retain a separate raw identity.
+allocation source IDs retain a separate raw identity. Source spans include the source-map
+expansion position used by caller-location intrinsics, and session material
+retains the location-detail policy. Lean constructs each caller location when
+the intrinsic executes; the exporter does not preallocate a Location for every
+span. Its new prepared allocation history is compared with Miri under the same
+preparation, rather than preserving the former eager-hook history.
 
 | Material | Contents and consumer |
 | --- | --- |
@@ -71,7 +76,8 @@ allocation source IDs retain a separate raw identity.
 | `source_cast_targets` | Resolution witnesses for actual function-pointer and closure casts |
 | `allocations`, `byte_images` | Evaluated constant memory and symbolic compiler allocations, with distinct identities, initialization and provenance |
 | `definitions`, `type_constants`, `predicates` | Referenced compiler identities and normalized finite declaration material |
-| `files`, `spans`, shared payload arrays | Source information and exact shared payloads used by MIR and memory |
+| `files`, `spans`, shared payload arrays | Source information, expansion positions and exact shared payloads used by MIR and memory |
+| `compiler_session_queries` | Target/session settings, including caller-location file/line/column redaction |
 
 Concrete ADT field types and repr drive Lean layout calculation. Generic type
 patterns are retained where trait selection, potentially-unsized tails or
@@ -89,6 +95,14 @@ neither a generic JSON tree nor a second MIR tree. The file entrypoint currently
 reads a complete `String`. Lean execution uses only the input and its own state;
 it starts no compiler process and uses no cache shared between executions.
 Unsupported algorithms and missing runtime material remain explicit errors.
+
+The expansion position is trusted rustc source-map material: macro expansion,
+path remapping and display columns are resolved during export. Lean applies the
+session redaction policy and computes the Location layout, bytes, initialization
+and provenance when the intrinsic executes. Filename bytes include a trailing
+NUL in storage; the string length excludes it. Existing compiler byte/salt dedup
+state supplies filename identity, and each invocation reserves a fresh Location
+root. Passing a track-caller span between frames does not itself allocate one.
 LLVM intrinsic identities retain explicit dispatch without an ordinary FnAbi;
 ordinary calls use Lean's ABI calculation and unknown LLVM operations still fail.
 
@@ -182,6 +196,6 @@ Run Rust units and exporter fixture suites with the pinned environment:
 Lean integration and theorem checks are separate. `tools/check-empty-function.sh`
 checks concrete providers for its fixture and then the kernel theorem/axiom
 closure. [STATUS.md](../STATUS.md) records current validation gaps; historical
-fixture and CI successes do not establish schema-14 execution. Whole-pipeline
+fixture and CI successes do not establish schema-15 execution. Whole-pipeline
 performance comparisons use identical Rust inputs and fixed artifacts via
 `tools/measure-pipeline.py`, as described in [PROFILING](../tools/PROFILING.md).

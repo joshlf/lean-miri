@@ -212,9 +212,6 @@ private def catalogs (b : ReferenceBounds) (q : Catalog.Queries) : Except String
         checkId b.allocations allocation path "allocation"
   for row in q.typeNames do
     for id in #[row.inputType, row.resultType] do checkId b.types id "$.compiler_type_name_constants" "type"
-  for row in q.callerLocations do
-    checkId b.spans row.span "$.compiler_caller_location_constants" "span"
-    if let some id := row.resultType then checkId b.types id "$.compiler_caller_location_constants" "type"
   for row in q.nativeSignatures do
     checkId b.instances row.instanceId "$.compiler_native_signatures" "instance"
     catalogSignature b "$.compiler_native_signatures" row.signature
@@ -382,6 +379,7 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
     auxiliary.mapIdx (fun index value => (value.body, s!"$.compiler_coroutine_coverage.auxiliary_bodies[{index}].body"))
   for (span, index) in document.spans.toList.zipIdx do
     checkId document.files.size span.file s!"$.spans[{index}].file" "file"
+    checkId document.files.size span.expansionLocation.file s!"$.spans[{index}].expansion_location.file" "file"
   for (node, index) in document.types.toList.zipIdx do
     let path := s!"$.types[{index}]"
     typeShape b s!"{path}.shape" node.shape

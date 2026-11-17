@@ -28,7 +28,7 @@ class SharedFixturePoolTests(unittest.TestCase):
 
     def test_complete_payload_dedup_preserves_source_and_allocation_identities(self):
         source = {
-            "schema_version": 14,
+            "schema_version": 15,
             "byte_images": ["00"],
             "types": [{"type_id": 0, "source_layout": {"normalized_type": 0}}],
             "allocations": [
@@ -67,8 +67,8 @@ class SharedFixturePoolTests(unittest.TestCase):
                 expand_document({"statement_kinds": [{}], "statements": [{"kind": invalid}]})
 
     def test_pooling_rejects_historical_and_malformed_schema(self):
-        for version in (8, 11, 12, 13, True, "14", 14.0, None):
-            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "requires schema 14"):
+        for version in (8, 11, 12, 13, 14, True, "15", 15.0, None):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "requires schema 15"):
                 pool_document({"schema_version": version})
         self.assertEqual(set(SHARED_POOLS), {"initialization_ranges", "relocations", "backtrace_spans",
                                            "statement_kinds", "source_infos"})

@@ -566,24 +566,6 @@ def typeName : Parser TypeName := do
   return {
     inputType, resultType, value }
 
-private structure callerLocationFields where
-  value : DecodeMIR.ConstValueFields := {}
-  span : Option (Nat) := none
-  resultType : Option (Option Nat) := none
-
-def callerLocation : Parser CallerLocation := do
-  let fields ← object ({} : callerLocationFields) fun fields key => do
-    match key with
-    | "span" => return { fields with span := some (← natural) }
-    | "result_type" => return { fields with resultType := some (← nullable natural) }
-    | _ => return { fields with value := ← DecodeMIR.parseConstValueField fields.value key }
-  let span ← need fields.span "span"
-  let resultType ← need fields.resultType "result_type"
-  let resultType ← need resultType "non-null result_type"
-  let value ← DecodeMIR.finishConstValueFields fields.value
-  return {
-    span, resultType := some resultType, value }
-
 structure QueryFields where
   session : Option (Session) := none
   runtime : Option (Runtime) := none
@@ -593,7 +575,6 @@ structure QueryFields where
   nativeSignatures : Option (Array NativeSignature) := none
   retag : Option (Array RetagQuery) := none
   globalBytes : Option (GlobalBytes) := none
-  callerLocations : Option (Array CallerLocation) := none
   main : Option (Main) := none
   primitives : Option (Primitives) := none
   namedTypes : Option (Option (Array (String × Nat))) := none
@@ -614,7 +595,6 @@ def parseField (fields : QueryFields) (key : String) : Parser (Option QueryField
   | "compiler_native_signature_queries" => return some { fields with nativeSignatures := some (← array native_signature) }
   | "compiler_retag_queries" => return some { fields with retag := some (← array retag_query) }
   | "compiler_global_byte_queries" => return some { fields with globalBytes := some (← globalBytes) }
-  | "compiler_caller_location_constants" => return some { fields with callerLocations := some (← array callerLocation) }
   | "compiler_main_queries" => return some { fields with main := some (← mainQueries) }
   | "compiler_runtime_primitives" => return some { fields with primitives := some (← primitives) }
   | "compiler_named_types" => return some { fields with namedTypes := some (← nullable (namedTypes)) }
@@ -636,7 +616,6 @@ def finish (fields : QueryFields) : Parser Queries := do
     nativeSignatures := ← need fields.nativeSignatures "compiler_native_signature_queries"
     retag := ← need fields.retag "compiler_retag_queries"
     globalBytes := ← need fields.globalBytes "compiler_global_byte_queries"
-    callerLocations := ← need fields.callerLocations "compiler_caller_location_constants"
     main := ← need fields.main "compiler_main_queries"
     primitives := ← need fields.primitives "compiler_runtime_primitives"
     namedTypes := fields.namedTypes.join
@@ -651,9 +630,6 @@ def finish (fields : QueryFields) : Parser Queries := do
 def validateQueries (ctx : DecodeMIR.Context) (queries : Queries) : Except String Unit := do
   for row in queries.typeNames do
     let _ ← DecodeMIR.resolveConstValue ctx row.resultType row.value
-  for row in queries.callerLocations do
-    let some resultType := row.resultType | throw "missing caller-location result type"
-    let _ ← DecodeMIR.resolveConstValue ctx resultType row.value
   for rows in queries.namedConstants do
     for row in rows do
       let _ ← DecodeMIR.resolveConstValue ctx row.typeId row.value

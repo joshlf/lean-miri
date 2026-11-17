@@ -5,14 +5,14 @@ open Miri Miri.Input
 
 private def span : SourceSpanData := {
   lo := 3, hi := 8,
-  start := ⟨1, 2⟩, «end» := ⟨1, 7⟩, context := "ctx", file := 0 }
+  start := ⟨1, 2⟩, «end» := ⟨1, 7⟩, context := "ctx", file := 0, expansionLocation := ⟨0,1,3⟩ }
 
 private def check (ok : Bool) (message : String) : IO Unit :=
   unless ok do throw (IO.userError message)
 
 def main : IO Unit := do
   let fields := "\"is_dummy\":false,\"lo\":3,\"hi\":8,\"start\":{\"line\":1,\"column\":2}," ++
-    "\"end\":{\"line\":1,\"column\":7},\"file\":0,\"ctxt\":"
+    "\"end\":{\"line\":1,\"column\":7},\"file\":0,\"expansion_location\":{\"file\":0,\"line\":1,\"column\":3},\"ctxt\":"
   let text := "{ " ++ fields ++ "\"#7\\n\\\"macro\\\"\"}"
   let .ok decoded := JsonReader.run DecoderValues.parseSourceSpan text
     | throw (IO.userError "source context string rejected")

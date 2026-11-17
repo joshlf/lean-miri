@@ -99,6 +99,12 @@ structure SourcePosition where
   column : Nat
   deriving Repr, DecidableEq
 
+structure ExpansionLocation where
+  file : Nat
+  line : UInt32
+  column : UInt32
+  deriving Repr, DecidableEq
+
 structure SourceSpanData where
   isDummy : Bool := false
   lo : Nat
@@ -107,6 +113,7 @@ structure SourceSpanData where
   «end» : SourcePosition
   context : String
   file : Nat
+  expansionLocation : ExpansionLocation
   deriving Repr, DecidableEq
 
 structure SourceInfo where

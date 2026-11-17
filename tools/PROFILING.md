@@ -165,3 +165,7 @@ proof. Add `--profile` to record Lean's internal spans; leave it off for ordinar
 execution measurements. Use `measure.py` on each exported input separately when
 detailed phase attribution is needed. Keep other builds out of the measured trials and inspect
 sample spread and host counters before interpreting differences.
+
+Pipeline comparisons require a stable choice cursor within each variant. Use
+`--baseline-expected-cursor N --candidate-expected-cursor M` to bind the observed
+cursors explicitly; allocation-history changes can make N and M differ.

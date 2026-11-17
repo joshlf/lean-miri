@@ -49,7 +49,7 @@ class FailClosedExportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         document = load_mir_document(self.output)
         self.assertNotIn("completeness", document)
-        self.assertEqual(document["schema_version"], 14)
+        self.assertEqual(document["schema_version"], 15)
         for name in ("layouts", "layout_values", "fn_abis", "abi_arguments", "boolean_queries",
                      "discriminants", "compiler_instance_abis", "compiler_function_facts",
                      "compiler_covariance_queries", "compiler_vtable_queries", "compiler_cast_queries"):
@@ -330,8 +330,18 @@ class FailClosedExportTests(unittest.TestCase):
 
     def test_allocation_identity_and_relocations_are_preserved(self):
         document = self.accepted("relocations", "ptr")
-        images = [node for node in document["allocations"] if node["kind"] == "memory"]
-        self.assertTrue(any(node["relocations"] for node in images))
+        pointers = next(node for node in document["allocations"]
+                        if node.get("def_path") == "POINTERS")
+        value = next(node for node in document["allocations"]
+                     if node.get("def_path") == "VALUE")
+        self.assertEqual(pointers["kind"], "static")
+        self.assertEqual(value["kind"], "static")
+        self.assertNotEqual(pointers["allocation_id"], value["allocation_id"])
+        self.assertNotEqual(pointers["source_alloc_id"], value["source_alloc_id"])
+        self.assertEqual(pointers["initializer"]["relocations"], [{
+            "storage_offset_bytes": 0, "target": value["allocation_id"],
+            "target_offset_encoded_bytes": "0000000000000000",
+            "immutable": True, "shared_ref": True}])
 
     def test_required_foreign_tls_initializer_aborts_without_output(self):
         result = self.export("foreign_tls", "read_external")
@@ -341,7 +351,7 @@ class FailClosedExportTests(unittest.TestCase):
 
     def test_coroutine_metadata_retains_exact_coverage_and_runtime_abi(self):
         document = self.accepted("coroutine", "root")
-        self.assertEqual(document["schema_version"], 14)
+        self.assertEqual(document["schema_version"], 15)
         coverage = document["compiler_coroutine_coverage"]
         self.assertTrue(coverage["coroutines"])
         self.assertEqual(len(coverage["body_coroutines"]), len(document["bodies"]))
