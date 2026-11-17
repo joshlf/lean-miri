@@ -4,7 +4,7 @@
 Usage: validate_orders.py SNAPSHOT RUN_LOG OUTPUT_JSON
 
 The replay is expected to come from the verification-only SC264 trace wrapper,
-run against the pinned schema-11 198-sc-base snapshot. This checker reads
+run against the pinned current-cohort 198-sc-base snapshot. This checker reads
 only those artifacts; it never executes Lean or changes a guest input.
 """
 import hashlib
@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 from mir_json import load_mir_inspection_document as load_mir_document, pool_entry
+from connected_cohort import load_cohort
 
 
 def need(ok, message):
@@ -28,7 +29,7 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-BASE198_SHA256 = "32c43f1089ed0de2d06dd2a8636a2c2ca0730f53f42c8f623f7bfdec9730b6c4"
+BASE198_SHA256 = load_cohort()['cases']['198-sc-base']['snapshot_sha256']
 
 STEP = re.compile(
     r"sc264_core_step thread=\{ value := (\d+) \}; choice_cursor=(\d+); "

@@ -1,0 +1,172 @@
+{
+  "schema": "lean-miri-connected-cohort-v1",
+  "schema_version": 16,
+  "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
+  "miri_commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
+  "cases": {
+    "192-released-natural-exit": {
+      "source_sha256": "c63594fe07b022237aba2e34a519025d594c47799bb1c7e92a3bf8b5dc189775",
+      "required_output": [
+        "outcome=natural_exit_zero; leak_check=true; threads=1; choice_cursor=304; active_frame=none"
+      ],
+      "snapshot_sha256": "e89d96e1b0aef0be8f03d84a540f273524c6cf3d31e24fcd26179e03e264f2c5",
+      "reference_seed": null
+    },
+    "192-active-protector-typed-ub": {
+      "source_sha256": "10b5dce57b9265f0d42ded3547817309962377f404141a3667edb1eafb5375ea",
+      "required_output": [
+        "ProtectedDisabled (Miri.TreeBorrows.Permission.Unique)",
+        "location=Miri.Interpreter.FrameLocation.mir { block := 0, statementIndex := 2 }",
+        "threads=1",
+        "stop-after-root-return=false"
+      ],
+      "snapshot_sha256": "2ac21a59e28f7dfdcdabcffffeda65176a1093d8866b769c717b11775415a23b",
+      "reference_seed": null
+    },
+    "193-rmw-release-positive": {
+      "source_sha256": "060a12e9b2372b15502375c7c3de3debb5af809b40e10f0afabec0d06bbb7df7",
+      "required_output": [
+        "outcome=exit_zero; leak_check=true; threads=3; choice_cursor=506; active_frame=none"
+      ],
+      "snapshot_sha256": "307b31b1d25d3d22b27c96c3de740e882bc4aa4288c98a94864d9d41a67540c2",
+      "reference_seed": null
+    },
+    "193-replace-store-datarace-negative": {
+      "source_sha256": "4b21dd18783555c390af8c88f790ffdb48d270323a23c92f7a7327fb8bb5ae47",
+      "required_output": [
+        "outcome=typed_DataRace_before_any_join; error=Miri.Interpreter.StepError.undefinedBehavior \"DataRace\"; threads=3; choice_cursor=205"
+      ],
+      "snapshot_sha256": "2633ff531b587180a63fbb5462d96eeee45fc7837cd75d733fe44f3f7b0f8dfb",
+      "reference_seed": 2
+    },
+    "196-slice-custom-dst": {
+      "source_sha256": "f875b318085990a0e61ee8d1e1ca749f9e70aa042c0495d6cb854c51dbfc4558",
+      "required_output": [
+        "dst_provider_result=exit_zero; leak_check=true; threads=1; choice_cursor=47; active_frame=none"
+      ]
+    },
+    "197-tls-drain-positive": {
+      "source_sha256": "834de1872a13e7c02dc7fcc12f2213fec7d2dd0afb047db6d654f4ee5aa278cd",
+      "required_output": [
+        "outcome=exit_zero; leak_check=true; threads=2; choice_cursor=469; active_frame=none"
+      ],
+      "snapshot_sha256": "6dd24d725b075c96f4da2469f18a6393fe7c351b29fc9b05b45e0b311767a356",
+      "reference_seed": null
+    },
+    "197-tls-drain-negative-prefix": {
+      "source_sha256": "9b26cbd6ecf96fc144b419117a30aa48d4e3768d668b8d35d698edea2401c8e4",
+      "required_output": [
+        "outcome=expected_undefined_behavior; error=DanglingIntPointer(address=0,size=4,context=memory_access); count=1; threads=2; active_function=destructor_a; source_line=41; callback_mir_location=11:0; active_thread=child-1; main=blocked_join_child-1; child=enabled; pending_key_b=true"
+      ],
+      "snapshot_sha256": "3c2510788ff4bd4fffb594bcc9bb2c2b55e981429332d4982901adb92c1408c5",
+      "reference_seed": null
+    },
+    "199-main-constructor-order": {
+      "source_sha256": "447b15d7ae6bf3aa1dc56c0eb18bae520bd120a304e25399b7fc1c30f4ad8b4f",
+      "required_output": [
+        "main_observed_trace=12\noutcome=exit_zero; leak_check=true; threads=1; choice_cursor=348; active_frame=none"
+      ],
+      "snapshot_sha256": "b126702e6de2799d65f264efba5cd7bf74bf6afc7cb189bbb13acaf2a6949a81",
+      "reference_seed": null
+    },
+    "203-upcast-a-prefix": {
+      "source_sha256": "2ff891239dc3cd9b752b6724cf56a7d0b62a6176da4570de1663e3a9058b309c",
+      "required_output": [
+        "trait_upcast_result=exit_zero; leak_check=true; threads=1; choice_cursor=52; active_frame=none"
+      ],
+      "snapshot_sha256": "fa783547c974c2f037fcba28b76eb516a7ad90ba2ac6ad7e9b61350d6fed27ec",
+      "reference_seed": null
+    },
+    "203-upcast-b-slot": {
+      "source_sha256": "16832a2a7660d7471bfa83e54ddb239a293893a666abe7302affd1d4ea773daa",
+      "required_output": [
+        "trait_upcast_result=exit_zero; leak_check=true; threads=1; choice_cursor=52; active_frame=none"
+      ],
+      "snapshot_sha256": "64d36d03a915e65bc0260e7cdbdb8fd4fd10c98e097853b2b6b4efac28b10a14",
+      "reference_seed": null
+    },
+    "198-sc-base": {
+      "source_sha256": "183a8d17b4096584b28d7627ce4ee60b1194943786fb60efa55a8c2d54bcb604",
+      "required_output": [
+        "choice_mode=bounded-seeded-diagnostic seed=0 algorithm=SplitMix64-v1; outcome=exit_zero; leak_check=true; threads=3; choice_cursor=533; active_frame=none"
+      ],
+      "snapshot_sha256": "55e0c844c7c89ac1eaebd6be638545b3de03cf4b3c2084d0cea1410bbe9a40dc",
+      "reference_seed": null
+    },
+    "198-relaxed-00": {
+      "source_sha256": "d6cd91a0edc9538d8d2408281b2cc4aaf32c19010eb2387ba18b452d8ab73e12",
+      "required_output": [
+        "choice_mode=bounded-seeded-diagnostic seed=0 algorithm=SplitMix64-v1; outcome=exit_zero; leak_check=true; threads=3; choice_cursor=540; active_frame=none"
+      ],
+      "snapshot_sha256": "9a9e08850de3d370f64b5476e0f071fc7f000c9668bd33ffd74447df118b0f87",
+      "reference_seed": 1
+    },
+    "fence-acqrel": {
+      "source_sha256": "2c6645e8da4e849ea7e13e3a1bcc5c1293a8965e7ab53605997a18d412048c26",
+      "snapshot_sha256": "ed91b6801c87b591b85c20a62e80665afa8058b071706722118825df263124f8",
+      "reference_seed": 3
+    },
+    "fence-sc": {
+      "source_sha256": "e55a059e733243d97e9a4ef5aa7e3ff9a264dcfbdcd07b74c04fc79fffc76905",
+      "snapshot_sha256": "c07f6c8f42ad06565a5cc8a35c06e0c5c8c33984190b879189094b2e2155b3ba",
+      "reference_seed": null
+    },
+    "rmw-relaxed": {
+      "source_sha256": "31042ff16963a0730d1d5d6f511bf240bc293d3a3e46880b8ab8ba7cea90975e",
+      "snapshot_sha256": "05b9bf14e5a29d8da44346ca813ab3e5d6120060b486209f9ff21a78e678c69a",
+      "reference_seed": null
+    },
+    "rmw-sc": {
+      "source_sha256": "059cb871809b85b579e70e0ae372203681be184c82df093d2032dccd38a00be0",
+      "snapshot_sha256": "31f2bb7d300994e2dab4ac7fdd8b92ed20791e644044bca2e93685cd62c9bd72",
+      "reference_seed": null
+    }
+  },
+  "fresh_large_tb_choices": 48,
+  "choice_migration": "Linux copy_file_range weak-function registration adds a function allocation and import pointer cell, consuming two addressReuse/addressSlack pairs before the old trace. Seeded diagnostics then advance the SplitMix stream by four draws, so their later schedule counts are separately measured.",
+  "files": {
+    "192-active-protector-typed-ub.json.gz": "3741fef7bc6607dc0ddb46deed6eefa66730235665d7efacc2b12250a8389e79",
+    "192-active-protector-typed-ub.miri-error.txt": "5166a060581074cabf671fcd7f144425a88fa5aee754040457165c40cb3197c4",
+    "192-active-protector-typed-ub.reference.json": "f88a22a87175599742f7ba629c5385820d7da3011ca9da69d2fa8d18e89640de",
+    "192-released-natural-exit.json.gz": "46b717dd13355a5ba861da85087f0338bb73f0f066f7391dfe114505bfb2569e",
+    "192-released-natural-exit.reference.json": "621ce554778d844808d2699a31603d77fcf11e520553450d21d108b2a33329d7",
+    "193-replace-store-datarace-negative.json.gz": "6d55d8cd14bdc45176e31ad675333dcd5185eb9c6fd476d838a263fc66f97c2e",
+    "193-replace-store-datarace-negative.miri-error.txt": "b0579fb7594f0f802f859b3952c3d49990ed1bd220cf6cbd4abe23416eddef61",
+    "193-replace-store-datarace-negative.reference.json": "ea8965366352ca87fc1db9438fcc8e375c57c0715fc717b391102bff736e4bb0",
+    "193-rmw-release-positive.json.gz": "3420b028541a0d5c3fc963b2f985de1b664545767fb009d5b74ea2f535479f36",
+    "193-rmw-release-positive.reference.json": "ad8410a92c1b2fb053bf7d4fa92f5548053824c1bf5c947d13789958577e5b68",
+    "197-tls-drain-negative-prefix.json.gz": "9fd8659576bab5d136554c312cdc6d466110916aa7d490b72aaf5e85171a0d02",
+    "197-tls-drain-negative-prefix.miri-error.txt": "5463a189421aab3cc4144dcb4644fc8efb98ae30b8e634178a1bd42e32c64511",
+    "197-tls-drain-negative-prefix.reference.json": "2e0fbc3776f4b27e1156006dd8b856ebfbe88c738cfcf20e3be10d1db241a1c7",
+    "197-tls-drain-positive.json.gz": "7094be63cf50bd973fcf3545eb2e095d04ea9596f2533e2a3c6efd9a1d0944ea",
+    "197-tls-drain-positive.reference.json": "316dab999904b1b727ba0a41c4d0531a92dadd5cae9be6debde6af0fdc560697",
+    "198-relaxed-00.json.gz": "d76541aa3d6b29a6ef3f35f865f72d6b90ccc51ef65ae9d73debcfac9555c9b3",
+    "198-relaxed-00.reference.json": "5139619bdeca0d67a912513e0f20979506747eddf4fe095d2508ac6cb5499aba",
+    "198-sc-base.json.gz": "f57ab7a9407eb9f487260380bb9d91c749a2ff2c6cd81ed6956e6d277ce77acc",
+    "198-sc-base.reference.json": "8b6d19bb8fb76105ac9e3304e010e2d7681a660fa951418d6a9611a9be1efa84",
+    "199-main-constructor-order.json.gz": "4bc83d732e0715e30e7e8430a9182652f980e909f63bb7ab11ff1ebd683130a8",
+    "199-main-constructor-order.reference.json": "8e08fb5ae9a7c66278e9b84ec7f103d9300138adcc8ac687215bda1193b65f6a",
+    "203-upcast-a-prefix.json.gz": "d5e0247fbc2be8fa85ea2f5607758e6353902fe7bdc679cdf1ced01e9152c71d",
+    "203-upcast-a-prefix.reference.json": "37b85486dc2889c5526adebc0cacb72dd2b270db8755eaeec68ddb5e0747d43a",
+    "203-upcast-b-slot.json.gz": "c53fd0ff39f129e140beb622add71945fb8e5e944eb627f784ed10607f5449b8",
+    "203-upcast-b-slot.reference.json": "e93af48d613fef8173023b22f60695b549304dbaa8e5cc864964b300b00431df",
+    "fence-acqrel.json.gz": "18786ccfe5b208fb382202b901f72e27cbb7d2a4cdf37d05eec4c23325614ca2",
+    "fence-acqrel.observed.json": "8acd054caffec41becbd54259ec985d0aa428e008abea48c3a22f87f154676fe",
+    "fence-acqrel.reference.json": "7f21048c1ee7d8e2319da43bb173ab437130fe421c97fc259ec318397ade7639",
+    "fence-acqrel.tape.json": "527f0facbca61892a13cfc576cf0910f6c853ac78fe2092097e39d7b8776b496",
+    "fence-sc.json.gz": "59ed8a4f6e81ab033b94562c5a3d9da4aa42d815205689f1e046628c77613660",
+    "fence-sc.observed.json": "3efca019591ff4749b5c1578eb1cbd08e017247da6b7a13b1ecee98bfb207eea",
+    "fence-sc.reference.json": "4edf9961ce2b15f77fc8e08c87e792b1b3f036025ab9b1582c9e7222a585535a",
+    "fence-sc.tape.json": "abfe839745cbccb740362b9627891aef93299564ed4db7506561474db9a3da7b",
+    "rmw-relaxed.json.gz": "76d8a6b262fad194c14fa1fff7413a6563af4d89f3deff2ef351fffcd299a43c",
+    "rmw-relaxed.observed.json": "c05fcb95ad8abce16028af1ade1d3079a5e4618193a7fdb4feb80652e838b701",
+    "rmw-relaxed.reference.json": "a3791af5dcb18011a57466e8ce515d878f0dd7ef1226b327e8d8b4f0dd8fe0e8",
+    "rmw-relaxed.tape.json": "b530df7847c23bc906f896d7a850096d166e4d4f85b207a1cbc014333edfd7e5",
+    "rmw-sc.json.gz": "226de31c5839764d28de7d43bf676dea3165f2b2c9b8f2d23a0a0e2f06eb0b4e",
+    "rmw-sc.observed.json": "6bb6ca979de47d0d2a67be2c316977f782d01d9844cb3092f2464da0e4969990",
+    "rmw-sc.reference.json": "c97b6b93ce957132ab9b1a75dfcadd81951c4f2cc59810280bbd417d1d83b567",
+    "rmw-sc.tape.json": "c683102ff40faf1139aed0b37742debf8535f2c9afc137747b65142cb3ba8f1e",
+    "README.md": "8e1ce295133b4dc7fb6181323962e02dd0f0b14e97edbcd79346b728b68e60c3"
+  },
+  "generation_revision": "5c3c61687da58647134101898219a3694358d936"
+}

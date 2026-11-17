@@ -33,7 +33,11 @@ their first failure internally, so a failed suite does not mean its later cases
 ran. No unavailable toolchain is silently skipped. Failed prerequisite suites
 can cause subsequent suites to fail as well; inspect the first setup/build error.
 
-Replay checks 15 stored, hash-matched Miri observations. The DST and large
+Replay checks 15 stored, hash-matched current-schema Miri observations from
+`tests/connected/fixtures/current/`; historical inputs remain unchanged in the
+parent directory. The cohort manifest records separately reviewed current-pin
+seeds and typed prefixes, and fails closed when compiler/Miri pins change.
+The DST and large
 Tree Borrows cases instead generate new exports and same-TyCtxt reference
 observations from their tracked source and unchanged flags/configuration,
 including argv0. Their Lean assertions and choice tapes remain fixed. This

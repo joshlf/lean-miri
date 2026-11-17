@@ -28,7 +28,12 @@ Even for expected UB, the harness itself exits 0 when its assertions hold.
 Unsupported, failure and fuel exhaustion cannot replace expected UB.
 The large TB case checks the final write to a Frozen tag after a parent read.
 
-Saved gzip files contain schema-11 payload projections of genuine compiler exports.
+The active replay inputs are the separately pinned schema-16 cohort in
+[fixtures/current](fixtures/current/README.md). Its byte-bound references and
+reviewed seed/typed-prefix migration retain the same terminal, UB and ordering
+contracts. Historical inputs in the parent fixture directory remain unchanged.
+
+The historical saved gzip files contain schema-11 payload projections of genuine compiler exports.
 An exact inverse check preserves all compiler data, raw IDs and prepared query
 order. The projection manifest pins original canonical payloads and current files;
 reference sidecars retain their original byte binding under `wire_projection`.
@@ -43,8 +48,8 @@ build/run logs. Do not rewrite fixtures to fit the current implementation.
 
 SC controls select the oldest candidate on the weaker side to demonstrate (0,0)
 and check that the corresponding SC side restricts candidates. They also check
-every request/input/domain in the typed prefix. The weak fence reference uses
-seed2/preemption_rate0; other references use the profile recorded in the sidecar.
+every request/input/domain in the typed prefix. The active weak fence reference uses
+seed3/preemption_rate0; other references use the profile recorded in the sidecar.
 These are finite support witnesses, not mutant tests or proofs for all schedules.
 `validate_ordering_pairs.py` also compares operation/scheduler order.
 Seed checks use `validate_schedule.py` to observe actual atomic-intrinsic
@@ -67,7 +72,7 @@ proof script has built its imports:
 
 ```bash
 mkdir -p scratch/connected-graph
-gzip -dc tests/connected/fixtures/198-sc-base.json.gz > scratch/connected-graph/sc.json
+gzip -dc tests/connected/fixtures/current/198-sc-base.json.gz > scratch/connected-graph/sc.json
 LEAN_PATH="$PWD/scratch/connected-proofs:$(.elan/bin/lake env printenv LEAN_PATH)" \
   .elan/bin/lake env lean --run tests/connected/proofs/ConnectedGraph215Schema3.lean \
   scratch/connected-graph/sc.json 1
@@ -112,8 +117,8 @@ current applicability.
 To regenerate the same weak-fence reference profile,
 `bash tools/build-reference-profile.sh` applies the combined patch in
 [reference/](reference/) to an exporter copy in scratch and builds it against
-pinned upstream sources. Only that copy uses `LEAN_MIRI_REFERENCE_SEED=2` and
-`LEAN_MIRI_REFERENCE_PREEMPTION_RATE=0`. The patch is for reference use and does
+pinned upstream sources. Only that copy supports `LEAN_MIRI_REFERENCE_SEED` and
+`LEAN_MIRI_REFERENCE_PREEMPTION_RATE` overrides. The patch is for reference use and does
 not change production semantics. Check the actual profile in the new sidecar;
 do not count an unestablished (0,0) as success.
 
@@ -124,10 +129,11 @@ regenerate the weak fence reference with:
 bash tools/build-reference-profile.sh
 python3 tools/export-connected.py fence-acqrel scratch/exports/new-fence-control.json \
   --libc scratch/connected-libc-target/x86_64-unknown-linux-gnu/debug/deps/liblibc-HASH.rlib \
-  --exporter scratch/reference-profile-target/debug/lean-miri-mir-exporter
+  --exporter scratch/reference-profile-target/debug/lean-miri-mir-exporter --reference-seed 3
 ```
 
-This entry point sets seed2/preemption_rate0 on the reference copy. After
+This command sets seed3/preemption_rate0 on the reference copy. The historical
+default remains seed 2 when no override is supplied. After
 generation, check the sidecar's actual profile and guest outcome. `fence-sc`,
 `rmw-sc` and `rmw-relaxed` use the default reference profile. Do not assume a
 re-export with new query history will pass an old typed tape; distinguish it

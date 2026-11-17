@@ -295,6 +295,48 @@ remain separate from the finite checks performed for this synchronization.
 
 ### Hosted regressions and coverage
 
+At main `5c3c6168`, the [hosted regression
+run](https://github.com/proofs-rs/lean-miri/actions/runs/44086004022) passes the
+regression and fresh lanes. Extended rejects the detached-join source check's
+stale whole-file hash after keyed allocation storage replaced `live.push` with
+`live.insert`. The `joinExclusive` slice is byte-identical to main `3a3489c8`;
+refreshing the file hash passes the unchanged source-order assertions locally.
+The complete quick entry point, including 135 Python checks, semantic-source
+lint and both historical/current fixture manifests, passes locally.
+
+Replay now uses a separate schema-16 [current cohort](tests/connected/fixtures/current/README.md)
+with 15 stored genuine compiler exports and fresh byte-bound same-TyCtxt Miri
+references. All historical fixture bytes remain intact; DST and large-TB still
+generate fresh inputs. Three explicit current-pin Miri seeds retain the same
+required observations: weak fence seed 3/preemption rate 0 witnesses `(0,0)`,
+store-replacement seed 2 establishes a genuine Data race, and relaxed seed 1
+witnesses `(0,0)`. The prior profiles' exit 91, ordinary exit zero and exit 11,
+respectively, were rejected as those witnesses. All other reference configuration
+fields and guest/compiler arguments remain unchanged. These selected seeds are
+finite witnesses, not all-schedule or PRNG-equivalence claims.
+
+The four extra diagnostic draws are traced to the pinned Linux `copy_file_range`
+weak-function registration: its function allocation and import pointer cell each
+consume an addressReuse/addressSlack pair. Each current ordering observation
+equals its historical request/input sequence after exactly those four initial
+draws. New typed tapes preserve every non-target choice and the oldest-candidate
+selection. Independent replay/pair validators retain matching worker operation
+and scheduler projections, weak supports `[2,2]` and SC singleton restrictions.
+Unseeded terminal cursors increase by four; the two seed-0 canonical diagnostic
+runs advance SplitMix before scheduling and have separately measured terminal
+cursors 533/540. The fresh large-TB check still establishes exactly the Frozen
+child write at source line 14/MIR bb1[8], with 48 choices rather than 44.
+
+Locally, canonical12, all four ordering controls and pair/domain checks, fresh
+large-TB, SC seeds 0–11 and four malformed-log rejections pass on the current
+source/OLean closure. Cohort units reject corrupt inputs, changed sources/pins
+and a resealed reference with an unreviewed profile change. No interpreter
+semantics, original Rust inputs, UB/terminal assertions or execution budgets
+were relaxed. A hosted rerun of these changes remains necessary. The separate
+[upstream UI run](https://github.com/proofs-rs/lean-miri/actions/runs/44086005061)
+still fails 19 of 32 shards and its aggregate job; those independent issues,
+including the portable-SIMD compiler panic, remain unresolved.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
