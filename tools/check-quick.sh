@@ -14,4 +14,5 @@ trap 'rm -f "$candidate"' EXIT
 python3 tools/extract_obligations.py --output "$candidate"
 diff -u tests/fixtures/source-obligations.json "$candidate"
 (cd tests/connected/fixtures && sha256sum --check SHA256SUMS)
+(cd tests/connected/fixtures/current && sha256sum --check SHA256SUMS)
 (cd tests/input/fixtures && sha256sum --check SHA256SUMS)

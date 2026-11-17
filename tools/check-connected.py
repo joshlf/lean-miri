@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / 'tests/connected'))
 from cases import CASES, MIRI_ERRORS
 from run_guarded import run as run_guarded, source_closure
 from connected_large_inputs import FRESH_CASES, generate as generate_large_input
+from connected_cohort import CURRENT, load_cohort
 FIXTURES = ROOT / 'tests/connected/fixtures'
 
 
@@ -25,6 +26,7 @@ def main():
     parser.add_argument('--large-tb', action='store_true', help='same-program Frozen-tag-write UB witness')
     parser.add_argument('--timeout', type=int, default=900, help='per-case seconds; expiration is a failure')
     args = parser.parse_args()
+    cohort = load_cohort()
     if sum((bool(args.case), args.ordering, args.large_tb)) > 1:
         parser.error('choose canonical cases, --ordering, or --large-tb separately')
     env = os.environ.copy()
@@ -34,7 +36,9 @@ def main():
     out = ROOT / 'scratch/connected-runs'
     out.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix='run-', dir=out))
-    canonical = {ident: (extra, code, texts, sha) for ident, extra, code, texts, sha, _, _ in CASES}
+    canonical = {ident: (extra, code, cohort['cases'][ident]['required_output'],
+                        cohort['cases'][ident].get('snapshot_sha256'))
+                 for ident, extra, code, texts, sha, _, _ in CASES}
     if args.case and set(args.case) - canonical.keys():
         parser.error('unknown case: ' + str(set(args.case) - canonical.keys()))
     jobs = []
@@ -44,7 +48,7 @@ def main():
             jobs.append((ident, f'{ident}.lean', extra, code, texts, sha))
     if args.ordering:
         for ident in ('fence-acqrel', 'fence-sc', 'rmw-relaxed', 'rmw-sc'):
-            jobs.append((ident, 'ScOrderingControls.lean', ['--tape', str(FIXTURES / f'{ident}.tape.json')], 0,
+            jobs.append((ident, 'ScOrderingControls.lean', ['--tape', str(CURRENT / f'{ident}.tape.json')], 0,
                          ['sc_ordering_control_fixture=PASS', 'outcome=exit_zero; leak_check=true'], None))
     if args.large_tb:
         jobs.append(('large-tb', 'LargeTreeBorrows.lean', ['Tree Borrows'], 0,
@@ -65,12 +69,12 @@ def main():
                                  ROOT / 'tools/connected_large_inputs.py', ROOT / 'tools/export-connected.py',
                                  FIXTURES.parent / 'cases.py', FIXTURES.parent / 'reference/preemption-rate-zero.patch']
         else:
-            raw = gzip.decompress((FIXTURES / f'{ident}.json.gz').read_bytes())
+            raw = gzip.decompress((CURRENT / f'{ident}.json.gz').read_bytes())
             if expected_sha and hashlib.sha256(raw).hexdigest() != expected_sha:
                 raise SystemExit(f'{ident}: snapshot SHA-256 mismatch')
             snapshot.write_bytes(raw)
-            reference_path = FIXTURES / f'{ident}.reference.json'
-            diagnostic_path = FIXTURES / f'{ident}.miri-error.txt'
+            reference_path = CURRENT / f'{ident}.reference.json'
+            diagnostic_path = CURRENT / f'{ident}.miri-error.txt'
         reference = json.loads(reference_path.read_text())
         if ident in MIRI_ERRORS:
             diagnostic = diagnostic_path.read_text()
@@ -88,9 +92,9 @@ def main():
         if reference['reference_contract'] != 'same_prepared_tcx_after_snapshot_capture;not_vanilla_miri_alloc_id_history':
             raise SystemExit(f'{ident}: reference contract changed')
         cmd = [lake, 'env', 'lean', '--run', str(ROOT / 'tests/connected' / harness), str(snapshot), *extra]
-        tracked_inputs = [snapshot, reference_path, ROOT / 'tests/connected' / harness, FIXTURES / f'{ident}.rs', *generation_inputs]
+        tracked_inputs = [snapshot, reference_path, CURRENT / 'manifest.json', ROOT / 'tests/connected' / harness, FIXTURES / f'{ident}.rs', *generation_inputs]
         if args.ordering:
-            tracked_inputs.append(FIXTURES / f'{ident}.tape.json')
+            tracked_inputs.append(CURRENT / f'{ident}.tape.json')
         def fingerprint():
             return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in tracked_inputs}
         inputs_before = fingerprint()
@@ -104,10 +108,10 @@ def main():
             if args.ordering and ident in ('fence-acqrel', 'fence-sc', 'rmw-relaxed', 'rmw-sc'):
                 result_path = run_dir / f'{ident}.result.json'
                 result_path.write_text(json.dumps({'exit_code': result.returncode, 'guard': None, 'inputs_before': inputs_before, 'inputs_after': fingerprint(), 'log_sha256': hashlib.sha256((run_dir / f'{ident}.log').read_bytes()).hexdigest()}))
-                Path(str(snapshot) + '.miri-reference.json').write_bytes((FIXTURES / f'{ident}.reference.json').read_bytes())
-                ordering_rows.append({'case': ident, 'snapshot': str(snapshot), 'log': str(run_dir / f'{ident}.log'), 'prefix': str(FIXTURES / f'{ident}.tape.json'), 'result': str(result_path)})
+                Path(str(snapshot) + '.miri-reference.json').write_bytes(reference_path.read_bytes())
+                ordering_rows.append({'case': ident, 'snapshot': str(snapshot), 'log': str(run_dir / f'{ident}.log'), 'prefix': str(CURRENT / f'{ident}.tape.json'), 'result': str(result_path)})
                 subprocess.run([sys.executable, str(ROOT / 'tests/connected/validate_guided_choice_replay.py'),
-                                str(FIXTURES / f'{ident}.tape.json'), str(run_dir / f'{ident}.log'),
+                                str(CURRENT / f'{ident}.tape.json'), str(run_dir / f'{ident}.log'),
                                 str(run_dir / f'{ident}.validation.json')], check=True)
             if ident == 'large-tb':
                 subprocess.run([sys.executable, str(ROOT / 'tests/connected/validate_large_tb.py'), str(snapshot), str(run_dir / f'{ident}.log')], check=True)

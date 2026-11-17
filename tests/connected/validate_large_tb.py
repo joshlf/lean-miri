@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 from mir_json import decode_mir_document, inspection_document, pool_entry
 from connected_large_inputs import validate_reference
+from connected_cohort import load_cohort
 
 
 def validate(snapshot, log):
@@ -26,11 +27,12 @@ def validate(snapshot, log):
     source = ROOT / 'tests/connected/fixtures/large-tb.rs'
     assert '*ptr = 0;' in source.read_text().splitlines()[13]
     text = Path(log).read_text()
+    choices = load_cohort()['fresh_large_tb_choices']
     assert all(x in text for x in ['phase=decode-complete', 'phase=lower-complete', 'phase=prepare-complete',
         'StepError.undefinedBehavior', 'ChildAccessForbidden', 'Permission.Frozen',
-        'block := 1, statementIndex := 8', 'threads=1', 'diagnostic-choices-consumed=44',
+        'block := 1, statementIndex := 8', 'threads=1', f'diagnostic-choices-consumed={choices},',
         'stop-after-root-return=false'])
-    print('PASS: Frozen child write at source line14/MIR bb1[8], one thread, 44 choices')
+    print(f'PASS: Frozen child write at source line14/MIR bb1[8], one thread, {choices} choices')
 
 
 if __name__ == '__main__':

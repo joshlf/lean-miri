@@ -18,7 +18,10 @@ def main():
     parser.add_argument('output', type=Path, help='new JSON path under scratch/ or /tmp/')
     parser.add_argument('--libc', type=Path, help='libc rlib built with the pinned Miri sysroot')
     parser.add_argument('--exporter', type=Path, help='reference-only profile copy for exact retained argv[0]; required for fence-acqrel')
+    parser.add_argument('--reference-seed', type=int, help='explicit reviewed current-cohort Miri seed (requires the profile exporter)')
     args = parser.parse_args()
+    if args.reference_seed is not None and (not args.exporter or not 0 <= args.reference_seed < 2**64):
+        parser.error('--reference-seed requires --exporter and a UInt64 seed')
     output = args.output.resolve()
     if not (output.is_relative_to(ROOT / 'scratch') or output.is_relative_to(Path('/tmp'))) or output.exists():
         parser.error('output must be a new file under scratch/ or /tmp/')
@@ -66,6 +69,8 @@ def main():
             parser.error('fence-acqrel requires --exporter from tools/build-reference-profile.sh')
         env['LEAN_MIRI_REFERENCE_SEED'] = '2'
         env['LEAN_MIRI_REFERENCE_PREEMPTION_RATE'] = '0'
+    if args.reference_seed is not None:
+        env['LEAN_MIRI_REFERENCE_SEED'] = str(args.reference_seed)
     cmd = [str(exporter), '--output', str(output)]
     for root in source_roots:
         cmd += ['--root', root]

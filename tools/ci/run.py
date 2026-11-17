@@ -36,7 +36,7 @@ def suites(lane):
         # check.sh already contains quick's audit/Python/inventory checks.
         # Only the two fixture hash manifests are unique to check-quick.sh.
         return [Suite('connected-fixture-hashes', ('bash', '-c',
-                      'cd tests/connected/fixtures && sha256sum --check SHA256SUMS')),
+                      'cd tests/connected/fixtures && sha256sum --check SHA256SUMS && cd current && sha256sum --check SHA256SUMS')),
                 Suite('input-fixture-hashes', ('bash', '-c',
                       'cd tests/input/fixtures && sha256sum --check SHA256SUMS')),
                 Suite('full', ('bash', 'tools/check.sh'), 14400)]
