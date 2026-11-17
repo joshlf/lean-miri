@@ -87,6 +87,10 @@ lean_exe profile_runtime_decoder where
   srcDir := "tools"
   root := `ProfileRuntimeDecoder
 
+lean_exe profile_retag_lookup where
+  srcDir := "tools"
+  root := `ProfileRetagLookup
+
 lean_exe source_abi_boundary_tests where
   srcDir := "tests/input"
   root := `SourceAbiBoundaryTests

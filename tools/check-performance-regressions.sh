@@ -34,6 +34,8 @@ done
 for test in SpanPool AllocationImageIndexed2026; do
   lake env lean --run "MiriTests/Input/$test.lean"
 done
+lake env lean MiriTests/Input/CompilerRetagQueries.lean
+lake env lean --run tests/input/RetagProviderLookup2026.lean scratch/decoder-id-inputs/genuine-mir-features.json
 for test in DecoderDynamicScan2026 CompilerBacktraceIndexTests2026 TypedCompilerPreparationTests; do
   lake env lean --run "tests/input/$test.lean" scratch/decoder-id-inputs/genuine-mir-features.json
 done
