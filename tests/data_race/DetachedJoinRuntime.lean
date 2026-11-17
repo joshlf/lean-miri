@@ -42,6 +42,7 @@ private def testCallHooks : CallHooks Provenance TestState Unit MachineHooks.Fra
   getFrame := fail
   setFrame := fun _ => fail
   frameIndex := fail
+  stackIsEmpty := fail
   evalOperand := fun _ _ => fail
   evalPlace := fun _ _ _ => fail
   placeToOp := fun _ _ => fail
