@@ -37,13 +37,13 @@ def initial : IO (MachineHooks.State Unit (List String)) := do
   let memory0 := MemoryState.setIssuedIds
     (MemoryState.empty : MemoryState Provenance BorrowTree Unit) #[allocId]
   let memory : MemoryState Provenance BorrowTree Unit := {memory0 with
-    live := #[(allocId, ⟨.stack, allocation.withExtra (BorrowTree.new rootTag (Size.ofBytes 1))⟩)]}
+    live := Std.ExtTreeMap.ofArray (β := LocalAllocation Provenance BorrowTree Unit) #[(allocId, ⟨.stack, allocation.withExtra (BorrowTree.new rootTag (Size.ofBytes 1))⟩)]}
   let global := { Miri.Concurrency.GlobalState.initial false false with
     multiThreaded := true
     vectorClocks := [{ clock := VClock.newWithIndex idx (← timestamp 3) }] }
   return ⟨⟨#[frame]⟩, ⟨memory, some ⟨{ Miri.TreeBorrows.GlobalState.new with nextPointerTag := ⟨2, by decide⟩ }, .Default⟩,
     some global, ThreadManager.initial false,
-    #[(allocId, VClockAlloc.newAllocation (ByteSize.ofU64 1 (by decide)) (← timestamp 9) idx)], #[], []⟩⟩
+    Std.ExtTreeMap.ofArray #[(allocId, VClockAlloc.newAllocation (ByteSize.ofU64 1 (by decide)) (← timestamp 9) idx)], #[], []⟩⟩
 def blocked (message : String) : MachineHooks.M Unit (List String) A := throw (.unsupported message)
 def storage : MachineHooks.StorageHooks Unit (List String) := {
   veryTriviallySized := fun _ => .ok true
@@ -69,7 +69,7 @@ def writeUninit (protectedPlace : MPlaceTy Provenance) : MachineHooks.M Unit (Li
   let some (.concrete id tag) := protectedPlace.mplace.ptr.provenance | throw (.invalidProgram "provenance")
   MachineHooks.memoryRaceWrite id (allocRange Size.ZERO (Size.ofBytes 1)) .Write
   let state ← get
-  let some (_, entry) := state.machine.memory.live.find? fun e => e.1 == id | throw (.invalidProgram "allocation")
+  let some entry := state.machine.memory.live[id]? | throw (.invalidProgram "allocation")
   let some tracker := state.machine.borrowTracker | throw (.invalidProgram "tracker")
   let accessed := entry.allocation.extra.performBorrowAccessRange (.concrete tag) Size.ZERO (Size.ofBytes 1)
     .Write tracker.global.protectedTags .VisitChildrenOfAccessed
@@ -91,7 +91,7 @@ def hooks : MachineHooks.Hooks Unit (List String) := {
   writeUninit
   ensureTreeExtra := fun id => do
     let state ← get
-    unless state.machine.memory.live.any (fun e => e.1 == id) do throw (.invalidProgram "missing extra") }
+    unless state.machine.memory.live.contains id do throw (.invalidProgram "missing extra") }
 
 /-- Only the simple Freeze path is used; unexpected compiler queries fail. -/
 def typedHooks (parent : BorTag) : TypedRetag.Hooks Unit (List String) := {
@@ -130,7 +130,7 @@ def typedHooks (parent : BorTag) : TypedRetag.Hooks Unit (List String) := {
 def checkReborrowDiagnostics (start : MachineHooks.State Unit (List String)) : IO Unit := do
   let child : BorTag := ⟨2, by decide⟩
   let newTag : BorTag := ⟨3, by decide⟩
-  let some (_, entry) := start.machine.memory.live[0]? | throw (IO.userError "allocation")
+  let some entry := start.machine.memory.live[allocId]? | throw (IO.userError "allocation")
   let inserted := entry.allocation.extra.newChild Size.ZERO (.concrete rootTag) child
     (Miri.DataStructures.DedupRangeMap.new (Size.ofBytes 1) (Tree.LocationState.newAccessed .Frozen .Read))
     .Frozen false
@@ -156,7 +156,7 @@ def checkReborrowDiagnostics (start : MachineHooks.State Unit (List String)) : I
       (message.splitOn "ChildAccessForbidden").length == 2 &&
       (message.splitOn "Disabled").length >= 2) "exact reborrow cause and typed permission failure"
     let some tracker := after.machine.borrowTracker | throw (IO.userError "tracker")
-    let some (_, allocation) := after.machine.memory.live[0]? | throw (IO.userError "allocation")
+    let some allocation := after.machine.memory.live[allocId]? | throw (IO.userError "allocation")
     check (tracker.global.nextPointerTag.value == 4 && tracker.global.protectedTags.size == 1 &&
       (allocation.allocation.extra.indexOfTag newTag).isNone && after.machine.user.isEmpty)
       "failed parent access preserves registration prefix and skips child/uninit"
@@ -190,7 +190,7 @@ def main : IO Unit := do
   check result.isOk "materialize"
   let some current := state.stack.currentFrame? | throw (IO.userError "frame")
   let some clocks := current.extra.dataRace | throw (IO.userError "clocks")
-  let some (_, allocation) := state.machine.raceAllocations[0]? | throw (IO.userError "race allocation")
+  let some allocation := state.machine.raceAllocations[allocId]? | throw (IO.userError "race allocation")
   let .ok cell := allocation.cellAt 0 | throw (IO.userError "cell")
   check (clocks.localClocks.isEmpty && cell.write.2.time == 3 && (cell.read.index idx).time == 3) "machine materialization transfers historical clocks"
   check (state.machine.allocationSpans[0]?.map (·.2.1) == some ⟨7⟩) "declaration span recorded"
@@ -210,11 +210,11 @@ def main : IO Unit := do
   let racy := { start with machine := { start.machine with
     dataRace := some racyGlobal
     threads := { start.machine.threads with threads := start.machine.threads.threads ++ [ThreadRecord.initial none none] }
-    raceAllocations := #[(allocId, VClockAlloc.newAllocation (ByteSize.ofU64 1 (by decide)) (← timestamp 5) raceIndex)] } }
+    raceAllocations := Std.ExtTreeMap.ofArray #[(allocId, VClockAlloc.newAllocation (ByteSize.ofU64 1 (by decide)) (← timestamp 5) raceIndex)] } }
   let (unknown, result) := MachineHooks.run (MachineHooks.protectInPlaceFunctionArgument hooks place) racy
   check (result == .error (.undefinedBehavior "DataRace")) "concurrent retag reports actual memory race"
   let some unknownTracker := unknown.machine.borrowTracker | throw (IO.userError "tracker")
-  let some (_, unknownAlloc) := unknown.machine.memory.live[0]? | throw (IO.userError "allocation")
+  let some unknownAlloc := unknown.machine.memory.live[allocId]? | throw (IO.userError "allocation")
   check (unknownTracker.global.nextPointerTag.value == 3 && unknownTracker.global.protectedTags.size == 1 &&
     (unknownAlloc.allocation.extra.indexOfTag ⟨2, by decide⟩).isNone && unknown.machine.user.isEmpty)
     "failed retag preserves source prefix, stops before child insert and uninit"
@@ -239,20 +239,20 @@ def main : IO Unit := do
   let .ok retaggedPtr := retaggedScalar.toPointer ⟨.little, .w64⟩ | throw (IO.userError "retag pointer")
   check (retaggedPtr.provenance == some (.concrete allocId ⟨2, by decide⟩) && retaggedPointer.layout == pointerLayout)
     "retag_ptr_value reconstructs typed pointer with new protected tag"
-  let some (_, pointerClocks) := pointerState.machine.raceAllocations[0]? | throw (IO.userError "clocks")
+  let some pointerClocks := pointerState.machine.raceAllocations[allocId]? | throw (IO.userError "clocks")
   let .ok pointerCell := pointerClocks.cellAt 0 | throw (IO.userError "cell")
   check ((pointerCell.read.index idx).readType == .Retag && (pointerCell.read.index idx).time == 9)
     "retag_ptr_value reads update actual clocks"
   let (concurrentProtected, result) := MachineHooks.run (MachineHooks.protectInPlaceFunctionArgument hooks place) concurrent
   check result.isOk "concurrent retag completes with actual clocks"
-  let some (_, protectedClocks) := concurrentProtected.machine.raceAllocations[0]? | throw (IO.userError "clocks")
+  let some protectedClocks := concurrentProtected.machine.raceAllocations[allocId]? | throw (IO.userError "clocks")
   let .ok protectedCell := protectedClocks.cellAt 0 | throw (IO.userError "cell")
   check (protectedCell.write.2.time == 9 && protectedCell.writeType == .Write)
     "uninit performs real memory write after retag read"
   let singleGlobal := { concurrentGlobal with multiThreaded := false }
   let singleThread := { start with machine := { start.machine with dataRace := some singleGlobal } }
   let (singleThread, result) := MachineHooks.run (MachineHooks.protectInPlaceFunctionArgument hooks place) singleThread
-  let some (_, singleAllocation) := singleThread.machine.raceAllocations[0]? | throw (IO.userError "single allocation")
+  let some singleAllocation := singleThread.machine.raceAllocations[allocId]? | throw (IO.userError "single allocation")
   let .ok singleCell := singleAllocation.cellAt 0 | throw (IO.userError "single cell")
   check (result.isOk && singleCell.writeType == .Allocate && singleCell.write.2.time == 9)
     "configured detector's source single-thread guard skips clocks while TB and uninit proceed"
@@ -269,7 +269,7 @@ def main : IO Unit := do
   check result.isOk "protector release"
   let some tracker := afterPop.machine.borrowTracker | throw (IO.userError "tracker")
   check (tracker.global.protectedTags.size == 0) "protectors removed after tree release"
-  let some (_, entry) := afterPop.machine.memory.live[0]? | throw (IO.userError "allocation")
+  let some entry := afterPop.machine.memory.live[allocId]? | throw (IO.userError "allocation")
   let read := Allocation.readScalar entry.allocation ⟨.little, .w64⟩ (allocRange Size.ZERO (Size.ofBytes 1)) false
   check (!read.isOk) "protected source contents remain uninitialized after pop"
   let secondId := ThreadId.ofU32 1 (by decide)
@@ -296,7 +296,7 @@ def main : IO Unit := do
   let (synced, result) := MachineHooks.memoryRaceAccess synced allocId
     (allocRange Size.ZERO (Size.ofBytes 1)) none .Read
   check result.isOk "synchronized second-thread materialized read"
-  let some (_, allocation) := synced.raceAllocations[0]? | throw (IO.userError "race allocation")
+  let some allocation := synced.raceAllocations[allocId]? | throw (IO.userError "race allocation")
   let .ok cell := allocation.cellAt 0 | throw (IO.userError "cell")
   check ((cell.read.index secondIndex).time == 4) "memory read updates actual shared allocation clocks"
   let .ok indirectFrame := frame.replaceLocalValue 1 (.live (.indirect place.mplace))

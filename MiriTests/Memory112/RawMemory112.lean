@@ -65,14 +65,14 @@ private def initial (mutability : Miri.Memory.Mutability) : IO (State × Pointer
   let emptyMemory : MemoryState Provenance BorrowTree K := MemoryState.empty
   let memory0 := MemoryState.setIssuedIds emptyMemory #[id]
   let memory : MemoryState Provenance BorrowTree K := {
-    memory0 with live := #[(id, ⟨.machine .machine, allocation⟩)] }
+    memory0 with live := Std.ExtTreeMap.ofArray (β := LocalAllocation Provenance BorrowTree K) #[(id, ⟨.machine .machine, allocation⟩)] }
   let machine : Machine := {
     memory, borrowTracker := none, dataRace := none, threads := .initial false
-    raceAllocations := #[], allocationSpans := #[], user := () }
+    raceAllocations := {}, allocationSpans := #[], user := () }
   pure (⟨Stack.empty, machine⟩, Pointer.new (some provenance) Size.ZERO, id)
 
 private def allocationAt (state : State) (id : AllocId) : IO (Allocation Provenance BorrowTree) := do
-  let some (_, entry) := state.machine.memory.live.find? (·.1 == id)
+  let some entry := state.machine.memory.live.get? id
     | throw (IO.userError "allocation disappeared")
   pure entry.allocation
 

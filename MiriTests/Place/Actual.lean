@@ -180,8 +180,8 @@ def main : IO Unit := do
     ⟨.local 0 1 none s.frame.localsIdentity, big⟩ false) s
   let (target, s) ← run (forceAllocation (hooks false) () ⟨.local 0 1 none s.frame.localsIdentity, big⟩) s
   let some targetId := target.mplace.ptr.provenance | throw (IO.userError "target provenance")
-  let some entry := s.memory.live.find? (fun e => e.1 == targetId) | throw (IO.userError "target allocation")
-  let bytes ← match entry.2.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 12)) with
+  let some entry := s.memory.live.get? targetId | throw (IO.userError "target allocation")
+  let bytes ← match entry.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 12)) with
     | .ok bytes => pure bytes | .error _ => throw (IO.userError "target read")
   unless bytes == #[1,2,3,4,5,6,7,8,9,10,11,12] do throw (IO.userError "slow memory copy bytes")
   IO.println "place projection, materialization, write/read and failure effects passed"

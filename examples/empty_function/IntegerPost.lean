@@ -102,7 +102,7 @@ private theorem old_rights_refl (tree : BorrowTree) : Preservation.OldNodeRights
   · simp [Returned,ReturnContinuation.resume,original,Stack.currentFrame?]
   · intro id old found
     refine ⟨old,?_,rfl,rfl,old_rights_refl _⟩
-    change (machine s p frame previous tracker room index).memory.live.find? (fun row => row.1 == id) = _
+    change (machine s p frame previous tracker room index).memory.live[id]? = _
     rw [memory_eq s metadata capacity]
     exact found
   · intro old current oldEq currentEq

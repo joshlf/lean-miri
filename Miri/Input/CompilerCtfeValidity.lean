@@ -46,7 +46,7 @@ def lookup (p : CompilerProviders.Prepared) (image : AllocationImage.Imported)
   let .ok resolved := resolved | return .noAllocationId
   let memory := (← get).machine.memory
   let some global := memory.findGlobal? resolved.allocId
-    | return .missingGlobal (memory.live.any (·.1 == resolved.allocId))
+    | return .missingGlobal (memory.live.contains resolved.allocId)
   let kind ← if global.kind == .static then do
       if let some (.static _ isStatic tls _) := global.payload then
         unless isStatic && !tls do throw (.invalidProgram "CTFE static declaration invariant failed")

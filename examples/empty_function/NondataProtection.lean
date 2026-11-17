@@ -12,20 +12,20 @@ set_option linter.unusedSimpArgs false
 /-- Disjoint family from live bytes and latent data. Earlier non-data registry
 entries may shadow the named raw entry, as in the actual metadata precedence. -/
 inductive Registry (before : State) (id : AllocId) : Prop where
-  | function (noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | function (noLive : before.machine.memory.live[id]? = none)
       (present : before.machine.memory.hasFunctionPointer id = true)
-  | vaList (noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | vaList (noLive : before.machine.memory.live[id]? = none)
       (present : before.machine.memory.hasVaListId id = true)
-  | global (noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | global (noLive : before.machine.memory.live[id]? = none)
       (entry : GlobalAllocation) (present : before.machine.memory.findGlobal? id = some entry)
       (notMemory : entry.kind ≠ .memory) (notStatic : entry.kind ≠ .static)
-  | dead (noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | dead (noLive : before.machine.memory.live[id]? = none)
       (noGlobal : before.machine.memory.findGlobal? id = none)
-      (entry : DeadAllocation) (present : before.machine.memory.dead.find? (fun row => row.allocId == id) = some entry)
+      (entry : DeadAllocation) (present : before.machine.memory.dead[id]? = some entry)
 
  theorem classification (before : State) (id : AllocId) (registry : Registry before id) :
     ∃ info, before.machine.memory.getAllocInfo id = .ok info ∧ info.kind ≠ .liveData := by
-  have noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none := by
+  have noLive : before.machine.memory.live[id]? = none := by
     cases registry <;> assumption
   unfold MemoryState.getAllocInfo
   simp only [noLive]

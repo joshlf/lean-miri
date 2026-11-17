@@ -45,9 +45,9 @@ private def finishWithoutRetag (result : Result MachineKind External HookError) 
 private def updateTreeExtra [DecidableEq MachineKind]
     (memory : MemoryState Provenance BorrowTree MachineKind) (allocId : AllocId)
     (tree : BorrowTree) : Except AllocationLookupError (MemoryState Provenance BorrowTree MachineKind) := do
-  let some liveEntry := memory.live.find? fun entry => entry.1 == allocId
+  let some liveEntry := memory.live[allocId]?
     | throw (.unavailable allocId)
-  let allocation := liveEntry.2.allocation.setExtra tree
+  let allocation := liveEntry.allocation.setExtra tree
   memory.setLiveAllocation allocId allocation
 
 private def buildInsidePermissions (policy : RetagPolicy.NewPermission)
@@ -97,9 +97,9 @@ private def accessTreeForReborrow [DecidableEq MachineKind]
           | return fail current (.rangeEndOverflow absoluteOffset length)
         let range : ByteRange := ⟨absoluteOffset.bytes, absoluteEnd.bytes⟩
         current := addEvent current (.parentTreeAccess kind range)
-        let some localEntry := current.state.memory.live.find? fun entry => entry.1 == location.allocId
+        let some localEntry := current.state.memory.live[location.allocId]?
           | return fail current (.treeExtraUnavailable location.allocId)
-        let access := localEntry.2.allocation.extra.performBorrowAccessRange
+        let access := localEntry.allocation.extra.performBorrowAccessRange
           location.parentProvenance absoluteOffset length kind
           current.state.global.protectedTags .VisitChildrenOfAccessed
         let nextMemory ← match updateTreeExtra current.state.memory location.allocId access.tree with
@@ -119,9 +119,9 @@ private def accessTreeForReborrow [DecidableEq MachineKind]
               match transition.outcome with
               | .error error => return { current with outcome := .error (.hook error) }
               | .ok () => pure ()
-  let some liveEntry := current.state.memory.live.find? fun entry => entry.1 == location.allocId
+  let some liveEntry := current.state.memory.live[location.allocId]?
     | return fail current (.treeExtraUnavailable location.allocId)
-  let child := liveEntry.2.allocation.extra.newChild location.baseOffset
+  let child := liveEntry.allocation.extra.newChild location.baseOffset
     location.parentProvenance newTag inside policy.outsidePermission
     policy.protector.isSome
   let nextMemory ← match updateTreeExtra current.state.memory location.allocId child.tree with
@@ -186,11 +186,11 @@ private def runReborrow [DecidableEq MachineKind]
       match request.hooks.allocationExtra with
       | .error message => return fail result (.allocationExtra message)
       | .ok () => pure ()
-      let some localEntry := result.state.memory.live.find? fun entry => entry.1 == location.allocId
+      let some localEntry := result.state.memory.live[location.allocId]?
         | return fail result (.treeExtraUnavailable location.allocId)
       result := addEvent result (.allocationExtraLoaded location.allocId)
       result := accessTreeForReborrow result request policy newTag location inside
-        localEntry.2.allocation.mutability effects
+        localEntry.allocation.mutability effects
       match result.outcome with
       | .error _ => return result
       | .ok _ => pure ()

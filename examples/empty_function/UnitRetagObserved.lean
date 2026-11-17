@@ -32,7 +32,7 @@ theorem reborrow_zero_live_cases {K U : Type} [DecidableEq K]
     (ensured : h.ensureTreeExtra id
       (withCurrent frames (registeredFrame frame borrowFrame id tag) (registeredMachine machine tracker tag)) =
       .ok () (withCurrent frames (registeredFrame frame borrowFrame id tag) ensuredMachine))
-    (live : ensuredMachine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : ensuredMachine.memory.live[id]? = some (entry))
     (currentTag : BorTag) (formed : TreeRuntimeInput.TreeFormed entry.allocation.extra currentTag)
     (protections : ProtectedTags) :
     (∃ tree, TypedRetag.reborrow h budget place Size.ZERO MachineHooks.protectionPolicy tag

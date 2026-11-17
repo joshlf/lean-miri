@@ -50,7 +50,7 @@ def initExtra [DecidableEq K] (extras : MemoryExtras.Hooks K U P)
     let length := ByteSize.ofU64 size.bytes.toNat (by have h := UInt64.toNat_lt size.bytes; omega)
     let allocation := VClockAlloc.newAllocation length VTimestamp.ZERO index
     modify fun machine => {machine with raceAllocations :=
-      (machine.raceAllocations.filter fun entry => entry.1 != id).push (id,allocation)}
+      (machine.raceAllocations.insert id allocation)}
   let weak := ((← get).dataRace.map (·.weakMemory)).getD false
   MemoryExtras.initAllocation extras id weak
   pure tree

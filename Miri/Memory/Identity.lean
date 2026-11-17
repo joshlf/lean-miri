@@ -16,6 +16,21 @@ structure AllocId where
 
 namespace AllocId
 
+instance : Ord AllocId where
+  compare a b := compare a.value b.value
+
+instance : Std.TransOrd AllocId where
+  eq_swap := Std.OrientedOrd.eq_swap (α := UInt64)
+  isLE_trans := Std.TransOrd.isLE_trans (α := UInt64)
+
+instance : Std.LawfulEqOrd AllocId where
+  eq_of_compare {a b} h := by
+    have values : a.value = b.value := Std.LawfulEqOrd.eq_of_compare h
+    cases a
+    cases b
+    cases values
+    rfl
+
 def ofUInt64 (value : UInt64) : Option AllocId :=
   if h : value = 0 then none else some ⟨value, h⟩
 

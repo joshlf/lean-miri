@@ -121,7 +121,7 @@ private def initial : IO S := do
   let memory0 := MemoryState.setIssuedIds
     (MemoryState.empty : MemoryState AllocId Unit Unit) #[dataId, vtableId]
   let memory1 : MemoryState AllocId Unit Unit := {memory0 with
-    nextAllocId := 3, live := #[(dataId, ⟨.stack, allocation⟩)]}
+    nextAllocId := 3, live := Std.ExtTreeMap.ofArray #[(dataId, LocalAllocation.mk (.stack) (allocation))]}
   let memory := MemoryState.setGlobalEntries memory1
     #[⟨vtableId, .vtable, Size.ZERO, .ONE, .Not, some .vtable⟩]
   return { memory }
@@ -155,15 +155,15 @@ def main : IO Unit := do
   let id ← match result with | .ok id => pure id | .error _ => throw (IO.userError "destination id")
   let allocation ← match Allocation.fromBytes (Prov := AllocId) (Array.replicate 32 0) ⟨3⟩ .Mut with
     | .ok a => pure a | .error _ => throw (IO.userError "destination allocation")
-  let s := { s with memory := { reserved with live := reserved.live.push (id, ⟨.stack, allocation⟩) } }
+  let s := { s with memory := { reserved with live := reserved.live.insert id (LocalAllocation.mk .stack allocation) } }
   let destination : MPlaceTy AllocId := ⟨⟨⟨Size.ZERO, some id⟩, memory.metadata, none⟩, dynamic⟩
   let copy := PlaceDynamic.memoryCopy dynHooks () 8 true (Size.ofBytes 8) copyHooks S.memory S.trace
     (fun s memory trace => {s with memory, trace}) ⟨memory, dynamic⟩ destination
   let copied ← match copy s with
     | .ok () state => pure state | .error e _ => throw (IO.userError (reprStr e))
   unless copied.counter == s.counter + 16 do throw (IO.userError "DST copy lost dynamic state")
-  let some entry := copied.memory.live.find? (fun entry => entry.1 == id) | throw (IO.userError "copy destination")
-  let bytes ← match entry.2.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 16)) with
+  let some entry := copied.memory.live.get? id | throw (IO.userError "copy destination")
+  let bytes ← match entry.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 16)) with
     | .ok bytes => pure bytes | .error _ => throw (IO.userError "copy bytes")
   unless bytes == Array.ofFn (fun i : Fin 16 => UInt8.ofNat (i.val + 8)) do
     throw (IO.userError "dynamic-size copy did not copy vtable-sized range")

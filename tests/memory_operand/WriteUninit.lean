@@ -40,7 +40,7 @@ def main : IO Unit := do
     | throw (IO.userError "allocation")
   let issued := MemoryState.setIssuedIds (MemoryState.empty : MemoryState CtfeProvenance Unit Unit) #[id]
   let memory : MemoryState CtfeProvenance Unit Unit := {
-    issued with live := #[(id, ⟨.stack, allocation⟩)] }
+    issued with live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (allocation))] }
   let pointer := Pointer.new (some provenance) (sz 1)
   for sized in [true, false] do
     -- Unsized layouts carry no static extent: the two-byte range must come
@@ -51,12 +51,12 @@ def main : IO Unit := do
     let result := writeUninitToMplace memory 0 place runtime false none globals (accesses false) dynamic
     check result.outcome.isOk "sized/unsized uninit write failed"
     check (result.hooks == 1) "uninit write skipped or duplicated permission hook"
-    let some (_, entry) := result.memory.live[0]? | throw (IO.userError "live allocation")
+    let some (_, entry) := result.memory.live.toArray[0]? | throw (IO.userError "live allocation")
     check (!initialized entry.allocation 1 2 && initialized entry.allocation 0 1 &&
       initialized entry.allocation 3 1) "uninit write did not preserve exact dynamic range"
     let denied := writeUninitToMplace memory 0 place runtime false none globals (accesses true) dynamic
     check (!denied.outcome.isOk && denied.hooks == 1) "permission failure or partial hook state lost"
-    let some (_, entry) := denied.memory.live[0]? | throw (IO.userError "denied live allocation")
+    let some (_, entry) := denied.memory.live.toArray[0]? | throw (IO.userError "denied live allocation")
     check (initialized entry.allocation 0 4) "denied write changed initialized bytes"
     if !sized then
       let immediate := writeImmediateToMplaceNoValidate memory 0 .uninit place runtime false none

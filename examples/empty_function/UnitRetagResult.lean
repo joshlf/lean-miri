@@ -77,7 +77,7 @@ theorem reborrow_zero_live_ensured {K U : Type} [DecidableEq K]
     (ensured : h.ensureTreeExtra id
       (withCurrent frames (registeredFrame frame borrowFrame id tag) (registeredMachine machine tracker tag)) =
       .ok () (withCurrent frames (registeredFrame frame borrowFrame id tag) ensuredMachine))
-    (live : ensuredMachine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : ensuredMachine.memory.live[id]? = some (entry)) :
     let child := entry.allocation.extra.newChild (Size.ofBytes offset) parent tag
       (DedupRangeMap.new Size.ZERO ⟨.ReservedFrz false,false,.None⟩) (.ReservedFrz false) true
     let after := withCurrent frames (registeredFrame frame borrowFrame id tag)
@@ -200,7 +200,7 @@ theorem reborrow_zero_live_cases {K U : Type} [DecidableEq K]
     (ensured : h.ensureTreeExtra id
       (withCurrent frames (registeredFrame frame borrowFrame id tag) (registeredMachine machine tracker tag)) =
       .ok () (withCurrent frames (registeredFrame frame borrowFrame id tag) ensuredMachine))
-    (live : ensuredMachine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : ensuredMachine.memory.live[id]? = some (entry))
     (currentTag : BorTag) (formed : TreeRuntimeInput.TreeFormed entry.allocation.extra currentTag)
     (fresh : entry.allocation.extra.tagMapping.get tag = none)
     (parentPresent : ∀ parentTag, parent = .concrete parentTag →
@@ -270,7 +270,7 @@ theorem release_live_current {K U : Type} [DecidableEq K]
   let memory := replaceTree machine.memory id entry tree
   let state := withCurrent frames (registeredFrame frame {} id tag)
     {machine with memory}
-  have live : memory.live.find? (fun row => row.1 == id) = some (id,updated) :=
+  have live : memory.live[id]? = some (updated) :=
     replace_lookup machine.memory id entry tree
   have info : memory.getAllocInfo id =
       .ok ⟨updated.allocation.byteSize,updated.allocation.align,.liveData,updated.allocation.mutability⟩ := by

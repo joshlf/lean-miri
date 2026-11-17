@@ -42,7 +42,7 @@ theorem preserves (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacit
     (enabled : p.before.machine.borrowTracker = some tracker)
     (place : MPlaceTy Provenance) (destination : p.destination = .memory place)
     (id : AllocId) (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : p.before.machine.memory.live[id]? = some (entry))
     (tree : BorrowTree) (rights : Preservation.OldNodeRights entry.allocation.extra tree) :
     Preservation.Preserves s p (ReturnContinuation.resume older caller
       (machine s p frame previous tracker room index id entry tree) p.returnBlock) := by
@@ -51,8 +51,7 @@ theorem preserves (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacit
   refine ⟨returned,?_,protectors,other,slots,?_,context,threads,addresses,runtime,roots⟩
   · intro selected old found
     change ∃ current : InputDraft.Entry,
-      (UnitRetag.replaceTree (IntegerPost.machine s p frame previous tracker room index).memory id entry tree).live.find?
-        (fun row => row.1 == selected) = some (selected,current) ∧
+      (UnitRetag.replaceTree (IntegerPost.machine s p frame previous tracker room index).memory id entry tree).live[selected]? = some (current) ∧
       current.kind = old.kind ∧ current.allocation.mapExtra (fun _ => ()) = old.allocation.mapExtra (fun _ => ()) ∧
       Preservation.OldNodeRights old.allocation.extra current.allocation.extra
     rw [IntegerPost.memory_eq s metadata capacity]

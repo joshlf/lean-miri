@@ -76,7 +76,7 @@ theorem copy (s : Static) (metadata : Metadata s) (profile : Profile s)
       allocation.byteSize = destination.baseLayout.layout.size ∧
       ((value = .uninit ∧ allocation = bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)) ∨
        (value ≠ .uninit ∧ (ValidityMachine.placeHooks s.cfg.access s.cfg.allocation s.cfg.compiler).writeMemoryNoValidate () value parent post =
-         .ok () {post with machine := {post.machine with memory := {post.machine.memory with live := reserved.live.push (id,⟨.stack,allocation⟩)}}})) := by
+         .ok () {post with machine := {post.machine with memory := {post.machine.memory with live := reserved.live.insert id (⟨.stack,allocation⟩)}}})) := by
     by_cases initialized : value = .uninit
     · exact ⟨bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size),sizeEq,Or.inl ⟨initialized,rfl⟩⟩
     · obtain ⟨allocation,written,sizeUpdated,rest⟩ :=
@@ -84,7 +84,7 @@ theorem copy (s : Static) (metadata : Metadata s) (profile : Profile s)
           (destination.oldEncoding value old) created sizeEq mutable destination.baseSized destination.baseSigned ctx.2.2.2.2.1 missing
           cached ctx.1 ctx.2.1 ctx.2.2.2.2.2.1 ctx.2.2.1 ctx.2.2.2.1
       exact ⟨allocation,sizeUpdated,Or.inr ⟨initialized,written⟩⟩
-  let writtenMachine : MachineHooks.MachineState MiriMemoryKind RootUser := {post.machine with memory := {post.machine.memory with live := reserved.live.push (id,⟨.stack,allocation⟩)}}
+  let writtenMachine : MachineHooks.MachineState MiriMemoryKind RootUser := {post.machine with memory := {post.machine.memory with live := reserved.live.insert id (⟨.stack,allocation⟩)}}
   have allocationEq : PlaceMachine.allocateStack s.cfg.allocation destination.baseLayout before =
       .ok parent (LocalUnit.current older frame post.machine) := allocatedEq
   have sameCaller : destination.caller = input.caller := Option.some.inj (destination.current.symm.trans input.current)
@@ -95,17 +95,17 @@ theorem copy (s : Static) (metadata : Metadata s) (profile : Profile s)
   have normalized : CompilerFrameContext.localType s.prepared.compiler frame destination.localId = .ok destination.metadata.normalizedTy := by
     simpa only [frame,ProjectedModel.caller,LocalImmediate.cached,CompilerFrameContext.localType,
       CompilerFrameContext.bodyOfFrame] using destination.metadata.normalization
-  have liveId : writtenMachine.memory.live.any (fun row => row.1 == id) = true := by
-    change (reserved.live.push _).any (fun row => row.1 == id) = true
-    simp [Array.any_push]
+  have liveId : writtenMachine.memory.live.contains id = true := by
+    change (reserved.live.insert id _).contains id = true
+    simp
   obtain ⟨span,moved⟩ := ProjectedForce.after_move s metadata capacity older frame writtenMachine destination.localId
     destination.metadata.normalizedTy normalized parent id tag rfl liveId noClocks
   let movedMachine : MachineHooks.MachineState MiriMemoryKind RootUser := {writtenMachine with allocationSpans := (writtenMachine.allocationSpans.filter (fun row => row.1 != id)).push (id,span,none)}
   have footprint : InputDraft.IndirectFootprint (LocalUnit.current older frame movedMachine) parent.mplace.ptr destination.baseLayout.layout.size := by
     refine {id := id,entry := ⟨.stack,allocation⟩,live := ?_,base := base,relative := 0,cached := cached,address := ?_,addressFits := ?_,extent := ?_,attribution := rfl}
-    · change (reserved.live.push _).find? _ = _
-      have absent : reserved.live.find? (fun row => row.1 == id) = none := allocated.fresh
-      simp [Array.find?_push,absent]
+    · change (reserved.live.insert id _)[id]? = _
+      have absent : reserved.live[id]? = none := allocated.fresh
+      simp [absent]
     · simp [parent,Pointer.new,Size.ofBytes]
     · rw [sizeUpdated]
       exact baseFits
@@ -126,7 +126,7 @@ theorem copy (s : Static) (metadata : Metadata s) (profile : Profile s)
       (LocalUnit.current older updated movedMachine,.ok ()) := by
     rcases writeCases with ⟨uninit,allocationUninit⟩ | ⟨initialized,written⟩
     · have machineEq : writtenMachine = post.machine := by
-        change {post.machine with memory := {post.machine.memory with live := reserved.live.push (id,⟨.stack,allocation⟩)}} = _
+        change {post.machine with memory := {post.machine.memory with live := reserved.live.insert id (⟨.stack,allocation⟩)}} = _
         rw [allocationUninit,←ctx.2.2.2.2.1]
       have createdEq := allocationEq
       rw [←machineEq] at createdEq

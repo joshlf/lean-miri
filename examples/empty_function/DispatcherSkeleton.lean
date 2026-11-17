@@ -9,34 +9,29 @@ set_option linter.unusedVariables false
 /-- Actual lookup precedence, expressed entirely as current raw table facts. -/
 inductive Registry (s : Static) (p : Packet) (id : AllocId) : Prop where
   | live (entry : Entry)
-      (lookup : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) : Registry s p id
-  | function (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+      (lookup : p.before.machine.memory.live[id]? = some (entry)) : Registry s p id
+  | function (absent : p.before.machine.memory.live[id]? = none)
       (present : p.before.machine.memory.hasFunctionPointer id = true) : Registry s p id
-  | vaList (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | vaList (absent : p.before.machine.memory.live[id]? = none)
       (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
       (present : p.before.machine.memory.hasVaListId id = true) : Registry s p id
-  | global (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | global (absent : p.before.machine.memory.live[id]? = none)
       (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
       (noVaList : p.before.machine.memory.hasVaListId id = false)
       (entry : GlobalAllocation) (present : p.before.machine.memory.findGlobal? id = some entry)
       (backing : Backing s p.before id) : Registry s p id
-  | dead (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+  | dead (absent : p.before.machine.memory.live[id]? = none)
       (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
       (noVaList : p.before.machine.memory.hasVaListId id = false)
       (noGlobal : p.before.machine.memory.findGlobal? id = none)
       (entry : DeadAllocation)
-      (present : p.before.machine.memory.dead.find? (fun row => row.allocId == id) = some entry) : Registry s p id
+      (present : p.before.machine.memory.dead[id]? = some entry) : Registry s p id
 
 theorem registry (s : Static) (p : Packet) (id : AllocId) (backing : Backing s p.before id) :
     Registry s p id := by
   classical
-  cases hl : p.before.machine.memory.live.find? (fun row => row.1 == id) with
-  | some row =>
-    have identity : row.1 = id := by
-      have member := Array.find?_some hl
-      simpa using member
-    cases row with
-    | mk found entry => simp only at identity;subst found;exact .live entry hl
+  cases hl : p.before.machine.memory.live[id]? with
+  | some entry => exact .live entry hl
   | none =>
     cases hf : p.before.machine.memory.hasFunctionPointer id with
     | true => exact .function hl hf

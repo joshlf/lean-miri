@@ -21,7 +21,7 @@ theorem ensure (s : WholeCall.Static) (p : WholeCall.Packet)
     (tagRoom : tracker.global.nextPointerTag.value.toNat+(resources.budget-1) < 2^64)
     (noRace : current.machine.dataRace = none) (reserved : BorTag) (fence : RootReservedPost.Fence tracker.global reserved)
     (id : AllocId) (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -36,7 +36,7 @@ theorem ensure (s : WholeCall.Static) (p : WholeCall.Packet)
       let adjusted := MemoryExtras.putAllocation (extras s) {middle with borrowTracker := some {afterTracker with global}} id {weakMemory := none}
       let installed := LatentInstallPost.installed adjusted id .global allocation
       s.cfg.retag.ensureTreeExtra id current = .ok () {current with machine := installed} ∧
-      installed.memory.live.find? (fun row => row.1 == id) = some (id,⟨.machine .global,allocation⟩) ∧
+      installed.memory.live[id]? = some (⟨.machine .global,allocation⟩) ∧
       TreeRuntimeInput.World installed {afterTracker with global} ∧
       root ≠ reserved ∧ RootReservedPost.Fence global reserved ∧
       middle.memory = current.machine.memory ∧

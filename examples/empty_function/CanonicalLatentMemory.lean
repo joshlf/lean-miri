@@ -14,7 +14,7 @@ abbrev extras (s : WholeCall.Static) := EvalCoreMachine.extras (leaves s).sync C
 private theorem vacant (s : WholeCall.Static) (p : WholeCall.Packet)
     (input : InputDraft.CurrentInputDraft s p) (id : AllocId) (allocation : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -42,7 +42,7 @@ theorem convert (s : WholeCall.Static) (p : WholeCall.Packet)
     (metadata : Specification.Metadata s) (input : InputDraft.CurrentInputDraft s p) (resources : Specification.ResourceMargins s p)
     (profile : Specification.RuntimeProfile s p) (id : AllocId)
     (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some

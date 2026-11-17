@@ -98,3 +98,7 @@ lean_exe source_abi_boundary_tests where
 lean_exe coroutine_native_queries where
   srcDir := "tests/input"
   root := `CoroutineNativeQueries
+
+lean_exe profile_allocation_storage where
+  srcDir := "tools"
+  root := `StorageMicro

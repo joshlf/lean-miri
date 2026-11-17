@@ -38,14 +38,14 @@ private def initialMemory : IO (MemoryState Provenance AuditExtra Unit) := do
     (MemoryState.empty : MemoryState Provenance AuditExtra Unit) #[first, second]
   pure {issued with
     nextAllocId := 3
-    live := #[(first, ⟨.machine (), firstAllocation⟩),
-      (second, ⟨.machine (), secondAllocation⟩)] }
+    live := Std.ExtTreeMap.ofArray #[(first, LocalAllocation.mk (.machine ()) (firstAllocation)),
+      (second, LocalAllocation.mk (.machine ()) (secondAllocation))] }
 
 private def appendNested (memory : MemoryState Provenance AuditExtra Unit)
     (id : AllocId) (value : Nat) : MemoryState Provenance AuditExtra Unit :=
-  match memory.live.find? (fun entry => entry.1 == id) with
+  match memory.live.get? id with
   | none => memory
-  | some (_, entry) =>
+  | some entry =>
       let old := entry.allocation.extra
       let nested := {old.child with events := old.child.events.push value}
       match memory.setLiveAllocation id (entry.allocation.setExtra {old with child := nested}) with
@@ -54,8 +54,8 @@ private def appendNested (memory : MemoryState Provenance AuditExtra Unit)
 
 private def nestedEvents (memory : MemoryState Provenance AuditExtra Unit)
     (id : AllocId) : Array Nat :=
-  ((memory.live.find? (fun entry => entry.1 == id)).map
-      (fun entry => entry.2.allocation.extra.child.events)).getD #[]
+  ((memory.live.get? id).map
+      (fun entry => entry.allocation.extra.child.events)).getD #[]
 
 private def deallocationHooks (failResolve failBefore : Bool) :
     MemoryDeallocationHooks Provenance AuditExtra Unit (Array String) Unit := {
@@ -81,9 +81,9 @@ private def run (failResolve failBefore : Bool)
 def main : IO Unit := do
   let success ← run false false
   check (success.outcome.isOk) "successful deallocation must complete"
-  check (success.memory.live.all (fun entry => entry.1 != targetId))
+  check ((!success.memory.live.contains targetId))
     "successful deallocation must remove the target allocation"
-  check (success.memory.dead.any (fun entry => entry.allocId == targetId))
+  check (success.memory.dead.contains targetId)
     "successful deallocation must cache the dead allocation after callbacks"
   check (success.detached.map Prod.fst == some targetId)
     "success must return the exact local owner removed by the lifecycle"
@@ -104,7 +104,7 @@ def main : IO Unit := do
       entry.2.allocation.byteSize == Size.ofBytes 4 &&
         entry.2.allocation.extra.child.events == #[0]) == some true)
     "layout failure must retain the original removed allocation owner"
-  check (layoutFailure.memory.live.all (fun entry => entry.1 != targetId))
+  check ((!layoutFailure.memory.live.contains targetId))
     "layout failure must retain the already-removed live-map prefix"
   check (layoutFailure.memory.dead.isEmpty)
     "layout failure must skip dead-allocation insertion"
@@ -113,7 +113,7 @@ def main : IO Unit := do
 
   let beforeFailure ← run false true
   check (hasError beforeFailure.outcome) "before-hook failure must propagate"
-  check (beforeFailure.memory.live.all (fun entry => entry.1 != targetId))
+  check ((!beforeFailure.memory.live.contains targetId))
     "before-hook failure must retain the earlier live-map removal"
   check (beforeFailure.memory.dead.isEmpty)
     "before-hook failure must skip dead-allocation insertion"
@@ -126,7 +126,7 @@ def main : IO Unit := do
 
   let resolveFailure ← run true false
   check (hasError resolveFailure.outcome) "resolver failure must propagate"
-  check (resolveFailure.memory.live.any (fun entry => entry.1 == targetId))
+  check (resolveFailure.memory.live.contains targetId)
     "resolver failure must occur before live-map removal"
   check (resolveFailure.memory.dead.isEmpty)
     "resolver failure must not insert dead-allocation metadata"
@@ -136,5 +136,32 @@ def main : IO Unit := do
     "resolver failure must retain its nested mutation prefix only"
   check (resolveFailure.hooks == #["resolve"])
     "resolver failure must skip the before-deallocation callback"
+
+  let highId : AllocId := ⟨18446744073709551615, by decide⟩
+  let keys : Std.ExtTreeMap AllocId Nat := Std.ExtTreeMap.ofArray
+    #[(highId, 1), (targetId, 2), (highId, 3)]
+  check (keys.size == 2 && keys.get? highId == some 3 && keys.get? targetId == some 2)
+    "same-key insertion must replace only that key, including full-width identities"
+  let erased := keys.erase highId
+  check (erased.size == 1 && erased.get? highId == none && erased.get? targetId == some 2)
+    "erasure must leave unrelated identities intact"
+  let reinserted := erased.insert highId 4
+  check (reinserted.size == 2 && reinserted.get? highId == some 4)
+    "reinsertion must not revive an obsolete value"
+
+  let memory ← initialMemory
+  let memory := {memory with dead := memory.dead.insert targetId ⟨Size.ofBytes 99, Align.EIGHT⟩}
+  let duplicate := MemoryLifecycle.deallocatePtrWith memory #[]
+    (Pointer.new (some (.concrete targetId BorTag.one)) Size.ZERO) none (.machine ())
+    (deallocationHooks false false)
+  check (duplicate.outcome == .error (.duplicateDeadAllocation targetId))
+    "an already-dead key must retain its exact diagnostic"
+  check (!duplicate.memory.live.contains targetId && duplicate.memory.dead.size == 1 &&
+      (duplicate.memory.dead.get? targetId).map (fun entry => (entry.size, entry.align)) ==
+        some (Size.ofBytes 4, Align.ONE))
+    "duplicate-dead failure must replace the old layout after live removal"
+  check (duplicate.hooks == #["resolve", "before"] &&
+      nestedEvents duplicate.memory sentinelId == #[0, 1, 2] && duplicate.detached.isSome)
+    "duplicate-dead failure must retain callback successors and the detached owner"
 
   IO.println "Coherent deallocation callback successors: PASS"

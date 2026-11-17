@@ -129,7 +129,7 @@ def varArgs [DecidableEq K] (leaves : VarArgsLeaves K U C) (registry : Access U)
      user := registry.put state.machine.user {registry.get state.machine.user with vaLists := lists}
      memory := MemoryState.setVaListIds state.machine.memory (lists.map (·.1))}}
    markDead := fun state id size align => {state with machine := {state.machine with memory :=
-     {state.machine.memory with dead := (state.machine.memory.dead.filter (·.allocId != id)).push ⟨id,size,align⟩}}}
+     {state.machine.memory with dead := state.machine.memory.dead.insert id ⟨size,align⟩}}}
    reserveAllocId := fun _ => reserve
    globalRootPointer := fun _ id => do return (← FunctionPointers.rootPointer functions id).withOptionalProvenance
    resolvePointer := fun _ ptr => do

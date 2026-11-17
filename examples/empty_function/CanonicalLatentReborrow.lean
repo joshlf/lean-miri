@@ -41,7 +41,7 @@ theorem reborrow (s : WholeCall.Static) (p : WholeCall.Packet) (budget : Nat)
     (tagRoom : tracker.global.nextPointerTag.value.toNat+(resources.budget-1) < 2^64)
     (noRace : machine.dataRace = none) (reserved : BorTag) (fence : RootReservedPost.Fence tracker.global reserved)
     (id : AllocId) (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -69,8 +69,7 @@ theorem reborrow (s : WholeCall.Static) (p : WholeCall.Packet) (budget : Nat)
       ensuredTracker.global.protectedTags = (registeredTracker tracker reserved).global.protectedTags ∧
       tree.releaseProtector reserved ensuredTracker.global.protectedTags = ⟨tree,.Released⟩ ∧
       replaceTree ensuredMachine.memory id entry tree =
-        {machine.memory with live := ((machine.memory.live.filter fun row => row.1 != id).push
-          (id,{entry with allocation := entry.allocation.setExtra tree}))} ∧
+        {machine.memory with live := machine.memory.live.insert id ({entry with allocation := entry.allocation.setExtra tree})} ∧
       ensuredMachine.threads = machine.threads ∧
       RelocationContext.view ensuredMachine.user.payload = RelocationContext.view machine.user.payload ∧
       (∀ oldId tag, tracker.global.rootTag? oldId = some tag → ensuredTracker.global.rootTag? oldId = some tag) ∧
@@ -91,7 +90,7 @@ theorem reborrow (s : WholeCall.Static) (p : WholeCall.Packet) (budget : Nat)
   let entry : InputDraft.Entry := ⟨.machine .global,allocation⟩
   have entryTree : entry.allocation.extra = BorrowTree.new root source.byteSize := rfl
   have treeFormed : TreeRuntimeInput.TreeFormed (BorrowTree.new root source.byteSize) global.nextPointerTag := by
-    exact Classical.choice (installedWorld.liveTrees (id,entry) (Array.mem_of_find?_eq_some live))
+    exact Classical.choice (installedWorld.liveTrees id entry live)
   have shape : parent = .wildcard ∨ parent = .concrete root := by
     rcases parentBinding with wild | ⟨tag,concrete,cached⟩
     · exact Or.inl wild
@@ -108,8 +107,11 @@ theorem reborrow (s : WholeCall.Static) (p : WholeCall.Packet) (budget : Nat)
     enabled frameBorrow id offset parent reserved check resolve log precise freeze _ information rfl installed ensured entry live tree constructed
   refine ⟨installed,{afterTracker with global},entry,tree,actual,rfl,protectedEq,released,?_,threadsPost,contextPost,rootsPost,addressPost⟩
   change middle.memory = machine.memory at middleMemory
-  simp [replaceTree,installed,LatentInstallPost.installed,adjusted,MemoryExtras.putAllocation,middleMemory,
-    Array.filter_filter]
+  simp [replaceTree,installed,LatentInstallPost.installed,adjusted,MemoryExtras.putAllocation,middleMemory]
+  apply Std.ExtTreeMap.ext_getElem?
+  intro key
+  simp only [Std.ExtTreeMap.getElem?_insert]
+  split <;> rfl
 end EmptyFunction.CanonicalLatentReborrow
 open Lean Elab Command in
 run_cmd do

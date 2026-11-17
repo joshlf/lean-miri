@@ -40,13 +40,13 @@ theorem memory_info_bounds (s : WholeCall.Static) (p : WholeCall.Packet)
     change 2^source.align.pow2 ≤ resources.maximumAlignment at alignBound
     omega
   unfold MemoryState.getAllocInfo at metadata
-  cases located : p.before.machine.memory.live.find? (fun row => row.1 == id) with
+  cases located : p.before.machine.memory.live[id]? with
   | some row =>
     simp only [located,pure,Except.pure] at metadata
     cases metadata
     refine ⟨by simp,by simp,?_,?_⟩
-    · exact resources.liveByteSizes row (Array.mem_of_find?_eq_some located)
-    · exact resources.liveAlignments row (Array.mem_of_find?_eq_some located)
+    · exact resources.liveByteSizes id row located
+    · exact resources.liveAlignments id row located
   | none =>
     simp only [located] at metadata
     by_cases function : p.before.machine.memory.hasFunctionPointer id = true

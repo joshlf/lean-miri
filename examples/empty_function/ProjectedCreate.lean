@@ -16,7 +16,7 @@ def registered (s : Static) (state : State) (reserved : MemoryState Provenance B
   let initialized := MemoryExtras.putAllocation (ProjectedAllocation.extras s)
     {state.machine with memory := reserved,borrowTracker := some {tracker with global}} id {weakMemory := none}
   {state with machine := {initialized with memory :=
-    {initialized.memory with live := initialized.memory.live.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag size)⟩)}}}
+    {initialized.memory with live := initialized.memory.live.insert id (⟨.stack,bytes.withExtra (BorrowTree.new tag size)⟩)}}}
 
  theorem allocate (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (p : Packet) (input : InputDraft.CurrentInputDraft s p) (resources : PolicyResourceMargins s p)
@@ -42,7 +42,7 @@ def registered (s : Static) (state : State) (reserved : MemoryState Provenance B
             (ChoiceProjection.tapeAccess.put (registered s state reserved input.tracker global id bytes tag destination.baseLayout.layout.size) nextTape)
             finalAddresses) ∧
       finalAddresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩ ∧ base.toNat + destination.baseLayout.layout.size.bytes.toNat < 2^64 ∧
-      reserved.live.find? (fun row => row.1 == id) = none ∧
+      reserved.live[id]? = none ∧
       ∃ supported : value < 16, finalAddresses = (ProjectedAddress.stackAttempt
         (registered s state reserved input.tracker global id bytes tag destination.baseLayout.layout.size) id
         destination.baseLayout.layout.size destination.baseLayout.layout.align.abi ⟨value,supported⟩).state ∧
@@ -66,10 +66,10 @@ def registered (s : Static) (state : State) (reserved : MemoryState Provenance B
   have sameLive : reserved.live = p.before.machine.memory.live := by
     rw [reserveCurrent] at reserveView
     exact reserveView.1.trans (congrArg (fun memory => memory.live) memory)
-  have registeredLive : liveState.machine.memory.live.find? (fun row => row.1 == id) =
-      some (id,⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩) := by
-    change (reserved.live.push _).find? _ = _
-    simp [Array.find?_push,sameLive,missingLive]
+  have registeredLive : liveState.machine.memory.live[id]? =
+      some (⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩) := by
+    change (reserved.live.insert id _)[id]? = _
+    simp [sameLive,missingLive]
   let info : AllocationInfo := ⟨destination.baseLayout.layout.size,destination.baseLayout.layout.align.abi,.liveData,.Mut⟩
   have infoEq : liveState.machine.memory.getAllocInfo id = .ok info := by
     simp only [MemoryState.getAllocInfo,registeredLive,pure,Pure.pure,Except.pure]

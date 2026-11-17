@@ -11,7 +11,7 @@ def Resident (s : Static) (p : Packet) (pointer : Pointer (Option Provenance)) :
   match pointer.provenance with
   | none => True
   | some (.concrete id _) =>
-    (∃ entry, p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) ∨
+    (∃ entry, p.before.machine.memory.live[id]? = some (entry)) ∨
       NondataProtection.Registry p.before id
   | some .wildcard => WildcardInit.Resident s p pointer
 
@@ -39,7 +39,7 @@ theorem protect (s : Static) (metadata : Metadata s) (profile : Profile s) (capa
   | some provenance =>
     cases provenance with
     | concrete id tag =>
-      have selected : (∃ entry, p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) ∨
+      have selected : (∃ entry, p.before.machine.memory.live[id]? = some (entry)) ∨
           NondataProtection.Registry p.before id := by simpa only [Resident,encoding] using resident
       rcases selected with ⟨entry,live⟩ | registry
       · obtain ⟨tree,protection,release,rights⟩ := ProtectionStages.concrete s metadata profile capacity metadata.pointerSize
@@ -62,10 +62,9 @@ theorem protect (s : Static) (metadata : Metadata s) (profile : Profile s) (capa
         rcases selected with ⟨entry,present⟩ | registry
         · obtain ⟨tree,protection,release,child,ended⟩ := liveCase row.allocId
             (Size.ofBytes (destination.place.mplace.ptr.offset.bytes-row.address)) entry rfl present
-          have memberLive := Array.mem_of_find?_eq_some present
-          obtain ⟨formed⟩ := input.world.liveTrees (row.allocId,entry) memberLive
+          obtain ⟨formed⟩ := input.world.liveTrees row.allocId entry present
           have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-            have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (row.allocId,entry) memberLive
+            have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom row.allocId entry present
             have accounting : entry.allocation.extra.tagMapping.mapping.size + entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
             omega
           have rights := WildcardRights.constructor entry.allocation.extra input.tracker.global.nextPointerTag formed nodeRoom

@@ -82,7 +82,7 @@ def visit (views : Views User Os R Payload H D O)
   -- registry slots from an already removed allocation's failing deallocation.
   let registry := views.extras user
   let registry := {registry with allocations := registry.allocations.filter fun entry =>
-    state.machine.memory.live.any (fun live => live.1 == entry.1)}
+    state.machine.memory.live.contains entry.1}
   roots ← roots.weakMemory registry
   let entry := views.entry user
   if let some place := entry.mainReturn then roots ← roots.memPlace place.mplace

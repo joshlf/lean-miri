@@ -118,7 +118,7 @@ structure Allocated (s : Static) (p : Packet) (input : InputDraft.CurrentInputDr
   native : bytes.nativeBuffer = none
   mutable : bytes.mutability = .Mut
   registry : reserved.live = p.before.machine.memory.live
-  fresh : reserved.live.find? (fun row => row.1 == id) = none
+  fresh : reserved.live[id]? = none
   afterEq : after = ProjectedAddress.assigned
     (ChoiceProjection.tapeAccess.put
       (ProjectedCreate.registered s before reserved input.tracker global id bytes tag destination.baseLayout.layout.size) tape) addresses
@@ -175,10 +175,10 @@ theorem allocate (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity
       let initial := MemoryExtras.putAllocation (ProjectedAllocation.extras s)
         {{state.machine with memory := reserved} with borrowTracker := some {input.tracker with global}} id {weakMemory := none}
       let liveState := ProjectedCreate.registered s state reserved input.tracker global id bytes tag destination.baseLayout.layout.size
-      have registeredLive : liveState.machine.memory.live.find? (fun row => row.1 == id) =
-          some (id,⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩) := by
-        change (reserved.live.push _).find? _ = _
-        simp [Array.find?_push,sameLive,missingLive]
+      have registeredLive : liveState.machine.memory.live[id]? =
+          some (⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩) := by
+        change (reserved.live.insert id _)[id]? = _
+        simp [sameLive,missingLive]
       let info : AllocationInfo := ⟨destination.baseLayout.layout.size,destination.baseLayout.layout.align.abi,.liveData,.Mut⟩
       have infoEq : liveState.machine.memory.getAllocInfo id = .ok info := by
         simp only [MemoryState.getAllocInfo,registeredLive,pure,Pure.pure,Except.pure]

@@ -127,10 +127,10 @@ theorem world {K U : Type} (before after : Interpreter.MachineHooks.MachineState
     TreeRuntimeInput.World after {tracker with global} := by
   have post := root tracker.global id global tag actual
   refine ⟨enabled,formed tracker.global id global tag prior.globals actual,?_⟩
-  intro row member
+  intro id entry member
   rw [memory] at member
-  obtain ⟨tree⟩ := prior.liveTrees row member
-  exact ⟨tree_mono row.2.allocation.extra tracker.global.nextPointerTag global.nextPointerTag tree post.2.2.2.2.1⟩
+  obtain ⟨tree⟩ := prior.liveTrees id entry member
+  exact ⟨tree_mono entry.allocation.extra tracker.global.nextPointerTag global.nextPointerTag tree post.2.2.2.2.1⟩
 end EmptyFunction.RootTagPost
 open Lean Elab Command in
 run_cmd do

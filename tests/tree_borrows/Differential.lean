@@ -176,7 +176,7 @@ private def retagTestMachineState : Except AllocError (RetagPipeline.MachineStat
   let localAlloc : LocalAllocation Provenance BorrowTree Unit := ⟨.stack, allocation⟩
   let memory0 : MemoryState Provenance BorrowTree Unit := MemoryState.empty
   let issued := MemoryState.setIssuedIds memory0 #[retagTestAllocId]
-  let memory := {issued with live := #[(retagTestAllocId, localAlloc)]}
+  let memory := {issued with live := Std.ExtTreeMap.ofArray #[(retagTestAllocId, localAlloc)]}
   return ⟨memory, GlobalState.new, {}⟩
 
 private def retagTestRequest (hooks : RetagPipeline.Hooks := {}) : RetagPipeline.Request := {
@@ -240,8 +240,8 @@ private def runRetagPipelineChecks : IO Unit := do
 
   let raceFailure := RetagPipeline.retagPointerValue initial
     { request with hooks := { request.hooks with dataRace := some #[.error "race"] } }
-  let raceTree := match raceFailure.state.memory.live[0]? with
-    | some (_, localAlloc) => localAlloc.allocation.extra
+  let raceTree := match raceFailure.state.memory.live[retagTestAllocId]? with
+    | some localAlloc => localAlloc.allocation.extra
     | none => BorrowTree.new retagTestParentTag (Size.ofBytes 1)
   let racePreservedProtector := match raceFailure.outcome with
     | .error (.dataRace _) =>
@@ -253,8 +253,8 @@ private def runRetagPipelineChecks : IO Unit := do
     "data-race failure must retain protector registration and precede child insertion"
 
   let successful := RetagPipeline.retagPointerValue initial request
-  let successTree := match successful.state.memory.live[0]? with
-    | some (_, localAlloc) => localAlloc.allocation.extra
+  let successTree := match successful.state.memory.live[retagTestAllocId]? with
+    | some localAlloc => localAlloc.allocation.extra
     | none => BorrowTree.new retagTestParentTag (Size.ofBytes 1)
   let successUpdatedExtra := successful.outcome ==
       .ok (some (.concrete retagTestAllocId BorTag.one)) &&

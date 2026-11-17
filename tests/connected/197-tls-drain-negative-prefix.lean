@@ -339,9 +339,9 @@ private def checkFailurePrefix (compiler : Input.CompilerProviders.Prepared)
     throw s!"compiler COUNT static metadata has is_static={globalInfo.isStatic}, size_bytes={globalInfo.sizeBytes}"
   let some countId := state.machine.memory.runtimeIdForExport? countNode.id
     | throw "compiler COUNT allocation has no runtime allocation identity"
-  let some countEntry := state.machine.memory.live.find? (fun entry => entry.1 == countId)
+  let some countEntry := state.machine.memory.live.get? countId
     | throw "compiler COUNT allocation is not live in the UB state"
-  let countScalar ← must ((countEntry.2.allocation.readScalar compiler.runtime.target.base
+  let countScalar ← must ((countEntry.allocation.readScalar compiler.runtime.target.base
       (allocRange Size.ZERO (Size.ofBytes (UInt64.ofNat globalInfo.sizeBytes))) false).mapError toString)
   let countBits ← must (countScalar.toBits (Size.ofBytes (UInt64.ofNat globalInfo.sizeBytes)) |>.mapError toString)
   unless countBits.toNat == 1 do

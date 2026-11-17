@@ -114,7 +114,7 @@ private def getPtrAllocation [DecidableEq MachineKind]
       let updated := { reference with allocation := reference.allocation.setExtra access.extra }
       -- Borrowed CTFE globals have no local cache entry. Miri's owned global
       -- conversions and all mutable accesses do have one.
-      if memory.live.any (fun entry => entry.1 == reference.allocId) then
+      if memory.live.contains reference.allocId then
         match memory.setLiveAllocation reference.allocId updated.allocation with
         | .ok afterUpdate => memory := afterUpdate
         | .error error => return ⟨memory, hookState, some updated, .error (.cacheUpdate error)⟩
@@ -158,19 +158,26 @@ theorem live_mut_of_edges (memory : MemoryState P E K) (hooks : H)
     (entry : LocalAllocation P E K) (provenance : X) (amount : Int)
     (signed : sizeAsI64 size = .ok amount) (nonzero : amount ≠ 0)
     (resolve : access.resolvePointer memory hooks ptr amount = ⟨hooks,.ok (.ok ⟨id,Size.ZERO,provenance⟩)⟩)
-    (live : memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : memory.live[id]? = some entry)
     (mutable : entry.allocation.mutability = .Mut)
     (synchronize : global.synchronizeMemory memory hooks = hooks)
     (bounds : checkedBounds target id entry.allocation.byteSize Size.ZERO amount .memoryAccess = .ok ())
     (before : access.beforeAllocationAccess hooks id = ⟨hooks,.ok ()⟩)
     (write : access.beforeMemoryWrite hooks entry.allocation.extra ptr id provenance (allocRange Size.ZERO size) =
       ⟨hooks,entry.allocation.extra,.ok ()⟩)
-    (last : (memory.live.filter (fun row => row.1 != id)).push (id,entry) = memory.live) :
+    :
     getPtrAllocMut memory hooks target ptr size false kind global access =
       ⟨memory,hooks,some ⟨id,allocRange Size.ZERO size,entry.allocation⟩,
         .ok (some ⟨id,allocRange Size.ZERO size,entry.allocation⟩)⟩ := by
   have sameExtra : entry.allocation.setExtra entry.allocation.extra = entry.allocation := by
     cases entry.allocation; rfl
+  have last : memory.live.insert id entry = memory.live := by
+    apply Std.ExtTreeMap.ext_getElem?
+    intro key
+    by_cases equal : key = id
+    · subst key
+      simp [live]
+    · simp [Std.ExtTreeMap.getElem?_insert, Ne.symm equal]
   have cache : memory.setLiveAllocation id entry.allocation = .ok memory := by
     rw [MemoryState.setLiveAllocation_of_find memory id entry entry.allocation live]
     simp only [last]

@@ -18,11 +18,11 @@ def withCurrent {K U : Type} (frames : Array F) (frame : F) (machine : MachineHo
 
 def replaceTree {K : Type} (memory : MemoryState Provenance BorrowTree K) (id : AllocId)
     (entry : LocalAllocation Provenance BorrowTree K) (tree : BorrowTree) : MemoryState Provenance BorrowTree K :=
-  {memory with live := ((memory.live.filter (fun row => row.1 != id)).push (id,{entry with allocation := entry.allocation.setExtra tree}))}
+  {memory with live := memory.live.insert id ({entry with allocation := entry.allocation.setExtra tree})}
 
 theorem set_live {K : Type} [DecidableEq K] (memory : MemoryState Provenance BorrowTree K)
     (id : AllocId) (entry : LocalAllocation Provenance BorrowTree K) (tree : BorrowTree)
-    (live : memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : memory.live[id]? = some (entry)) :
     memory.setLiveAllocation id (entry.allocation.setExtra tree) = .ok (replaceTree memory id entry tree) := by
   exact MemoryState.setLiveAllocation_of_find memory id entry (entry.allocation.setExtra tree) live
 
@@ -58,7 +58,7 @@ private theorem reborrow_zero_live_equations {K U : Type} [DecidableEq K]
     (extra : h.ensureTreeExtra = GlobalAllocationMachine.ensure kind globals)
     (synchronize : ∀ memory view, globals.synchronizeMemory memory view =
       {view with machine := {view.machine with memory}})
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (finalTree : BorrowTree)
     (child : entry.allocation.extra.newChild (Size.ofBytes offset) parent tag
       (DedupRangeMap.new Size.ZERO ⟨.ReservedFrz false,false,.None⟩) (.ReservedFrz false) true =
@@ -118,7 +118,7 @@ theorem reborrow_zero_live_concrete {K U : Type} [DecidableEq K]
     (parentTag tag : BorTag) (parentIndex : UniIndex) (address base : UInt64)
     (encoding : place.mplace.ptr = Pointer.new (some (.concrete id parentTag)) (Size.ofBytes address))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tag)
     (tagged : entry.allocation.extra.tagMapping.get parentTag = some parentIndex)
     (room : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
@@ -201,7 +201,7 @@ theorem retag_place_live_concrete {K U : Type} [DecidableEq K]
     (parentTag : BorTag) (parentIndex : UniIndex) (address base : UInt64)
     (encoding : place.mplace.ptr = Pointer.new (some (.concrete id parentTag)) (Size.ofBytes address))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
     (tagged : entry.allocation.extra.tagMapping.get parentTag = some parentIndex)
     (nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
@@ -258,7 +258,7 @@ theorem protect_live_concrete {K U : Type} [DecidableEq K]
     (parentTag : BorTag) (parentIndex : UniIndex) (address base : UInt64)
     (encoding : place.mplace.ptr = Pointer.new (some (.concrete id parentTag)) (Size.ofBytes address))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
     (tagged : entry.allocation.extra.tagMapping.get parentTag = some parentIndex)
     (nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
@@ -317,20 +317,25 @@ theorem protect_live_concrete {K U : Type} [DecidableEq K]
 other live rows, including their order and contents. -/
 theorem replace_lookup {K : Type} (memory : MemoryState Provenance BorrowTree K)
     (id : AllocId) (entry : LocalAllocation Provenance BorrowTree K) (tree : BorrowTree) :
-    (replaceTree memory id entry tree).live.find? (fun row => row.1 == id) =
-      some (id,{entry with allocation := entry.allocation.setExtra tree}) := by
-  simp [replaceTree,Array.find?_push,Array.find?_filter]
-  have emptyFind : memory.live.find? (fun _ => false) = none :=
-    Array.find?_eq_none.mpr (by intro row member; simp)
-  rw [emptyFind]
-  rfl
+    (replaceTree memory id entry tree).live[id]? =
+      some ({entry with allocation := entry.allocation.setExtra tree}) := by
+  simp [replaceTree]
 
 /-- A second write-back of the same zero-protection tree changes nothing. -/
 theorem replace_same {K : Type} (memory : MemoryState Provenance BorrowTree K)
     (id : AllocId) (entry : LocalAllocation Provenance BorrowTree K) (tree : BorrowTree) :
     replaceTree (replaceTree memory id entry tree) id
       {entry with allocation := entry.allocation.setExtra tree} tree = replaceTree memory id entry tree := by
-  simp [replaceTree,Array.filter_filter,Allocation.setExtra,Allocation.mapExtra]
+  unfold replaceTree
+  have allocation : (entry.allocation.setExtra tree).setExtra tree = entry.allocation.setExtra tree := by
+    cases entry.allocation
+    rfl
+  simp only [allocation]
+  congr 1
+  apply Std.ExtTreeMap.ext_getElem?
+  intro key
+  simp only [Std.ExtTreeMap.getElem?_insert]
+  split <;> rfl
 
 private theorem protector_roundtrip (protections : ProtectedTags) (tag : BorTag)
     (fresh : protections.get tag = none) :
@@ -370,7 +375,7 @@ theorem release_live_singleton {K U : Type} [DecidableEq K]
   let memory := replaceTree machine.memory id entry tree
   let state := withCurrent frames (registeredFrame frame {} id tag)
     {registeredMachine machine tracker tag with memory}
-  have live : memory.live.find? (fun row => row.1 == id) = some (id,updated) :=
+  have live : memory.live[id]? = some (updated) :=
     replace_lookup machine.memory id entry tree
   have info : memory.getAllocInfo id =
       .ok ⟨updated.allocation.byteSize,updated.allocation.align,.liveData,updated.allocation.mutability⟩ := by
@@ -414,7 +419,7 @@ theorem protect_then_release_live_concrete {K U : Type} [DecidableEq K]
     (parentTag : BorTag) (parentIndex : UniIndex) (address base : UInt64)
     (encoding : place.mplace.ptr = Pointer.new (some (.concrete id parentTag)) (Size.ofBytes address))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
     (tagged : entry.allocation.extra.tagMapping.get parentTag = some parentIndex)
     (nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
@@ -711,7 +716,7 @@ theorem protect_live_concrete_observed {K U : Type} [DecidableEq K]
     (parentTag : BorTag) (parentIndex : UniIndex) (address base : UInt64)
     (encoding : place.mplace.ptr = Pointer.new (some (.concrete id parentTag)) (Size.ofBytes address))
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
     (tagged : entry.allocation.extra.tagMapping.get parentTag = some parentIndex)
     (nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)

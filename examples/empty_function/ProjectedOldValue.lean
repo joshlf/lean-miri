@@ -13,14 +13,14 @@ encoding; the actual memory write and storage image are conclusions. -/
 theorem write (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (state : State) (id : AllocId) (tag : BorTag) (base : UInt64) (layout : LocalLayout)
     (bytes : Allocation Provenance Unit) (value : Immediate Provenance) (initialized : value ≠ .uninit)
-    (older : Array (AllocId × InputDraft.Entry))
+    (older : Std.ExtTreeMap AllocId InputDraft.Entry)
     (encoding : InputDraft.ImmediateEncoding s.prepared.compiler.runtime.target layout value)
     (created : Allocation.tryNew layout.layout.size layout.layout.align.abi .Uninit
       (fun n _ => some (Array.replicate n.bytes.toNat 0)) = .ok bytes)
     (size : bytes.byteSize = layout.layout.size) (mutable : bytes.mutability = .Mut)
     (sized : layout.layout.isSized = true) (signed : layout.layout.size.bytes.toNat < 2^63)
-    (liveShape : state.machine.memory.live = older.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩))
-    (fresh : older.find? (fun row => row.1 == id) = none)
+    (liveShape : state.machine.memory.live = older.insert id ⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩)
+    (fresh : older[id]? = none)
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (backend : state.machine.user.payload.payload.user.backend = .none) (noClocks : state.machine.dataRace = none)
     (extra : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{weakMemory := none}))
@@ -28,7 +28,7 @@ theorem write (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     ∃ after,
       (ValidityMachine.placeHooks s.cfg.access s.cfg.allocation s.cfg.compiler).writeMemoryNoValidate () value
         ⟨⟨Pointer.new (some (.concrete id tag)) (Size.ofBytes base),.none,none⟩,layout⟩ state =
-        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.push (id,⟨.stack,after⟩)}}} ∧
+        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.insert id ⟨.stack,after⟩}}} ∧
       after.byteSize = layout.layout.size ∧ after.len = bytes.len ∧ after.mutability = .Mut ∧ after.align = bytes.align ∧
       after.extra = BorrowTree.new tag layout.layout.size ∧ after.nativeBuffer = bytes.nativeBuffer ∧
       ∃ expected, Preservation.expectedImage s.prepared.compiler.runtime.target.base layout value = some expected ∧

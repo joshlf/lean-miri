@@ -30,9 +30,9 @@ def OldNodeRights (before after : BorrowTree) : Prop :=
             ((segment.data.perms.get index).getD old.defaultLocationState).accessed)
 
 def OriginalLiveAllocations (before after : State) : Prop :=
-  ∀ id old,
-    before.machine.memory.live.find? (fun row => row.1 == id) = some (id, old) →
-    ∃ current, after.machine.memory.live.find? (fun row => row.1 == id) = some (id, current) ∧
+  ∀ (id : AllocId) (old : InputDraft.Entry),
+    before.machine.memory.live[id]? = some (old) →
+    ∃ (current : InputDraft.Entry), after.machine.memory.live[id]? = some (current) ∧
       current.kind = old.kind ∧
       current.allocation.mapExtra (fun _ => ()) = old.allocation.mapExtra (fun _ => ()) ∧
       OldNodeRights old.allocation.extra current.allocation.extra
@@ -155,7 +155,7 @@ def SelectedProjectedContents (s : Static) (p : Packet) (after : State) : Prop :
           ∃ memory id tag entry base expected,
             current.value = .live (.indirect memory) ∧
             memory.ptr.provenance = some (.concrete id tag) ∧
-            after.machine.memory.live.find? (fun row => row.1 == id) = some (id, entry) ∧
+            after.machine.memory.live[id]? = some (entry) ∧
             after.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id, base⟩ ∧
             memory.ptr.offset.bytes = base ∧
             expectedImage s.prepared.compiler.runtime.target.base layout value = some expected ∧

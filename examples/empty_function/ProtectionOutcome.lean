@@ -27,7 +27,7 @@ inductive ReleaseReady (machine : Machine) (borrow : FrameState) : Prop where
   | live (tracker : MachineHooks.BorrowState) (id : AllocId) (tag : BorTag)
       (entry : InputDraft.Entry) (enabled : machine.borrowTracker = some tracker)
       (frame : borrow = ({} : FrameState).addProtector id tag)
-      (lookup : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+      (lookup : machine.memory.live[id]? = some (entry))
       (released : entry.allocation.extra.releaseProtector tag tracker.global.protectedTags =
         ⟨entry.allocation.extra,.Released⟩)
 

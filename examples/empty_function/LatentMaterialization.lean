@@ -44,7 +44,7 @@ theorem ensure_live [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (state : MachineHooks.State K U) (id : AllocId)
     (entry : LocalAllocation Provenance BorrowTree K)
-    (live : state.machine.memory.live.find? (fun row=>row.1==id)=some (id,entry)) :
+    (live : state.machine.memory.live[id]?=some (entry)) :
     GlobalAllocationMachine.ensure kind (GlobalAllocationMachine.hooks target extras leaves initializer) id state =
       .ok () state := by
   simp [GlobalAllocationMachine.ensure,MemoryLifecycle.getAllocRaw,live,
@@ -171,12 +171,11 @@ def cached {K U P : Type} (extras : MemoryExtras.Hooks K U P)
     (before : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (allocation : Allocation Provenance BorrowTree) : MachineHooks.MachineState K U :=
   let after := MemoryExtras.putAllocation extras before id {weakMemory := none}
-  {after with memory := {before.memory with live :=
-    (before.memory.live.filter fun old => old.1 != id).push (id,⟨.machine kind,allocation⟩)}}
+  {after with memory := {before.memory with live := before.memory.live.insert id (⟨.machine kind,allocation⟩)}}
 
 theorem alloc_info {K U : Type} (before : MachineHooks.MachineState K U)
     (id : AllocId) (source : Allocation CtfeProvenance Unit)
-    (absent : (before.memory.live.find? (fun old => old.1 == id)) = none)
+    (absent : (before.memory.live[id]?) = none)
     (noFunction : before.memory.hasFunctionPointer id = false)
     (noVaList : before.memory.hasVaListId id = false)
     (descriptor : before.memory.findGlobal? id = some
@@ -199,7 +198,7 @@ theorem get_raw_data_only {K U P : Type} [DecidableEq K]
     (rootCached : tracker.global.rootTag? id = some root)
     (race : before.dataRace = none)
     (noExtras : ((extras.get before.user).allocations.any (fun row => row.1 == id)) = false)
-    (absent : (before.memory.live.find? (fun old => old.1 == id)) = none)
+    (absent : (before.memory.live[id]?) = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩) :
     ∃ converted : Allocation Provenance Unit,
@@ -230,7 +229,7 @@ theorem ensure_data_only {K U P : Type} [DecidableEq K]
     (rootCached : tracker.global.rootTag? id = some root)
     (race : before.machine.dataRace = none)
     (noExtras : ((extras.get before.machine.user).allocations.any (fun row => row.1 == id)) = false)
-    (absent : (before.machine.memory.live.find? (fun old => old.1 == id)) = none)
+    (absent : (before.machine.memory.live[id]?) = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩) :
     ∃ converted : Allocation Provenance Unit,

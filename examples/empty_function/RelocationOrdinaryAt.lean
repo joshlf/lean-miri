@@ -55,7 +55,7 @@ theorem convert (s : WholeCall.Static) (p : WholeCall.Packet)
     (tagRoom : tracker.global.nextPointerTag.value.toNat+(resources.budget-1) < 2^64)
     (noRace : current.dataRace = none) (reserved : BorTag) (fence : RootReservedPost.Fence tracker.global reserved)
     (id : AllocId) (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some

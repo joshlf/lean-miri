@@ -117,7 +117,7 @@ def getOrCreate (p : CompilerProviders.Prepared) (maximum : Size)
     -- may-leak/no-allocation-span category; TrackingAlloc is display-only.
     let tree ← GlobalAllocationMachine.initExtra extras (fun _ _ _ => pure ()) id allocation.byteSize allocation.align
     modify fun machine => {machine with memory := {machine.memory with
-      live := machine.memory.live.push (id,⟨.machine .tls,allocation.withExtra tree⟩)}}
+      live := machine.memory.live.insert id ⟨.machine .tls,allocation.withExtra tree⟩}}
     let tag ← match (← get).borrowTracker with
       | none => pure BorTag.one
       | some tracker => match tracker.global.rootTag? id with
@@ -129,7 +129,7 @@ def getOrCreate (p : CompilerProviders.Prepared) (maximum : Size)
     pure pointer
   catch error =>
     if allocation.nativeBuffer.isSome then
-      let retained := (← get).memory.live.any fun (_,entry) => entry.allocation.nativeBuffer == allocation.nativeBuffer
+      let retained := (← get).memory.live.any fun _ entry => entry.allocation.nativeBuffer == allocation.nativeBuffer
       unless retained do
         let some host := leaves.nativeHost | throw (.unsupported "native TLS insertion cleanup requires actual backing")
         NativeAllocationLifecycle.releaseAllocation host.backing allocation

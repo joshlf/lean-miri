@@ -90,10 +90,10 @@ def exposeProvenance [DecidableEq K] (h : Hooks K U) (provenance : Provenance) :
     let machine := (← get).machine
     let some tracker := machine.borrowTracker
       | throw (.invalidProgram "borrow tracker removed during exposure")
-    let some entry := machine.memory.live.find? (fun entry => entry.1 == id)
+    let some entry := machine.memory.live[id]?
       | throw (.invalidProgram "exposed allocation has no Tree Borrows extra")
-    let result := entry.2.allocation.extra.exposeTag tracker.global.protectedTags tag
-    let memory ← match machine.memory.setLiveAllocation id (entry.2.allocation.setExtra result.tree) with
+    let result := entry.allocation.extra.exposeTag tracker.global.protectedTags tag
+    let memory ← match machine.memory.setLiveAllocation id (entry.allocation.setExtra result.tree) with
       | .ok memory => pure memory
       | .error error => throw (.invalidProgram s!"exposure tree update: {reprStr error}")
     modify fun state => { state with machine := { state.machine with memory } }

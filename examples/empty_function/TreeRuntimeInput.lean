@@ -42,7 +42,8 @@ structure World {K U : Type} (before : Interpreter.MachineHooks.MachineState K U
     (tracker : Interpreter.MachineHooks.BorrowState) : Prop where
   enabled : before.borrowTracker = some tracker
   globals : GlobalFormed tracker.global
-  liveTrees : ∀ row ∈ before.memory.live, Nonempty (TreeFormed row.2.allocation.extra tracker.global.nextPointerTag)
+  liveTrees : ∀ (id : AllocId) (entry : LocalAllocation Provenance BorrowTree K), before.memory.live[id]? = some entry →
+    Nonempty (TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
 
 namespace GlobalFormed
 variable {global : GlobalState}

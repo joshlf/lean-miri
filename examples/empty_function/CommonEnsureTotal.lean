@@ -28,7 +28,7 @@ def Outcome (s : Static) (p : Packet) (id : AllocId) (current : State) : Prop :=
   (∃ after tracker entry,
     s.cfg.retag.ensureTreeExtra id current = .ok () {current with machine := after} ∧
     TreeRuntimeInput.World after tracker ∧
-    after.memory.live.find? (fun row => row.1 == id) = some (id,entry) ∧
+    after.memory.live[id]? = some (entry) ∧
     ProtectionOutcome.Stable current.machine after ∧
     Preservation.OriginalLiveAllocations p.before {current with machine := after} ∧
     FootprintAfter.Geometry p.before {current with machine := after} ∧
@@ -36,16 +36,9 @@ def Outcome (s : Static) (p : Packet) (id : AllocId) (current : State) : Prop :=
 
 private theorem live_row (machine : ChoiceExecution.S) (id : AllocId)
     (allocation : Allocation Provenance BorrowTree) :
-    (GlobalErrorAware.installed machine id .global allocation).memory.live.find? (fun row => row.1 == id) =
-      some (id,⟨.machine .global,allocation⟩) := by
-  have removed : (machine.memory.live.filter fun row => row.1 != id).find? (fun row => row.1 == id) = none := by
-    apply Array.find?_eq_none.mpr
-    intro row member same
-    have notSame : (row.1 == id) = false := by
-      simpa only [bne,Bool.not_eq_true'] using (Array.mem_filter.mp member).2
-    rw [same] at notSame
-    cases notSame
-  simp only [GlobalErrorAware.installed,Array.find?_push,removed,beq_self_eq_true,↓reduceIte,Option.or]
+    (GlobalErrorAware.installed machine id .global allocation).memory.live[id]? =
+      some (⟨.machine .global,allocation⟩) := by
+  simp [GlobalErrorAware.installed]
 
 /-- Compose the finite conversion's two actual outcomes with source-tree
 initialization and canonical getter insertion. Every premise mentioning an
@@ -94,7 +87,7 @@ theorem from_conversion (s : Static) (metadata : Specification.Metadata s)
           post.threads post.race post.context
       · apply MaterializationPreservation.original_live p.before {current with machine := installed} id ⟨.machine .global,allocation⟩
           (SelectedMaterializationFacts.absent s p id sourceBytes selected)
-        change (middle.memory.live.filter fun row => row.1 != id).push (id,⟨.machine .global,allocation⟩) = _
+        change middle.memory.live.insert id (⟨.machine .global,allocation⟩) = _
         rw [post.memory,memory]
       · exact ⟨{current with machine := middle},post.memory.trans memory,rfl,post.tables⟩
       · have kept : installed.user.addresses = middle.user.addresses :=

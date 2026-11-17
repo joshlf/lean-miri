@@ -143,13 +143,13 @@ def main : IO Unit := do
   let newId ← match newPointer.provenance with
     | .concrete id _ => pure id
     | .wildcard => throw (IO.userError "reallocation returned a wildcard pointer")
-  let some newAllocation := reallocOk.memory.live.find? fun entry => entry.1 == newId
+  let some newAllocation := reallocOk.memory.live.get? newId
     | throw (IO.userError "reallocated allocation is absent")
-  let copiedBytes ← requireOk (newAllocation.2.allocation.getBytesUnchecked
+  let copiedBytes ← requireOk (newAllocation.allocation.getBytesUnchecked
       (allocRange Size.ZERO smallSize) |>.mapError MemoryLifecycleError.allocation)
   IO.println s!"copy-success live={reallocOk.memory.live.size} dead={reallocOk.memory.dead.size} bytes={copiedBytes.size} events={eventText reallocOk.hooks}"
 
 theorem empty_has_no_live_or_dead_allocations :
-    (MemoryState.empty : MemoryState Provenance Unit Unit).live = #[] ∧
-      (MemoryState.empty : MemoryState Provenance Unit Unit).dead = #[] := by
+    (MemoryState.empty : MemoryState Provenance Unit Unit).live = {} ∧
+      (MemoryState.empty : MemoryState Provenance Unit Unit).dead = {} := by
   exact ⟨rfl, rfl⟩

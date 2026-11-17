@@ -99,7 +99,7 @@ private theorem old_rights_refl (tree : Miri.TreeBorrows.BorrowTree) : Preservat
   · simp [Returned,LocalModel.finish,ReturnContinuation.resume,original,Stack.currentFrame?,LocalModel.caller,LocalImmediate.cached]
   · intro id old found
     refine ⟨old,?_,rfl,rfl,old_rights_refl _⟩
-    change (LocalModel.machine s p tracker destination older bound frame previous index).memory.live.find? (fun row => row.1 == id) = _
+    change (LocalModel.machine s p tracker destination older bound frame previous index).memory.live[id]? = _
     rw [field.1]; exact found
   · intro old found
     exact ⟨old,field.2.2.1.trans found,rfl⟩

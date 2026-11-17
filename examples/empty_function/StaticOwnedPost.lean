@@ -14,7 +14,7 @@ theorem get_raw_owned [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K) (definition : Nat)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.memory.live[id]? = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.static,source.byteSize,source.align,source.mutability,some (.static definition true false false)⟩)
     (evaluated : initializer before.memory ⟨before,none⟩ definition = ⟨before.memory,⟨before,none⟩,.ok source⟩)
@@ -36,7 +36,7 @@ theorem ensure_owned [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before : MachineHooks.State K U) (adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K) (definition : Nat)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.static,source.byteSize,source.align,source.mutability,some (.static definition true false false)⟩)
     (evaluated : initializer before.machine.memory ⟨before.machine,none⟩ definition = ⟨before.machine.memory,⟨before.machine,none⟩,.ok source⟩)

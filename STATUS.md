@@ -11,6 +11,38 @@ and exit, threads, synchronization, atomics, weak memory and data races. Finite
 QA and general whole-machine proofs are separate goals. Overall completion and
 the ability to verify arbitrary Rust are not claimed.
 
+## Allocation state
+
+Live allocations, dead size/alignment records and allocation-local race clocks
+use unique `AllocId` keys in `Std.ExtTreeMap`. IDs compare by their full UInt64
+value. Dead payloads do not repeat their key. Imported-ID validation is unchanged;
+internal insertion updates one binding rather than creating duplicate rows.
+Lookup, insertion and erasure use balanced-tree operations, without an additional
+order-maintenance list. Enumeration is by key, so GC's internal-error update
+prefix and leak-report order can differ from the former array order. Normal
+reachability, allocation identity and provenance remain the intended semantics.
+Deallocation still removes live storage before its checks, and duplicate-dead
+errors still follow replacement. Race errors retain the preceding clock updates.
+
+Three alternating pairs against main `3211f7a8`, CPU 0 and one Lean thread,
+give Lean wall medians 26.660 to 26.913 seconds for Vec16 sorted six times,
+32.274 to 32.165 for 64 Box allocations with one live at a time, and 28.682 to
+28.427 for batches of 32. All ranges overlap: these ordinary Rust cases do not
+establish a speedup. All eighteen trials match input, output, runtime profile
+and choice cursor, with no cgroup throttling. Peak RSS is 501.68/498.23 MB,
+472.31/477.03 MB and 470.25/477.79 MB respectively; memory reduction is not
+claimed. These comparisons do not include query memoization.
+
+The reusable `profile_allocation_storage` benchmark calls the real storage APIs
+with initialized four-byte allocations in a minimal typed memory model. At
+8,192 entries, three pairs give inner wall medians 10.340 to 0.081 seconds for
+200,000 live lookup/update operations, 2.444 to 0.087 for 1,000,000 dead lookups,
+and 0.330 to 0.008 for normal deallocation of all entries. Payload, ID and checksum
+checks agree. Setup and verification are timed separately; whole-process CPU is
+not an inner-loop CPU measurement. This establishes a local storage-scale
+advantage, not a whole-interpreter performance bound or a benchmark of the full
+borrow/race/address-reuse pipeline.
+
 ## Exported input coverage
 
 Upstream main `08879436` has been integrated with rustc
@@ -129,12 +161,17 @@ premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
 all 268 proof modules and the 77,958-declaration transitive axiom audit.
 Separately, the schema-16 fixture passes the canonical checker on its actual
 input path with the current compiler/Miri pins: all 268 modules, the final
-`target`/`noUB` types, and 78,270 imported declarations including private/generated
+`target`/`noUB` types, and 78,274 imported declarations including private/generated
 declarations. Only `propext`, `Classical.choice` and `Quot.sound` occur.
 Input, example and library-source hashes remained unchanged during the successful
 check; the compiled proof artifacts are recorded separately.
 The `EmptyFunctionQueries` executable separately passes actual layout/ABI/trait
 provider assertions; it supplies no theorem premise or safety verdict.
+The allocation-map representation passes both the standard frozen fixture check
+and a separate fresh schema-16 exporter input: each checks all 268 proof modules,
+the same final claims and 78,274 imported declarations. Rust source and the
+committed input JSON are unchanged. The proofs use map lookup and extensionality;
+no additional caller-domain assumptions replace the former array-order facts.
 
 ## Remaining general proofs (not acceptance conditions for current finite QA)
 

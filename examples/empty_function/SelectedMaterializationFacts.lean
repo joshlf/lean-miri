@@ -10,7 +10,7 @@ set_option maxRecDepth 65536
 private theorem memory_vacant (s : Static) (p : Packet)
     (input : InputDraft.CurrentInputDraft s p) (id : AllocId) (source : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -56,7 +56,7 @@ theorem tables (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s
 
 theorem absent (s : Static) (p : Packet) (id : AllocId) (source : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedSource s p id source) :
-    p.before.machine.memory.live.find? (fun row => row.1 == id) = none := by
+    p.before.machine.memory.live[id]? = none := by
   cases selected with
   | memory _ absent _ _ _ => exact absent
   | internalStatic _ _ absent _ _ _ _ => exact absent

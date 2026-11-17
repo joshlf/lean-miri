@@ -7,7 +7,7 @@ set_option autoImplicit false
 set_option maxHeartbeats 8000000
 
 def Resident (p : Packet) (id : AllocId) : Prop :=
-  (∃ entry, p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) ∨
+  (∃ entry, p.before.machine.memory.live[id]? = some (entry)) ∨
   NondataProtection.Registry p.before id
 
 theorem selected (s : Static) (p : Packet) (id : AllocId)

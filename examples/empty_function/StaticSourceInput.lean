@@ -31,7 +31,7 @@ and target representation facts in the original raw current input. -/
 theorem facts (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s p)
     (id : AllocId) (definition : Nat) (source : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -74,7 +74,7 @@ no memory descriptor or replacement caller packet is manufactured. -/
 theorem environment (s : Static) (p : Packet) (resources : Specification.ResourceMargins s p)
     (id : AllocId) (definition : Nat) (source : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -88,7 +88,7 @@ seed and the actual fallback plan. -/
 theorem policy_environment (s : Static) (p : Packet) (resources : Specification.PolicyResourceMargins s p)
     (id : AllocId) (definition : Nat) (source : Allocation CtfeProvenance Unit)
     (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -141,13 +141,13 @@ theorem info_bounds (s : Static) (p : Packet) (condition : Prop)
     change 2^source.align.pow2 ≤ resources.maximumAlignment at sourceAlign
     omega
   unfold MemoryState.getAllocInfo at metadata
-  cases located : p.before.machine.memory.live.find? (fun row => row.1 == id) with
+  cases located : p.before.machine.memory.live[id]? with
   | some row =>
     simp only [located,pure,Except.pure] at metadata
     cases metadata
     refine ⟨by simp,?_,?_⟩
-    · exact resources.liveByteSizes row (Array.mem_of_find?_eq_some located)
-    · exact resources.liveAlignments row (Array.mem_of_find?_eq_some located)
+    · exact resources.liveByteSizes id row located
+    · exact resources.liveAlignments id row located
   | none =>
     simp only [located] at metadata
     by_cases function : p.before.machine.memory.hasFunctionPointer id = true

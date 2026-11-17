@@ -71,17 +71,17 @@ theorem uninit (s : Static) (metadata : Metadata s) (profile : Profile s) (capac
     ⟨⟨Pointer.new (some (.concrete id tag)) (Size.ofBytes base),.none,none⟩,destination.baseLayout⟩
   have allocatedEq : PlaceMachine.allocateStack s.cfg.allocation destination.baseLayout
       (LocalUnit.current frames frame machine) = .ok allocated (LocalUnit.current frames frame post.machine) := allocationEq
-  have liveId : post.machine.memory.live.any (fun row => row.1 == id) = true := by
-    change (reserved.live.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩)).any (fun row => row.1 == id) = true
-    simp [Array.any_push]
+  have liveId : post.machine.memory.live.contains id = true := by
+    change (reserved.live.insert id (⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩)).contains id = true
+    simp
   obtain ⟨span,moved⟩ := ProjectedForce.after_move s metadata capacity frames frame post.machine
     destination.localId destination.metadata.normalizedTy normalized allocated id tag rfl liveId noClocks
   let movedMachine : MachineHooks.MachineState MiriMemoryKind RootUser := {post.machine with allocationSpans := (post.machine.allocationSpans.filter (fun row => row.1 != id)).push (id,span,none)}
   have footprint : Nonempty (InputDraft.IndirectFootprint (LocalUnit.current frames frame post.machine) allocated.mplace.ptr
       destination.baseLayout.layout.size) := by
     refine ⟨{id := id,entry := ⟨.stack,bytes.withExtra (BorrowTree.new tag destination.baseLayout.layout.size)⟩, live := ?_,base := base,relative := 0,cached := cached,address := ?_,addressFits := ?_,extent := ?_,attribution := rfl}⟩
-    · change (reserved.live.push _).find? _ = _
-      simp [Array.find?_push,missingLive]
+    · change (reserved.live.insert id _)[id]? = _
+      simp [missingLive]
     · simp [allocated,Pointer.new,Size.ofBytes]
     · change base.toNat + bytes.byteSize.bytes.toNat < 2^64
       rw [sizeEq]

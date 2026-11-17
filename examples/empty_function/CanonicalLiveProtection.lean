@@ -14,7 +14,7 @@ set_option backward.dsimp.instances true
 
 private theorem ensure_live (s : Static) (metadata : Metadata s) (current : State)
     (id : AllocId) (entry : InputDraft.Entry)
-    (live : current.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : current.machine.memory.live[id]? = some (entry)) :
     s.cfg.retag.ensureTreeExtra id current = .ok () current := by
   rw [(CanonicalEnsureRoute.fields s metadata).ensure,(CanonicalEnsureRoute.fields s metadata).globalConstruction]
   change GlobalAllocationMachine.ensure .global
@@ -65,21 +65,19 @@ theorem protect (s : Static) (metadata : Metadata s) (profile : Profile s)
   have below : tag.value.toNat < global.nextPointerTag.value.toNat := by rw [tagEq,next];omega
   have registeredWorld : TreeRuntimeInput.World registered (registeredTracker {input.tracker with global} tag) :=
     ProtectionWorld.registered allocated {input.tracker with global} allocatedWorld tag below
-  cases initialLive : before.memory.live.find? (fun row => row.1 == id) with
+  cases initialLive : before.memory.live[id]? with
   | some row =>
-    have identity : row.1 = id := by simpa only [beq_iff_eq] using Array.find?_some initialLive
-    have live : registered.memory.live.find? (fun row => row.1 == id) = some (id,row.2) := by
-      change before.memory.live.find? (fun row => row.1 == id) = _
-      rw [initialLive]
-      exact congrArg some (Prod.ext identity rfl)
-    have ensured := ensure_live s metadata current id row.2 live
-    have formed := registeredWorld.liveTrees (id,row.2) (Array.mem_of_find?_eq_some live)
+    have live : registered.memory.live[id]? = some row := by
+      change before.memory.live[id]? = _
+      exact initialLive
+    have ensured := ensure_live s metadata current id row live
+    have formed := registeredWorld.liveTrees id row live
     exact LiveProtectionOutcome.live s metadata profile place frames frame before input.tracker global tag
       layout noMetadata aligned enabled frameBorrow tagged id offset parent resolve info classification data
-      registered (registeredTracker {input.tracker with global} tag) ensured row.2 live _ formed registeredWorld.enabled
+      registered (registeredTracker {input.tracker with global} tag) ensured row live _ formed registeredWorld.enabled
       ⟨rfl,rfl,rfl,rfl,rfl⟩
   | none =>
-    have absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none := by rw [←memory];exact initialLive
+    have absent : p.before.machine.memory.live[id]? = none := by rw [←memory];exact initialLive
     rcases MemoryPartition.selected s p id selected backing with resident | ⟨source,sourceSelected⟩
     · rcases resident with ⟨entry,live⟩ | nondata
       · rw [absent] at live
@@ -94,7 +92,7 @@ theorem protect (s : Static) (metadata : Metadata s) (profile : Profile s)
         ⟨ensuredMachine,ensuredTracker,entry,ensured,world,live,stable,_oldLive,_geometry,_kept⟩
       · exact ProtectionStops.ensure_error s metadata profile place frames frame before input.tracker global tag
           layout enabled frameBorrow tagged id offset parent resolve info classification data error failed failedEnsure nonUB
-      · have formed := world.liveTrees (id,entry) (Array.mem_of_find?_eq_some live)
+      · have formed := world.liveTrees id entry live
         exact LiveProtectionOutcome.live s metadata profile place frames frame before input.tracker global tag
           layout noMetadata aligned enabled frameBorrow tagged id offset parent resolve info classification data
           ensuredMachine ensuredTracker ensured entry live _ formed world.enabled

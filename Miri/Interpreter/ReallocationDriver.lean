@@ -59,7 +59,7 @@ private def allocateWithRoot [DecidableEq K] (h : CreationHooks K U Payload) (si
     let config := MemoryExtras.bindAllocation h.extras h.weakMemory h.allocation
     let tree ← PlaceMachine.initializeAllocation config id kind size align
     modify fun state => {state with machine := {state.machine with memory :=
-      {state.machine.memory with live := state.machine.memory.live.push (id,⟨kind,allocation.withExtra tree⟩)}}}
+      {state.machine.memory with live := state.machine.memory.live.insert id ⟨kind,allocation.withExtra tree⟩}}}
     let tag ← match (← get).machine.borrowTracker with
       | none => pure BorTag.one
       | some tracker =>
@@ -69,7 +69,7 @@ private def allocateWithRoot [DecidableEq K] (h : CreationHooks K U Payload) (si
     root id tag kind
   catch error =>
     if allocation.nativeBuffer.isSome then
-      let retained := (← get).machine.memory.live.any fun (_,entry) => entry.allocation.nativeBuffer == allocation.nativeBuffer
+      let retained := (← get).machine.memory.live.any fun _ entry => entry.allocation.nativeBuffer == allocation.nativeBuffer
       unless retained do
         let some drop := h.allocation.nativeDrop | throw (.invalidProgram "native backing lacks allocation-failure drop capability")
         drop allocation
@@ -115,7 +115,7 @@ def allocateConfigured [DecidableEq K] (config : PlaceMachine.AllocationConfig K
       | .error error => throw (.resourceExhaustion s!"allocation identity: {reprStr error}")
     let tree ← PlaceMachine.initializeAllocation config id kind size align
     modify fun state => {state with machine := {state.machine with memory :=
-      {state.machine.memory with live := state.machine.memory.live.push (id,⟨kind,allocation.withExtra tree⟩)}}}
+      {state.machine.memory with live := state.machine.memory.live.insert id ⟨kind,allocation.withExtra tree⟩}}}
     let tag ← match (← get).machine.borrowTracker with
       | none => pure BorTag.one
       | some tracker => match tracker.global.rootTag? id with
@@ -124,7 +124,7 @@ def allocateConfigured [DecidableEq K] (config : PlaceMachine.AllocationConfig K
     config.adjustRootAddress id tag
   catch error =>
     if allocation.nativeBuffer.isSome then
-      let retained := (← get).machine.memory.live.any fun (_,entry) => entry.allocation.nativeBuffer == allocation.nativeBuffer
+      let retained := (← get).machine.memory.live.any fun _ entry => entry.allocation.nativeBuffer == allocation.nativeBuffer
       unless retained do
         let some drop := config.nativeDrop | throw (.invalidProgram "native backing lacks allocation-failure drop capability")
         drop allocation

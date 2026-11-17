@@ -132,7 +132,7 @@ theorem reborrow_after_ensure {K U : Type} [DecidableEq K]
         (UnitRetag.registeredMachine machine tracker tag)) =
       .ok () (UnitRetag.withCurrent frames (UnitRetag.registeredFrame frame borrowFrame id tag) ensuredMachine))
     (entry : LocalAllocation Provenance BorrowTree K)
-    (live : ensuredMachine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : ensuredMachine.memory.live[id]? = some (entry))
     (tree : BorrowTree)
     (constructed : entry.allocation.extra.newChild (Size.ofBytes offset) parent tag
       (DedupRangeMap.new Size.ZERO ⟨.ReservedFrz false,false,.None⟩) (.ReservedFrz false) true = ⟨tree,.ok ()⟩) :

@@ -46,7 +46,7 @@ def mkState (user : UserState) (threads : ThreadManager) : MachineHooks.State Mi
       borrowTracker := none
       dataRace := none
       threads
-      raceAllocations := #[]
+      raceAllocations := {}
       allocationSpans := #[]
       user } }
 

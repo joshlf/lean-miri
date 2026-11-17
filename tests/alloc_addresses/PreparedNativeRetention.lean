@@ -47,13 +47,13 @@ def main : IO Unit := do
   let some id := AllocId.ofUInt64 1 | throw (IO.userError "invalid fixture ID")
   let addresses ← match GlobalAddressState.new .default .nativeLib 0 18446744073709551615 ⟨0.5,0.1⟩ with
     | .ok value => pure value | .error error => throw (IO.userError (toString error))
-  let memory : MemoryState Provenance BorrowTree MiriMemoryKind :=
+  let memory : MemoryState Provenance Miri.TreeBorrows.BorrowTree Unit :=
     MemoryState.setGlobalEntries MemoryState.empty
       #[⟨id,.memory,Size.ofBytes 8,Align.ONE,.Not,none⟩]
   let state : Machine := {
     memory
     borrowTracker := none, dataRace := none, threads := .initial false
-    raceAllocations := #[], allocationSpans := #[], user := ⟨addresses,0,#[]⟩ }
+    raceAllocations := {}, allocationSpans := #[], user := ⟨addresses,0,#[]⟩ }
   let choices : AddressRandomChoices := ⟨false,false,0,⟨0,by decide⟩⟩
   let (value,after) ← must (MachineAddress.assign machineHooks id (some .other) choices state)
   check (value == 4096) "machine address changed backing identity"

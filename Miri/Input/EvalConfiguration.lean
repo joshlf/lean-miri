@@ -77,9 +77,8 @@ def allocation
     let weak := match selected with | .vclocks global => global.weakMemory | .none => false
     MemoryExtras.initAllocation extras id weak
   adjustRootAddress := fun id tag => do
-    let some (_,kind,_) := ((← get).machine.memory.live.map fun (id,entry) => (id,entry.1,entry.2)).find?
-      (fun entry => entry.1 == id) | throw (.invalidProgram "new root allocation is not live")
-    let kind := match kind with | .stack => AllocAddresses.AddressMemoryKind.stack | .callerLocation | .machine _ => .other
+    let some entry := (← get).machine.memory.live[id]? | throw (.invalidProgram "new root allocation is not live")
+    let kind := match entry.kind with | .stack => AllocAddresses.AddressMemoryKind.stack | .callerLocation | .machine _ => .other
     let address ← ExecutionAddressChoices.addrFromAllocId EvalCoreMachine.tape pointers id (some kind)
     pure (Pointer.new (Provenance.concrete id tag) (Size.ofBytes address))
 end Miri.Input.EvalConfiguration

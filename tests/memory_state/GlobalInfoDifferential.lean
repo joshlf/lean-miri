@@ -78,11 +78,11 @@ def main : IO Unit := do
   let withMachineIds := MemoryState.setExtraFunctionIds withGlobals #[id2]
   let withVaList := MemoryState.setVaListIds withMachineIds #[id3]
   let base : MemoryState Provenance Unit Unit := { withVaList with
-    live := #[
-      (id1, ⟨.stack, id1Alloc⟩),
-      (id4, ⟨.machine (), id4Alloc⟩)
+    live := Std.ExtTreeMap.ofArray #[
+      (id1, LocalAllocation.mk (.stack) (id1Alloc)),
+      (id4, LocalAllocation.mk (.machine ()) (id4Alloc))
     ]
-    dead := #[⟨id9, localBytes.byteSize, localBytes.align⟩]
+    dead := Std.ExtTreeMap.ofArray #[(id9, DeadAllocation.mk localBytes.byteSize localBytes.align)]
   }
   emitInfo base "local" id1
   emitInfo base "extra-fn" id2

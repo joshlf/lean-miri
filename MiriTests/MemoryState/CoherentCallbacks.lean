@@ -82,7 +82,7 @@ private def memoryWithTwo : IO (Mem × AllocId × AllocId) := do
     | .ok allocation => pure allocation
     | .error error => throw (IO.userError (toString error))
   let state : Mem := { (MemoryState.empty : Mem) with
-    live := #[(sourceId,⟨.machine (),source⟩),(destId,⟨.machine (),dest⟩)] }
+    live := Std.ExtTreeMap.ofArray #[(sourceId,LocalAllocation.mk (.machine ()) (source)),(destId,LocalAllocation.mk (.machine ()) (dest))] }
   pure (state,sourceId,destId)
 
 private def ptr (id : AllocId) (offset : Nat) : Pointer (Option Provenance) :=
@@ -102,7 +102,7 @@ private def allocationCallbacks (failAt : String) :=
     else ({memory := changed,state,outcome := .ok ()} :
       MemoryStateHookResult Provenance Unit Unit Nested Unit)
   let root := fun (memory : Mem) (state : Nested) (id : AllocId) (_kind : MemoryKind Unit) =>
-    let visible := coherent state memory && memory.live.any (fun entry => entry.1 == id)
+    let visible := coherent state memory && memory.live.contains id
     let state := mark state (if visible then "root" else "stale:root")
     let changed := mutate memory
     if failAt == "root" then
@@ -122,8 +122,8 @@ def main : IO Unit := do
     s!"callbacks observed stale or reordered machine memory: {copied.hooks.events}"
   ensure (coherent copied.hooks copied.memory) "success result must synchronize embedded machine memory"
   ensure (copied.memory.issuedIds.size == 6) "all six nested memory mutations must survive copy"
-  let bytes := (copied.memory.live.find? (fun entry => entry.1 == destId)).map fun entry =>
-    entry.2.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 1))
+  let bytes := (copied.memory.live.get? destId).map fun entry =>
+    entry.allocation.getBytesUnchecked (allocRange Size.ZERO (Size.ofBytes 1))
   ensure (bytes == some (.ok #[7])) "copy storage update must follow callback memory mutations"
 
   let failStart : Nested := {start with failAt := "pointer-source"}

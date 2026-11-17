@@ -102,9 +102,9 @@ theorem beginPadding_zero [DecidableEq K] (env : Environment P E K H X S)
 private def mutate [DecidableEq K] (env : Environment P E K H X S) (handle : PaddingHandle)
     (action : Allocation P E → EStateM.Result AllocError (Allocation P E) Unit) : M S Unit := do
   let state ← get
-  let some entry := (env.memory state).live.find? (fun entry => entry.1 == handle.allocId)
+  let some entry := (env.memory state).live[handle.allocId]?
     | throw (.invalidProgram "validity mutable allocation disappeared")
-  let result := action entry.2.allocation
+  let result := action entry.allocation
   let allocation := match result with | .ok _ allocation | .error _ allocation => allocation
   let memory ← liftResult (((env.memory state).setLiveAllocation handle.allocId allocation).mapError
     fun error => .invalidProgram s!"validity allocation update: {repr error}")

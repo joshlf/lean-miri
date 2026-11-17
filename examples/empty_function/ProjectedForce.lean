@@ -56,7 +56,7 @@ without asking any future materialization operation to succeed. -/
     (normalized : Input.CompilerFrameContext.localType s.prepared.compiler frame id = .ok ty)
     (place : MPlaceTy Provenance) (allocation : AllocId) (tag : BorTag)
     (provenance : place.mplace.ptr.provenance = some (.concrete allocation tag))
-    (live : machine.memory.live.any (fun row => row.1 == allocation) = true)
+    (live : machine.memory.live.contains allocation = true)
     (noClocks : frame.extra.dataRace = none) :
     ∃ span, MachineHooks.afterLocalMovedToMemory id place s.cfg.compiler.localSpan
       (LocalUnit.current frames frame machine) =
@@ -64,13 +64,10 @@ without asking any future materialization operation to succeed. -/
         (machine.allocationSpans.filter (fun row => row.1 != allocation)).push (allocation,span,none)}) := by
   obtain ⟨span,spanEq⟩ := EmptyFunction.ProjectedSpan.local_span s metadata capacity frames frame machine id ty normalized
   simp only [LocalUnit.current] at spanEq
-  have present : ∃ (index : Nat) (valid : index < machine.memory.live.size),
-      (machine.memory.live[index]'valid).1 = allocation := by
-    simpa only [Array.any_eq_true,beq_iff_eq] using live
   refine ⟨span,?_⟩
   unfold MachineHooks.afterLocalMovedToMemory
   simp [provenance,MachineHooks.currentFrame,LocalUnit.current,Stack.currentFrame?,noClocks,
-    spanEq,live,present,get,getThe,MonadStateOf.get,EStateM.get,bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
+    spanEq,live,get,getThe,MonadStateOf.get,EStateM.get,bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure,
     modify,modifyGet,MonadStateOf.modifyGet,EStateM.modifyGet]
 
 /-- Internal composition of the uninitialized immediate arm. The actual

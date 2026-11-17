@@ -73,13 +73,13 @@ private def makeFixture (initialBytes : Array UInt8) : IO
   let id ← match AllocId.ofUInt64 7 with
     | some id => pure id
     | none => throw (IO.userError "could not create test allocation ID")
-  let allocation ← match Allocation.fromBytes initialBytes Align.ONE .Mut with
+  let allocation ← match Allocation.fromBytes (Prov := CtfeProvenance) initialBytes Align.ONE .Mut with
     | .ok allocation => pure allocation
     | .error error => throw (IO.userError s!"allocation setup failed: {error}")
   let empty : MemoryState CtfeProvenance Unit Unit := MemoryState.empty
   let memory : MemoryState CtfeProvenance Unit Unit := {
     empty with
-    live := #[(id, ⟨.stack, allocation⟩)]
+    live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (allocation))]
   } |>.setIssuedIds #[id]
   let pointer ← pointerFor id Size.ZERO
   pure (memory, id, pointer)
@@ -119,7 +119,7 @@ private def emitResult (tag : String)
   match result.outcome with
   | .error error => IO.println s!"W {tag} error={repr error}"
   | .ok () =>
-    let some (_, entry) := result.memory.live[0]?
+    let some (_, entry) := result.memory.live.toArray[0]?
       | throw (IO.userError "test allocation disappeared")
     let bytes ← requireResult (entry.allocation.getBytesUnchecked (range 0 24))
       "test byte read failed"
@@ -150,7 +150,7 @@ def main : IO Unit := do
     assertCheck (!fixed.isPointer && fixed.size == sz n) "destination zero size/provenance wrong"
     let result := runWrite memory pointer layout (.scalar fixed) false
     assertCheck (result.outcome == .ok ()) s!"destination sizedzero failed at{n}: {repr result.outcome}"
-    let some (_,entry) := result.memory.live[0]? | throw (IO.userError "live allocation missing")
+    let some (_,entry) := result.memory.live.toArray[0]? | throw (IO.userError "live allocation missing")
     let bytes ← requireResult (entry.allocation.getBytesUnchecked (range 0 n)) "read written bytes"
     assertCheck (bytes.all (· == 0)) "destination not overwritten with zero"
     assertCheck (← isAllInitialized entry.allocation (range 0 n)) "zero write left uninitialized bytes"

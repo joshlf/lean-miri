@@ -85,7 +85,7 @@ private def globalMemory (id : AllocId) (kind : GlobalAllocationKind)
     #[⟨id, kind, source.byteSize, source.align, mutability, some payload⟩]
 
 private def contains (state : MemoryState Provenance Unit Unit) (id : AllocId) : Bool :=
-  state.live.any fun entry => entry.1 == id
+  state.live.contains id
 
 def main : IO Unit := do
   let id ← mkId 1
@@ -110,7 +110,7 @@ def main : IO Unit := do
   let owned := MemoryLifecycle.getAllocRaw memory #[] id (some ()) ownedHooks
   check (isOk owned.outcome && contains owned.memory id)
     "owned global adjustment must be cached locally"
-  check (owned.memory.live[0]?.map (fun entry => entry.2.kind) == some (.machine ()))
+  check (owned.memory.live.toArray[0]?.map (fun entry => entry.2.kind) == some (.machine ()))
     "owned global copies must use the machine global memory kind"
 
   let missingKind := MemoryLifecycle.getAllocRaw memory #[] id none ownedHooks
@@ -163,7 +163,7 @@ def main : IO Unit := do
     "machine-specific extra functions must participate in liveness and info"
 
   let deadState : MemoryState Provenance Unit Unit := {
-    dead := #[⟨id, source.byteSize, source.align⟩]
+    dead := Std.ExtTreeMap.ofArray #[(id, DeadAllocation.mk source.byteSize source.align)]
   }
   let deadInfo ← match deadState.getAllocInfo id with
     | .ok info => pure info

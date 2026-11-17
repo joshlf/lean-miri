@@ -128,8 +128,8 @@ def core [DecidableEq K] (h : Hooks K U C E Other) (choice : C)
     allocation := allocation h
     allocationInfo := allocationInfo
     localCAllocation := fun id => do
-      let entry := (← get).machine.memory.live.find? (·.1 == id)
-      return entry.any (fun (_,entry) => h.cAllocation entry.kind)
+      let entry := (← get).machine.memory.live[id]?
+      return entry.any (fun entry => h.cAllocation entry.kind)
     trackAllocation := track h
     staticRoot := staticRoot h
     startUnwind := Unwind.handleStartUnwind h.unwind choice

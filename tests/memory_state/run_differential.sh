@@ -12,9 +12,12 @@ trap 'rm -rf "$work_dir"' EXIT
 python3 tests/memory_state/extract_reallocate_reference.py "$work_dir/reference.rs"
 rustc --edition=2021 -A dead_code -A unused_imports -C overflow-checks=yes \
   "$work_dir/reference.rs" -o "$work_dir/reference"
-lake build Miri.Memory.MemoryState
+flock /tmp/lean-miri-lake-build.lock lake build Miri.Memory.MemoryState
 "$work_dir/reference" > "$work_dir/rust.out"
-lake env lean --run tests/memory_state/ReallocateDifferential.lean > "$work_dir/lean.out"
+if ! lake env lean --run tests/memory_state/ReallocateDifferential.lean > "$work_dir/lean.out"; then
+  cat "$work_dir/lean.out" >&2
+  exit 1
+fi
 if ! diff -u "$work_dir/rust.out" "$work_dir/lean.out"; then
   echo "Lean MemoryState reallocation ordering differs from the hash-checked rustc reference" >&2
   exit 1
