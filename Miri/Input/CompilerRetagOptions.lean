@@ -14,19 +14,8 @@ structure Options where
   implicitWrites : Bool
   preciseInteriorMut : Bool
 
-def rustcNoWritable (p : CompilerProviders.Prepared) (id : DefId) : Except String Bool := do
-  let some _ := p.program.compilerTables.definitions[id]?
-    | throw "retag frame absent from canonical compiler definition table"
-  let mut selected : Option Bool := none
-  let mut seen : Array Nat := #[]
-  for row in p.program.input.queries.retag do
-    let key := row.definition
-    unless key < p.program.compilerTables.definitions.size do throw "retag compiler definition ID out of bounds"
-    if seen.contains key then throw "duplicate compiler retag definition query"
-    seen := seen.push key
-    if key == id then selected := some row.rustcNoWritable
-  let some value := selected | throw "exact compiler retag frame attribute query absent"
-  pure value
+def rustcNoWritable (p : CompilerProviders.Prepared) (id : DefId) : Except String Bool :=
+  CompilerRetagQueries.lookup p.program.compilerTables.definitions.size p.retagQueries id
 
 def make (p : CompilerProviders.Prepared) (options : Options) : EvalRetagMachine.Leaves K U where
   implicitWrites := pure options.implicitWrites

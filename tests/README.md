@@ -61,6 +61,23 @@ not change the assertions or turn finite checks into general proofs.
 
 ## What is being checked?
 
+Retag attribute indexing has a self-contained scan/index comparison in
+[`MiriTests/Input/CompilerRetagQueries.lean`](../MiriTests/Input/CompilerRetagQueries.lean).
+[`input/RetagProviderLookup2026.lean`](input/RetagProviderLookup2026.lean) accepts an
+export path and checks production preparation, including malformed typed tables
+whose errors must remain demand-local. The performance regression script runs
+both checks. To measure the lookup separately from whole-program execution:
+
+```bash
+lake build profile_retag_lookup
+python3 tools/measure-retag-lookup.py --output scratch/retag-lookup.json
+```
+
+The driver alternates the original scan, indexed lookup and repeated preparation
+on identical rows, pins each process to one CPU and records raw loop times,
+process wall/CPU time, same-CPU steal and cgroup throttling. Its results are a
+microbenchmark, not a claim about guest execution speed.
+
 The main behavior pipeline is:
 
 ```text

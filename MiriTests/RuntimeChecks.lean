@@ -4,6 +4,7 @@ namespace MiriTests
 
 /-- Source checks rerun even when their build artifacts are cached. -/
 def runtimeChecks : Array (String × Bool) := #[
+  ("MiriTests/Input/CompilerRetagQueries.lean", false),
   ("MiriTests/Concurrency/MetaObjects.lean", true),
   ("MiriTests/Aggregate/Memory.lean", true),
   ("MiriTests/Aggregate/Order.lean", true),
