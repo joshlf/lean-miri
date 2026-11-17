@@ -295,6 +295,30 @@ remain separate from the finite checks performed for this synchronization.
 
 ### Hosted regressions and coverage
 
+At main `5c3c6168`, the [hosted regression
+run](https://github.com/proofs-rs/lean-miri/actions/runs/44086004022) passes the
+regression and fresh lanes. Extended rejects the detached-join source check's
+stale whole-file hash after keyed allocation storage replaced `live.push` with
+`live.insert`. The `joinExclusive` slice is byte-identical to main `3a3489c8`;
+refreshing the file hash passes the unchanged source-order assertions locally.
+Semantic-source lint and all 132 Python checks also pass. A hosted rerun remains
+necessary.
+
+Replay still rejects the retained historical input schema and the large-TB
+choice-count difference described below. Fresh exports of unchanged large-TB,
+protector-release and four ordering sources were generated with the current
+pinned compiler, Miri and sysroot, retaining each original reference configuration.
+The large-TB reference establishes the expected Frozen-write UB; protector
+release, fence-SC and both RMW references exit zero. The weak fence reference
+instead exits 91, meaning the required `(0,0)` witness was not observed, despite
+the retained seed 2/preemption-rate-zero configuration. Exporter exit zero alone
+does not establish the guest outcome. These are reference-only observations:
+the diagnostic native build was interrupted before connected Lean comparisons,
+and no stored inputs, choice tapes, profiles or expected outcomes were changed.
+Migrating the maintained replay cohort therefore still needs a reviewed
+current-pin reference witness and typed-choice migration, beyond adding missing
+metadata or changing the recorded choice counts.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
