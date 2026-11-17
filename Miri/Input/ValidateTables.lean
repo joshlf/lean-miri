@@ -378,6 +378,8 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
   let bodyEntries := document.bodies.mapIdx (fun index value => (value, s!"$.bodies[{index}]")) ++
     auxiliary.mapIdx (fun index value => (value.body, s!"$.compiler_coroutine_coverage.auxiliary_bodies[{index}].body"))
   for (span, index) in document.spans.toList.zipIdx do
+    checkId document.syntaxContexts.size span.context s!"$.spans[{index}].ctxt" "syntax context"
+    checkId document.files.size span.runtimeFile s!"$.spans[{index}].runtime_file" "file"
     checkId document.files.size span.file s!"$.spans[{index}].file" "file"
     checkId document.files.size span.expansionLocation.file s!"$.spans[{index}].expansion_location.file" "file"
   for (node, index) in document.types.toList.zipIdx do
@@ -430,9 +432,6 @@ def validateParsedTables (document : ImportDocument) : Except String Unit := do
           if let some id := entry.allocationId then checkId b.allocations id s!"{path}.entries[{ei}].allocation" "allocation"
           if let some id := entry.traitDefinitionId then checkId b.definitions id s!"{path}.entries[{ei}].trait_def_id" "definition"
   for (value, path) in bodyEntries do
-    for (entry, ei) in value.backtraceSpans.toList.zipIdx do
-      checkId document.files.size entry.position.filename
-        s!"{path}.backtrace_spans[{ei}].source_position.filename" "file"
     checkId b.instances value.instanceId s!"{path}.instance_id" "instance"
     for scope in value.sourceScopes do
       if let some inlined := scope.inlined then

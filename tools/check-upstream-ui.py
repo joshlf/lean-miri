@@ -38,6 +38,8 @@ def invoke(command, env, log, timeout, memory_limit=None, *, pass_fds=()):
         return guarded_run(command, cwd=ROOT, env=env, log=log, timeout=timeout,
                            memory_limit=memory_limit, pass_fds=pass_fds).returncode
     except RuntimeError as error:
+        with log.open('a') as stream:
+            stream.write(f'\nfixture_process_guard: {error}\n')
         return 'timeout' if 'walltime limit' in str(error) else 'resource_limit'
 
 

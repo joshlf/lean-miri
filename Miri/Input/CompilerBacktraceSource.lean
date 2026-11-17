@@ -1,9 +1,11 @@
 import Miri.Input.CompilerInstance
 import Miri.Interpreter.Backtrace
 import Miri.Interpreter.BacktraceMachine
+import Miri.Input.SourceHygiene
 
-/-! Compiler hygiene/source-map/rendering evidence, with exact body/span keys.
-An unseen forged BytePos remains unresolved; no nearby-position approximation. -/
+/-! Expansion declarations compute body-dependent collapse without a body/span
+answer table. BytePos values outside exported span starts remain unresolved;
+no nearby-position approximation is valid. -/
 namespace Miri.Input.CompilerBacktraceSource
 open Lean Miri.Interpreter
 structure Position where
@@ -12,50 +14,16 @@ structure Position where
   column : Nat
   filename : Nat
   deriving DecidableEq
-structure SpanEntry where
-  span : MIR.SpanRef
-  position : Position
 structure Prepared where
   program : LoweredProgram
-  bodySpans : Array (Except String (Array SpanEntry))
-  positions : Array Position
+  positions : Std.HashMap UInt32 Position
   names : Array (CallInstance × String)
 
-private def position (files : Array String) (source : CompilerSourcePosition) : Except String Position := do
-  unless source.filename < files.size do throw "backtrace filename ID out of bounds"
-  unless source.bytePosition < 2^32 do throw "compiler BytePos exceeds u32"
-  pure ⟨UInt32.ofNat source.bytePosition,source.line,source.column,source.filename⟩
-private def spans (files : Array String) (ctx : LowerContext) (tables : CompilerTables) (body : BodyCore) :
-    Except String (Array SpanEntry × CompilerTables) := do
-  let mut tables := tables
-  let mut entries := #[]
-  for record in body.backtraceSpans do
-    unless record.spanId < tables.spans.size do throw "backtrace span ID out of bounds"
-    let span : MIR.SpanRef := ⟨record.spanId⟩
-    let location ← position files record.position
-    if let some old := entries.find? (fun entry : SpanEntry => entry.span == span) then
-      unless old.position == location do throw "conflicting body/span hygiene query"
-    else entries := entries.push ⟨span,location⟩
-  return (entries,tables)
-
 def prepare (program : LoweredProgram) : Except String Prepared := do
-  let ctx := LowerContext.ofDocument program.input
-  let mut tables := program.compilerTables
-  let mut bodySpans := #[]
-  let mut positions := #[]
-  let mut positionIndex : Std.HashMap UInt32 Position := {}
-  for body in program.bundle.bodies do
-    match spans program.input.files ctx tables body.input with
-    | .error error => bodySpans := bodySpans.push (.error error)
-    | .ok (entries,next) =>
-      tables := next
-      bodySpans := bodySpans.push (.ok entries)
-      for entry in entries do
-        if let some old := positionIndex.get? entry.position.bytePosition then
-          unless old == entry.position do throw "conflicting exact source-map query"
-        else
-          positionIndex := positionIndex.insert entry.position.bytePosition entry.position
-          positions := positions.push entry.position
+  let mut positions : Std.HashMap UInt32 Position := {}
+  for span in program.input.spans do
+    let offset := UInt32.ofNat span.lo
+    positions := positions.insert offset ⟨offset,span.start.line,span.start.column,span.runtimeFile⟩
   let ctx := LowerContext.ofDocument program.input
   let records := program.input.queries.runtime.instances
   let mut names := #[]
@@ -75,7 +43,15 @@ def prepare (program : LoweredProgram) : Except String Prepared := do
       let index := names.size
       names := names.push (callee,name)
       namesByDefinition := namesByDefinition.insert callee (candidates.push index)
-  return ⟨program.withCompilerTables tables,bodySpans,positions,names⟩
+  return ⟨program,positions,names⟩
+
+def collapsedSpanLo (p : Prepared) (identity : BodyIdentity) (span : MIR.SpanRef) :
+    Except String UInt32 := do
+  let some body := p.program.bundle.bodies[identity.index]? | throw "canonical backtrace body identity absent"
+  let id ← SourceHygiene.collapse p.program.input.spans p.program.input.syntaxContexts
+    p.program.input.expansions span.id body.input.spanId
+  let some collapsed := p.program.input.spans[id]? | throw "collapsed source span is absent"
+  pure (UInt32.ofNat collapsed.lo)
 
 private def lift (result : Except String A) : EStateM StepError S A :=
   match result with
@@ -83,7 +59,7 @@ private def lift (result : Except String A) : EStateM StepError S A :=
   | .error error => throw (.unsupported s!"compiler backtrace source: {error}")
 
 /-- Compiler-source construction with only runtime global/pointer queries.
-Every hygiene/source-map/name result is selected by its exact exported key. -/
+Hygiene walks use finite declarations; source positions and names retain exact identities. -/
 def source (p : Prepared) (hostUsizeMax : Nat)
     (unitPointerLayout : EStateM StepError S LocalLayout)
     (misaligned : Memory.Pointer (Option Memory.Provenance) → ABI.Align → EStateM StepError S (Option Memory.Misalignment))
@@ -93,12 +69,9 @@ def source (p : Prepared) (hostUsizeMax : Nat)
     BacktraceMachine.Sources S Position := {
   hostUsizeMax,unitPointerLayout,misaligned,functionPointer,allocation,globalFunction
   collapsedSpanLo := fun identity span => lift do
-    let some records := p.bodySpans[identity.index]? | throw "canonical backtrace body identity absent"
-    let entries ← records
-    let some entry := entries.find? (·.span == span) | throw "exact body/span hygiene query absent"
-    return entry.position.bytePosition
+    collapsedSpanLo p identity span
   lookupCharPos := fun offset => lift do
-    let some location := p.positions.find? (·.bytePosition == offset)
+    let some location := p.positions[offset]?
       | throw "unseen BytePos needs actual compiler source-map query"
     return location
   line := Position.line
@@ -115,12 +88,9 @@ def hooks (p : Prepared) (base : Backtrace.Hooks P S D MD B I E Position) :
     Backtrace.Hooks P S D MD B I E Position :=
   {base with
     collapsedSpanLo := fun identity span => lift do
-      let some records := p.bodySpans[identity.index]? | throw "canonical backtrace body identity absent"
-      let entries ← records
-      let some entry := entries.find? (·.span == span) | throw "exact body/span hygiene query absent"
-      return entry.position.bytePosition
+      collapsedSpanLo p identity span
     lookupCharPos := fun offset => lift do
-      let some location := p.positions.find? (·.bytePosition == offset)
+      let some location := p.positions[offset]?
         | throw "unseen BytePos needs actual compiler source-map query"
       return location
     line := Position.line

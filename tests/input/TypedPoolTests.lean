@@ -84,19 +84,15 @@ def main : IO Unit := do
   reject (← must (set source "files" (.arr #[toJson (0 : Nat)]))) "nonstring filename definition"
   reject (← must (set source "files" (.arr #[]))) "absent referenced filename"
   reject (← must (set source "files" (.arr #[.str "strict.rs", .str "strict.rs"]))) "duplicate exact filename identities"
-  let bodies ← must ((source.getObjVal? "bodies").bind Json.getArr?)
-  let backtrace ← must (Json.parse "{\"span\":0,\"source_position\":{\"byte_position\":0,\"line\":1,\"zero_based_char_column\":0,\"filename\":0}}")
-  let validBody ← must (set bodies[0]! "backtrace_spans" (toJson (0 : Nat)))
-  let validBacktrace ← must (set source "bodies" (.arr (bodies.set! 0 validBody)))
-  let validBacktrace ← must (set validBacktrace "backtrace_spans" (.arr #[.arr #[backtrace]]))
-  let validBacktrace ← must (decodeJson validBacktrace.compress)
-  let some validBody := validBacktrace.document.bodies[0]? | throw (IO.userError "missing decoded body")
-  let some validRow := validBody.backtraceSpans[0]? | throw (IO.userError "missing decoded backtrace")
-  check (validRow.position.filename == 0)
-    "backtrace filename reference was eagerly expanded"
-  let position ← must (backtrace.getObjVal? "source_position")
-  let position ← must (set position "filename" (toJson (1 : Nat)))
-  let badBacktrace ← must (set backtrace "source_position" position)
-  reject (← must (set source "backtrace_spans" (.arr #[.arr #[badBacktrace]]))) "out of bounds backtrace filename ID"
+  let runtimeSpan ← must (set firstSpan "runtime_file" (toJson (1 : Nat)))
+  let runtimeSource ← must (set source "files" (.arr #[.str "strict.rs", .str "runtime.rs"]))
+  let runtimeSource ← must (set runtimeSource "spans" (.arr #[runtimeSpan]))
+  let runtimeInput ← must (decodeJson runtimeSource.compress)
+  check ((runtimeInput.document.spans[0]?).map (·.runtimeFile) == some 1)
+    "runtime filename identity was expanded or rewritten"
+  let invalidRuntimeSpan ← must (set firstSpan "runtime_file" (toJson (1 : Nat)))
+  reject (← must (set source "spans" (.arr #[invalidRuntimeSpan]))) "out of bounds runtime filename"
+  let invalidContext ← must (set firstSpan "ctxt" (toJson (99999 : Nat)))
+  reject (← must (set source "spans" (.arr #[invalidContext]))) "out of bounds syntax context"
   reject (← must (set source "schema_version" (toJson (4 : Nat)))) "obsolete root schema"
   IO.println "typed pools preserve ID spaces and allocation identity; all definitions and references are checked"

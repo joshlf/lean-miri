@@ -4,7 +4,7 @@ open Miri Miri.Input Miri.Interpreter
 
 private def sourceSpan (dummy : Bool := false) : SourceSpanData := {
   isDummy := dummy, lo := 0, hi := 1, start := ⟨1,0⟩, «end» := ⟨1,1⟩,
-  context := "allocation-backtrace-test", file := 0, expansionLocation := ⟨0,1,1⟩ }
+  context := 0, file := 0, runtimeFile := 0, expansionLocation := ⟨0,1,1⟩ }
 private def spans := #[sourceSpan true, sourceSpan, sourceSpan, sourceSpan, sourceSpan]
 private def scopes : Array SourceScope := #[
   {id := 0, parent := none, spanId := 1, inlined := none, inlinedParent := none},

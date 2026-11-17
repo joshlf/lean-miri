@@ -5,11 +5,11 @@ import copy
 import json
 
 SHARED_POOLS = {
-    "initialization_ranges": list, "relocations": list, "backtrace_spans": list,
+    "initialization_ranges": list, "relocations": list,
     "statement_kinds": dict, "source_infos": dict,
 }
 FIELD_POOLS = {name: name for name in (
-    "initialization_ranges", "relocations", "backtrace_spans")}
+    "initialization_ranges", "relocations")}
 FIELD_POOLS["source_info"] = "source_infos"
 
 
@@ -32,8 +32,8 @@ def _walk(value, transform):
 
 def pool_document(document):
     """Share repeated payloads of a current expanded input without changing values."""
-    if type(document.get("schema_version")) is not int or document["schema_version"] != 15:
-        raise ValueError("fixture pooling requires schema 15")
+    if type(document.get("schema_version")) is not int or document["schema_version"] != 16:
+        raise ValueError("fixture pooling requires schema 16")
     document = {key: copy.deepcopy(value) for key, value in document.items()
                 if key not in SHARED_POOLS}
     pools = {name: [] for name in SHARED_POOLS}

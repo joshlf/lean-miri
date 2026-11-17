@@ -6,7 +6,7 @@ private def statementText := r#"{"variant":"Assign","place":{"local":1,"type":0,
 
 private def bodyText (locals : String) :=
   r#"{"phase":{"kind":"built"},"instance_id":0,"arg_count":0,"spread_arg":null,"locals":["# ++ locals ++
-  r#"],"basic_blocks":[{"block":0,"is_cleanup":false,"statements":[{"source_info":0,"kind":0},{"source_info":0,"kind":0}],"terminator":{"source_info":0,"kind":{"variant":"Return"}}}],"source_scopes":[{"scope":0,"span":0,"parent":null,"inlined":null,"inlined_parent_scope":null}],"source_def_id":0,"span":0,"preamble_def_span":0,"backtrace_spans":0,"required_consts":[]}"#
+  r#"],"basic_blocks":[{"block":0,"is_cleanup":false,"statements":[{"source_info":0,"kind":0},{"source_info":0,"kind":0}],"terminator":{"source_info":0,"kind":{"variant":"Return"}}}],"source_scopes":[{"scope":0,"span":0,"parent":null,"inlined":null,"inlined_parent_scope":null}],"source_def_id":0,"span":0,"preamble_def_span":0,"required_consts":[]}"#
 
 private def local0 := r#"{"local":0,"type":0,"source_info":0}"#
 private def local1 := r#"{"local":1,"type":0,"source_info":0}"#
@@ -15,7 +15,7 @@ private def context : Context := {
   typeConstantCount := 0, spanCount := 1, scalarSize := fun _ => some 1 }
 
 def main : IO Unit := do
-  let base : MIRParser.SharedPools := {sources := #[⟨0, 0⟩], backtraces := #[#[]]}
+  let base : MIRParser.SharedPools := {sources := #[⟨0, 0⟩]}
   let .ok statement := JsonReader.run (parseSharedStatement base) statementText
     | throw (IO.userError "shared statement parse failed")
   let pools := {base with statements := #[statement]}
@@ -31,8 +31,6 @@ def main : IO Unit := do
     throw (IO.userError "shared statement escaped per-body local bounds")
   unless !(decode ((bodyText (local0 ++ "," ++ local1)).replace "\"source_info\":0" "\"source_info\":1")).isOk do
     throw (IO.userError "dangling pooled SourceInfo accepted")
-  unless !(decode ((bodyText (local0 ++ "," ++ local1)).replace "\"backtrace_spans\":0" "\"backtrace_spans\":1")).isOk do
-    throw (IO.userError "dangling pooled backtrace accepted")
   unless !(decode ((bodyText (local0 ++ "," ++ local1)).replace "\"kind\":0" "\"kind\":1")).isOk do
     throw (IO.userError "dangling pooled statement kind accepted")
   let badSpan := {pools with sources := #[⟨1, 0⟩]}

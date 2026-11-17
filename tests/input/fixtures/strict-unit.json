@@ -1,6 +1,6 @@
 {
   "schema": "lean-miri-rustc-mir",
-  "schema_version": 15,
+  "schema_version": 16,
   "producer": {
     "miri_commit": "93c45edea8b148a6b6f05ec9384449a04217143f",
     "rustc_commit": "8eb778d04094d3af4b26580cab327e0413eb1e02",
@@ -819,7 +819,6 @@
       "def_id": 0,
       "span": 0,
       "preamble_def_span": 0,
-      "backtrace_spans": 0,
       "source_scopes": [
         {
           "scope": 0,
@@ -845,14 +844,15 @@
         "line": 1,
         "column": 0
       },
-      "ctxt": "root",
+      "ctxt": 0,
       "file": 0,
       "is_dummy": false,
       "expansion_location": {
         "file": 0,
         "line": 1,
         "column": 1
-      }
+      },
+      "runtime_file": 0
     }
   ],
   "definitions": [
@@ -964,9 +964,6 @@
     []
   ],
   "relocations": [
-    []
-  ],
-  "backtrace_spans": [
     []
   ],
   "statement_kinds": [],
@@ -1111,5 +1108,11 @@
     "auxiliary_bodies": []
   },
   "source_cast_targets": [],
-  "mir_query": "TyCtxt::instance_mir(InstanceKind::Item(def_id)); ordinary runtime function bodies use optimized_mir"
+  "mir_query": "TyCtxt::instance_mir(InstanceKind::Item(def_id)); ordinary runtime function bodies use optimized_mir",
+  "syntax_contexts": [
+    {
+      "outer_expansion": null
+    }
+  ],
+  "expansions": []
 }

@@ -399,7 +399,7 @@ private def summarize (result : Input.EvalSourceRunFinalization.Result OuterStat
   | .pending state cause => s!"pending {reprStr cause}; {stateInfo state}"
 
 /-- Diagnostics retain raw MIR spans and use only exact canonical body/span
-compiler hygiene queries for user-facing locations. This is separate from
+computed hygiene collapse for user-facing locations. This is separate from
 allocation span hooks and does not change interpreter execution. -/
 private def terminalDiagnostic (prepared : Input.EvalPreparation.Prepared)
     (result : Input.EvalSourceRunFinalization.Result OuterState) (allocationTraces : Bool := false) : Lean.Json := Id.run do
@@ -425,10 +425,9 @@ private def terminalDiagnostic (prepared : Input.EvalPreparation.Prepared)
       let body ← prepared.compiler.program.bundle.bodies[frame.bodyIdentity.index]?
       if body.body != frame.body || body.input.instanceId != frame.functionInstance then none
       else do
-        let records ← prepared.compiler.lifecycle.backtrace.bodySpans[frame.bodyIdentity.index]?
-        let entries ← match records with | .ok entries => some entries | .error _ => none
-        let entry ← entries.find? (·.span == span)
-        pure entry.position
+        let source := prepared.compiler.lifecycle.backtrace
+        let offset ← (Input.CompilerBacktraceSource.collapsedSpanLo source frame.bodyIdentity span).toOption
+        source.positions[offset]?
     return match source? with
     | none => Lean.Json.null
     | some source =>

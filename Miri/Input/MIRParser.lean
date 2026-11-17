@@ -83,7 +83,6 @@ structure SharedStatement where
 structure SharedPools where
   statements : Array SharedStatement := #[]
   sources : Array Input.SourceInfo := #[]
-  backtraces : Array (Array BacktraceSpan) := #[]
   initializationRanges : Array (Array InitRange) := #[]
   relocations : Array (Array Relocation) := #[]
 

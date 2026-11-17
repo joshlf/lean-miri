@@ -18,7 +18,7 @@ private def reject (value : Json) (label : String) (diagnostic : String := "") :
   | .error error =>
     check (diagnostic.isEmpty || error.contains diagnostic) s!"{label}: unexpected diagnostic {error}"
 
-private def poolNames := #["initialization_ranges", "relocations", "backtrace_spans", "statement_kinds", "source_infos"]
+private def poolNames := #["initialization_ranges", "relocations", "statement_kinds", "source_infos"]
 
 private def memory (id size image ranges relocations : Nat) : Json := Json.mkObj [
   ("allocation_id", toJson id), ("source_alloc_id", toJson (id + 1)),

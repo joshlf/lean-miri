@@ -18,9 +18,9 @@ EXPORTS = ROOT / "tests/input/fixtures"
 def write(name, value):
     if isinstance(value, dict) and value.get("schema") == "lean-miri-rustc-mir":
         version = value["schema_version"]
-        value["schema_version"] = 15
+        value["schema_version"] = 16
         value = pool_document(value)
-        if version != 15:
+        if version != 16:
             value["schema_version"] = version
     (OUT / f"{name}.json").write_text(json.dumps(value, separators=(",", ":")) + "\n")
 
