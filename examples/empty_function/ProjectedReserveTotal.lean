@@ -31,7 +31,7 @@ theorem total (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s 
       reserved.live = p.before.machine.memory.live ∧
       p.before.machine.user.payload.payload.user.runtime.extras.allocations.any (fun row => row.1 == id) = false ∧
       p.before.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = none ∧
-      p.before.machine.memory.live.find? (fun row => row.1 == id) = none) := by
+      p.before.machine.memory.live[id]? = none) := by
   cases reservedEq : p.before.machine.memory.reserveAllocId with
   | mk reserved outcome =>
     cases outcome with
@@ -48,10 +48,9 @@ theorem total (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s 
       refine Or.inr ⟨reserved,id,rfl,identity,fields.1,?_,?_,?_⟩
       · simpa only [←canonical] using ProjectedAllocation.extras_fresh s p representation nonzero
       · simpa only [←canonical] using RawResources.fresh_base_issued p.before representation nonzero
-      · apply Array.find?_eq_none.mpr
-        intro row member equal
-        have below := representation.live row member
-        have same := beq_iff_eq.mp equal
-        rw [same,identity] at below
+      · apply Std.ExtTreeMap.getElem?_eq_none
+        intro member
+        have below := representation.live id member
+        rw [identity] at below
         exact Nat.lt_irrefl _ below
 end EmptyFunction.ProjectedReserveTotal

@@ -219,7 +219,7 @@ theorem get_raw_adjust_error [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before final : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (error : StepError)
-    (absent : before.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.memory.live[id]? = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before = .error error final) :
@@ -241,7 +241,7 @@ theorem ensure_adjust_error [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before : MachineHooks.State K U) (final : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (error : StepError)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before.machine = .error error final) :
@@ -259,7 +259,7 @@ theorem get_raw_static_adjust_error [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before final : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (definition : Nat) (source : Allocation CtfeProvenance Unit) (error : StepError)
-    (absent : before.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.memory.live[id]? = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.static,source.byteSize,source.align,source.mutability,some (.static definition true false false)⟩)
     (evaluated : initializer before.memory ⟨before,none⟩ definition =
@@ -282,7 +282,7 @@ theorem ensure_static_adjust_error [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before : MachineHooks.State K U) (final : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (definition : Nat) (source : Allocation CtfeProvenance Unit) (error : StepError)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.static,source.byteSize,source.align,source.mutability,some (.static definition true false false)⟩)
     (evaluated : initializer before.machine.memory ⟨before.machine,none⟩ definition =
@@ -295,8 +295,7 @@ theorem ensure_static_adjust_error [DecidableEq K]
   exact ensure_pending kind _ id before final.memory ⟨final,some error⟩ _ error raw rfl
 def installed (machine : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (allocation : Allocation Provenance BorrowTree) : MachineHooks.MachineState K U :=
-  {machine with memory := {machine.memory with live :=
-    (machine.memory.live.filter fun row => row.1 != id).push (id,⟨.machine kind,allocation⟩)}}
+  {machine with memory := {machine.memory with live := machine.memory.live.insert id (⟨.machine kind,allocation⟩)}}
 
 /-- Internal composition boundary: a proved actual owned adjustment result
 runs through getAllocRaw and its actual live insertion without losing nested
@@ -308,7 +307,7 @@ theorem get_raw_owned [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.memory.live[id]? = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before = .ok (.owned allocation) adjusted) :
@@ -329,7 +328,7 @@ theorem ensure_owned [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before : MachineHooks.State K U) (adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before.machine = .ok (.owned allocation) adjusted) :

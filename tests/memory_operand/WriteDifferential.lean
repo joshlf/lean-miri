@@ -73,13 +73,13 @@ private def makeFixture (initialBytes : Array UInt8) : IO
   let id ← match AllocId.ofUInt64 7 with
     | some id => pure id
     | none => throw (IO.userError "could not create test allocation ID")
-  let allocation ← match Allocation.fromBytes initialBytes Align.ONE .Mut with
+  let allocation ← match Allocation.fromBytes (Prov := CtfeProvenance) initialBytes Align.ONE .Mut with
     | .ok allocation => pure allocation
     | .error error => throw (IO.userError s!"allocation setup failed: {error}")
   let empty : MemoryState CtfeProvenance Unit Unit := MemoryState.empty
   let issued := MemoryState.setIssuedIds empty #[id]
   let memory : MemoryState CtfeProvenance Unit Unit := {
-    issued with live := #[(id, ⟨.stack, allocation⟩)] }
+    issued with live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (allocation))] }
   let pointer ← pointerFor id Size.ZERO
   pure (memory, id, pointer)
 
@@ -118,7 +118,7 @@ private def emitResult (tag : String)
   match result.outcome with
   | .error error => IO.println s!"W {tag} error={repr error}"
   | .ok () =>
-    let some (_, entry) := result.memory.live[0]?
+    let some (_, entry) := result.memory.live.toArray[0]?
       | throw (IO.userError "test allocation disappeared")
     let bytes ← requireResult (entry.allocation.getBytesUnchecked (range 0 24))
       "test byte read failed"
@@ -140,7 +140,7 @@ def main : IO Unit := do
     backendRepr := .ScalarPair (a := i64Abi) (b := ptrAbi) (bOffset := sz 16)
   }
   let (memory, id, pointer) ← makeFixture (Array.replicate 24 0)
-  let some (_, initialEntry) := memory.live[0]?
+  let some (_, initialEntry) := memory.live.toArray[0]?
     | throw (IO.userError "test allocation is absent")
   let initial ← requireAlloc <| Allocation.writeScalar testRuntime.base (range 8 16)
     (← match scalarInt 0xfeedface 8 with
@@ -151,7 +151,7 @@ def main : IO Unit := do
     (← match scalarInt 0x1122334455667788 8 with
       | .ok value => pure value
       | .error reason => throw (IO.userError s!"integer setup failed: {reason}")) initial
-  let seeded := { memory with live := #[(id, ⟨.stack, initial⟩)] }
+  let seeded := { memory with live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (initial))] }
   let pointerProv ← match CtfeProvenance.fromAllocId id with
     | .ok value => pure value
     | .error _ => throw (IO.userError "could not create pointer provenance")

@@ -99,14 +99,14 @@ def namePointer [DecidableEq MiriMemoryKind]
     -- the source machine. Run that canonical path before inspecting memory.
     machine.pointer.ensureTreeExtra allocId
     let state ← get
-    let some entry := state.machine.memory.live.find? (fun item => item.1 == allocId)
+    let some entry := state.machine.memory.live[allocId]?
       | throw (.invalidProgram "miri_pointer_name allocation has no live Tree Borrows extra")
-    let tree := entry.2.allocation.extra
+    let tree := entry.allocation.extra
     let tree ← match tree.givePointerDebugName tag parentDistance.toNat name with
       | .ok tree => pure tree
       | .error error => throw (.invalidProgram s!"Tree Borrows pointer name: {reprStr error}")
     let memory ← match state.machine.memory.setLiveAllocation allocId
-        (entry.2.allocation.setExtra tree) with
+        (entry.allocation.setExtra tree) with
       | .ok memory => pure memory
       | .error error => throw (.invalidProgram s!"Tree Borrows pointer name update: {reprStr error}")
     modify fun current => {current with machine := {current.machine with memory}}
@@ -150,9 +150,9 @@ def printBorrowState [DecidableEq MiriMemoryKind]
     let state ← get
     let some tracker := state.machine.borrowTracker
       | throw (.invalidProgram "Tree Borrows tracker disappeared during diagnostic materialization")
-    let some entry := state.machine.memory.live.find? (fun item => item.1 == allocId)
+    let some entry := state.machine.memory.live[allocId]?
       | throw (.invalidProgram "miri_print_borrow_state allocation is not live")
-    let tree := entry.2.allocation.extra
+    let tree := entry.allocation.extra
     let lines ← match TreeBorrows.DiagnosticsRender.render tree tracker.global.protectedTags showUnnamed with
       | .ok lines => pure lines
       | .error reason => throw (.invalidProgram s!"Tree Borrows diagnostic rendering: {reason}")

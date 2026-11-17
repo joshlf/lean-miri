@@ -32,8 +32,8 @@ theorem selected (before : State) (pointer : Pointer (Option Provenance)) (lengt
   have size : (WildcardResolution.lookup before).sizeOf foot.id = some foot.entry.allocation.byteSize := by
     simp only [WildcardResolution.lookup,info,Except.toOption,Option.map_some]
   have live : (WildcardResolution.lookup before).isLive foot.id = some true := by
-    have present : before.machine.memory.live.any (fun entry => entry.1 == foot.id) = true :=
-      Array.any_eq_true'.mpr ⟨(foot.id,foot.entry),Array.mem_of_find?_eq_some foot.live,by simp⟩
+    have present : before.machine.memory.live.contains foot.id = true :=
+      by rw [Std.ExtTreeMap.contains_eq_isSome_getElem?,foot.live]; rfl
     simp only [WildcardResolution.lookup,MemoryState.isAllocLive,present,Bool.true_or]
   have lower : foot.base ≤ pointer.offset.bytes := UInt64.le_iff_toNat_le.mpr (by have h := foot.address;omega)
   have inside : pointer.offset.bytes-foot.base < foot.entry.allocation.byteSize.bytes := by

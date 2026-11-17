@@ -177,17 +177,17 @@ structure ResourceMargins (s : Static) (p : Packet)
   dynamic : budget ≤ s.options.place.dynamicFuel
   tagRoom : ∀ tracker, p.before.machine.borrowTracker = some tracker →
     tracker.global.nextPointerTag.value.toNat + budget < 2^64
-  nodeRoom : ∀ row ∈ p.before.machine.memory.live,
-    row.2.allocation.extra.nodes.size + budget < 2^32
+  nodeRoom : ∀ (id : AllocId) (entry : InputDraft.Entry), p.before.machine.memory.live[id]? = some entry →
+    entry.allocation.extra.nodes.size + budget < 2^32
   maximumSize : Nat
   maximumAlignment : Nat
-  liveSizes : ∀ row ∈ p.before.machine.memory.live, row.2.allocation.len ≤ maximumSize
-  liveByteSizes : ∀ row ∈ p.before.machine.memory.live,
-    row.2.allocation.byteSize.bytes.toNat ≤ maximumSize
-  liveStorage : ∀ row ∈ p.before.machine.memory.live,
-    row.2.allocation.len = row.2.allocation.byteSize.bytes.toNat
-  liveAlignments : ∀ row ∈ p.before.machine.memory.live,
-    2^row.2.allocation.align.pow2 ≤ maximumAlignment
+  liveSizes : ∀ (id : AllocId) (entry : InputDraft.Entry), p.before.machine.memory.live[id]? = some entry → entry.allocation.len ≤ maximumSize
+  liveByteSizes : ∀ (id : AllocId) (entry : InputDraft.Entry), p.before.machine.memory.live[id]? = some entry →
+    entry.allocation.byteSize.bytes.toNat ≤ maximumSize
+  liveStorage : ∀ (id : AllocId) (entry : InputDraft.Entry), p.before.machine.memory.live[id]? = some entry →
+    entry.allocation.len = entry.allocation.byteSize.bytes.toNat
+  liveAlignments : ∀ (id : AllocId) (entry : InputDraft.Entry), p.before.machine.memory.live[id]? = some entry →
+    2^entry.allocation.align.pow2 ≤ maximumAlignment
   globalSizes : ∀ row ∈ p.before.machine.memory.globals, row.size.bytes.toNat ≤ maximumSize
   globalAlignments : ∀ row ∈ p.before.machine.memory.globals,
     2^row.align.pow2 ≤ maximumAlignment

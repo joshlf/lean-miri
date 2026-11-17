@@ -64,8 +64,8 @@ def Registry.restoreGlobals (vtables : Registry)
         throw "vtable AllocId collides with a non-vtable global"
     else
       if memory.hasIssuedId entry.allocation ||
-          memory.live.any (·.1 == entry.allocation) ||
-          memory.dead.any (·.allocId == entry.allocation) ||
+          memory.live.contains entry.allocation ||
+          memory.dead.contains entry.allocation ||
           memory.hasImportedRuntimeId entry.allocation ||
           memory.byteGlobalKeys.any (·.2.2 == entry.allocation) ||
           memory.hasExtraFunctionId entry.allocation ||
@@ -77,8 +77,8 @@ def Registry.restoreGlobals (vtables : Registry)
       let some source := sourceGlobals[0]? | throw "persistent vtable global lookup failed"
       unless source.kind == .vtable do
         throw "persistent vtable registry points to a non-vtable global"
-      if live.live.any (·.1 == entry.allocation) ||
-          live.dead.any (·.allocId == entry.allocation) ||
+      if live.live.contains entry.allocation ||
+          live.dead.contains entry.allocation ||
           live.byteGlobalKeys.any (·.2.2 == entry.allocation) ||
           live.hasExtraFunctionId entry.allocation ||
           live.hasVaListId entry.allocation then

@@ -31,7 +31,7 @@ def finishedMachine (s : Static) (p : Packet) (frame previous : LocalUnit.F)
     (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : p.before.machine.memory.live[id]? = some (entry)) :
     ∃ installed frame machine tree,
       WholeCall.install s p = .ok () installed ∧ installed.stack.frames.size = WholeCall.depth p ∧
       ExecutionMachine.step s.cfg s.limits () installed =
@@ -150,7 +150,7 @@ private theorem initialized_fixed (s : Static) (metadata : Metadata s) (capacity
     (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : p.before.machine.memory.live[id]? = some (entry)) :
     ∃ (installed finish : State) (frame previous : LocalUnit.F) (tree : BorrowTree) (index : Nat)
       (older : Array LocalUnit.F),
       p.before.stack.frames = older.push input.caller ∧

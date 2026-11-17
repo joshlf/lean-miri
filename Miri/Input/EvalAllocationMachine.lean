@@ -38,10 +38,9 @@ def allocation
       let weak := match selected with | .vclocks global => global.weakMemory | .none => false
       MemoryExtras.initAllocation extras id weak
     adjustRootAddress := fun id tag => do
-      let some (_,kind,_) := ((← get).machine.memory.live.map fun (id,entry) => (id,entry.1,entry.2)).find?
-        (fun entry => entry.1 == id)
+      let some entry := (← get).machine.memory.live[id]?
         | throw (.invalidProgram "new root allocation is not live")
-      let address ← ExecutionAddressChoices.addrFromAllocId tape pointers id (some (addressKind kind))
+      let address ← ExecutionAddressChoices.addrFromAllocId tape pointers id (some (addressKind entry.kind))
       pure (Pointer.new (Provenance.concrete id tag) (Size.ofBytes address))}
 
 /-- Capture the actual active view at this deallocation, not at Config creation.

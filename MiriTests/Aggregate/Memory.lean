@@ -50,16 +50,16 @@ private def twoBlocks : IO (MemoryState Provenance Unit Unit) := do
   let sourceEntry : LocalAllocation Provenance Unit Unit := ⟨.machine (), source⟩
   let destEntry : LocalAllocation Provenance Unit Unit := ⟨.machine (), dest⟩
   return { (MemoryState.empty : MemoryState Provenance Unit Unit) with
-    live := #[(sourceId, sourceEntry), (destId, destEntry)] }
+    live := Std.ExtTreeMap.ofArray #[(sourceId, sourceEntry), (destId, destEntry)] }
 
 private def ptr (id : AllocId) (offset : UInt64 := 0) : Pointer (Option Provenance) :=
   Pointer.new (some (.concrete id BorTag.one)) (Size.ofBytes offset)
 
 private def requireBytes (memory : MemoryState Provenance Unit Unit) (id : AllocId)
     (range : AllocRange) : IO (Array UInt8) := do
-  let some entry := memory.live.find? fun item => item.1 == id
+  let some entry := memory.live.get? id
     | throw (IO.userError "expected local allocation is absent")
-  match entry.2.allocation.getBytesUnchecked range with
+  match entry.allocation.getBytesUnchecked range with
   | .ok bytes => pure bytes
   | .error error => throw (IO.userError (toString error))
 

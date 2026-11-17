@@ -13,9 +13,9 @@ theorem anchor (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s
     (memory : machine.memory = p.before.machine.memory) :
     TreeRuntimeInput.World machine input.tracker := by
   refine ⟨enabled,input.world.globals,?_⟩
-  intro row member
+  intro id entry member
   rw [memory] at member
-  exact input.world.liveTrees row member
+  exact input.world.liveTrees id entry member
 
 /-- A successful checked tag allocation supplies the exact counter increment
 needed for current-tree formation; no spare counter interval is assumed. -/
@@ -37,9 +37,9 @@ theorem allocated (machine : ProtectionOutcome.Machine) (tracker : MachineHooks.
     change row.2.value.toNat < global.nextPointerTag.value.toNat
     rw [next]
     omega
-  · intro row member
-    obtain ⟨formed⟩ := world.liveTrees row member
-    exact ⟨RootTagPost.tree_mono row.2.allocation.extra tracker.global.nextPointerTag global.nextPointerTag
+  · intro id entry member
+    obtain ⟨formed⟩ := world.liveTrees id entry member
+    exact ⟨RootTagPost.tree_mono entry.allocation.extra tracker.global.nextPointerTag global.nextPointerTag
       formed (by rw [next];omega)⟩
 
 theorem registered (machine : ProtectionOutcome.Machine) (tracker : MachineHooks.BorrowState)

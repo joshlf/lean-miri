@@ -81,5 +81,5 @@ def create (config : Configuration Aff B)
   let threads := ThreadManager.initial config.fixedScheduling
   let threads := {threads with threads := threads.threads.map fun thread =>
     {thread with originSpanToken := config.dummySpan.id}}
-  return ⟨⟨#[]⟩,⟨memory,borrow,clocks,threads,#[],#[],user⟩⟩
+  return ⟨⟨#[]⟩,⟨memory,borrow,clocks,threads,{},#[],user⟩⟩
 end Miri.Input.InitialMachine

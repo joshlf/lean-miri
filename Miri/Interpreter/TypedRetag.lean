@@ -78,16 +78,16 @@ private def tracker : M K User MachineHooks.BorrowState := do
 
 private def updateTree [DecidableEq K] (allocId : AllocId) (tree : BorrowTree) : M K User Unit := do
   let state ← get
-  let some entry := state.machine.memory.live.find? (fun entry => entry.1 == allocId)
+  let some entry := state.machine.memory.live[allocId]?
     | throw (.invalidProgram "Tree Borrows allocation extra unavailable")
   let memory ← checked "update allocation tree"
-    (state.machine.memory.setLiveAllocation allocId (entry.2.allocation.setExtra tree))
+    (state.machine.memory.setLiveAllocation allocId (entry.allocation.setExtra tree))
   set { state with machine := { state.machine with memory } }
 
 private def getTree (allocId : AllocId) : M K User BorrowTree := do
-  let some entry := (← get).machine.memory.live.find? (fun entry => entry.1 == allocId)
+  let some entry := (← get).machine.memory.live[allocId]?
     | throw (.invalidProgram "Tree Borrows allocation extra unavailable")
-  return entry.2.allocation.extra
+  return entry.allocation.extra
 
 /-- These failures arise only from the parent access in tb_reborrow.
 Pinned tree_borrows/mod.rs passes AccessCause::Reborrow(access), whose primary
@@ -135,9 +135,9 @@ def reborrow [DecidableEq K] (h : Hooks K User) (budget : Nat)
     for segment in inside.iterAll do
       if let some access := segment.data.permission.associatedAccess then
         if access == .Write then
-          let some entry := (← get).machine.memory.live.find? (fun entry => entry.1 == location.allocId)
+          let some entry := (← get).machine.memory.live[location.allocId]?
             | throw (.invalidProgram "missing live allocation mutability")
-          if entry.2.allocation.mutability == .Not then
+          if entry.allocation.mutability == .Not then
             throw .retagWriteToReadOnly
         let offset ← checked "reborrow offset"
           (Size.add location.baseOffset (Size.ofBytes segment.range.start))
@@ -240,35 +240,35 @@ theorem tracker_apply (state : State K User) : tracker state =
 
 /-- The tree query follows the current raw live lookup without effects. -/
 theorem getTree_apply (id : AllocId) (state : State K User) : getTree id state =
-    match state.machine.memory.live.find? (fun row => row.1 == id) with
-    | some entry => .ok entry.2.allocation.extra state
+    match state.machine.memory.live[id]? with
+    | some entry => .ok entry.allocation.extra state
     | none => .error (.invalidProgram "Tree Borrows allocation extra unavailable") state := by
   change ((show M K User BorrowTree from do
-    let some entry := state.machine.memory.live.find? (fun row => row.1 == id)
+    let some entry := state.machine.memory.live[id]?
       | throw (.invalidProgram "Tree Borrows allocation extra unavailable")
-    pure entry.2.allocation.extra) state) = _
-  cases state.machine.memory.live.find? (fun row => row.1 == id) <;> rfl
+    pure entry.allocation.extra) state) = _
+  cases state.machine.memory.live[id]? <;> rfl
 
 /-- The exact tree write-back equation retains both failure branches. -/
 theorem updateTree_apply [DecidableEq K] (id : AllocId) (tree : BorrowTree) (state : State K User) :
     updateTree id tree state =
-    match state.machine.memory.live.find? (fun row => row.1 == id) with
+    match state.machine.memory.live[id]? with
     | none => .error (.invalidProgram "Tree Borrows allocation extra unavailable") state
     | some entry =>
-      match state.machine.memory.setLiveAllocation id (entry.2.allocation.setExtra tree) with
+      match state.machine.memory.setLiveAllocation id (entry.allocation.setExtra tree) with
       | .error error => .error (.invalidProgram s!"update allocation tree: {reprStr error}") state
       | .ok memory => .ok () {state with machine := {state.machine with memory}} := by
   change ((show M K User Unit from do
-    let some entry := state.machine.memory.live.find? (fun row => row.1 == id)
+    let some entry := state.machine.memory.live[id]?
       | throw (.invalidProgram "Tree Borrows allocation extra unavailable")
     let memory ← checked "update allocation tree"
-      (state.machine.memory.setLiveAllocation id (entry.2.allocation.setExtra tree))
+      (state.machine.memory.setLiveAllocation id (entry.allocation.setExtra tree))
     set {state with machine := {state.machine with memory}}) state) = _
-  cases found : state.machine.memory.live.find? (fun row => row.1 == id) with
+  cases found : state.machine.memory.live[id]? with
   | none => rfl
   | some entry =>
     dsimp only
-    cases mutation : state.machine.memory.setLiveAllocation id (entry.2.allocation.setExtra tree) <;>
+    cases mutation : state.machine.memory.setLiveAllocation id (entry.allocation.setExtra tree) <;>
       simp [checked] <;> with_unfolding_all rfl
 
 /-- Checked pure compiler/memory results preserve the existing error mapping. -/

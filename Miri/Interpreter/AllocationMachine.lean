@@ -55,7 +55,7 @@ private def before (h : DeallocationHooks K User Payload)
     (old,allocated,if old == id then some span else freed)}
   h.freeAllocId id size align kind
   MemoryExtras.removeAllocation h.extras id
-  modify fun machine => {machine with raceAllocations := machine.raceAllocations.filter fun entry => entry.1 != id}
+  modify fun machine => {machine with raceAllocations := machine.raceAllocations.erase id}
 
 private def callback (h : DeallocationHooks K User Payload)
     (memory : MemoryState Provenance BorrowTree K) (state : PlaceMachine.AccessState K User)
@@ -85,7 +85,7 @@ def deallocate [DecidableEq K] (h : DeallocationHooks K User Payload)
     machine := {machine with
       user := h.extras.put machine.user
         {registry with allocations := registry.allocations.filter fun entry => entry.1 != id}
-      raceAllocations := machine.raceAllocations.filter fun entry => entry.1 != id}
+      raceAllocations := machine.raceAllocations.erase id}
   modify fun state => {state with machine}
   if let some (_, detached) := result.detached then
     if detached.allocation.nativeBuffer.isSome then

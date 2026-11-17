@@ -123,12 +123,11 @@ theorem full_bounds (target : PointerArithmetic) (id : AllocId) (size : Size)
 theorem allocation_access (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (machine : MachineHooks.MachineState MiriMemoryKind RootUser) (id : AllocId) (tag : BorTag)
     (size : Size) (base : UInt64) (entry : InputDraft.Entry)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : entry.allocation.extra = BorrowTree.new tag size)
     (storage : entry.allocation.byteSize = size) (mutable : entry.allocation.mutability = .Mut)
     (positive : size.bytes ≠ 0) (signed : size.bytes.toNat < 2^63)
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (last : (machine.memory.live.filter (fun row => row.1 != id)).push (id,entry) = machine.memory.live)
     (backend : machine.user.payload.payload.user.backend = .none) (noClocks : machine.dataRace = none)
     (extra : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
       some (id,{weakMemory := none})) :
@@ -169,18 +168,17 @@ theorem allocation_access (s : Static) (metadata : Metadata s) (capacity : 0 < s
     (by simp [sizeAsI64,signedNat])
     (by intro h; have hn : size.bytes.toNat = 0 := by simpa using h
         exact positive (UInt64.toNat_inj.mp hn)) resolveHook live mutable sync
-    (by rw [storage]; exact full_bounds _ id size signed) beforeHook writeHook last
+    (by rw [storage]; exact full_bounds _ id size signed) beforeHook writeHook
 
 theorem get_place (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (machine : MachineHooks.MachineState MiriMemoryKind RootUser) (id : AllocId) (tag : BorTag)
     (layout : LocalLayout) (base : UInt64) (entry : InputDraft.Entry)
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : entry.allocation.extra = BorrowTree.new tag layout.layout.size)
     (storage : entry.allocation.byteSize = layout.layout.size) (mutable : entry.allocation.mutability = .Mut)
     (sized : layout.layout.isSized = true) (positive : layout.layout.size.bytes ≠ 0)
     (signed : layout.layout.size.bytes.toNat < 2^63)
     (cached : machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
-    (last : (machine.memory.live.filter (fun row => row.1 != id)).push (id,entry) = machine.memory.live)
     (backend : machine.user.payload.payload.user.backend = .none) (noClocks : machine.dataRace = none)
     (extra : machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
       some (id,{weakMemory := none})) :
@@ -202,6 +200,6 @@ theorem get_place (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacit
   exact getPlaceAllocMut_sized_of_access machine.memory (⟨machine,none⟩ : PlaceMachine.AccessState MiriMemoryKind RootUser)
     _ s.cfg.access.runtime _ _ _ _ _ _ notUnsized rfl pointer
     (allocation_access s metadata capacity machine id tag layout.layout.size base entry live tree storage mutable
-      positive signed cached last backend noClocks extra)
+      positive signed cached backend noClocks extra)
 
 end EmptyFunction.ProjectedOldWrite

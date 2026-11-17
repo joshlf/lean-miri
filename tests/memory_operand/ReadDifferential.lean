@@ -79,7 +79,7 @@ private def makeMemory : IO
   let empty : MemoryState CtfeProvenance Unit Unit := MemoryState.empty
   let issued := MemoryState.setIssuedIds empty #[id]
   let state : MemoryState CtfeProvenance Unit Unit := {
-    issued with live := #[(id, ⟨.stack, allocation⟩)] }
+    issued with live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (allocation))] }
   pure (state, Pointer.new (some prov) Size.ZERO)
 
 private def showScalar (value : Scalar CtfeProvenance) : IO String := do
@@ -157,11 +157,11 @@ def main : IO Unit := do
   let u8Layout : MemoryOperandLayout := ⟨sz 1, Align.ONE, .Scalar u8, none⟩
   IO.println s!"O already_immediate {← rawResult memory (.immediate immediate) u8Layout}"
   let id ← id7
-  let some (_, entry) := memory.live[0]?
+  let some (_, entry) := memory.live.toArray[0]?
     | throw (IO.userError "test allocation is absent")
   let uninitialized ← requireAlloc <| Allocation.writeUninit (range 0 8) (sz 8)
       entry.allocation
-  let updatedMemory := { memory with live := #[(id, { entry with allocation := uninitialized })] }
+  let updatedMemory := { memory with live := Std.ExtTreeMap.ofArray #[(id, { entry with allocation := uninitialized })] }
   emitRead "uninitialized" updatedMemory pointer intLayout
   let empty : MemoryState CtfeProvenance Unit Unit := MemoryState.empty
   emitRead "zero_sized_allocation" empty pointer zstLayout

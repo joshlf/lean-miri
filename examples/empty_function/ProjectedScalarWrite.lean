@@ -163,18 +163,10 @@ theorem pair_created (runtime : RuntimeTargetDataLayout) (layout : LocalLayout)
     mutB.trans (mutA.trans mutable),alignB.trans alignA,extraB.trans extraA,nativeB.trans nativeA,
     after.mapExtra (fun _ => ()),image,ProjectedImage.storageImage_of_erased _ _ rfl⟩
 
-private theorem filter_absent (older : Array (AllocId × InputDraft.Entry)) (id : AllocId)
-    (fresh : older.find? (fun row => row.1 == id) = none) :
-    older.filter (fun row => row.1 != id) = older := by
-  apply Array.filter_eq_self.mpr
-  intro row member
-  have missing := Array.find?_eq_none.mp fresh row member
-  simpa only [bne_iff_ne,beq_iff_eq] using missing
-
  theorem write_scalar (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (state : State) (id : AllocId) (tag : BorTag) (base : UInt64) (layout : LocalLayout)
     (abi : Miri.ABI.Scalar) (bytes : Allocation Provenance Unit) (value : Memory.Scalar Provenance)
-    (older : Array (AllocId × InputDraft.Entry))
+    (older : Std.ExtTreeMap AllocId InputDraft.Entry)
     (backendLayout : layout.layout.backendRepr = .Scalar abi)
     (encoding : InputDraft.ScalarEncoding s.prepared.compiler.runtime.target abi.primitive value)
     (created : Allocation.tryNew layout.layout.size layout.layout.align.abi .Uninit
@@ -182,8 +174,8 @@ private theorem filter_absent (older : Array (AllocId × InputDraft.Entry)) (id 
     (size : bytes.byteSize = layout.layout.size) (storage : bytes.len = layout.layout.size.bytes.toNat)
     (mutable : bytes.mutability = .Mut) (valueBound : value.size.bytes ≤ layout.layout.size.bytes)
     (sized : layout.layout.isSized = true) (signed : layout.layout.size.bytes.toNat < 2^63)
-    (liveShape : state.machine.memory.live = older.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩))
-    (fresh : older.find? (fun row => row.1 == id) = none)
+    (liveShape : state.machine.memory.live = older.insert id ⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩)
+    (fresh : older[id]? = none)
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (backend : state.machine.user.payload.payload.user.backend = .none) (noClocks : state.machine.dataRace = none)
     (extra : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
@@ -191,7 +183,7 @@ private theorem filter_absent (older : Array (AllocId × InputDraft.Entry)) (id 
     ∃ after,
       PlaceMachine.writeMemory {s.cfg.access with ghostMode := false} (fun _ => true) (.scalar value)
         ⟨⟨Pointer.new (some (.concrete id tag)) (Size.ofBytes base),.none,none⟩,layout⟩ state =
-        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.push (id,⟨.stack,after⟩)}}} ∧
+        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.insert id ⟨.stack,after⟩}}} ∧
       after.byteSize = layout.layout.size ∧ after.len = bytes.len ∧ after.mutability = .Mut ∧
       after.align = bytes.align ∧ after.extra = BorrowTree.new tag layout.layout.size ∧ after.nativeBuffer = bytes.nativeBuffer ∧
       ∃ expected, Preservation.expectedImage s.prepared.compiler.runtime.target.base layout (.scalar value) = some expected ∧
@@ -206,19 +198,19 @@ private theorem filter_absent (older : Array (AllocId × InputDraft.Entry)) (id 
     have valueZero : value.size.bytes.toNat = 0 := by have b := UInt64.le_iff_toNat_le.mp valueBound; simp only [zero,UInt64.toNat_zero] at b; omega
     exact positiveValue (UInt64.toNat_inj.mp valueZero)
   let entry : InputDraft.Entry := ⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩
-  have live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry) := by
+  have live : state.machine.memory.live[id]? = some (entry) := by
     rw [liveShape]
-    simp [Array.find?_push,fresh,entry]
-  have filtered := filter_absent older id fresh
-  have last : (state.machine.memory.live.filter (fun row => row.1 != id)).push (id,entry) = state.machine.memory.live := by
-    rw [liveShape]
-    simp [Array.filter_push,filtered,entry]
+    simp [entry]
   have accessed := ProjectedOldWrite.get_place s metadata capacity state.machine id tag layout base entry live rfl
-    size mutable sized positive signed cached last backend noClocks extra
-  let memory := {state.machine.memory with live := older.push (id,⟨.stack,after⟩)}
+    size mutable sized positive signed cached backend noClocks extra
+  let memory := {state.machine.memory with live := older.insert id ⟨.stack,after⟩}
   have committed : state.machine.memory.setLiveAllocation id after = .ok memory := by
     rw [MemoryState.setLiveAllocation_of_find state.machine.memory id entry after live]
-    simp [memory,liveShape,Array.filter_push,filtered,entry]
+    apply congrArg Except.ok
+    congr 1
+    apply Std.ExtTreeMap.ext_getElem?
+    intro key
+    by_cases same : compare id key = .eq <;> simp only [memory,liveShape,entry,Std.ExtTreeMap.getElem?_insert,same,↓reduceIte]
   have width : Primitive.size abi.primitive s.cfg.access.runtime = .ok value.size := by
     rw [(MetadataBinding.fields s metadata capacity).runtime,sizeValue]
     exact primitive
@@ -236,7 +228,7 @@ private theorem filter_absent (older : Array (AllocId × InputDraft.Entry)) (id 
 theorem write_pair (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (state : State) (id : AllocId) (tag : BorTag) (base : UInt64) (layout : LocalLayout)
     (abiA abiB : Miri.ABI.Scalar) (offset : Size) (bytes : Allocation Provenance Unit)
-    (first second : Memory.Scalar Provenance) (older : Array (AllocId × InputDraft.Entry))
+    (first second : Memory.Scalar Provenance) (older : Std.ExtTreeMap AllocId InputDraft.Entry)
     (backendLayout : layout.layout.backendRepr = .ScalarPair (a := abiA) (b := abiB) (bOffset := offset))
     (encodingA : InputDraft.ScalarEncoding s.prepared.compiler.runtime.target abiA.primitive first)
     (encodingB : InputDraft.ScalarEncoding s.prepared.compiler.runtime.target abiB.primitive second)
@@ -246,8 +238,8 @@ theorem write_pair (s : Static) (metadata : Metadata s) (capacity : 0 < s.capaci
     (mutable : bytes.mutability = .Mut) (offsetPositive : offset.bytes ≠ 0) (firstEnd : first.size.bytes ≤ offset.bytes)
     (bound : offset.bytes.toNat+second.size.bytes.toNat ≤ layout.layout.size.bytes.toNat)
     (sized : layout.layout.isSized = true) (signed : layout.layout.size.bytes.toNat < 2^63)
-    (liveShape : state.machine.memory.live = older.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩))
-    (fresh : older.find? (fun row => row.1 == id) = none)
+    (liveShape : state.machine.memory.live = older.insert id ⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩)
+    (fresh : older[id]? = none)
     (cached : state.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id,base⟩)
     (backend : state.machine.user.payload.payload.user.backend = .none) (noClocks : state.machine.dataRace = none)
     (extra : state.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) =
@@ -255,7 +247,7 @@ theorem write_pair (s : Static) (metadata : Metadata s) (capacity : 0 < s.capaci
     ∃ after,
       PlaceMachine.writeMemory {s.cfg.access with ghostMode := false} (fun _ => true) (.scalarPair first second)
         ⟨⟨Pointer.new (some (.concrete id tag)) (Size.ofBytes base),.none,none⟩,layout⟩ state =
-        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.push (id,⟨.stack,after⟩)}}} ∧
+        .ok () {state with machine := {state.machine with memory := {state.machine.memory with live := older.insert id ⟨.stack,after⟩}}} ∧
       after.byteSize = layout.layout.size ∧ after.len = bytes.len ∧ after.mutability = .Mut ∧
       after.align = bytes.align ∧ after.extra = BorrowTree.new tag layout.layout.size ∧ after.nativeBuffer = bytes.nativeBuffer ∧
       ∃ expected, Preservation.expectedImage s.prepared.compiler.runtime.target.base layout (.scalarPair first second) = some expected ∧
@@ -271,23 +263,28 @@ theorem write_pair (s : Static) (metadata : Metadata s) (capacity : 0 < s.capaci
     have secondZero : second.size.bytes.toNat = 0 := by have b := bound; simp only [zero,UInt64.toNat_zero] at b; omega
     exact positiveValue (UInt64.toNat_inj.mp secondZero)
   let entry : InputDraft.Entry := ⟨.stack,bytes.withExtra (BorrowTree.new tag layout.layout.size)⟩
-  have live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry) := by
-    rw [liveShape]; simp [Array.find?_push,fresh,entry]
-  have filtered := filter_absent older id fresh
-  have last : (state.machine.memory.live.filter (fun row => row.1 != id)).push (id,entry) = state.machine.memory.live := by
-    rw [liveShape]; simp [Array.filter_push,filtered,entry]
+  have live : state.machine.memory.live[id]? = some (entry) := by
+    rw [liveShape]; simp [entry]
   have accessed := ProjectedOldWrite.get_place s metadata capacity state.machine id tag layout base entry live rfl
-    size mutable sized positive signed cached last backend noClocks extra
-  let middleMemory := {state.machine.memory with live := older.push (id,⟨.stack,middle⟩)}
-  let memory := {state.machine.memory with live := older.push (id,⟨.stack,after⟩)}
+    size mutable sized positive signed cached backend noClocks extra
+  let middleMemory := {state.machine.memory with live := older.insert id ⟨.stack,middle⟩}
+  let memory := {state.machine.memory with live := older.insert id ⟨.stack,after⟩}
   have cacheA : state.machine.memory.setLiveAllocation id middle = .ok middleMemory := by
     rw [MemoryState.setLiveAllocation_of_find state.machine.memory id entry middle live]
-    simp [middleMemory,liveShape,Array.filter_push,filtered,entry]
-  have liveMiddle : middleMemory.live.find? (fun row => row.1 == id) = some (id,⟨.stack,middle⟩) := by
-    simp [middleMemory,Array.find?_push,fresh]
+    apply congrArg Except.ok
+    congr 1
+    apply Std.ExtTreeMap.ext_getElem?
+    intro key
+    by_cases same : compare id key = .eq <;> simp only [middleMemory,liveShape,entry,Std.ExtTreeMap.getElem?_insert,same,↓reduceIte]
+  have liveMiddle : middleMemory.live[id]? = some (⟨.stack,middle⟩) := by
+    simp [middleMemory]
   have cacheB : middleMemory.setLiveAllocation id after = .ok memory := by
     rw [MemoryState.setLiveAllocation_of_find middleMemory id ⟨.stack,middle⟩ after liveMiddle]
-    simp [middleMemory,memory,Array.filter_push,filtered]
+    apply congrArg Except.ok
+    congr 1
+    apply Std.ExtTreeMap.ext_getElem?
+    intro key
+    by_cases same : compare id key = .eq <;> simp only [middleMemory,memory,Std.ExtTreeMap.getElem?_insert,same,↓reduceIte]
   have widthA : Primitive.size abiA.primitive s.cfg.access.runtime = .ok first.size := by
     rw [(MetadataBinding.fields s metadata capacity).runtime,sizeValueA]; exact primitiveA
   have widthB : Primitive.size abiB.primitive s.cfg.access.runtime = .ok second.size := by

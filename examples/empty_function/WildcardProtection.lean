@@ -26,7 +26,7 @@ private theorem protect_live_from_resolution {K U : Type} [DecidableEq K]
       (withCurrent frames frame (allocatedMachine machine tracker tagRoom)) =
       .ok (some ⟨id,Size.ofBytes offset,.wildcard⟩)
         (withCurrent frames frame (allocatedMachine machine tracker tagRoom)))
-    (live : machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : machine.memory.live[id]? = some (entry))
     (tree : TreeRuntimeInput.TreeFormed entry.allocation.extra tracker.global.nextPointerTag)
     (nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295)
     (access : ValidityMachine.Access K U)
@@ -270,7 +270,7 @@ theorem dispatch (s : Static) (metadata : Metadata s) (profile : Profile s) (cap
             (registeredFrame frame {} id input.tracker.global.nextPointerTag) entered)) ∧
       ∀ (id : AllocId) (offset : Size) (entry : InputDraft.Entry),
         answer = some ⟨id,offset,.wildcard⟩ →
-        p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry) →
+        p.before.machine.memory.live[id]? = some (entry) →
         ∃ tree,
           TypedRetag.protectInPlaceFunctionArgument s.cfg.retag s.limits.retag destination.place
             (LocalUnit.current p.before.stack.frames frame machine) =
@@ -336,10 +336,9 @@ theorem dispatch (s : Static) (metadata : Metadata s) (profile : Profile s) (cap
         input.tracker.global.nextPointerTag input.world.globals.nextNotProtected info classNow nondata
       exact ⟨protectionEq,ended⟩
   · intro id offset entry result live
-    have member := Array.mem_of_find?_eq_some live
-    obtain ⟨formed⟩ := input.world.liveTrees (id,entry) member
+    obtain ⟨formed⟩ := input.world.liveTrees id entry live
     have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-      have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (id,entry) member
+      have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom id entry live
       have account : entry.allocation.extra.tagMapping.mapping.size + entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
       omega
     cases offset with
@@ -396,7 +395,7 @@ theorem dispatch_stage (s : Static) (metadata : Metadata s) (profile : Profile s
             (registeredFrame frame {} id input.tracker.global.nextPointerTag) entered)) ∧
       ∀ (id : AllocId) (offset : Size) (entry : InputDraft.Entry),
         answer = some ⟨id,offset,.wildcard⟩ →
-        p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry) →
+        p.before.machine.memory.live[id]? = some (entry) →
         ∃ tree,
           TypedRetag.protectInPlaceFunctionArgument s.cfg.retag s.limits.retag destination.place
             (LocalUnit.current frames frame machine) =
@@ -462,10 +461,9 @@ theorem dispatch_stage (s : Static) (metadata : Metadata s) (profile : Profile s
         input.tracker.global.nextPointerTag input.world.globals.nextNotProtected info classNow nondata
       exact ⟨protectionEq,ended⟩
   · intro id offset entry result live
-    have member := Array.mem_of_find?_eq_some live
-    obtain ⟨formed⟩ := input.world.liveTrees (id,entry) member
+    obtain ⟨formed⟩ := input.world.liveTrees id entry live
     have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-      have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (id,entry) member
+      have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom id entry live
       have account : entry.allocation.extra.tagMapping.mapping.size + entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
       omega
     cases offset with

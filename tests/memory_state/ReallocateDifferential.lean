@@ -62,11 +62,11 @@ private def initialMemory (present : Bool) : IO (MemoryState Provenance Unit Uni
     | .ok allocation => pure allocation
     | .error error => throw (IO.userError (toString error))
   let entry : LocalAllocation Provenance Unit Unit :=
-    ⟨.machine (), allocation⟩
+    LocalAllocation.mk (.machine ()) (allocation)
   let issued := MemoryState.setIssuedIds
     (MemoryState.empty : MemoryState Provenance Unit Unit) #[id]
   let issued := {issued with nextAllocId := 2}
-  return {issued with live := if present then #[(id, entry)] else #[]}
+  return {issued with live := Std.ExtTreeMap.ofArray (if present then #[(id, entry)] else #[])}
 
 private def runCase (tag failStage : String) (offset : UInt64)
     (oldSize : Option UInt64) (present : Bool) : IO Unit := do

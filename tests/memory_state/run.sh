@@ -6,7 +6,7 @@ export CARGO_HOME="${LEAN_MIRI_CARGO_HOME:-$repo_root/.cargo}"
 export RUSTUP_HOME="${LEAN_MIRI_RUSTUP_HOME:-$repo_root/.rustup}"
 export PATH="$ELAN_HOME/bin:$CARGO_HOME/bin:$PATH"
 cd "$repo_root"
-lake build Miri.Memory.MemoryState
+flock /tmp/lean-miri-lake-build.lock lake build Miri.Memory.MemoryState
 lake env lean --run MiriTests/MemoryState/KeyedArrayProfiles.lean
 lake env lean --run MiriTests/MemoryState/MemoryStateKeyedTableProfiles.lean
 tests/memory_state/run_differential.sh

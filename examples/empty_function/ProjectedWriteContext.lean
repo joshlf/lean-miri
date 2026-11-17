@@ -17,7 +17,7 @@ theorem registered (s : Static) (state : State)
       (ProjectedCreate.registered s state reserved tracker global id bytes tag size) tape) addresses
     post.machine.user.payload.payload.user.backend = .none ∧ post.machine.dataRace = none ∧
     post.machine.user.payload.ghost = false ∧ post.machine.user.payload.validation = .Shallow ∧
-    post.machine.memory.live = reserved.live.push (id,⟨.stack,bytes.withExtra (BorrowTree.new tag size)⟩) ∧
+    post.machine.memory.live = reserved.live.insert id (⟨.stack,bytes.withExtra (BorrowTree.new tag size)⟩) ∧
     post.machine.user.payload.payload.user.runtime.extras.allocations.find? (fun row => row.1 == id) = some (id,{weakMemory := none}) ∧
     post.machine.borrowTracker = some {tracker with global} := by
   dsimp only

@@ -23,7 +23,7 @@ private def initial (user : User) : S := {
     borrowTracker := none
     dataRace := none
     threads := ThreadManager.initial false
-    raceAllocations := #[]
+    raceAllocations := {}
     allocationSpans := #[]
     user } }
 private def fd (id : Nat) (value : D) : F := ⟨⟨id⟩,value⟩

@@ -12,7 +12,7 @@ theorem selected (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft
     (destination : ProtectionPlace.Input s p.before input.tracker) (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : p.before.machine.memory.live[id]? = some (entry)) :
     ∃ base parent, p.before.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id,base⟩ ∧ entry.allocation.extra.tagMapping.get tag = some parent := by
   cases destination.pointer with
@@ -31,7 +31,7 @@ theorem concrete (s : Static) (metadata : Metadata s) (profile : Profile s) (cap
     (destination : ProtectionPlace.Input s p.before input.tracker) (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : p.before.machine.memory.live[id]? = some (entry))
     (frames : Array LocalUnit.F) (frame : LocalUnit.F) (machine : MachineHooks.MachineState MiriMemoryKind RootUser)
     (enabled : machine.borrowTracker = some input.tracker)
     (frameBorrow : frame.extra.borrowTracker = some {})
@@ -48,10 +48,9 @@ theorem concrete (s : Static) (metadata : Metadata s) (profile : Profile s) (cap
           input.tracker.global.nextPointerTag).global.protectedTags = ⟨tree,.Released⟩ ∧
       Preservation.OldNodeRights entry.allocation.extra tree := by
   obtain ⟨base,parent,cached,tagged⟩ := selected s p input destination id tag encoding entry live
-  have member := Array.mem_of_find?_eq_some live
-  obtain ⟨formed⟩ := input.world.liveTrees (id,entry) member
+  obtain ⟨formed⟩ := input.world.liveTrees id entry live
   have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (id,entry) member
+    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom id entry live
     have account : entry.allocation.extra.tagMapping.mapping.size +
         entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
     omega

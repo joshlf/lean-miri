@@ -8,21 +8,13 @@ set_option maxHeartbeats 1000000
 
 private theorem other_lookup (memory : MemoryState Provenance BorrowTree MiriMemoryKind)
     (id : AllocId) (entry : InputDraft.Entry) (tree : BorrowTree) (query : AllocId) (different : query ≠ id) :
-    (UnitRetag.replaceTree memory id entry tree).live.find? (fun row => row.1 == query) =
-      memory.live.find? (fun row => row.1 == query) := by
-  simp only [UnitRetag.replaceTree,Array.find?_push,Array.find?_filter]
-  have predicate : (fun row : AllocId × InputDraft.Entry => decide ((row.1 != id) = true ∧ (row.1 == query) = true)) =
-      (fun row => row.1 == query) := by
-    funext row
-    by_cases matched : row.1 = query
-    · simp [matched,different]
-    · simp [matched]
-  rw [predicate]
-  cases found : memory.live.find? (fun row => row.1 == query) <;> simp [different,Ne.symm different]
+    (UnitRetag.replaceTree memory id entry tree).live[query]? =
+      memory.live[query]? := by
+  simp [UnitRetag.replaceTree,Std.ExtTreeMap.getElem?_insert,Ne.symm different]
 
 theorem replace_info (memory : MemoryState Provenance BorrowTree MiriMemoryKind)
     (id : AllocId) (entry : InputDraft.Entry) (tree : BorrowTree)
-    (live : memory.live.find? (fun row => row.1 == id) = some (id,entry)) (query : AllocId) :
+    (live : memory.live[id]? = some (entry)) (query : AllocId) :
     (UnitRetag.replaceTree memory id entry tree).getAllocInfo query = memory.getAllocInfo query := by
   by_cases same : query = id
   · subst query
@@ -34,24 +26,16 @@ theorem replace_info (memory : MemoryState Provenance BorrowTree MiriMemoryKind)
 
 theorem replace_live (memory : MemoryState Provenance BorrowTree MiriMemoryKind)
     (id : AllocId) (entry : InputDraft.Entry) (tree : BorrowTree)
-    (live : memory.live.find? (fun row => row.1 == id) = some (id,entry)) (query : AllocId) :
+    (live : memory.live[id]? = some (entry)) (query : AllocId) :
     (UnitRetag.replaceTree memory id entry tree).isAllocLive query = memory.isAllocLive query := by
-  have keys : (UnitRetag.replaceTree memory id entry tree).live.any (fun row => row.1 == query) =
-      memory.live.any (fun row => row.1 == query) := by
+  have keys : (UnitRetag.replaceTree memory id entry tree).live.contains query =
+      memory.live.contains query := by
+    rw [Std.ExtTreeMap.contains_eq_isSome_getElem?,Std.ExtTreeMap.contains_eq_isSome_getElem?]
     by_cases same : query = id
     · subst query
-      have old : memory.live.any (fun row => row.1 == id) = true :=
-        Array.any_eq_true'.mpr ⟨(id,entry),Array.mem_of_find?_eq_some live,by simp⟩
-      simp [UnitRetag.replaceTree,Array.any_push,old]
-    · simp only [UnitRetag.replaceTree,Array.any_push,Array.any_filter]
-      have predicate : (fun row : AllocId × InputDraft.Entry => (row.1 != id) && (row.1 == query)) =
-          (fun row => row.1 == query) := by
-        funext row
-        by_cases matched : row.1 = query
-        · simp [matched,same]
-        · simp [matched]
-      rw [predicate]
-      simp [same,Ne.symm same]
+      simp [UnitRetag.replace_lookup,live]
+    · rw [other_lookup memory id entry tree query same]
+
   unfold MemoryState.isAllocLive
   rw [keys]
   rfl

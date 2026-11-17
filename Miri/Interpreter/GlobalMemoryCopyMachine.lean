@@ -50,7 +50,7 @@ private def access [DecidableEq K] (config : PlaceMachine.AccessConfig K U)
   let result := PlaceMachine.memoryAccess config write ⟨state.machine,none⟩ allocation.extra id provenance range
   let allocation := allocation.setExtra result.extra
   let machine := result.state.machine
-  let memory ← if machine.memory.live.any (fun entry => entry.1 == id) then
+  let memory ← if machine.memory.live.contains id then
       match machine.memory.setLiveAllocation id allocation with
       | .ok memory => pure memory
       | .error error => throw (config.memoryError (.memoryUpdate error))

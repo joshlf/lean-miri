@@ -178,7 +178,7 @@ this is used by a client theorem. Address assignment remains the actual call. -/
     (tracker : MachineHooks.BorrowState) (tag : BorTag)
     (enabled : initialized.borrowTracker = some tracker) (tagged : tracker.global.rootTag? id = some tag) :
     let committed : WholeCall.State := {state with machine := {initialized with memory :=
-      {initialized.memory with live := initialized.memory.live.push (id,⟨.stack,bytes.withExtra tree⟩)}}}
+      {initialized.memory with live := initialized.memory.live.insert id (⟨.stack,bytes.withExtra tree⟩)}}}
     PlaceMachine.allocateStackRaw s.cfg.allocation size align state =
       ((do
         let pointer ← s.cfg.allocation.adjustRootAddress id tag
@@ -199,7 +199,7 @@ this is used by a client theorem. Address assignment remains the actual call. -/
     set,MonadStateOf.set,EStateM.set,EarlyReturnT.return,EarlyReturn.runK,
     ExceptT.bind,ExceptT.bindCont,ExceptT.mk,ExceptT.run,throw,throwThe,MonadExceptOf.throw]
   let committed : WholeCall.State := {state with machine := {initialized with memory :=
-    {initialized.memory with live := initialized.memory.live.push (id,⟨.stack,bytes.withExtra tree⟩)}}}
+    {initialized.memory with live := initialized.memory.live.insert id (⟨.stack,bytes.withExtra tree⟩)}}}
   cases addressEq : s.cfg.allocation.adjustRootAddress id tag committed with
   | ok pointer after =>
     simp only [committed,enabled] at addressEq
@@ -213,7 +213,7 @@ this is used by a client theorem. Address assignment remains the actual call. -/
 
  theorem adjust_source (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacity)
     (state : WholeCall.State) (id : AllocId) (tag : BorTag) (bytes : Allocation Provenance BorrowTree)
-    (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id,⟨.stack,bytes⟩)) :
+    (live : state.machine.memory.live[id]? = some (⟨.stack,bytes⟩)) :
     s.cfg.allocation.adjustRootAddress id tag state =
       ((do
         let address ← ExecutionAddressChoices.addrFromAllocId EvalCoreMachine.tape
@@ -221,7 +221,7 @@ this is used by a client theorem. Address assignment remains the actual call. -/
         pure (Pointer.new (.concrete id tag) (Size.ofBytes address))) :
           MachineHooks.M MiriMemoryKind RootUser (Pointer Provenance)) state := by
   rw [source s metadata capacity]
-  simp [allocation,EvalConfiguration.allocation,Array.find?_map,Function.comp_def,live,
+  simp [allocation,EvalConfiguration.allocation,live,
     get,getThe,MonadStateOf.get,EStateM.get,bind,Bind.bind,EStateM.bind,pure,Pure.pure,EStateM.pure]
 
  theorem reserve_initial (s : Static) (p : Packet) (input : InputDraft.CurrentInputDraft s p)
@@ -231,7 +231,7 @@ this is used by a client theorem. Address assignment remains the actual call. -/
       id.value = p.before.machine.memory.nextAllocId ∧
       p.before.machine.user.payload.payload.user.runtime.extras.allocations.any (fun row => row.1 == id) = false ∧
       p.before.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = none ∧
-      p.before.machine.memory.live.find? (fun row => row.1 == id) = none := by
+      p.before.machine.memory.live[id]? = none := by
   have margins := resources.allocation needed
   have representation := input.projectedAllocator needed
     ⟨margins.available,margins.nonzero,fun active => ⟨margins.sourceAvailable active,margins.sourceNonzero active⟩⟩
@@ -248,14 +248,10 @@ this is used by a client theorem. Address assignment remains the actual call. -/
       rw [same] at below
       exact Nat.lt_irrefl _ below
     simpa only [beq_iff_eq] using different
-  · apply Array.find?_eq_none.mpr
-    intro row member
-    have below := representation.live row member
-    have different : row.1 ≠ id := by
-      intro same
-      rw [same] at below
-      exact Nat.lt_irrefl _ below
-    simpa only [beq_iff_eq] using different
+  · apply Std.ExtTreeMap.getElem?_eq_none
+    intro member
+    have below := representation.live id member
+    exact Nat.lt_irrefl _ below
 
 /-- Reserving an ID changes supplies and issued ledgers, while current backing
 and lookup metadata remain untouched until the new live row is registered. -/

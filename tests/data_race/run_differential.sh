@@ -17,7 +17,7 @@ rustc --edition=2021 -Awarnings "$tmp_dir/data_race_reference.rs" \
   -o "$tmp_dir/data_race_reference"
 (
   cd "$repo_root"
-  lake build Miri.Concurrency.GlobalStateVerification Miri.Concurrency.AtomicAccess Miri.Concurrency.Scheduler Miri.Concurrency.Join Miri.Concurrency.Lifecycle Miri.Concurrency.Deadline
+  flock /tmp/lean-miri-lake-build.lock lake build Miri.Concurrency.GlobalStateVerification Miri.Concurrency.AtomicAccess Miri.Concurrency.Scheduler Miri.Concurrency.Join Miri.Concurrency.Lifecycle Miri.Concurrency.Deadline
 )
 "$tmp_dir/data_race_reference" > "$tmp_dir/source.out"
 sed '/^sync:/d' "$tmp_dir/source.out" > "$tmp_dir/global-source.out"

@@ -25,7 +25,7 @@ function, even through the constructor. -/
 /- error: Application type mismatch -/
 #guard_msgs (error, substring := true) in
 #check (MemoryState.mk (Prov := Unit) (Extra := Unit) (MachineKind := Unit)
-  1 false wrongIssuedProfile #[] #[]
+  1 false wrongIssuedProfile {} {}
   (KeyedArray.empty (fun (global : GlobalAllocation) => global.allocId.value))
   (KeyedArray.empty (@Prod.fst Nat AllocId))
   (KeyedArray.empty (@Prod.fst UInt64 Nat))

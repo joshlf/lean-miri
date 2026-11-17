@@ -10,7 +10,7 @@ theorem not_dead {K : Type} (memory : MemoryState Provenance BorrowTree K) (id :
     (live : memory.isAllocLive id = true) (info : AllocationInfo)
     (metadata : memory.getAllocInfo id = .ok info) : info.kind ≠ .dead := by
   unfold MemoryState.getAllocInfo at metadata
-  cases located : memory.live.find? (fun row => row.1 == id) with
+  cases located : memory.live[id]? with
   | some row =>
     simp only [located,pure,Except.pure] at metadata
     cases metadata
@@ -32,8 +32,8 @@ theorem not_dead {K : Type} (memory : MemoryState Provenance BorrowTree K) (id :
         simp only [va,Bool.false_eq_true,↓reduceIte] at metadata
         cases descriptor : memory.findGlobal? id with
         | none =>
-          have noLive : memory.live.any (fun row => row.1 == id) = false :=
-            Array.any_eq_false'.mpr (Array.find?_eq_none.mp located)
+          have noLive : memory.live.contains id = false :=
+            by rw [Std.ExtTreeMap.contains_eq_isSome_getElem?,located]; rfl
           have noExtra : memory.hasExtraFunctionId id = false := by
             apply Bool.eq_false_iff.mpr
             intro extra
@@ -45,7 +45,7 @@ theorem not_dead {K : Type} (memory : MemoryState Provenance BorrowTree K) (id :
             unfold MemoryState.hasGlobalId
             unfold MemoryState.findGlobal? at descriptor
             exact KeyedArray.contains_false_of_find_none _ _ descriptor
-          change (memory.live.any (fun row => row.1 == id) || memory.hasExtraFunctionId id || memory.hasVaListId id ||
+          change (memory.live.contains id || memory.hasExtraFunctionId id || memory.hasVaListId id ||
             memory.hasGlobalId id) = true at live
           rw [noLive,noExtra,noVa,noGlobal] at live
           cases live

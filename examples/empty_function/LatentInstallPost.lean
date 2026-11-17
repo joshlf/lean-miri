@@ -12,8 +12,7 @@ variable {K U P : Type}
 replaces only this allocation's live registry row. -/
 def installed (machine : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (allocation : Allocation Provenance BorrowTree) : MachineHooks.MachineState K U :=
-  {machine with memory := {machine.memory with live :=
-    (machine.memory.live.filter fun row => row.1 != id).push (id,⟨.machine kind,allocation⟩)}}
+  {machine with memory := {machine.memory with live := machine.memory.live.insert id (⟨.machine kind,allocation⟩)}}
 
 /-- Internal composition boundary: a proved actual owned adjustment result
 runs through getAllocRaw and its actual live insertion without losing nested
@@ -25,7 +24,7 @@ theorem get_raw [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.memory.live[id]? = none)
     (descriptor : before.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before = .ok (.owned allocation) adjusted) :
@@ -46,7 +45,7 @@ theorem ensure [DecidableEq K]
       GlobalMemoryHookResult Provenance BorrowTree K (PlaceMachine.AccessState K U) (Allocation CtfeProvenance Unit))
     (before : MachineHooks.State K U) (adjusted : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (source : Allocation CtfeProvenance Unit) (allocation : Allocation Provenance BorrowTree)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (descriptor : before.machine.memory.findGlobal? id = some
       ⟨id,.memory,source.byteSize,source.align,source.mutability,some (.memory source)⟩)
     (adjustment : GlobalAllocationMachine.adjust target extras leaves id source before.machine = .ok (.owned allocation) adjusted) :
@@ -60,16 +59,9 @@ theorem ensure [DecidableEq K]
 /-- The owned source insertion establishes the exact current live row. -/
 theorem live_row (machine : MachineHooks.MachineState K U) (id : AllocId) (kind : K)
     (allocation : Allocation Provenance BorrowTree) :
-    (installed machine id kind allocation).memory.live.find? (fun row => row.1 == id) =
-      some (id,⟨.machine kind,allocation⟩) := by
-  have removed : (machine.memory.live.filter (fun row => row.1 != id)).find? (fun row => row.1 == id) = none := by
-    apply Array.find?_eq_none.mpr
-    intro row member same
-    have notSame : (row.1 == id) = false := by
-      simpa only [bne,Bool.not_eq_true'] using (Array.mem_filter.mp member).2
-    rw [same] at notSame
-    cases notSame
-  simp only [installed,Array.find?_push,removed,beq_self_eq_true,↓reduceIte,Option.or]
+    (installed machine id kind allocation).memory.live[id]? =
+      some (⟨.machine kind,allocation⟩) := by
+  simp [installed]
 
 /-- Registering a newly formed allocation preserves arbitrary existing live
 trees. The new-tree fact is a pure constructor post, not operation success. -/
@@ -79,12 +71,13 @@ theorem world (machine : MachineHooks.MachineState K U) (tracker : MachineHooks.
     (formed : TreeRuntimeInput.TreeFormed allocation.extra tracker.global.nextPointerTag) :
     TreeRuntimeInput.World (installed machine id kind allocation) tracker := by
   refine ⟨prior.enabled,prior.globals,?_⟩
-  intro row member
-  change row ∈ (machine.memory.live.filter fun entry => entry.1 != id).push (id,⟨.machine kind,allocation⟩) at member
-  rcases Array.mem_push.mp member with old | same
-  · exact prior.liveTrees row (Array.mem_filter.mp old).1
-  · subst row
+  intro query entry present
+  simp only [installed,Std.ExtTreeMap.getElem?_insert] at present
+  split at present
+  · cases Option.some.inj present
     exact ⟨formed⟩
+  · exact prior.liveTrees query entry present
+
 end EmptyFunction.LatentInstallPost
 open Lean Elab Command in
 run_cmd do

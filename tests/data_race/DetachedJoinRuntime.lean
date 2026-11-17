@@ -240,7 +240,7 @@ private def makeState (manager : ThreadManager) : Except StepError TestState := 
       borrowTracker := none
       dataRace := none
       threads := manager
-      raceAllocations := #[]
+      raceAllocations := {}
       allocationSpans := #[]
       user := {} } }
   match ThreadStacks.attach machine inactive ⟨0⟩ with
@@ -262,7 +262,7 @@ private def makeReuseState (manager : ThreadManager) (global : Option GlobalStat
       borrowTracker := none
       dataRace := global
       threads := manager
-      raceAllocations := #[]
+      raceAllocations := {}
       allocationSpans := #[]
       user := probe } }
   match ThreadStacks.attach machine inactive ⟨0⟩ with

@@ -44,7 +44,7 @@ private def machineState (failSync : Bool) : IO (MachineHooks.State Unit UserSta
     (MemoryState.empty : MemoryState Provenance BorrowTree Unit)
     #[targetId,resolverRemovedId,hookRemovedId,survivorId]
   let memory : MemoryState Provenance BorrowTree Unit :=
-    { issued with nextAllocId := 5, live := values }
+    { issued with nextAllocId := 5, live := Std.ExtTreeMap.ofArray values }
   let registry : Registry Unit := { allocations := #[
     (targetId,extraFor targetId), (resolverRemovedId,extraFor resolverRemovedId),
     (hookRemovedId,extraFor hookRemovedId), (survivorId,extraFor survivorId)] }
@@ -57,7 +57,7 @@ private def machineState (failSync : Bool) : IO (MachineHooks.State Unit UserSta
     borrowTracker := none
     dataRace := none
     threads := Miri.Concurrency.ThreadManager.initial false
-    raceAllocations := #[(targetId,clock),(resolverRemovedId,clock),(hookRemovedId,clock),(survivorId,clock)]
+    raceAllocations := Std.ExtTreeMap.ofArray #[(targetId,clock),(resolverRemovedId,clock),(hookRemovedId,clock),(survivorId,clock)]
     allocationSpans := #[]
     user := ⟨registry,#[],#[],failSync⟩ }
   return ⟨Stack.empty,machine⟩
@@ -72,10 +72,10 @@ private def extras : MemoryExtras.Hooks Unit UserState Unit where
     let hookEntry := (hookRemovedId, extraFor hookRemovedId)
     let registry := {registry with allocations :=
       (registry.allocations.filter (fun entry => entry.1 != hookRemovedId)).push hookEntry}
-    let memory := {machine.memory with live := machine.memory.live.filter (fun entry => entry.1 != hookRemovedId)}
-    let hookRace := machine.raceAllocations.find? (fun entry => entry.1 == hookRemovedId)
-    let races := machine.raceAllocations.filter (fun entry => entry.1 != hookRemovedId)
-    let races := match hookRace with | some entry => races.push entry | none => races
+    let memory := {machine.memory with live := machine.memory.live.erase hookRemovedId}
+    let hookRace := machine.raceAllocations[hookRemovedId]?
+    let races := machine.raceAllocations.erase hookRemovedId
+    let races := match hookRace with | some entry => races.insert hookRemovedId entry | none => races
     let events := machine.user.events.push
       (if kind == .deallocation then
         if machine.user.failSync then "sync-failure" else "sync-success"
@@ -89,15 +89,15 @@ private def extras : MemoryExtras.Hooks Unit UserState Unit where
 private def hooks (failResolve : Bool) : AllocationMachine.DeallocationHooks Unit UserState Unit := {
   extras
   resolvePointer := fun memory access pointer _ =>
-    let memory := {memory with live := memory.live.filter (fun entry => entry.1 != resolverRemovedId)}
+    let memory := {memory with live := memory.live.erase resolverRemovedId}
     let machine := access.machine
     let registry := machine.user.registry
     let resolverEntry := (resolverRemovedId, extraFor resolverRemovedId)
     let registry := {registry with allocations :=
       (registry.allocations.filter (fun entry => entry.1 != resolverRemovedId)).push resolverEntry}
-    let resolverRace := machine.raceAllocations.find? (fun entry => entry.1 == resolverRemovedId)
-    let races := machine.raceAllocations.filter (fun entry => entry.1 != resolverRemovedId)
-    let races := match resolverRace with | some entry => races.push entry | none => races
+    let resolverRace := machine.raceAllocations[resolverRemovedId]?
+    let races := machine.raceAllocations.erase resolverRemovedId
+    let races := match resolverRace with | some entry => races.insert resolverRemovedId entry | none => races
     let state := {access with machine := {machine with
       memory
       raceAllocations := races
@@ -124,10 +124,10 @@ def main : IO Unit := do
       throw (IO.userError s!"only detached owner 101 should be dropped: {reprStr result.machine.user.released}")
     if result.machine.user.events != #["resolve",expectedEvent] then
       throw (IO.userError s!"callback mutations were lost: {reprStr result.machine.user.events}")
-    if result.machine.memory.live.map Prod.fst != #[survivorId] then
+    if result.machine.memory.live.toArray.map Prod.fst != #[survivorId] then
       throw (IO.userError "unrelated survivor memory was changed")
-    if result.machine.raceAllocations.map Prod.fst != #[survivorId,resolverRemovedId,hookRemovedId] then
-      throw (IO.userError s!"callback successor race entries were changed: {reprStr (result.machine.raceAllocations.map Prod.fst)}")
+    if result.machine.raceAllocations.toArray.map Prod.fst != #[resolverRemovedId,hookRemovedId,survivorId] then
+      throw (IO.userError s!"callback successor race entries were changed: {reprStr (result.machine.raceAllocations.toArray.map Prod.fst)}")
     if result.machine.user.registry.allocations.map Prod.fst != #[survivorId,resolverRemovedId,hookRemovedId] then
       throw (IO.userError s!"callback successor allocation extras were changed: {reprStr (result.machine.user.registry.allocations.map Prod.fst)}")
     let some resolverExtra := (result.machine.user.registry.allocations.find? (fun entry => entry.1 == resolverRemovedId)).map Prod.snd
@@ -155,19 +155,19 @@ def main : IO Unit := do
       throw (IO.userError "resolver failure must not drop a non-detached owner")
     if result.machine.user.events != #["resolve"] then
       throw (IO.userError "resolver failure did not retain its mutation prefix")
-    if result.machine.memory.live.map Prod.fst != #[targetId,hookRemovedId,survivorId] then
+    if result.machine.memory.live.toArray.map Prod.fst != #[targetId,hookRemovedId,survivorId] then
       throw (IO.userError "resolver failure lost or changed the target live allocation")
-    if result.machine.raceAllocations.map Prod.fst != #[targetId,hookRemovedId,survivorId,resolverRemovedId] then
+    if result.machine.raceAllocations.toArray.map Prod.fst != #[targetId,resolverRemovedId,hookRemovedId,survivorId] then
       throw (IO.userError "resolver failure lost unrelated race state")
     if result.machine.user.registry.allocations.map Prod.fst != #[targetId,hookRemovedId,survivorId,resolverRemovedId] then
       throw (IO.userError "resolver failure lost target allocation extras")
   let initialMachine ← machineState false
   let stillOwned := MemoryExtras.discardUninserted extras targetId initialMachine.machine
-  if stillOwned.raceAllocations.map Prod.fst != initialMachine.machine.raceAllocations.map Prod.fst then
+  if stillOwned.raceAllocations.toArray.map Prod.fst != initialMachine.machine.raceAllocations.toArray.map Prod.fst then
     throw (IO.userError "cleanup changed side tables for an allocation that is still live")
   let missingLiveOwner := {initialMachine.machine with
     memory := {initialMachine.machine.memory with
-      live := initialMachine.machine.memory.live.filter (fun entry => entry.1 != targetId)}}
+      live := initialMachine.machine.memory.live.erase targetId}}
   match (MemoryExtras.initAllocation extras targetId false).run missingLiveOwner with
   | .ok _ _ => throw (IO.userError "duplicate extras must fail before creating another owner")
   | .error error result => do
@@ -176,7 +176,7 @@ def main : IO Unit := do
     if result.user.registry.allocations.map Prod.fst !=
         initialMachine.machine.user.registry.allocations.map Prod.fst then
       throw (IO.userError "failed duplicate initialization deleted a preexisting registry owner")
-    if result.raceAllocations.map Prod.fst != initialMachine.machine.raceAllocations.map Prod.fst then
+    if result.raceAllocations.toArray.map Prod.fst != initialMachine.machine.raceAllocations.toArray.map Prod.fst then
       throw (IO.userError "failed duplicate initialization changed a preexisting race owner")
     let some (_, oldExtra) := result.user.registry.allocations.find? (fun entry => entry.1 == targetId)
       | throw (IO.userError "failed duplicate initialization lost target registry data")
@@ -186,10 +186,10 @@ def main : IO Unit := do
       throw (IO.userError "failed duplicate initialization overwrote existing target sync data")
   let tentative := {initialMachine.machine with
     memory := {initialMachine.machine.memory with
-      live := initialMachine.machine.memory.live.filter (fun entry => entry.1 != targetId)}
+      live := initialMachine.machine.memory.live.erase targetId}
     allocationSpans := #[(targetId,⟨1⟩,none),(survivorId,⟨2⟩,none)]}
   let cleaned := MemoryExtras.discardUninserted extras targetId tentative
-  if cleaned.raceAllocations.map Prod.fst != #[resolverRemovedId,hookRemovedId,survivorId] then
+  if cleaned.raceAllocations.toArray.map Prod.fst != #[resolverRemovedId,hookRemovedId,survivorId] then
     throw (IO.userError "uninserted cleanup did not remove only its race owner")
   if cleaned.user.registry.allocations.map Prod.fst != #[resolverRemovedId,hookRemovedId,survivorId] then
     throw (IO.userError "uninserted cleanup did not remove only its allocation extras")

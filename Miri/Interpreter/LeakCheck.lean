@@ -24,9 +24,9 @@ private def walk (memory : MemoryState Provenance E MiriMemoryKind) :
   | fuel+1,id::todo,seen =>
     if seen.contains id then walk memory fuel todo seen
     else
-      let children := match memory.live.find? (·.1 == id) with
+      let children := match memory.live[id]? with
         | none => []
-        | some (_,entry) => (allocationIds entry.allocation).toList
+        | some entry => (allocationIds entry.allocation).toList
       walk memory fuel (children ++ todo) (seen.push id)
 
 def mayLeak : MemoryKind MiriMemoryKind → Bool
@@ -41,17 +41,17 @@ def takeProfiled (profile : Lean.Options)
     (memory : MemoryState Provenance E MiriMemoryKind) (staticRoots : Array AllocId) :
     Except StepError (MemoryState Provenance E MiriMemoryKind ×
       Array (AllocId × LocalAllocation Provenance E MiriMemoryKind)) := do
-  let globals := memory.live.filterMap fun (id,entry) =>
-    if entry.kind == .machine .global then some id else none
+  let globals := memory.live.foldl (fun roots id entry =>
+    if entry.kind == .machine .global then roots.push id else roots) #[]
   let todo := globals ++ staticRoots
-  let edges := memory.live.foldl (fun count (_,entry) => count + (allocationIds entry.allocation).size) 0
+  let edges := memory.live.foldl (fun count _ entry => count + (allocationIds entry.allocation).size) 0
   let todo := Lean.profileit
     s!"finalization.leak_walk.start.live_{memory.live.size}.roots_{todo.size}.edges_{edges}"
     profile (fun _ => todo)
   let reachable ← Lean.profileit "finalization.leak_walk.complete" profile fun _ =>
     walk memory (todo.size + edges) todo.toList #[]
-  let leaked := memory.live.filter fun (id,entry) => !mayLeak entry.kind && !reachable.contains id
-  return ({memory with live := memory.live.filter fun (id,_) => !(leaked.any (·.1 == id))},leaked)
+  let leaked := memory.live.filter fun id entry => !mayLeak entry.kind && !reachable.contains id
+  return ({memory with live := memory.live.filter fun id _ => !leaked.contains id},leaked.toArray)
 
 def take (memory : MemoryState Provenance E MiriMemoryKind) (staticRoots : Array AllocId) :
     Except StepError (MemoryState Provenance E MiriMemoryKind ×

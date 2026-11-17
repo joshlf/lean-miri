@@ -39,7 +39,7 @@ theorem live (s : Static) (metadata : Metadata s) (profile : Profile s)
         (UnitRetag.registeredMachine (taggedMachine before tracker global) {tracker with global} tag)) =
       .ok () (LocalUnit.current frames (UnitRetag.registeredFrame frame {} id tag) ensuredMachine))
     (entry : InputDraft.Entry)
-    (live : ensuredMachine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : ensuredMachine.memory.live[id]? = some (entry))
     (currentTag : BorTag) (formed : Nonempty (TreeRuntimeInput.TreeFormed entry.allocation.extra currentTag))
     (enabledAfter : ensuredMachine.borrowTracker = some ensuredTracker)
     (stable : Stable before ensuredMachine) : Outcome s place frames frame before := by

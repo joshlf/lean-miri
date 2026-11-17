@@ -21,7 +21,7 @@ def memory : IO (MemoryState Provenance BorrowTree Unit) := do
   let memory := MemoryState.setIssuedIds
     (MemoryState.empty : MemoryState Provenance BorrowTree Unit) #[id]
   return {memory with
-    live := #[(id, ⟨.stack, allocation.withExtra (BorrowTree.new parent (Size.ofBytes 2))⟩)]}
+    live := Std.ExtTreeMap.ofArray (β := LocalAllocation Provenance BorrowTree Unit) #[(id, ⟨.stack, allocation.withExtra (BorrowTree.new parent (Size.ofBytes 2))⟩)]}
 def request : RetagPipeline.Request := {
   typeShape := .reference, typeFacts := ⟨true, true, false⟩, referenceKind := .Mutable
   mode := .Default, config := ⟨false, false⟩, layoutSize := Size.ofBytes 2
@@ -42,7 +42,7 @@ structure External where
 
 def effectHooks : RetagPipeline.Effectful.Hooks Unit External StepError := {
   dataRace := some fun core external allocId kind range => Id.run do
-    let childAbsent := (core.memory.live[0]?.bind fun entry => entry.2.allocation.extra.indexOfTag child).isNone
+    let childAbsent := (core.memory.live[EffectfulRetagTests.id]?.bind fun entry => entry.allocation.extra.indexOfTag child).isNone
     let observed := external.observed.push (kind, range, childAbsent, core.global.nextPointerTag.value)
     let (machine, outcome) := MachineHooks.memoryRaceAccess external.machine allocId range
       (if kind == .Write then some .Retag else none) .Retag
@@ -63,7 +63,7 @@ def makeExternal (memory : MemoryState Provenance BorrowTree Unit) (raceSecond :
     threadInfo := [⟨some zeroIndex, none⟩, ⟨some oneIndex, none⟩] }
   let threads := { ThreadManager.initial false with
     threads := [ThreadRecord.initial none none, ThreadRecord.initial none none] }
-  return ⟨⟨memory, none, some global, threads, #[(id, allocation)], #[], []⟩, #[]⟩
+  return ⟨⟨memory, none, some global, threads, Std.ExtTreeMap.ofArray #[(id, allocation)], #[], []⟩, #[]⟩
 
 end EffectfulRetagTests
 open EffectfulRetagTests
@@ -75,8 +75,8 @@ def main : IO Unit := do
   for write in [false, true] do
     for readonly in [false, true] do
       for racy in [false, true] do
-        let memory := if readonly then { memory with live := memory.live.map fun (allocationId, entry) =>
-          (allocationId, { entry with allocation := entry.allocation.withMutability .Not }) } else memory
+        let memory := if readonly then { memory with live := memory.live.map fun _ entry =>
+          { entry with allocation := entry.allocation.withMutability .Not } } else memory
         let core := { core with memory }
         let request := if write then { request with
           mode := .FnEntry
@@ -89,10 +89,10 @@ def main : IO Unit := do
           "race leaf follows each source parent permission segment"
         check (result.external.observed.all fun (_, _, absent, next) => absent && next == 3)
           "callback observes allocated tag and no child yet"
-        let some (_, allocation) := result.external.machine.raceAllocations[0]? | throw (IO.userError "clock allocation")
+        let some allocation := result.external.machine.raceAllocations[EffectfulRetagTests.id]? | throw (IO.userError "clock allocation")
         let .ok firstCell := allocation.cellAt 0 | throw (IO.userError "first cell")
         let .ok secondCell := allocation.cellAt 1 | throw (IO.userError "second cell")
-        let some (_, entry) := result.state.memory.live[0]? | throw (IO.userError "tree allocation")
+        let some entry := result.state.memory.live[EffectfulRetagTests.id]? | throw (IO.userError "tree allocation")
         check ((entry.allocation.extra.indexOfTag child).isSome == !(racy || failedReadonly))
           "child inserted only after all TB and race stages succeed"
         if failedReadonly then
@@ -118,7 +118,7 @@ def main : IO Unit := do
         IO.println s!"E {write} {readonly} {racy} {result.outcome.isOk} {(entry.allocation.extra.indexOfTag child).isSome} {(firstCell.read.index zeroIndex).packedValue} {(secondCell.read.index zeroIndex).packedValue} {firstCell.write.2.packedValue} {secondCell.write.2.packedValue} {firstCell.writeType == .Retag} {secondCell.writeType == .Retag} {String.intercalate "," trace}"
   let external ← makeExternal memory false
   let sourceNoModel : RetagPipeline.Effectful.Hooks Unit External StepError := ⟨none⟩
-  let disabled := { external with machine := { external.machine with dataRace := none, raceAllocations := #[] } }
+  let disabled := { external with machine := { external.machine with dataRace := none, raceAllocations := {} } }
   let result := RetagPipeline.Effectful.retagPointerValue core request disabled sourceNoModel
   check (result.outcome.isOk && result.external.observed.isEmpty) "no vector-clock model calls no race hook"
   let raw := RetagPipeline.Effectful.retagPointerValue core
@@ -131,6 +131,6 @@ def main : IO Unit := do
     "source None mode returns before tag or race operations"
   let zero := RetagPipeline.Effectful.retagPointerValue core
     { request with layoutSize := Size.ZERO, preciseInteriorMut := false } external effectHooks
-  let some (_, zeroAllocation) := zero.state.memory.live[0]? | throw (IO.userError "zero allocation")
+  let some zeroAllocation := zero.state.memory.live[EffectfulRetagTests.id]? | throw (IO.userError "zero allocation")
   check (zero.outcome.isOk && zero.external.observed.isEmpty && (zeroAllocation.allocation.extra.indexOfTag child).isSome)
     "zero-byte reborrow inserts lazy child without any memory race stage"

@@ -19,7 +19,7 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
     (tape : ChoiceExecution.tapeAccess.get machine = ChoiceExecution.tapeAccess.get p.before.machine)
     (thread : machine.threads.activeThread = p.before.machine.threads.activeThread) (noRace : machine.dataRace = none)
     (id : AllocId) (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -50,8 +50,7 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
       Preservation.ExistingAddressFacts p.before releasedState ∧
       ensuredMachine.threads = machine.threads ∧
       replaceTree ensuredMachine.memory id entry tree =
-        {p.before.machine.memory with live := ((p.before.machine.memory.live.filter fun row => row.1 != id).push
-          (id,{entry with allocation := entry.allocation.setExtra tree}))} ∧
+        {p.before.machine.memory with live := p.before.machine.memory.live.insert id ({entry with allocation := entry.allocation.setExtra tree})} ∧
       ensuredMachine.borrowTracker = some ensuredTracker ∧
       ensuredTracker.global.protectedTags = input.tracker.global.protectedTags.insert tag .StrongProtector ∧
       tree.releaseProtector tag ensuredTracker.global.protectedTags = ⟨tree,.Released⟩ ∧

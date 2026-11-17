@@ -45,9 +45,9 @@ private theorem allocated_world (machine : ChoiceExecution.S) (tracker : Machine
     change row.2.value.toNat < (allocatedTracker tracker room).global.nextPointerTag.value.toNat
     rw [next]
     omega
-  · intro row member
-    obtain ⟨formed⟩ := world.liveTrees row member
-    exact ⟨RootTagPost.tree_mono row.2.allocation.extra tracker.global.nextPointerTag
+  · intro id entry member
+    obtain ⟨formed⟩ := world.liveTrees id entry member
+    exact ⟨RootTagPost.tree_mono entry.allocation.extra tracker.global.nextPointerTag
       (allocatedTracker tracker room).global.nextPointerTag formed (by rw [next];omega)⟩
 
 /-- The ordinary-source latent family enters the shared pipeline through the
@@ -64,7 +64,7 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
     (tape : ChoiceExecution.tapeAccess.get machine = ChoiceExecution.tapeAccess.get p.before.machine)
     (thread : machine.threads.activeThread = p.before.machine.threads.activeThread) (noRace : machine.dataRace = none)
     (id : AllocId) (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -110,8 +110,7 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
       Preservation.ExistingAddressFacts p.before releasedState ∧
       ensuredMachine.threads = machine.threads ∧
       replaceTree ensuredMachine.memory id entry tree =
-        {p.before.machine.memory with live := ((p.before.machine.memory.live.filter fun row => row.1 != id).push
-          (id,{entry with allocation := entry.allocation.setExtra tree}))} ∧
+        {p.before.machine.memory with live := p.before.machine.memory.live.insert id ({entry with allocation := entry.allocation.setExtra tree})} ∧
       ensuredMachine.borrowTracker = some ensuredTracker ∧
       ensuredTracker.global.protectedTags = input.tracker.global.protectedTags.insert tag .StrongProtector ∧
       tree.releaseProtector tag ensuredTracker.global.protectedTags = ⟨tree,.Released⟩ ∧
@@ -121,8 +120,8 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
   let enteredTracker := allocatedTracker input.tracker room
   have initialWorld : TreeRuntimeInput.World machine input.tracker := by
     refine ⟨enabled,input.world.globals,?_⟩
-    intro row member
-    exact input.world.liveTrees row (by simpa only [memory] using member)
+    intro query entry member
+    exact input.world.liveTrees query entry (by simpa only [memory] using member)
   have enteredWorld : TreeRuntimeInput.World entered enteredTracker := allocated_world machine input.tracker initialWorld room
   have next := successor_nat input.tracker room
   have tags : enteredTracker.global.nextPointerTag.value.toNat+(resources.budget-1) < 2^64 := by
@@ -153,8 +152,7 @@ theorem protect (s : WholeCall.Static) (p : WholeCall.Packet)
     ensuredEnabled input.tracker.global.protectedTags input.tracker.global.nextPointerTag originalFresh protectedShape id entry tree released
   rw [←extraBinding] at release
   have physical : replaceTree ensuredMachine.memory id entry tree =
-      {p.before.machine.memory with live := ((p.before.machine.memory.live.filter fun row => row.1 != id).push
-        (id,{entry with allocation := entry.allocation.setExtra tree}))} := by
+      {p.before.machine.memory with live := p.before.machine.memory.live.insert id ({entry with allocation := entry.allocation.setExtra tree})} := by
     simpa only [entered,allocatedMachine,memory] using memoryPost
   refine ⟨ensuredMachine,ensuredTracker,entry,tree,protectedRun,release,?_,?_,?_,?_,?_,threadsPost,physical,ensuredEnabled,protectedShape,released,contextPost⟩
   · apply LatentProtectionPost.original_live p.before _ id {entry with allocation := entry.allocation.setExtra tree} absent

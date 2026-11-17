@@ -12,7 +12,7 @@ set_option linter.unusedSimpArgs false
 It is a subset for a family theorem; it does not replace CurrentInputDraft. -/
 def Ordinary (_s : Static) (p : Packet) : Prop :=
   ∀ id, ChoiceAdmission.SelectedId p id → ∃ source : Allocation CtfeProvenance Unit,
-    p.before.machine.memory.live.find? (fun row => row.1 == id) = none ∧
+    p.before.machine.memory.live[id]? = none ∧
     p.before.machine.memory.hasFunctionPointer id = false ∧
     p.before.machine.memory.hasVaListId id = false ∧
     p.before.machine.memory.findGlobal? id = some

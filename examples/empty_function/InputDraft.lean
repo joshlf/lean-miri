@@ -19,14 +19,14 @@ abbrev F := Frame Provenance LocalLayout MachineHooks.FrameExtra
 dead metadata. Live/global entries need not be mutable for a zero-byte write. -/
 inductive MetadataBacking (before : State) (id : AllocId) : Prop where
   | live (entry : Entry)
-      (row : before.machine.memory.live.find? (fun row => row.1 == id) = some (id, entry))
+      (row : before.machine.memory.live[id]? = some (entry))
   | global (entry : GlobalAllocation)
       (row : before.machine.memory.findGlobal? id = some entry)
       (identity : entry.allocId = id)
   | extraFunction (row : before.machine.memory.hasExtraFunctionId id = true)
   | vaList (row : before.machine.memory.hasVaListId id = true)
   | dead (entry : DeadAllocation)
-      (row : before.machine.memory.dead.find? (fun row => row.allocId == id) = some entry)
+      (row : before.machine.memory.dead[id]? = some entry)
 
 /-- Current address-table coherence. Freed allocations may retain base-cache
 rows and share old addresses with later allocations; only current live IDs
@@ -196,22 +196,22 @@ Inverse-table supplier metadata does not force unrelated descriptor contents
 through conversion or restrict their relocation lists. -/
 inductive Backing (s : Static) (before : State) (id : AllocId) : Prop where
   | live (entry : Entry)
-      (row : before.machine.memory.live.find? (fun row => row.1 == id) = some (id, entry))
+      (row : before.machine.memory.live[id]? = some (entry))
   | global (entry : GlobalAllocation)
       (row : before.machine.memory.findGlobal? id = some entry)
       (identity : entry.allocId = id) (content : GlobalContent s before entry)
       (runtimeStorage : ∀ definition isStatic tls foreign,
         entry.payload = some (.static definition isStatic tls foreign) →
         tls = false ∧ foreign = false)
-      (registryVacant : before.machine.memory.live.find? (fun row => row.1 == id) = none →
+      (registryVacant : before.machine.memory.live[id]? = none →
         (entry.kind = .memory ∨ entry.kind = .static) →
         (before.machine.user.payload.payload.user.runtime.extras.allocations.any
           (fun row => row.1 == id)) = false)
   | extraFunction (row : before.machine.memory.hasExtraFunctionId id = true)
   | vaList (row : before.machine.memory.hasVaListId id = true)
   | dead (entry : DeadAllocation)
-      (row : before.machine.memory.dead.find? (fun row => row.allocId == id) = some entry)
-      (noLive : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+      (row : before.machine.memory.dead[id]? = some entry)
+      (noLive : before.machine.memory.live[id]? = none)
       (noFunction : before.machine.memory.hasFunctionPointer id = false)
       (noVaList : before.machine.memory.hasVaListId id = false)
       (noGlobal : before.machine.memory.findGlobal? id = none)
@@ -242,10 +242,10 @@ inductive PointerInput (s : Static) (before : State) (tracker : MachineHooks.Bor
         some ⟨id, base⟩)
       (backing : Backing s before id)
       (parent : ∀ entry : Entry,
-        before.machine.memory.live.find? (fun row => row.1 == id) = some (id, entry) →
+        before.machine.memory.live[id]? = some (entry) →
         ∃ index node, entry.allocation.extra.tagMapping.get tag = some index ∧
           entry.allocation.extra.nodes.get index = some node ∧ node.tag = tag)
-      (latentRoot : before.machine.memory.live.find? (fun row => row.1 == id) = none →
+      (latentRoot : before.machine.memory.live[id]? = none →
         ∀ global, before.machine.memory.findGlobal? id = some global →
         (global.kind = .memory ∨ global.kind = .static) →
         tracker.global.rootTag? id = some tag)
@@ -270,7 +270,7 @@ structure IndirectFootprint (before : State) (pointer : Pointer (Option Provenan
     (length : Size) where
   id : AllocId
   entry : Entry
-  live : before.machine.memory.live.find? (fun row => row.1 == id) = some (id, entry)
+  live : before.machine.memory.live[id]? = some (entry)
   base : UInt64
   relative : UInt64
   cached : before.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) = some ⟨id, base⟩
@@ -393,12 +393,12 @@ structure AllocatorRepresentation (before : State) : Prop where
     row.allocId ∈ before.machine.memory.issuedIds
   issued : ∀ id ∈ before.machine.memory.issuedIds,
     id.value.toNat < before.machine.memory.nextAllocId.toNat
-  live : ∀ row ∈ before.machine.memory.live,
-    row.1.value.toNat < before.machine.memory.nextAllocId.toNat
+  live : ∀ id ∈ before.machine.memory.live,
+    id.value.toNat < before.machine.memory.nextAllocId.toNat
   global : ∀ row ∈ before.machine.memory.globals,
     row.allocId.value.toNat < before.machine.memory.nextAllocId.toNat
-  dead : ∀ row ∈ before.machine.memory.dead,
-    row.allocId.value.toNat < before.machine.memory.nextAllocId.toNat
+  dead : ∀ id ∈ before.machine.memory.dead,
+    id.value.toNat < before.machine.memory.nextAllocId.toNat
   functions : ∀ id ∈ before.machine.memory.extraFnPtrIds,
     id.value.toNat < before.machine.memory.nextAllocId.toNat
   vaLists : ∀ id ∈ before.machine.memory.vaListIds,

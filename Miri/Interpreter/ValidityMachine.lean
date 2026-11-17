@@ -214,8 +214,8 @@ def inMutableMemory (place : RuntimePlace Provenance) : M K User Bool := do
     let some (.concrete id _) := place.ptr.provenance | return false
     let memory := (← get).machine.memory
     let some global := memory.findGlobal? id | throw (.invalidProgram "validity memory was not interned")
-    if let some cached := memory.live.find? (fun entry => entry.1 == id) then
-      if cached.2.allocation.mutability != global.mutability then
+    if let some cached := memory.live[id]? then
+      if cached.allocation.mutability != global.mutability then
         throw (.invalidProgram "interned allocation mutability disagrees with local cache")
     return global.mutability == .Mut
 

@@ -96,7 +96,7 @@ private def mkMemory (localMutability globalMutability : Option Mutability) :
       }]
   let empty : MemoryState TestProvenance Nat Unit := MemoryState.empty
   let withGlobals := MemoryState.setGlobalEntries empty globals
-  return { withGlobals with live := locals }
+  return { withGlobals with live := Std.ExtTreeMap.ofArray locals }
 
 private def mkPointer (offset : Nat) (valid : Bool) : Pointer (Option TestProvenance) :=
   ⟨size offset, if valid then some (.fixed allocId) else none⟩
@@ -115,9 +115,9 @@ private def showOutcome (result : PtrAllocationResult TestProvenance Nat Unit Ho
   | .error error => s!"E{reprStr error}"
 
 private def extraOf (memory : MemoryState TestProvenance Nat Unit) : String :=
-  match memory.live.find? (fun entry => entry.1 == allocId) with
+  match memory.live.get? allocId with
   | none => "-"
-  | some entry => toString entry.2.allocation.extra
+  | some entry => toString entry.allocation.extra
 
 private def runCase (tag : String) (write : Bool) (bytes offset : Nat)
     (ghost valid : Bool) (localMutability globalMutability : Option Mutability)

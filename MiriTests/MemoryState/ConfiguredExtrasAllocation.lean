@@ -22,7 +22,7 @@ private def initial : State :=
     borrowTracker := none
     dataRace := none
     threads := Miri.Concurrency.ThreadManager.initial false
-    raceAllocations := #[]
+    raceAllocations := {}
     allocationSpans := #[]
     user := {
       addresses := {provenanceMode := .default, addressMode := .managed, generation := none}
@@ -54,7 +54,7 @@ private def collecting : PlaceMachine.AllocationConfig Unit Wrapped :=
       event "extras"
     allocationBacktrace := some (fun id _ => do
       let state ← get
-      if state.machine.memory.live.any (·.1 == id) then
+      if state.machine.memory.live.contains id then
         throw (.invalidProgram "backtrace capture ran after live insertion")
       let extra ← match MemoryExtras.lookup extras state.machine id with
         | .ok extra => pure extra | .error error => throw error
@@ -118,7 +118,7 @@ private def backtraceChecks : IO Unit := do
   | .error error stopped =>
     unless error == .unsupported "span query failed" &&
         stopped.machine.user.payload.registry.allocations.map Prod.fst == #[firstId,secondId] &&
-        stopped.machine.memory.live.map Prod.fst == #[firstId,secondId] do
+        stopped.machine.memory.live.toArray.map Prod.fst == #[firstId,secondId] do
       throw (IO.userError "failed initialization retained its trace or discarded another allocation")
 
 private def access : PlaceMachine.AccessConfig Unit Wrapped where
@@ -142,7 +142,7 @@ private def access : PlaceMachine.AccessConfig Unit Wrapped where
   memoryError := fun error => .invalidProgram (reprStr error)
 
 private def allocationAt (state : State) (id : AllocId) : IO (Allocation Provenance BorrowTree) := do
-  let some (_,entry) := state.machine.memory.live.find? (·.1 == id)
+  let some entry := state.machine.memory.live.get? id
     | throw (IO.userError "expected allocation disappeared")
   pure entry.allocation
 
@@ -204,8 +204,8 @@ private def configuredReallocationChecks : IO Unit := do
     | .ok () allocation => pure allocation
     | .error error _ => throw (IO.userError s!"source pointer setup failed: {reprStr error}")
   let state := {state with machine := {state.machine with
-    memory := {state.machine.memory with live := state.machine.memory.live.map fun (id,entry) =>
-      (id,if id == sourceId then {entry with allocation := initialized} else entry)}
+    memory := {state.machine.memory with live := state.machine.memory.live.map fun id entry =>
+      if id == sourceId then {entry with allocation := initialized} else entry}
     user := {state.machine.user with payload := {state.machine.user.payload with events := #[]}}}}
   let runRealloc := fun access fail init =>
     ReallocationDriver.reallocateConfiguredFrom access extras ⟨Size.ofBytes 8⟩ collecting (destroy fail)
@@ -220,7 +220,7 @@ private def configuredReallocationChecks : IO Unit := do
         allocation.readScalar access.runtime.base (allocRange Size.ZERO (Size.ofBytes 8)) true == .ok scalar &&
         allocation.initializationMask.get (Size.ofBytes 8) == .ok false &&
         allocation.initializationMask.get (Size.ofBytes 16) == .ok (init == .Zero) &&
-        stopped.machine.memory.live.map Prod.fst == #[zeroId,destId] &&
+        stopped.machine.memory.live.toArray.map Prod.fst == #[zeroId,destId] &&
         stopped.machine.user.payload.registry.allocations.map Prod.fst == #[zeroId,destId] &&
         stopped.machine.user.payload.events == #["diagnostic","extras","capture","span","read","write","free"] do
       throw (IO.userError "realloc lost copy provenance/init mask/growth policy or allocate-copy-free ordering")

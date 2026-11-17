@@ -51,7 +51,7 @@ def create (target : TargetDataLayout) (layout : LocalLayout) :
       (allocRange Size.ZERO layout.layout.size) (Size.fromBits target.pointerWidth.bits) allocation with
     | .ok () allocation => pure allocation
     | .error error _ => throw (.callback s!"return initialization: {error}")
-  let memory := { memory with live := #[(id, ⟨.stack, allocation⟩)] }
+  let memory := { memory with live := Std.ExtTreeMap.ofArray #[(id, LocalAllocation.mk (.stack) (allocation))] }
   return (⟨memory, #[]⟩, ⟨⟨⟨Size.ZERO, some id⟩, .none, none⟩, localMemoryLayout layout⟩)
 
 def write (target : TargetDataLayout) (state : State) (place : MemoryOperandPlace AllocId)

@@ -13,7 +13,7 @@ theorem result (s : Static) (metadata : Metadata s) (profile : Profile s)
     (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : p.before.machine.memory.live[id]? = some (entry)) :
     WholeCall.Result s (Preservation.Preserves s) p := by
   have budget : 64 ≤ resources.budget := by have bound := resources.reserve; unfold work at bound; omega
   have capacity : 0 < s.capacity := by have bound := resources.capacity; omega

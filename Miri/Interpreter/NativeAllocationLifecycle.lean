@@ -136,7 +136,7 @@ def allocate [DecidableEq K] (access : Access S Prov Extra K H) (backing : Backi
     access.synchronizeMemory
     allocation kind maximum globalKind initExtra adjustRoot
   set (access.put state result.memory result.hooks)
-  let retained := result.memory.live.any fun (_,entry) => entry.allocation.nativeBuffer == allocation.nativeBuffer
+  let retained := result.memory.live.any fun _ entry => entry.allocation.nativeBuffer == allocation.nativeBuffer
   unless retained do releaseAllocation backing allocation
   pure result.outcome
 

@@ -11,7 +11,7 @@ theorem ensure (s : WholeCall.Static) (p : WholeCall.Packet)
     (metadata : Specification.Metadata s) (input : InputDraft.CurrentInputDraft s p) (resources : Specification.ResourceMargins s p)
     (profile : Specification.RuntimeProfile s p) (id : AllocId)
     (source : Allocation CtfeProvenance Unit) (selected : ChoiceAdmission.SelectedId p id)
-    (absent : p.before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : p.before.machine.memory.live[id]? = none)
     (noFunction : p.before.machine.memory.hasFunctionPointer id = false)
     (noVaList : p.before.machine.memory.hasVaListId id = false)
     (descriptor : p.before.machine.memory.findGlobal? id = some
@@ -26,7 +26,7 @@ theorem ensure (s : WholeCall.Static) (p : WholeCall.Packet)
       let adjusted := MemoryExtras.putAllocation (extras s) {middle with borrowTracker := some {tracker with global}} id {weakMemory := none}
       let installed := LatentInstallPost.installed adjusted id .global allocation
       s.cfg.retag.ensureTreeExtra id p.before = .ok () {p.before with machine := installed} ∧
-      installed.memory.live.find? (fun row => row.1 == id) = some (id,⟨.machine .global,allocation⟩) ∧
+      installed.memory.live[id]? = some (⟨.machine .global,allocation⟩) ∧
       TreeRuntimeInput.World installed {tracker with global} ∧
       tracker.global.rootPointerTag id = .ok (global,root) := by
   obtain ⟨converted,middle,tracker,global,root,attributes,tagged,adjusted,world,_memory,_cost⟩ :=

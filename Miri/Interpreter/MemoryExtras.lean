@@ -42,14 +42,14 @@ this cleanup is deliberately keyed to the reserved ID alone. -/
 def discardUninserted [DecidableEq K] (h : Hooks K User Payload)
     (id : AllocId) (machine : Machine K User) (cleanRegistry := true)
     (cleanRace := true) (cleanSpan := true) : Machine K User := Id.run do
-  if machine.memory.live.any (fun entry => entry.1 == id) then return machine
+  if machine.memory.live.contains id then return machine
   let registry := h.get machine.user
   let registry := if cleanRegistry then
     {registry with allocations := registry.allocations.filter (fun entry => entry.1 != id)}
     else registry
   return {machine with
     user := h.put machine.user registry
-    raceAllocations := if cleanRace then machine.raceAllocations.filter (fun entry => entry.1 != id)
+    raceAllocations := if cleanRace then machine.raceAllocations.erase id
       else machine.raceAllocations
     allocationSpans := if cleanSpan then machine.allocationSpans.filter (fun entry => entry.1 != id)
       else machine.allocationSpans}
@@ -89,7 +89,7 @@ def initAllocation [DecidableEq K] (h : Hooks K User Payload) (id : AllocId) (we
       throw (.invalidProgram "allocation extras initialized twice")
     if weak then
       if machine.dataRace.isNone then throw (.invalidProgram "weak memory requires vector clocks")
-      unless machine.raceAllocations.any (fun entry => entry.1 == id) do
+      unless machine.raceAllocations.contains id do
         throw (.invalidProgram "weak memory requires allocation race clocks")
     set (putAllocation h machine id {weakMemory := if weak then some StoreBufferAlloc.newAllocation else none})
   catch error =>
@@ -180,7 +180,7 @@ weak buffer as non-atomic accesses. Missing clocks remain an explicit error. -/
 def getAtomic (h : Hooks K User Payload) (machine : Machine K User) (id : AllocId) :
     Except StepError (AtomicState (Scalar Provenance)) := do
   let some global := machine.dataRace | throw (.invalidProgram "atomic vector clocks disabled")
-  let some (_,allocation) := machine.raceAllocations.find? (fun entry => entry.1 == id) |
+  let some allocation := machine.raceAllocations[id]? |
     throw (.invalidProgram "atomic allocation race clocks missing")
   let extra ← lookup h machine id
   return ⟨global, allocation, extra.weakMemory⟩
@@ -192,7 +192,7 @@ def setAtomic (h : Hooks K User Payload) (machine : Machine K User) (id : AllocI
   let extra ← lookup h machine id
   return putAllocation h {machine with
     dataRace := some atomic.global
-    raceAllocations := (machine.raceAllocations.filter fun entry => entry.1 != id).push (id,atomic.allocation)}
+    raceAllocations := machine.raceAllocations.insert id atomic.allocation}
     id {extra with weakMemory := atomic.weakMemoryAllocation}
 
 /-- Checked effectful setter for IntrinsicAtomic: absence is an error rather

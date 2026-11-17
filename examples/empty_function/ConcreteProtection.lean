@@ -70,7 +70,7 @@ def source (s : Static) := CanonicalDictionaries.pointerSource s.prepared.compil
     (destination : InputDraft.MemoryDestination s p input.tracker) (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : p.before.machine.memory.live[id]? = some (entry)) :
     ∃ base parent, p.before.machine.user.addresses.baseAddr.find? (fun row => row.allocId == id) =
       some ⟨id,base⟩ ∧ entry.allocation.extra.tagMapping.get tag = some parent := by
   cases destination.pointer with
@@ -113,7 +113,7 @@ freshness facts. No byte bounds, nonnull or unit mutability condition is added. 
     (destination : InputDraft.MemoryDestination s p input.tracker) (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : p.before.machine.memory.live[id]? = some (entry))
     (frame : LocalUnit.F) (machine : MachineHooks.MachineState MiriMemoryKind RootUser)
     (enabled : machine.borrowTracker = some input.tracker)
     (frameBorrow : frame.extra.borrowTracker = some {})
@@ -129,10 +129,9 @@ freshness facts. No byte bounds, nonnull or unit mutability condition is added. 
         (UnitRetag.registeredTracker (UnitRetag.allocatedTracker input.tracker (tag_room s p input resources))
           input.tracker.global.nextPointerTag).global.protectedTags = ⟨tree,.Released⟩ := by
   obtain ⟨base,parent,cached,tagged⟩ := selected s p input destination id tag encoding entry live
-  have member := Array.mem_of_find?_eq_some live
-  obtain ⟨formed⟩ := input.world.liveTrees (id,entry) member
+  obtain ⟨formed⟩ := input.world.liveTrees id entry live
   have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (id,entry) member
+    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom id entry live
     have account : entry.allocation.extra.tagMapping.mapping.size +
         entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
     omega
@@ -174,7 +173,7 @@ freshness facts. No byte bounds, nonnull or unit mutability condition is added. 
     (destination : InputDraft.MemoryDestination s p input.tracker) (id : AllocId) (tag : BorTag)
     (encoding : destination.place.mplace.ptr.provenance = some (.concrete id tag))
     (entry : InputDraft.Entry)
-    (live : p.before.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry))
+    (live : p.before.machine.memory.live[id]? = some (entry))
     (frame : LocalUnit.F) (machine : MachineHooks.MachineState MiriMemoryKind RootUser)
     (enabled : machine.borrowTracker = some input.tracker)
     (frameBorrow : frame.extra.borrowTracker = some {})
@@ -191,10 +190,9 @@ freshness facts. No byte bounds, nonnull or unit mutability condition is added. 
           input.tracker.global.nextPointerTag).global.protectedTags = ⟨tree,.Released⟩ ∧
       Preservation.OldNodeRights entry.allocation.extra tree := by
   obtain ⟨base,parent,cached,tagged⟩ := selected s p input destination id tag encoding entry live
-  have member := Array.mem_of_find?_eq_some live
-  obtain ⟨formed⟩ := input.world.liveTrees (id,entry) member
+  obtain ⟨formed⟩ := input.world.liveTrees id entry live
   have nodeRoom : entry.allocation.extra.tagMapping.mapping.size ≤ 4294967295 := by
-    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom (id,entry) member
+    have bound : entry.allocation.extra.nodes.size + resources.budget < 2^32 := resources.nodeRoom id entry live
     have account : entry.allocation.extra.tagMapping.mapping.size +
         entry.allocation.extra.tagMapping.deassigned.size = entry.allocation.extra.nodes.size := formed.accounting
     omega

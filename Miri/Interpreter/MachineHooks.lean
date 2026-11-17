@@ -33,7 +33,7 @@ structure MachineState (K User : Type) where
   borrowTracker : Option BorrowState
   dataRace : Option Miri.Concurrency.GlobalState
   threads : Miri.Concurrency.ThreadManager
-  raceAllocations : Array (AllocId × Miri.Concurrency.VClockAlloc)
+  raceAllocations : Std.ExtTreeMap AllocId Miri.Concurrency.VClockAlloc
   allocationSpans : Array (AllocId × SpanRef × Option SpanRef)
   user : User
 
@@ -203,16 +203,16 @@ def afterLocalMovedToMemory (localId : LocalId) (place : MPlaceTy Provenance)
   modify fun state => { state with machine := { state.machine with allocationSpans :=
     (state.machine.allocationSpans.filter fun entry => entry.1 != allocId).push (allocId, span, none) } }
   let state ← get
-  unless (state.machine.memory.live.any fun entry => entry.1 == allocId) do
+  unless (state.machine.memory.live.contains allocId) do
     throw (.invalidProgram "fresh local allocation has no allocation extra")
   if let some clocks := frame.extra.dataRace then
     let global ← requireGlobal state.machine
-    let allocation ← match state.machine.raceAllocations.find? fun entry => entry.1 == allocId with
+    let allocation ← match state.machine.raceAllocations[allocId]? with
       | none => throw (.invalidProgram "local allocation missing vector-clock extra")
-      | some entry => pure entry.2
+      | some entry => pure entry
     let result := Miri.Concurrency.LocalRace.localMovedToMemory clocks global state.machine.threads localId allocation
     modify fun state => { state with machine := { state.machine with raceAllocations :=
-      (state.machine.raceAllocations.filter fun entry => entry.1 != allocId).push (allocId, result.allocation) } }
+      (state.machine.raceAllocations.insert allocId result.allocation) } }
     setCurrentFrame { frame with extra := { frame.extra with dataRace := some result.frame } }
     match result.outcome with
     | .ok () => pure ()
@@ -231,9 +231,9 @@ def memoryRaceAccess (machine : MachineState K User) (allocId : AllocId)
   let global ← match machine.dataRace with
     | none => return (machine, .ok ())
     | some global => pure global
-  let allocation ← match machine.raceAllocations.find? fun entry => entry.1 == allocId with
+  let allocation ← match machine.raceAllocations[allocId]? with
     | none => return (machine, .error (.invalidProgram "allocation missing vector-clock extra"))
-    | some entry => pure entry.2
+    | some entry => pure entry
   if !global.raceDetecting then return (machine, .ok ())
   let (index, clocks) ← match global.activeThreadState machine.threads with
     | .error error => return (machine, .error (.callback s!"memory race active clock: {reprStr error}"))
@@ -245,7 +245,7 @@ def memoryRaceAccess (machine : MachineState K User) (allocId : AllocId)
   let global := { global with vectorClocks := global.vectorClocks.set index.toNat result.thread }
   let machine := { machine with
     dataRace := some global
-    raceAllocations := (machine.raceAllocations.filter fun entry => entry.1 != allocId).push (allocId, result.allocation) }
+    raceAllocations := machine.raceAllocations.insert allocId result.allocation }
   let outcome := match result.result with
     | .ok => .ok ()
     | .race => .error (.undefinedBehavior "DataRace")
@@ -423,9 +423,9 @@ def beforeStackPopWithEnsure [DecidableEq K]
       if info.kind == .liveData then
         ensureTreeExtra allocId
         let machine := (← get).machine
-        let entry ← match machine.memory.live.find? fun entry => entry.1 == allocId with
+        let entry ← match machine.memory.live[allocId]? with
           | none => throw (.invalidProgram "live protected allocation missing Tree Borrows extra")
-          | some entry => pure entry.2
+          | some entry => pure entry
         let currentTracker ← match machine.borrowTracker with
           | none => throw (.invalidProgram "borrow tracker removed during protector release")
           | some tracker => pure tracker

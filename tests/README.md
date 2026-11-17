@@ -400,3 +400,12 @@ whole-machine claim.
 `bash tools/check-lowering-reader.sh [INPUT.json ...]` checks source paths and
 compiler pool IDs across lowering for root, instance and promoted bodies.
 The default input is the fixed empty-function fixture.
+
+`lake exe profile_allocation_storage 16 200000 live` measures the public allocation
+storage APIs; use `dead` as the last argument for normal deallocation followed by
+dead-metadata lookup. This uses a minimal typed memory model with successful
+hooks, not the full borrow/race/address-reuse machine. Reported setup, operation,
+free and verification times are inner wall times. Whole-process CPU and RSS
+require an external collector and include startup and all phases. The committed
+source is byte-identical to the source used for the recorded storage microbenchmarks;
+those timings remain observations of their frozen benchmark binaries.

@@ -144,10 +144,10 @@ def run [DecidableEq K] (h : Hooks K User) : M K User Unit := do
     -- outcome; a representation failure preserves the already-mutated prefix.
     for (id,_) in state.machine.memory.live do
       let machine := (← get).machine
-      let some entry := machine.memory.live.find? (·.1 == id) |
+      let some entry := machine.memory.live[id]? |
         throw (.invalidProgram "GC live allocation disappeared")
-      let result := entry.2.allocation.extra.removeUnreachableTags roots.tags
-      let memory ← lift ((machine.memory.setLiveAllocation id (entry.2.allocation.setExtra result.tree)).mapError
+      let result := entry.allocation.extra.removeUnreachableTags roots.tags
+      let memory ← lift ((machine.memory.setLiveAllocation id (entry.allocation.setExtra result.tree)).mapError
         (fun error => .invalidProgram s!"GC tree replacement: {reprStr error}"))
       modify fun s => { s with machine := { s.machine with memory } }
       match result.outcome with

@@ -55,7 +55,7 @@ private def treeMemory : Except AllocError (MemoryState Provenance BorrowTree Un
   let secondEntry : LocalAllocation Provenance BorrowTree Unit := ⟨.stack, second⟩
   let initial : MemoryState Provenance BorrowTree Unit := MemoryState.empty
   let issued := MemoryState.setIssuedIds initial #[allocId1, allocId2]
-  return {issued with live := #[(allocId1, firstEntry), (allocId2, secondEntry)]}
+  return {issued with live := Std.ExtTreeMap.ofArray #[(allocId1, firstEntry), (allocId2, secondEntry)]}
 
 private def syncStore : SyncObjectStore Nat := Id.run do
   let first : SyncObjectMap Nat :=
@@ -110,9 +110,9 @@ def main : IO Unit := do
   requireCheck (eventText copied.hooks.state.events |>.contains "sync:write:20")
     "mem-copy write should invoke the destination sync object"
 
-  let some firstEntry := memory.live[0]?
+  let some firstEntry := memory.live[allocId1]?
     | throw (IO.userError "test source allocation is missing")
-  let firstAllocation := firstEntry.2.allocation
+  let firstAllocation := firstEntry.allocation
   let successfulWrite := beforeMemoryWrite memory (context ({} : TestState)) (hooks none)
       firstAllocation (pointer allocId1 BorTag.one) allocId1 (.concrete BorTag.one)
       (allocRange Size.ZERO (Size.ofBytes 3))
@@ -141,8 +141,8 @@ def main : IO Unit := do
   requireCheck (match raceFailure.outcome with | .error _ => true | .ok _ => false)
     "data-race failure should stop the write before Tree Borrows"
   requireCheck (raceFailure.context.state.events == #["diagnostic:write", "race:write"] &&
-      (raceFailure.memory.live[0]?).map (fun entry =>
-        entry.2.allocation.extra == firstAllocation.extra) == some true)
+      (raceFailure.memory.live[allocId1]?).map (fun entry =>
+        entry.allocation.extra == firstAllocation.extra) == some true)
     "data-race failure must precede Tree Borrows and sync-object updates"
 
   let deallocation := beforeMemoryDeallocation (context ({} : TestState)) (hooks none) firstAllocation
@@ -189,9 +189,9 @@ def main : IO Unit := do
       | .error message => message.contains "Tree Borrows write failed"
       | .ok _ => false)
     "the second range should trigger a Tree Borrows write error"
-  let some updatedEntry := partialTreeFailure.memory.live.find? fun entry => entry.1 == allocId1
+  let some updatedEntry := partialTreeFailure.memory.live.get? allocId1
     | throw (IO.userError "Tree Borrows failure dropped the live allocation")
-  let firstSavedLocation := updatedEntry.2.allocation.extra.locations.iterAll[0]?.map (·.data)
+  let firstSavedLocation := updatedEntry.allocation.extra.locations.iterAll[0]?.map (·.data)
     |>.getD (default : LocationTree)
   let firstSavedState := firstSavedLocation.perms.get rootIndex
   requireCheck (firstSavedState.map (·.permission) == some .Unique &&

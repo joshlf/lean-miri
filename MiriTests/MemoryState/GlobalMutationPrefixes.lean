@@ -47,18 +47,18 @@ def main : IO Unit := do
     let success := MemoryLifecycle.getAllocRaw initial.memory #[] outer (some ()) (hooks source runtime owned false)
     let _ ← must success.outcome
     retained success.memory success.hooks outer nested
-    check ((success.memory.live.any (·.1 == outer)) == owned)
+    check ((success.memory.live.contains outer) == owned)
       "owned cache insertion or borrowed noninsertion changed"
   let failed := MemoryLifecycle.getAllocRaw initial.memory #[] outer (some ()) (hooks source runtime true true)
   check (failed.outcome matches .error (.globalAccess (.hookFailure "adjustGlobalAllocation" "after nested reservation")))
     "adjustment failure changed category"
   retained failed.memory failed.hooks outer nested
-  check (!(failed.memory.live.any (·.1 == outer))) "failed adjustment cached outer allocation"
+  check (!(failed.memory.live.contains outer)) "failed adjustment cached outer allocation"
   let immutable ← must (Allocation.fromBytes (Prov := Provenance) #[4,5,6] Align.ONE .Not)
   let readonly := MemoryLifecycle.getAllocRawMut initial.memory #[] outer (some ()) (hooks source immutable true false)
   check (readonly.outcome matches .error (.readOnlyAllocation _)) "immutable write unexpectedly succeeded"
   retained readonly.memory readonly.hooks outer nested
-  check (readonly.memory.live.any (·.1 == outer)) "readonly error lost completed outer materialization"
+  check (readonly.memory.live.contains outer) "readonly error lost completed outer materialization"
   let failedWrite := MemoryLifecycle.getAllocRawMut initial.memory #[] outer (some ()) (hooks source runtime true true)
   check (failedWrite.outcome matches .error (.globalAccess (.hookFailure "adjustGlobalAllocation" "after nested reservation")))
     "write adjustment failure changed category"
@@ -78,6 +78,6 @@ def main : IO Unit := do
   check (synced.outcome matches .error (.readOnlyAllocation _)) "coherence readonly error missing"
   check (synced.hooks.issuedIds == synced.memory.issuedIds &&
       synced.hooks.runtimeIdForExport? 22 == some nested &&
-      synced.hooks.live.any (·.1 == outer))
+      synced.hooks.live.contains outer)
     "returned hook state lost nested reservation or outer cache synchronization"
   IO.println "global mutation prefixes: nested registration and ID supply retained across borrowed/owned success, adjustment failures, and readonly error"

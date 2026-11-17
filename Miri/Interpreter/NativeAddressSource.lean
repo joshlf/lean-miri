@@ -54,7 +54,7 @@ def externalAddress (effects : Effects K U C) (choice : C) (id : AllocId)
       checkedAddress (← NativePreparedGlobals.reserve NativePreparedGlobals.machineAccess
         effects.backing id info.size info.align)
     else
-      let some (_,entry) := machine.memory.live.find? (·.1 == id)
+      let some entry := machine.memory.live[id]?
         | throw (.invalidProgram "native non-global data backing is not live")
       let address ← match NativeAllocationLifecycle.address entry.allocation with
         | .ok address => pure address

@@ -86,7 +86,7 @@ private def immutable [DecidableEq K] (place : MPlaceTy Provenance) : MachineHoo
   let some provenance := place.mplace.ptr.provenance | throw (.invalidProgram "argument allocation lacks provenance")
   let some id := PointerProvenance.getAllocId provenance | throw (.invalidProgram "argument allocation lacks identity")
   let state ← get
-  let some (_,entry) := state.machine.memory.live.find? (fun entry => entry.1 == id) |
+  let some entry := state.machine.memory.live[id]? |
     throw (.invalidProgram "argument allocation is not live")
   let memory ← liftResult (state.machine.memory.setLiveAllocation id (entry.allocation.withMutability .Not)
     |>.mapError fun error => .invalidProgram s!"mark_immutable: {reprStr error}")

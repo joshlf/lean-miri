@@ -44,7 +44,7 @@ its subsequent FFI operation fails. No mask/provenance transition runs here. -/
 def publish [DecidableEq K] (access : ValidityMachine.Access K U) (id : AllocId)
     (bytes : Array UInt8) : M K U Unit := do
   let state ← get
-  let some (_,entry) := state.machine.memory.live.find? (·.1 == id)
+  let some entry := state.machine.memory.live[id]?
     | throw (.invalidProgram "native host published a non-owned backing")
   let allocation ← lift (entry.allocation.refreshNativeBytes bytes |>.mapError (allocationError access))
   commit id allocation

@@ -76,8 +76,7 @@ theorem preserves (s : Static) (metadata : Metadata s) (capacity : 0 < s.capacit
     · intro selected old found
       have memory : (taggedMachine s p tracker destination older bound frame previous index room).memory = p.before.machine.memory :=
         (LocalPost.fields s metadata capacity p tracker destination older bound frame previous index).1
-      change ∃ current, (UnitRetag.replaceTree (taggedMachine s p tracker destination older bound frame previous index room).memory id entry tree).live.find?
-        (fun row => row.1 == selected) = some (selected,current) ∧ _
+      change ∃ current, (UnitRetag.replaceTree (taggedMachine s p tracker destination older bound frame previous index room).memory id entry tree).live[selected]? = some (current) ∧ _
       rw [memory]
       by_cases same : selected = id
       · subst selected

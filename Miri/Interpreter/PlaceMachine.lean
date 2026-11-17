@@ -194,7 +194,7 @@ def initStackExtra (allocationTail : AllocId → Size → Align → MachineM K U
     let length := Miri.Concurrency.ByteSize.ofU64 size.bytes.toNat (by have h := UInt64.toNat_lt size.bytes; omega)
     let allocation := Miri.Concurrency.VClockAlloc.newAllocation length (clocks.clock.index index) index
     modify fun machine => {machine with raceAllocations :=
-      (machine.raceAllocations.filter fun entry => entry.1 != id).push (id, allocation)}
+      (machine.raceAllocations.insert id allocation)}
   allocationTail id size align
   return tree
 
@@ -257,7 +257,7 @@ def allocateStackRaw [DecidableEq K] (config : AllocationConfig K User) (size : 
       | .error e => throw (.resourceExhaustion s!"stack allocation ID: {repr e}")
     let tree ← initializeAllocation config id .stack size align
     modify fun state => {state with machine := {state.machine with memory :=
-      {state.machine.memory with live := state.machine.memory.live.push (id, ⟨.stack, allocation.withExtra tree⟩)}}}
+      {state.machine.memory with live := state.machine.memory.live.insert id ⟨.stack, allocation.withExtra tree⟩}}}
     let state ← get
     let tag ← match state.machine.borrowTracker with
       | none => pure BorTag.one
@@ -269,7 +269,7 @@ def allocateStackRaw [DecidableEq K] (config : AllocationConfig K User) (size : 
     return pointer.withOptionalProvenance
   catch error =>
     if allocation.nativeBuffer.isSome then
-      let retained := (← get).machine.memory.live.any fun (_,entry) => entry.allocation.nativeBuffer == allocation.nativeBuffer
+      let retained := (← get).machine.memory.live.any fun _ entry => entry.allocation.nativeBuffer == allocation.nativeBuffer
       unless retained do
         let some drop := config.nativeDrop | throw (.invalidProgram "native stack backing lacks drop capability")
         drop allocation

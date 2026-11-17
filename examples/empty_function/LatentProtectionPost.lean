@@ -103,9 +103,9 @@ write-back therefore preserve every original live allocation and old node's
 observable rights by exact row retention, without constraining the new root. -/
 theorem original_live (before after : WholeCall.State) (id : AllocId)
     (entry : InputDraft.Entry)
-    (absent : before.machine.memory.live.find? (fun row => row.1 == id) = none)
+    (absent : before.machine.memory.live[id]? = none)
     (installed : after.machine.memory.live =
-      (before.machine.memory.live.filter fun row => row.1 != id).push (id,entry)) :
+      before.machine.memory.live.insert id (entry)) :
     Preservation.OriginalLiveAllocations before after := by
   intro oldId old prior
   have different : oldId ≠ id := by
@@ -113,17 +113,9 @@ theorem original_live (before after : WholeCall.State) (id : AllocId)
     subst oldId
     rw [absent] at prior
     cases prior
-  have clean : (before.machine.memory.live.filter fun row => row.1 != id).find? (fun row => row.1 == oldId) = some (oldId,old) := by
-    rw [Array.find?_filter]
-    have test : (fun row : AllocId × InputDraft.Entry => (row.1 != id) && (row.1 == oldId)) =
-        (fun row => row.1 == oldId) := by
-      funext row
-      by_cases equal : row.1 = oldId <;> simp [equal,different]
-    change before.machine.memory.live.find? (fun row => (row.1 != id) && (row.1 == oldId)) = _
-    rw [test]
-    exact prior
   refine ⟨old,?_,rfl,rfl,rights_refl old.allocation.extra⟩
-  simp only [installed,Array.find?_push,clean,Option.or]
+  simpa [installed,Std.ExtTreeMap.getElem?_insert,Ne.symm different] using prior
+
 end EmptyFunction.LatentProtectionPost
 open Lean Elab Command in
 run_cmd do

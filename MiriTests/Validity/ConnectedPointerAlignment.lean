@@ -26,7 +26,7 @@ private def testState : ValidityMachine.State Unit Unit := {
     borrowTracker := none,
     dataRace := none,
     threads := Miri.Concurrency.ThreadManager.initial false,
-    raceAllocations := #[],
+    raceAllocations := {},
     allocationSpans := #[],
     user := testUser } }
 

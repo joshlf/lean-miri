@@ -3,6 +3,7 @@ import Miri.Memory.Pointer
 import Miri.Memory.CtfeProvenance
 import Miri.Memory.Access
 import Miri.Memory.KeyedArray
+import Std.Data.ExtTreeMap
 
 /-! Core local-allocation lifecycle transitions from rustc's interpreter
 `memory.rs`. Allocation IDs, Miri machine state, pointer lookup, native
@@ -43,7 +44,6 @@ structure LocalAllocation (Prov Extra MachineKind : Type) where
   allocation : Allocation Prov Extra
 
 structure DeadAllocation where
-  allocId : AllocId
   size : Size
   align : Align
   deriving DecidableEq, Repr
@@ -104,8 +104,8 @@ structure MemoryState (Prov Extra MachineKind : Type) where
   idSupplyExhausted : Bool := false
   private issuedIdTable : KeyedArray UInt64 AllocId (fun (id : AllocId) => id.value) :=
     .empty (fun (id : AllocId) => id.value)
-  live : Array (AllocId × LocalAllocation Prov Extra MachineKind) := #[]
-  dead : Array DeadAllocation := #[]
+  live : Std.ExtTreeMap AllocId (LocalAllocation Prov Extra MachineKind) := {}
+  dead : Std.ExtTreeMap AllocId DeadAllocation := {}
   private globalTable : KeyedArray UInt64 GlobalAllocation
       (fun (global : GlobalAllocation) => global.allocId.value) :=
     .empty (fun (global : GlobalAllocation) => global.allocId.value)
@@ -276,8 +276,8 @@ def empty : MemoryState Prov Extra MachineKind := {
   nextAllocId := 1
   idSupplyExhausted := false
   issuedIdTable := .empty (fun (id : AllocId) => id.value)
-  live := #[]
-  dead := #[]
+  live := {}
+  dead := {}
   globalTable := .empty (fun (global : GlobalAllocation) => global.allocId.value)
   importedGlobalTable := .empty (@Prod.fst Nat AllocId)
   importedGlobalRuntimeTable := .empty (@Prod.fst UInt64 Nat)
@@ -288,8 +288,8 @@ def empty : MemoryState Prov Extra MachineKind := {
 }
 
 private def containsId (state : MemoryState Prov Extra MachineKind) (id : AllocId) : Bool :=
-  state.issuedIdTable.contains id.value || state.live.any (fun entry => entry.1 == id) ||
-    state.dead.any (fun entry => entry.allocId == id) ||
+  state.issuedIdTable.contains id.value || state.live.contains id ||
+    state.dead.contains id ||
   state.globalTable.contains id.value
 
 /-- `AllocMap::reserve` uses an AtomicU64 starting at one and `fetch_add`.
@@ -343,7 +343,7 @@ def hasFunctionPointer (state : MemoryState Prov Extra MachineKind) (id : AllocI
     state.globalTable.any? id.value fun entry => entry.kind == .function
 
 def isAllocLive (state : MemoryState Prov Extra MachineKind) (id : AllocId) : Bool :=
-  state.live.any (fun entry => entry.1 == id) || state.extraFnPtrTable.contains id.value ||
+  state.live.contains id || state.extraFnPtrTable.contains id.value ||
     state.vaListTable.contains id.value || state.globalTable.contains id.value
 
 def registerExtraFunction (state : MemoryState Prov Extra MachineKind) (id : AllocId) :
@@ -361,8 +361,8 @@ compiler globals, then dead-allocation metadata. Missing metadata is an
 explicit lookup error instead of an unchecked map expectation. -/
 def getAllocInfo (state : MemoryState Prov Extra MachineKind) (id : AllocId) :
     Except AllocationLookupError AllocationInfo := do
-  if let some localEntry := state.live.find? fun entry => entry.1 == id then
-    let allocation := localEntry.2.allocation
+  if let some localEntry := state.live[id]? then
+    let allocation := localEntry.allocation
     return ⟨allocation.byteSize, allocation.align, .liveData, allocation.mutability⟩
   if state.hasFunctionPointer id then
     return ⟨Size.ZERO, Align.ONE, .function, .Not⟩
@@ -375,7 +375,7 @@ def getAllocInfo (state : MemoryState Prov Extra MachineKind) (id : AllocId) :
     | .typeId => return ⟨Size.ZERO, Align.ONE, .typeId, .Not⟩
     | .static | .memory =>
         return ⟨global.size, global.align, .liveData, global.mutability⟩
-  if let some dead := state.dead.find? fun entry => entry.allocId == id then
+  if let some dead := state.dead[id]? then
     return ⟨dead.size, dead.align, .dead, .Not⟩
   throw (.unavailable id)
 
@@ -394,9 +394,9 @@ private def validateReservedGlobal (state : MemoryState Prov Extra MachineKind)
     throw (.duplicateExportId exportId)
   if state.globalTable.contains entry.allocId.value then
     throw (.duplicateRuntimeId entry.allocId)
-  if state.live.any fun old => old.1 == entry.allocId then
+  if state.live.contains entry.allocId then
     throw (.globalIdAlreadyPresent entry.allocId)
-  if state.dead.any fun old => old.allocId == entry.allocId then
+  if state.dead.contains entry.allocId then
     throw (.globalIdAlreadyPresent entry.allocId)
   if !(state.issuedIdTable.contains entry.allocId.value) then
     throw (.globalIdAlreadyPresent entry.allocId)
@@ -431,11 +431,11 @@ private def registerReservedGlobalLegacy (state : MemoryState Prov Extra Machine
 
 private def findLive? (state : MemoryState Prov Extra MachineKind) (id : AllocId) :
     Option (LocalAllocation Prov Extra MachineKind) :=
-  (state.live.find? fun entry => entry.1 == id).map Prod.snd
+  state.live[id]?
 
 private def insertLive (state : MemoryState Prov Extra MachineKind) (id : AllocId)
     (entry : LocalAllocation Prov Extra MachineKind) : MemoryState Prov Extra MachineKind :=
-  { state with live := (state.live.filter fun old => old.1 != id).push (id, entry) }
+  { state with live := state.live.insert id entry }
 
 def setLiveAllocation [DecidableEq MachineKind]
     (state : MemoryState Prov Extra MachineKind) (id : AllocId)
@@ -449,27 +449,27 @@ without requiring clients to unfold private memory-map helpers. -/
 theorem setLiveAllocation_of_find [DecidableEq MachineKind]
     (state : MemoryState Prov Extra MachineKind) (id : AllocId)
     (entry : LocalAllocation Prov Extra MachineKind) (allocation : Allocation Prov Extra)
-    (present : state.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (present : state.live[id]? = some entry) :
     state.setLiveAllocation id allocation = .ok
-      {state with live := ((state.live.filter fun row => row.1 != id).push (id,{entry with allocation}))} := by
+      {state with live := state.live.insert id {entry with allocation}} := by
   simp [setLiveAllocation,findLive?,insertLive,present]
   rfl
 
 private def removeLive (state : MemoryState Prov Extra MachineKind) (id : AllocId) :
     MemoryState Prov Extra MachineKind × Option (LocalAllocation Prov Extra MachineKind) :=
   let found := findLive? state id
-  ({ state with live := state.live.filter fun old => old.1 != id }, found)
+  ({ state with live := state.live.erase id }, found)
 
-private def insertDead (state : MemoryState Prov Extra MachineKind) (entry : DeadAllocation) :
+private def insertDead (state : MemoryState Prov Extra MachineKind) (id : AllocId) (entry : DeadAllocation) :
     MemoryState Prov Extra MachineKind :=
-  { state with dead := (state.dead.filter fun old => old.allocId != entry.allocId).push entry }
+  { state with dead := state.dead.insert id entry }
 
 /-- The upstream provenance collector prunes only dead-allocation metadata in
 this part of `Memory`; live-map and address-map collection have separate
 owners. -/
 def removeUnreachable (state : MemoryState Prov Extra MachineKind) (reachable : Array AllocId) :
     MemoryState Prov Extra MachineKind :=
-  { state with dead := state.dead.filter fun entry => reachable.contains entry.allocId }
+  { state with dead := state.dead.filter fun id _ => reachable.contains id }
 
 private theorem highWater_absent {V : Type} {keyFn : V → UInt64}
     (table : KeyedArray UInt64 V keyFn) (cursor : UInt64)
@@ -493,28 +493,26 @@ theorem reserve_of_highWater (state : MemoryState Prov Extra MachineKind)
     (sourceAvailable : state.sourceAllocIdWorldActive = true → state.sourceAllocIdExhausted = false)
     (sourceNonzero : state.sourceAllocIdWorldActive = true → state.sourceAllocIdNext ≠ 0)
     (issued : ∀ id ∈ state.issuedIds, id.value.toNat < state.nextAllocId.toNat)
-    (live : ∀ row ∈ state.live, row.1.value.toNat < state.nextAllocId.toNat)
+    (live : ∀ id ∈ state.live, id.value.toNat < state.nextAllocId.toNat)
     (global : ∀ row ∈ state.globals, row.allocId.value.toNat < state.nextAllocId.toNat)
-    (dead : ∀ row ∈ state.dead, row.allocId.value.toNat < state.nextAllocId.toNat) :
+    (dead : ∀ id ∈ state.dead, id.value.toNat < state.nextAllocId.toNat) :
     ∃ after, state.reserveAllocId = (after,.ok ⟨state.nextAllocId,nonzero⟩) := by
   have issuedAbsent : state.issuedIdTable.contains state.nextAllocId = false :=
     highWater_absent _ _ (by simpa only [issuedIds] using issued)
   have globalAbsent : state.globalTable.contains state.nextAllocId = false :=
     highWater_absent _ _ (by simpa only [globals] using global)
-  have liveAbsent : state.live.any (fun row => row.1 == (⟨state.nextAllocId,nonzero⟩ : AllocId)) = false := by
-    apply Array.any_eq_false.mpr
-    intro index valid found
-    have equal := beq_iff_eq.mp found
-    have bound := live state.live[index] (Array.getElem_mem valid)
-    rw [equal] at bound
-    exact False.elim (Nat.lt_irrefl _ bound)
-  have deadAbsent : state.dead.any (fun row => row.allocId == (⟨state.nextAllocId,nonzero⟩ : AllocId)) = false := by
-    apply Array.any_eq_false.mpr
-    intro index valid found
-    have equal := beq_iff_eq.mp found
-    have bound := dead state.dead[index] (Array.getElem_mem valid)
-    rw [equal] at bound
-    exact False.elim (Nat.lt_irrefl _ bound)
+  have liveAbsent : state.live.contains (⟨state.nextAllocId,nonzero⟩ : AllocId) = false := by
+    cases found : state.live.contains (⟨state.nextAllocId,nonzero⟩ : AllocId) with
+    | false => rfl
+    | true =>
+      have bound := live ⟨state.nextAllocId,nonzero⟩ (Std.ExtTreeMap.mem_iff_contains.mpr found)
+      exact False.elim (Nat.lt_irrefl _ bound)
+  have deadAbsent : state.dead.contains (⟨state.nextAllocId,nonzero⟩ : AllocId) = false := by
+    cases found : state.dead.contains (⟨state.nextAllocId,nonzero⟩ : AllocId) with
+    | false => rfl
+    | true =>
+      have bound := dead ⟨state.nextAllocId,nonzero⟩ (Std.ExtTreeMap.mem_iff_contains.mpr found)
+      exact False.elim (Nat.lt_irrefl _ bound)
   have absent : containsId state ⟨state.nextAllocId,nonzero⟩ = false := by
     simp only [containsId,issuedAbsent,globalAbsent,liveAbsent,deadAbsent,Bool.false_or]
   cases active : state.sourceAllocIdWorldActive with
@@ -829,8 +827,8 @@ def getAllocRaw [DecidableEq MachineKind]
     MemoryAccessResult Prov Extra MachineKind HookState (Allocation Prov Extra) := Id.run do
   let finish := fun memory state outcome =>
     (⟨memory,hooks.synchronizeMemory memory state,outcome⟩ : MemoryAccessResult Prov Extra MachineKind HookState (Allocation Prov Extra))
-  if let some entry := memory.live.find? fun old => old.1 == id then
-    return finish memory hooksState (.ok entry.2.allocation)
+  if let some entry := memory.live[id]? then
+    return finish memory hooksState (.ok entry.allocation)
   let global := getGlobalAlloc memory hooksState id false hooks
   let adjusted ← match global.outcome with
     | .ok allocation => pure allocation
@@ -856,8 +854,8 @@ def getAllocRawMut [DecidableEq MachineKind]
   let finish := fun memory state outcome =>
     (⟨memory,hooks.synchronizeMemory memory state,outcome⟩ : MemoryAccessResult Prov Extra MachineKind HookState (Allocation Prov Extra))
   let (afterMaterialize, hookState, allocation) ←
-    match memory.live.find? fun old => old.1 == id with
-    | some entry => pure (memory, hooksState, entry.2.allocation)
+    match memory.live[id]? with
+    | some entry => pure (memory, hooksState, entry.allocation)
     | none =>
         let global := getGlobalAlloc memory hooksState id true hooks
         let adjusted ← match global.outcome with
@@ -894,20 +892,20 @@ def copyResolvedRanges [DecidableEq MachineKind]
     (destId : AllocId) (destOffset : Size) (size : Size) (repeatCount : UInt64)
     (pointerSize : Size) (nonoverlapping : Bool) :
     MemoryLifecycleResult Prov Extra MachineKind HookState Unit := Id.run do
-  let some sourceEntry := memory.live.find? fun entry => entry.1 == sourceId
+  let some sourceEntry := memory.live[sourceId]?
     | return ⟨memory, hooksState, .error (.allocationNotLocal sourceId)⟩
-  let some destEntry := memory.live.find? fun entry => entry.1 == destId
+  let some destEntry := memory.live[destId]?
     | return ⟨memory, hooksState, .error (.allocationNotLocal destId)⟩
   let sourceRange := allocRange sourceOffset size
   let sameAllocation := sourceId == destId
-  let transfer := Allocation.copyRepeatedly sourceEntry.2.allocation sourceRange destOffset
-      repeatCount pointerSize sameAllocation nonoverlapping destEntry.2.allocation
+  let transfer := Allocation.copyRepeatedly sourceEntry.allocation sourceRange destOffset
+      repeatCount pointerSize sameAllocation nonoverlapping destEntry.allocation
   match transfer with
   | .ok () updatedDestination =>
-      let updatedEntry := { destEntry.2 with allocation := updatedDestination }
+      let updatedEntry := { destEntry with allocation := updatedDestination }
       return ⟨memory.insertLive destId updatedEntry, hooksState, .ok ()⟩
   | .error error updatedDestination =>
-      let updatedEntry := { destEntry.2 with allocation := updatedDestination }
+      let updatedEntry := { destEntry with allocation := updatedDestination }
       return ⟨memory.insertLive destId updatedEntry, hooksState,
         .error (.allocation error)⟩
 
@@ -963,10 +961,10 @@ def memCopyRepeatedly [DecidableEq MachineKind]
               .error (.hookFailure "beforeAllocAccess(source)" message)⟩
   let some (sourceId, sourceOffset, sourceProvExtra) := sourceParts
     | return ⟨afterProbeMemory, afterProbeState, .ok ()⟩
-  let some sourceEntry := afterProbeMemory.live.find? fun entry => entry.1 == sourceId
+  let some sourceEntry := afterProbeMemory.live[sourceId]?
     | return ⟨afterProbeMemory, afterProbeState, .error (.allocationNotLocal sourceId)⟩
   let sourceRange := allocRange sourceOffset size
-  let read := hooks.beforeMemoryRead afterProbeState afterProbeMemory sourceEntry.2.allocation
+  let read := hooks.beforeMemoryRead afterProbeState afterProbeMemory sourceEntry.allocation
       sourcePointer sourceId sourceProvExtra sourceRange
   let readState := hooks.synchronizeMemory read.memory read.hooks
   let afterReadMemory ← match read.outcome with
@@ -975,7 +973,7 @@ def memCopyRepeatedly [DecidableEq MachineKind]
         return ⟨read.memory, readState, .error (.hookFailure "beforeMemoryRead" message)⟩
   let some (destId, destOffset, destProvExtra) := destParts
     | return ⟨afterReadMemory, readState, .ok ()⟩
-  if !(afterReadMemory.live.any fun entry => entry.1 == destId) then
+  if !(afterReadMemory.live.contains destId) then
     return ⟨afterReadMemory, readState, .error (.allocationNotLocal destId)⟩
   let destAccessHook := hooks.beforeAllocationAccess afterReadMemory readState destId
   let destAccessState := hooks.synchronizeMemory destAccessHook.memory destAccessHook.state
@@ -987,10 +985,10 @@ def memCopyRepeatedly [DecidableEq MachineKind]
   let afterDestAccess := hooks.synchronizeMemory destAccessHook.memory afterDestAccess
   let destRange := allocRange destOffset destSize
   let writeBaseMemory := destAccessHook.memory
-  let some destEntry := writeBaseMemory.live.find? fun entry => entry.1 == destId
+  let some destEntry := writeBaseMemory.live[destId]?
     | return ⟨writeBaseMemory, destAccessState, .error (.allocationNotLocal destId)⟩
   let write := hooks.beforeMemoryWrite afterDestAccess writeBaseMemory
-      destEntry.2.allocation destPointer destId destProvExtra destRange
+      destEntry.allocation destPointer destId destProvExtra destRange
   let writeState := hooks.synchronizeMemory write.memory write.hooks
   let afterWriteMemory ← match write.outcome with
     | .ok () => pure write.memory
@@ -1141,9 +1139,9 @@ def deallocatePtrWith [DecidableEq MachineKind]
     | .error message =>
         return ⟨before.memory, beforeState, detached,
           .error (.hookFailure "beforeMemoryDeallocation" message)⟩
-  let deadEntry : DeadAllocation := ⟨allocId, allocation.byteSize, allocation.align⟩
-  let alreadyDead := before.memory.dead.any fun old => old.allocId == allocId
-  let afterDead := before.memory.insertDead deadEntry
+  let deadEntry : DeadAllocation := ⟨allocation.byteSize, allocation.align⟩
+  let alreadyDead := before.memory.dead.contains allocId
+  let afterDead := before.memory.insertDead allocId deadEntry
   let finalState := hooks.synchronizeMemory afterDead beforeState
   if alreadyDead then
     return ⟨afterDead, finalState, detached, .error (.duplicateDeadAllocation allocId)⟩
@@ -1194,8 +1192,8 @@ def reallocatePtr [DecidableEq MachineKind]
   let oldSize ← match oldSizeAndAlign with
     | some (size, _align) => pure (some size)
     | none =>
-        match allocated.memory.live.find? fun entry => entry.1 == oldId with
-        | some (_, oldEntry) => pure (some oldEntry.allocation.byteSize)
+        match allocated.memory.live[oldId]? with
+        | some oldEntry => pure (some oldEntry.allocation.byteSize)
         | none =>
             match allocated.memory.findGlobal? oldId with
             | some global => pure (some global.size)

@@ -17,7 +17,7 @@ theorem ensure_live {K U : Type} [DecidableEq K] (kind : K)
       {view with machine := {view.machine with memory}})
     (state : MachineHooks.State K U) (id : AllocId)
     (entry : LocalAllocation Provenance TreeBorrows.BorrowTree K)
-    (live : state.machine.memory.live.find? (fun row => row.1 == id) = some (id,entry)) :
+    (live : state.machine.memory.live[id]? = some (entry)) :
     GlobalAllocationMachine.ensure kind hooks id state = .ok () state := by
   change (let result := (MemoryLifecycle.getAllocRaw state.machine.memory
       (⟨state.machine, none⟩ : PlaceMachine.AccessState K U) id (some kind) hooks);

@@ -63,7 +63,7 @@ def create (runtime : RuntimeTargetDataLayout) (definitions : Array Input.Defini
   let allocation ← match allocation.writeUninit (allocRange Size.ZERO layout.layout.size) runtime.pointerSize with
     | .ok () allocation => pure allocation
     | .error e _ => throw (.invalidProgram (toString e))
-  let memory := { memory with live := memory.live.push (id,⟨.stack,allocation⟩) }
+  let memory := { memory with live := memory.live.insert id (LocalAllocation.mk .stack allocation) }
   return (⟨memory,#[],image⟩,⟨⟨⟨Size.ZERO,some provenance⟩,.none,none⟩,localMemoryLayout layout⟩)
 
 def write (runtime : RuntimeTargetDataLayout) (state : State) (place : MemoryOperandPlace CtfeProvenance)

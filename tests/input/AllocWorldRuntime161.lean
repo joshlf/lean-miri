@@ -152,7 +152,7 @@ private def stateWith (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTr
     (user : RuntimeUser) : RuntimeState :=
   ⟨Stack.empty, {
     memory, borrowTracker := none, dataRace := none, threads := ThreadManager.initial false,
-    raceAllocations := #[], allocationSpans := #[], user
+    raceAllocations := {}, allocationSpans := #[], user
   }⟩
 
 private def functionHooks (prepared : EvalPreparation.Prepared) (salt : Fin 32) :

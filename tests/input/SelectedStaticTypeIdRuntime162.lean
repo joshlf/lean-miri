@@ -23,7 +23,7 @@ private def stateWith
     (registry : IntrinsicSymbolsMachine.Registry) : TypeIdState :=
   ⟨Stack.empty, {
     memory, borrowTracker := none, dataRace := none, threads := ThreadManager.initial false,
-    raceAllocations := #[], allocationSpans := #[], user := ⟨registry⟩
+    raceAllocations := {}, allocationSpans := #[], user := ⟨registry⟩
   }⟩
 
 def main (args : List String) : IO Unit := do
