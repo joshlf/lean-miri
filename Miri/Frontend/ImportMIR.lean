@@ -130,6 +130,8 @@ deriving instance ToExpr for Input.InstanceKind
 deriving instance ToExpr for Input.Obligation
 deriving instance ToExpr for Input.SourcePosition
 deriving instance ToExpr for Input.ExpansionLocation
+deriving instance ToExpr for Input.SyntaxContext
+deriving instance ToExpr for Input.SourceExpansion
 deriving instance ToExpr for Input.SourceSpanData
 deriving instance ToExpr for Input.SourceInfo
 deriving instance ToExpr for Input.Producer
@@ -194,8 +196,6 @@ deriving instance ToExpr for Input.CallAbiEvidence
 deriving instance ToExpr for Input.CallResolutionEvidence
 deriving instance ToExpr for Input.InlinedScope
 deriving instance ToExpr for Input.SourceScope
-deriving instance ToExpr for Input.CompilerSourcePosition
-deriving instance ToExpr for Input.BacktraceSpan
 deriving instance ToExpr for Input.LocalDecl
 deriving instance ToExpr for Input.ThreadLocalEvidence
 deriving instance ToExpr for Input.PlaceFact

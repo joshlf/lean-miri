@@ -20,7 +20,7 @@ private def body (bits : String) (localId : Nat := 0) :=
   ",\"type\":0,\"projection\":[]},\"rvalue\":{\"kind\":\"Use\",\"retag\":{\"kind\":\"no\",\"performs_retag\":false},\"operand\":" ++ literal bits ++ "}}}]," ++
   "\"terminator\":{\"source_info\":" ++ source ++ ",\"kind\":{\"variant\":\"Return\"}}}]," ++
   "\"source_scopes\":[{\"scope\":0,\"span\":0,\"parent\":null,\"inlined\":null,\"inlined_parent_scope\":null}]," ++
-  "\"source_def_id\":0,\"span\":0,\"preamble_def_span\":0,\"backtrace_spans\":[],\"required_consts\":[]}"
+  "\"source_def_id\":0,\"span\":0,\"preamble_def_span\":0,\"required_consts\":[]}"
 
 private def decode (text : String) := do
   DecodeMIR.resolveBody context (← JsonReader.run (DecodeMIR.parseBody "bodies[0]") text)

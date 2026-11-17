@@ -149,8 +149,5 @@ def validateLayout (layout : Layout) (path : String) : Except String Unit := do
 
 def validateBody (body : Body) (path : String) : Except String Unit := do
   validatePromotedBody body.promotedBodies (path ++ ".promoted_bodies")
-  for (entry, index) in body.backtraceSpans.toList.zipIdx do
-    unless entry.position.bytePosition < 2^32 do
-      throw s!"{path}.backtrace_spans[{index}]: compiler BytePos exceeds u32"
 
 end Miri.Input.LocalValidation

@@ -15,7 +15,7 @@ open Lean
 def expectedMiriCommit : String := "93c45edea8b148a6b6f05ec9384449a04217143f"
 def expectedRustcCommit : String := "8eb778d04094d3af4b26580cab327e0413eb1e02"
 def expectedSchema : String := "lean-miri-rustc-mir"
-def expectedSchemaVersion : Nat := 15
+def expectedSchemaVersion : Nat := 16
 
 def escapePathKey (key : String) : String :=
   key.toList.foldl (fun out char => out ++ match char with
@@ -163,7 +163,8 @@ private structure parseSourceSpanFields where
   «hi» : Option (Nat) := none
   «start» : Option (SourcePosition) := none
   «end» : Option (SourcePosition) := none
-  «ctxt» : Option (String) := none
+  «ctxt» : Option Nat := none
+  runtimeFile : Option Nat := none
   «file» : Option (Nat) := none
   expansionLocation : Option ExpansionLocation := none
 
@@ -176,12 +177,13 @@ def parseSourceSpan (_path : String := "$parseSourceSpan") : Parser (SourceSpanD
     | "hi" => return { s with «hi» := some (← natural) }
     | "start" => return { s with «start» := some (← parseSourcePosition) }
     | "end" => return { s with «end» := some (← parseSourcePosition) }
-    | "ctxt" => return { s with «ctxt» := some (← string) }
+    | "ctxt" => return { s with «ctxt» := some (← natural) }
+    | "runtime_file" => return {s with runtimeFile := some (← natural)}
     | "file" => return { s with «file» := some (← natural) }
     | _ => skipValue; pure s
   return {
     isDummy := (← required s.«is_dummy» "is_dummy"), lo := (← required s.«lo» "lo"), hi := (← required s.«hi» "hi"), start := (← required s.«start» "start"),
-    «end» := (← required s.«end» "end"), context := (← required s.«ctxt» "ctxt"), file := (← required s.«file» "file"), expansionLocation := ← required s.expansionLocation "expansion_location" }
+    «end» := (← required s.«end» "end"), context := (← required s.«ctxt» "ctxt"), runtimeFile := ← required s.runtimeFile "runtime_file", file := (← required s.«file» "file"), expansionLocation := ← required s.expansionLocation "expansion_location" }
 
 private structure parseSourceInfoFields where
   «span» : Option (Nat) := none

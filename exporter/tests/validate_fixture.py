@@ -9,7 +9,7 @@ from mir_json import load_mir_inspection_document as load_mir_document, pool_ent
 
 doc = load_mir_document(sys.argv[1])
 assert doc["schema"] == "lean-miri-rustc-mir"
-assert doc["schema_version"] == 15
+assert doc["schema_version"] == 16
 assert doc["compiler_coroutine_coverage"]["body_coroutines"] == [False] * len(doc["bodies"])
 assert doc["compiler_coroutine_coverage"]["coroutines"] == []
 assert doc["compiler_coroutine_coverage"]["auxiliary_bodies"] == []
@@ -20,12 +20,11 @@ assert all(isinstance(name, str) for name in doc["files"])
 assert len(doc["files"]) == len(set(doc["files"])), "duplicate filename spellings"
 for span in doc["spans"]:
     assert type(span["file"]) is int and 0 <= span["file"] < len(doc["files"])
-for body in doc["bodies"]:
-    for span in body["backtrace_spans"]:
-        assert "collapsed_lo" not in span
-        assert type(span["source_position"]["byte_position"]) is int
-        filename = span["source_position"]["filename"]
-        assert type(filename) is int and 0 <= filename < len(doc["files"])
+assert doc["syntax_contexts"][0]["outer_expansion"] is None
+for span in doc["spans"]:
+    assert 0 <= span["runtime_file"] < len(doc["files"])
+    assert 0 <= span["ctxt"] < len(doc["syntax_contexts"])
+assert all("backtrace_spans" not in body for body in doc["bodies"])
 type_nodes = {node["type_id"]: node for node in doc["types"]}
 assert type_nodes, "compilation-scoped type graph missing"
 assert sorted(type_nodes) == list(range(len(type_nodes))), "type IDs must be session-local monotonic IDs"

@@ -16,7 +16,8 @@ except ImportError:
     from coroutine_json import validate_catalog
 
 POOL_NAMES = frozenset({"types", "allocations", "instances", "spans",
-                        "definitions", "type_constants", "bodies", "predicates"})
+                        "definitions", "type_constants", "bodies", "predicates",
+                        "syntax_contexts", "expansions"})
 
 
 class MirJSONError(ValueError):
@@ -28,8 +29,8 @@ def decode_mir_document(document: Any) -> dict[str, Any]:
         raise MirJSONError("MIR document root must be an object")
     if document.get("schema") != "lean-miri-rustc-mir":
         raise MirJSONError("document is not a lean-miri-rustc-mir export")
-    if type(document.get("schema_version")) is not int or document["schema_version"] != 15:
-        raise MirJSONError("MIR root schema_version must be 15")
+    if type(document.get("schema_version")) is not int or document["schema_version"] != 16:
+        raise MirJSONError("MIR root schema_version must be 16")
     for name in sorted(POOL_NAMES):
         if not isinstance(document.get(name), list):
             raise MirJSONError(f"{name} must be a pool array")
@@ -112,5 +113,5 @@ def inspection_document(document: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_mir_inspection_document(path: str | Path) -> dict[str, Any]:
-    """Load a schema-15 document and explicitly resolve shared inspection payloads."""
+    """Load a schema-16 document and explicitly resolve shared inspection payloads."""
     return inspection_document(load_mir_document(path))

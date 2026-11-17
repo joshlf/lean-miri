@@ -28,6 +28,8 @@ structure ImportDocument where
   /-- Exact diagnostic and remapped filenames, shared across all source records. -/
   files : Array String := #[]
   spans : Array SourceSpanData := #[]
+  syntaxContexts : Array SyntaxContext := #[]
+  expansions : Array SourceExpansion := #[]
   types : Array TypeNode
   allocations : Array AllocationNode
   compilerAllocIdWorld : Option CompilerAllocIdWorld := none

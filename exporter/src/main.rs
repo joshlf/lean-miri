@@ -35,6 +35,7 @@ mod resolution_values;
 mod retag_queries;
 mod shared_json;
 mod shim_abi;
+mod source_hygiene;
 mod source_traits;
 mod source_vtables;
 mod startup_queries;
@@ -82,7 +83,7 @@ fn export_failure<T>(context: &str, details: impl std::fmt::Display) -> Result<T
 
 const EXPECTED_RUSTC_COMMIT: &str = "8eb778d04094d3af4b26580cab327e0413eb1e02";
 const MIRI_COMMIT: &str = "93c45edea8b148a6b6f05ec9384449a04217143f";
-const ROOT_SCHEMA_VERSION: u64 = 15;
+const ROOT_SCHEMA_VERSION: u64 = 16;
 
 struct Options {
     output: PathBuf,
@@ -192,6 +193,8 @@ struct ExportDocument {
     type_constants: Vec<pool_values::TypeConstant>,
     files: Vec<String>,
     spans: Vec<pool_values::Span>,
+    syntax_contexts: Vec<source_hygiene::SyntaxContext>,
+    expansions: Vec<source_hygiene::Expansion>,
     #[serde(flatten)]
     shared_values: shared_json::Values,
     instances: Vec<pool_instance::Instance>,
@@ -279,6 +282,8 @@ struct ExportContext<'tcx> {
     type_constants: Pool<ty::Const<'tcx>, pool_values::TypeConstant>,
     files: pool_values::Files,
     spans: Pool<rustc_span::Span, pool_values::Span>,
+    syntax_contexts: Pool<rustc_span::SyntaxContext, source_hygiene::SyntaxContext>,
+    expansions: Pool<rustc_span::hygiene::ExpnId, source_hygiene::Expansion>,
     type_ids: Pool<rustc_middle::ty::Ty<'tcx>, pool_type::Type>,
     type_nodes_in_progress: HashSet<rustc_middle::ty::Ty<'tcx>>,
     byte_images: allocation_values::ByteImages,
@@ -299,9 +304,6 @@ struct ExportContext<'tcx> {
     predicate_ids: Pool<ty::PolyExistentialPredicate<'tcx>, allocation_values::Predicate>,
     predicates_in_progress: HashSet<ty::PolyExistentialPredicate<'tcx>>,
     pending_predicates: Vec<ty::PolyExistentialPredicate<'tcx>>,
-    /// Caller-location construction is a rustc hook, not a memoized query;
-    /// each invocation allocates a fresh global. Cache the exact serialized
-    /// result once per source span so closure rounds do not invent identities.
     vtable_demands: OrderedSet<(
         ty::Ty<'tcx>,
         &'tcx ty::List<ty::PolyExistentialPredicate<'tcx>>,
@@ -1751,6 +1753,8 @@ impl ExportCallbacks {
             type_constants: export_context.type_constants.finish("type_constant")?,
             files: export_context.files.finish(),
             spans: export_context.spans.finish("span_id")?,
+            syntax_contexts: export_context.syntax_contexts.finish("syntax context")?,
+            expansions: export_context.expansions.finish("expansion")?,
             shared_values: shared_json::Values::default(),
             instances: export_context.instance_ids.finish("instance_id")?,
             types: export_context.type_ids.finish("type_id")?,
@@ -2707,7 +2711,6 @@ fn mir_body_json<'tcx>(
     let result = pool_body::Body {
         instance_id,
         preamble_def_span: span_json(context, tcx, tcx.def_span(body.source.def_id())),
-        backtrace_spans: backtrace_spans_json(context, tcx, body).into(),
         source_def_id: def_json(context, body.source.def_id()),
         phase: mir_phase_json(body.phase),
         injection_phase: body.injection_phase.map(mir_phase_json),
@@ -2809,6 +2812,9 @@ fn span_json<'tcx>(
         let map = tcx.sess.source_map();
         let start = map.lookup_char_pos(span.lo());
         let end = map.lookup_char_pos(span.hi());
+        let ctxt = source_hygiene::context(context, tcx, span.ctxt());
+        let runtime_file = context.files.intern(start.file.name
+            .prefer_remapped_unconditionally().to_string());
         let expansion = span.ctxt().outer_expn().expansion_cause().unwrap_or(span);
         let location = map.lookup_char_pos(expansion.lo());
         let expansion_location = pool_values::SourceLocation {
@@ -2823,7 +2829,8 @@ fn span_json<'tcx>(
                 is_dummy: span.is_dummy(),
                 lo: span.lo().0,
                 hi: span.hi().0,
-                ctxt: format!("{:?}", span.ctxt()),
+                ctxt,
+                runtime_file,
                 expansion_location,
                 file: context.files.intern(format!("{:?}", start.file.name)),
                 start: pool_values::Position {
@@ -5523,53 +5530,6 @@ fn compiler_frame_metadata_json(tcx: TyCtxt<'_>) -> FrameMetadata {
             })
             .collect(),
     }
-}
-
-// backtrace.rs::handle_miri_get_backtrace and resolve_frame_pointer. The table
-// covers compiler-produced frame positions only. Forged/unseen byte positions
-// require additional source-map evidence; consumers must never guess a line.
-fn backtrace_spans_json<'tcx>(
-    context: &mut ExportContext<'tcx>,
-    tcx: TyCtxt<'tcx>,
-    body: &rustc_middle::mir::Body<'tcx>,
-) -> Vec<pool_body::BacktraceSpan> {
-    let mut spans = vec![body.span, tcx.def_span(body.source.def_id())];
-    for local in body.local_decls.iter() {
-        spans.push(local.source_info.span);
-    }
-    for block in body.basic_blocks.iter() {
-        for statement in &block.statements {
-            spans.push(statement.source_info.span);
-        }
-        if let Some(terminator) = &block.terminator {
-            spans.push(terminator.source_info.span);
-        }
-    }
-    let mut seen = HashSet::new();
-    let records = spans
-        .into_iter()
-        .filter(|span| seen.insert(*span))
-        .map(|span| {
-            let collapsed = rustc_span::hygiene::walk_chain_collapsed(span, body.span);
-            let position = tcx.sess.source_map().lookup_char_pos(collapsed.lo());
-            pool_body::BacktraceSpan {
-                span: span_json(context, tcx, span),
-                source_position: pool_body::SourcePosition {
-                    byte_position: collapsed.lo().0,
-                    line: position.line,
-                    zero_based_char_column: position.col.0,
-                    filename: context.files.intern(
-                        position
-                            .file
-                            .name
-                            .prefer_remapped_unconditionally()
-                            .to_string(),
-                    ),
-                },
-            }
-        })
-        .collect::<Vec<_>>();
-    records
 }
 
 // interpret/discriminant.rs and Ty::{discriminant_ty,discriminant_for_variant}.

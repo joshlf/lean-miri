@@ -24,7 +24,7 @@ empty-function proof modules and the 78,057-declaration axiom audit, and its
 fresh standard-library startup export executes with exit code zero. Historical
 results explicitly naming `c8daa215` retain their original scope.
 
-Schema 15 exports concrete instance/promoted MIR from selected roots, evaluated
+Schema 16 exports concrete instance/promoted MIR from selected roots, evaluated
 constants, concrete type structure and finite declaration material. Executables
 default to their entry function; libraries require explicit roots. Repeated
 `--root` options select multiple definitions. Generic roots contribute
@@ -70,6 +70,25 @@ filename constant through byte/salt dedup. Synthetic trailing padding remains
 uninitialized. These are finite comparisons; the empty-function proof checks the
 new input path and does not prove general caller-location constructor equivalence.
 
+Schema 16 replaces body/span backtrace answers with finite syntax-context and
+expansion declarations, call-site spans and exact remapped source positions.
+Lean computes collapse at demand. Input validation checks graph references,
+root/acyclicity and consistent BytePos positions once. Five kernel lemmas cover
+steps and the conditional finite-chain invariant: sufficient fuel returns the
+last collapse-marked callsite before the body/root boundary, or the original
+span. Validator completeness and general rustc equivalence remain unproved.
+
+Fresh backtrace comparisons pass ordinary, Unicode-remapped and diagnostics-only
+profiles: 72 guest-visible events match function raw IDs, BytePos, line/char
+column, names, filenames and order. Independent rustc walk comparisons match
+47,260 std cases and 115,422 runtime-fixture cases. The event fixture uses
+nongeneric inline-never functions so resolved/opaque pointers share an identity;
+that observation does not establish such identity equality for generic functions.
+Caller-location's nine profiles also pass after the schema change. Unknown
+positions outside known span starts remain Unsupported; full arbitrary-BytePos
+source-map lookup is not implemented. Private collapse attributes are trusted
+compiler projections through a checked public one-step API, not parsed debug text.
+
 Fresh schema-14 ordinary-std startup and dynamic-upcast/provenance guests complete
 with `finalized_exit code=0`; both also match their same-TyCtxt references.
 Finite std compiler comparisons agree for 10,931 layouts, 196,758 Boolean type
@@ -108,9 +127,9 @@ The proof covers the diagnostic-off profile; collection-enabled UI executions
 are separate finite comparisons. The Rust source, target theorem and caller-domain
 premises are unchanged. At main `c8daa215`, the committed schema-11 input passed
 all 268 proof modules and the 77,958-declaration transitive axiom audit.
-Separately, the schema-15 fixture passes the canonical checker on its actual
+Separately, the schema-16 fixture passes the canonical checker on its actual
 input path with the current compiler/Miri pins: all 268 modules, the final
-`target`/`noUB` types, and 78,272 imported declarations including private/generated
+`target`/`noUB` types, and 78,270 imported declarations including private/generated
 declarations. Only `propext`, `Classical.choice` and `Quot.sound` occur.
 Input, example and library-source hashes remained unchanged during the successful
 check; the compiled proof artifacts are recorded separately.
@@ -812,6 +831,32 @@ transitive axiom audit pass with matching library/example source freezes and
 fixed input hashes. Rust/MIR bytes, SHA records, claims and budgets are unchanged.
 
 ### Performance and optimization assurance
+
+The backtrace-on-demand comparison uses main `45640654` and schema 16 with
+`tests/repro/startup/empty-main.rs`, identical absolute source path, roots, Rust
+flags and prepared sysroot in the backtrace worktree. Three alternating pairs
+run on CPU 0 with one Lean thread and diagnostic seed zero, without profiling,
+oracle output or concurrent checks. All six trials have the same runtime profile,
+exit code zero and cursor 1608; source and per-variant input hashes are stable.
+
+| Metric | main | Backtrace on demand |
+| --- | --- | --- |
+| Export-to-result wall median, seconds (min–max) | 6.904 (6.902–7.647) | 6.621 (6.519–6.912) |
+| Total process CPU median, seconds | 6.809 | 6.524 |
+| Export wall median, seconds | 1.870 | 1.592 |
+| Lean runner wall median, seconds | 5.032 | 5.063 |
+| Exported bytes | 67,344,603 | 63,278,260 |
+| Maximum exporter child RSS, bytes | 329,007,104 | 324,501,504 |
+| Maximum runner child RSS, bytes | 471,932,928 | 461,082,624 |
+
+Serialized size decreases by 6.04%. The observed wall/CPU medians decrease by
+4.10%/4.19%, with overlapping sample ranges; these shared-host trials do not
+establish a small speedup. The exporter improves in these samples; runner time
+stays within the observed spread. Same-CPU steal is 2–12 ticks per phase and
+cgroup throttling is zero. Exporter/runner SHA-256 prefixes are
+`3be1d4582636`/`baadb4633a7f` for main and `6af11c7fea47`/`1979e06844fb`
+for backtrace on demand. The following caller-location results are historical
+measurements from their original worktree and revision.
 
 The final-artifact comparison uses `tests/repro/startup/empty-main.rs`, main
 `0939bd70` and the runtime caller-location implementation, with identical

@@ -12,7 +12,7 @@ from mir_json import MirJSONError, POOL_NAMES, decode_mir_document, load_mir_doc
 
 
 def document(**fields):
-    value = {"schema": "lean-miri-rustc-mir", "schema_version": 15,
+    value = {"schema": "lean-miri-rustc-mir", "schema_version": 16,
              **{name: [] for name in POOL_NAMES}, **{name: [] for name in SHARED_POOLS},
              "files": [], "byte_images": [], "source_trait_material": {},
              "source_vtables": {}, "source_abi": {}, "source_cast_targets": [],
@@ -65,20 +65,20 @@ class MirJSONTests(unittest.TestCase):
                     decode_mir_document(document(**{name: value}))
 
     def test_requires_current_schema_version(self):
-        for version in (4, 6, 7, 8, 9, 10, 11, 12, 13, 14, True, "15", 15.0):
-            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 15"):
+        for version in (4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, True, "16", 16.0):
+            with self.subTest(version=version), self.assertRaisesRegex(MirJSONError, "schema_version must be 16"):
                 decode_mir_document(document(schema_version=version))
 
     def test_current_schema_requires_exact_coroutine_catalog_and_preserves_version(self):
         catalog = {"body_coroutines": [], "coroutines": [], "auxiliary_bodies": []}
-        current = document(schema_version=15, compiler_coroutine_coverage=catalog)
+        current = document(schema_version=16, compiler_coroutine_coverage=catalog)
         self.assertIs(decode_mir_document(current), current)
-        self.assertEqual(expand_document(current)["schema_version"], 15)
+        self.assertEqual(expand_document(current)["schema_version"], 16)
         for invalid in (None, {}, {**catalog, "unknown_witness": True},
                         {**catalog, "body_coroutines": [False]},
                         {**catalog, "body_coroutines": [0]}):
             with self.subTest(catalog=invalid), self.assertRaises(MirJSONError):
-                decode_mir_document(document(schema_version=15, compiler_coroutine_coverage=invalid))
+                decode_mir_document(document(schema_version=16, compiler_coroutine_coverage=invalid))
         with self.assertRaises(MirJSONError):
             missing = document()
             del missing["compiler_coroutine_coverage"]
@@ -99,7 +99,7 @@ class MirJSONTests(unittest.TestCase):
                               "storage_conflicts": [[]]},
                    "drop_sync": None, "drop_async": 0, "drop_proxy_async": None}
         catalog = {"body_coroutines": [True], "coroutines": [witness], "auxiliary_bodies": [auxiliary]}
-        current = document(schema_version=15, bodies=[body], types=[{}], instances=[{}], definitions=[{}], spans=[{}],
+        current = document(schema_version=16, bodies=[body], types=[{}], instances=[{}], definitions=[{}], spans=[{}],
                            source_infos=[{"span": 0, "scope": 0}], compiler_coroutine_coverage=catalog)
         self.assertIs(decode_mir_document(current), current)
         expanded = expand_document(current)
@@ -131,12 +131,10 @@ class MirJSONTests(unittest.TestCase):
 
     def test_filename_ids_stay_shared_and_unexpanded(self):
         encoded = document(files=["src/a.rs", "src/b.rs"],
-                           spans=[{"file": 0}, {"file": 1}, {"file": 0}],
-                           bodies=[{"backtrace_spans": 0}],
-                           backtrace_spans=[[{"source_position": {"filename": 0}}]])
+                           spans=[{"file": 0, "runtime_file": 1}, {"file": 1, "runtime_file": 0}])
         self.assertIs(decode_mir_document(encoded), encoded)
-        self.assertEqual([row["file"] for row in encoded["spans"]], [0, 1, 0])
-        self.assertEqual(encoded["backtrace_spans"][0][0]["source_position"]["filename"], 0)
+        self.assertEqual([row["file"] for row in encoded["spans"]], [0, 1])
+        self.assertEqual([row["runtime_file"] for row in encoded["spans"]], [1, 0])
         for invalid in (None, {}, [0], ["src/a.rs", False]):
             with self.subTest(invalid=invalid), self.assertRaises(MirJSONError):
                 decode_mir_document(document(files=invalid))
@@ -144,7 +142,7 @@ class MirJSONTests(unittest.TestCase):
     def test_lossless_pool_projection_preserves_identity_and_defaults(self):
         raw = document(types=[{"source_layout": {"normalized_type": 0, "is_box": False,
                                                 "simd": None, "variant_discriminants": []}}],
-            bodies=[{"backtrace_spans": [], "locals": [{"source_info": {"span": 0, "scope": 0}}],
+            bodies=[{"locals": [{"source_info": {"span": 0, "scope": 0}}],
                      "basic_blocks": [{"statements": [{"source_info": {"span": 0, "scope": 0},
                         "kind": {"variant": "Nop"}}], "terminator": {"source_info": {"span": 0, "scope": 0},
                         "kind": {"variant": "Return"}}}]}],

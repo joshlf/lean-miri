@@ -5,6 +5,7 @@ pub(super) struct Material {
     types: Vec<TypeFact>,
     abi: oracle_abi::Material,
     vtables: Vec<VtableFact>,
+    backtrace_walks: Vec<source_hygiene::WalkOracle>,
 }
 
 #[derive(serde::Serialize)]
@@ -209,6 +210,7 @@ pub(super) fn collect<'tcx>(
         types,
         abi: oracle_abi::collect(tcx, context)?,
         vtables,
+        backtrace_walks: source_hygiene::oracle(tcx, context)?,
     })
 }
 

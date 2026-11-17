@@ -18,7 +18,7 @@ private def context : DecodeMIR.Context := {
 private def decode (statements : List String) (phase : String := tag "runtime" [("phase",s "optimized")]) := do
   let body := obj [
     ("def_id","0"),("instance_id","0"),("phase",phase),("arg_count","0"),("spread_arg","null"),
-    ("span","0"),("preamble_def_span","0"),("backtrace_spans","[]"),("required_consts","[]"),
+    ("span","0"),("preamble_def_span","0"),("required_consts","[]"),
     ("locals",arr [obj [("local","0"),("type","0"),("source_info",info)]]),
     ("source_scopes",arr [obj [("scope","0"),("parent","null"),("span","0"),("inlined","null"),("inlined_parent_scope","null")]]),
     ("basic_blocks",arr [obj [("block","0"),("is_cleanup","false"),("statements",arr (statements.map node)),

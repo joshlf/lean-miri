@@ -58,7 +58,6 @@ impl<T: Serialize> Payloads<T> {
 pub(super) struct Values {
     initialization_ranges: Payloads<Vec<crate::allocation_values::InitializationRange>>,
     relocations: Payloads<Vec<crate::allocation_values::Relocation>>,
-    backtrace_spans: Payloads<Vec<crate::pool_body::BacktraceSpan>>,
     statement_kinds: Payloads<crate::pool_body::StatementKind>,
     source_infos: Payloads<crate::pool_body::SourceInfo>,
 }
@@ -93,7 +92,6 @@ pub(super) fn freeze(document: &mut crate::ExportDocument) -> Result<(), String>
         }
     }
     for body in document.bodies.iter_mut().chain(document.compiler_coroutine_coverage.auxiliary_bodies.iter_mut().map(|row| &mut row.body)) {
-        pools.backtrace_spans.share(&mut body.backtrace_spans)?;
         for local in &mut body.locals {
             pools.source_infos.share(&mut local.source_info)?;
         }
@@ -309,7 +307,6 @@ mod semantic_tests {
         for field in [
             "initialization_ranges",
             "relocations",
-            "backtrace_spans",
             "statement_kinds",
             "source_infos",
         ] {

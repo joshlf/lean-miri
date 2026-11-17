@@ -5,21 +5,21 @@ open Miri Miri.Input
 
 private def span : SourceSpanData := {
   lo := 3, hi := 8,
-  start := ⟨1, 2⟩, «end» := ⟨1, 7⟩, context := "ctx", file := 0, expansionLocation := ⟨0,1,3⟩ }
+  start := ⟨1, 2⟩, «end» := ⟨1, 7⟩, context := 0, file := 0, runtimeFile := 0, expansionLocation := ⟨0,1,3⟩ }
 
 private def check (ok : Bool) (message : String) : IO Unit :=
   unless ok do throw (IO.userError message)
 
 def main : IO Unit := do
   let fields := "\"is_dummy\":false,\"lo\":3,\"hi\":8,\"start\":{\"line\":1,\"column\":2}," ++
-    "\"end\":{\"line\":1,\"column\":7},\"file\":0,\"expansion_location\":{\"file\":0,\"line\":1,\"column\":3},\"ctxt\":"
-  let text := "{ " ++ fields ++ "\"#7\\n\\\"macro\\\"\"}"
+    "\"end\":{\"line\":1,\"column\":7},\"file\":0,\"runtime_file\":0,\"expansion_location\":{\"file\":0,\"line\":1,\"column\":3},\"ctxt\":"
+  let text := "{ " ++ fields ++ "7}"
   let .ok decoded := JsonReader.run DecoderValues.parseSourceSpan text
-    | throw (IO.userError "source context string rejected")
-  check (decoded.context == "#7\n\"macro\"") "source context diagnostic text changed"
-  let legacy := "{" ++ fields ++ "{\"status\":\"debug_payload\",\"rustc_debug\":\"#7\"}}"
-  check (!(JsonReader.run DecoderValues.parseSourceSpan legacy).isOk)
-    "source context object accepted instead of a string"
+    | throw (IO.userError "typed source context rejected")
+  check (decoded.context == 7) "source context identity changed"
+  for invalid in #["\"#7\"", "{}", "true", "null"] do
+    check (!(JsonReader.run DecoderValues.parseSourceSpan ("{" ++ fields ++ invalid ++ "}")).isOk)
+      "non-numeric source context accepted"
   let tables : CompilerTables := {spans := #[span, span], definitions := #[], typeConstants := #[]}
   for id in #[0, 1] do
     let .ok (reference, after) := lowerCompilerSpan tables ⟨id⟩

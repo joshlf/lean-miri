@@ -948,7 +948,6 @@ structure ParseBodyFields where
   injection_phase : Option (Option MIR.MirPhase) := none
   instance_id : Option Nat := none
   source_scopes : Option (Array SourceScope) := none
-  backtrace_spans : Option (Array BacktraceSpan) := none
   required_consts : Option (Array MIR.ConstOperand) := none
   promoted_bodies : Option (Array PromotedBody) := none
 
@@ -967,14 +966,6 @@ def parseBodyField (sourcePath : String) (s : ParseBodyFields) (key : String) : 
   | "injection_phase" => return {s with injection_phase := some (← MIRParser.nullable phase)}
   | "instance_id" => return {s with instance_id := some (← natural)}
   | "source_scopes" => return {s with source_scopes := some (← MIRParser.array scope)}
-  | "backtrace_spans" =>
-    let value ← match (← get).pools with
-      | none => JsonReader.arrayIndexed (fun index => backtrace s!"{sourcePath}.backtrace_spans[{index}]")
-      | some pools => do
-        let id ← natural
-        let some value := pools.backtraces[id]? | reject s!"{sourcePath}.backtrace_spans: unresolved backtrace {id}"
-        pure value
-    return {s with backtrace_spans := some value}
   | "required_consts" => return {s with required_consts := some (← MIRParser.array parseConstOperand)}
   | "promoted_bodies" => return {s with promoted_bodies := some (← MIRParser.array (promotedBody s!"{sourcePath}.promoted_bodies"))}
   | _ => skipValue; pure s
@@ -1001,8 +992,6 @@ def finishParseBodyFields (sourcePath : String) (s : ParseBodyFields) : MIRParse
     recordType decl.typeId
     recordSpan decl.sourceInfo.spanId
     recordScope decl.sourceInfo.scope
-  let backtraceSpans ← required s.backtrace_spans "backtrace_spans"
-  for backtrace in backtraceSpans do recordSpan backtrace.spanId
   let definitionId := s.def_id.join.orElse (fun _ => s.source_def_id.join)
   for id in definitionId do recordDef id
   let spanId ← required s.span "span"
@@ -1015,7 +1004,7 @@ def finishParseBodyFields (sourcePath : String) (s : ParseBodyFields) : MIRParse
     definitionId, defPath := s.def_path.join.getD sourcePath, sourcePath,
     spanId, preambleDefSpanId, injectionPhase := s.injection_phase.join,
     instanceId := (← required s.instance_id "instance_id"), localSources := locals.map (·.sourceInfo), sourceScopes := scopes,
-    backtraceSpans, callEvidence := blocks.map (·.2.evidence), nodeFacts := blocks.map (·.2.facts),
+    callEvidence := blocks.map (·.2.evidence), nodeFacts := blocks.map (·.2.facts),
     requiredConsts := (← required s.required_consts "required_consts"),
     promotedBodies := s.promoted_bodies.getD #[] }
 def parseBodyRaw (sourcePath : String) : MIRParser.Parser Body := do

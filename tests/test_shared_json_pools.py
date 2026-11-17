@@ -28,7 +28,7 @@ class SharedFixturePoolTests(unittest.TestCase):
 
     def test_complete_payload_dedup_preserves_source_and_allocation_identities(self):
         source = {
-            "schema_version": 15,
+            "schema_version": 16,
             "byte_images": ["00"],
             "types": [{"type_id": 0, "source_layout": {"normalized_type": 0}}],
             "allocations": [
@@ -36,7 +36,7 @@ class SharedFixturePoolTests(unittest.TestCase):
                  "initialization_ranges": [[0, 1]], "relocations": []},
                 {"allocation_id": 1, "source_alloc_id": 29, "byte_image_id": 0,
                  "initialization_ranges": [], "relocations": []}],
-            "bodies": [{"backtrace_spans": [], "basic_blocks": [{"statements": [
+            "bodies": [{"basic_blocks": [{"statements": [
                 {"source_info": {"span": 0, "scope": 0}, "kind": {"variant": "Nop"}},
                 {"source_info": {"span": 0, "scope": 0}, "kind": {"variant": "Nop"}},
                 {"source_info": {"span": 0, "scope": 1}, "kind": {"variant": "StorageLive", "local": 0}},
@@ -57,8 +57,7 @@ class SharedFixturePoolTests(unittest.TestCase):
 
     def test_invalid_shared_references_fail(self):
         for field, pool in [("source_info", "source_infos"), ("relocations", "relocations"),
-                            ("initialization_ranges", "initialization_ranges"),
-                            ("backtrace_spans", "backtrace_spans")]:
+                            ("initialization_ranges", "initialization_ranges")]:
             for invalid in (-1, 1, True, 0.0, None):
                 with self.subTest(field=field, reference=invalid), self.assertRaisesRegex(ValueError, "out of range"):
                     expand_document({pool: [{}], "payload": {field: invalid}})
@@ -67,10 +66,10 @@ class SharedFixturePoolTests(unittest.TestCase):
                 expand_document({"statement_kinds": [{}], "statements": [{"kind": invalid}]})
 
     def test_pooling_rejects_historical_and_malformed_schema(self):
-        for version in (8, 11, 12, 13, 14, True, "15", 15.0, None):
-            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "requires schema 15"):
+        for version in (8, 11, 12, 13, 14, 15, True, "16", 16.0, None):
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, "requires schema 16"):
                 pool_document({"schema_version": version})
-        self.assertEqual(set(SHARED_POOLS), {"initialization_ranges", "relocations", "backtrace_spans",
+        self.assertEqual(set(SHARED_POOLS), {"initialization_ranges", "relocations",
                                            "statement_kinds", "source_infos"})
 
 

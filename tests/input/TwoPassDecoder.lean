@@ -84,7 +84,6 @@ private def checkPlaceFactsOrder (fixture : String) : IO Unit := do
   let terminator := obj #[("source_info", info), ("kind", obj #[("variant", Json.renderString "Return")])]
   let block := obj #[("block", "0"), ("is_cleanup", "false"),
     ("statements", arr #[statement]), ("terminator", terminator)]
-  let original ← must (set original "backtrace_spans" "[]")
   let source ← must (set (← must (set original "locals" (arr #[declaration 0, declaration 1])))
     "basic_blocks" (arr #[block]))
   let context : DecodeMIR.Context := {

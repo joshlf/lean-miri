@@ -619,37 +619,6 @@ def scope : Parser (SourceScope) := do
     | _ => skipValue; pure v
   return { id := (← required v.scope "scope"), spanId := (← required v.span "span"), parent := v.parent.join, inlinedParent := v.inlined_parent_scope.join, inlined := v.inlined.join }
 
-private structure BacktracePositionFields where
-  byte_position : Option (Nat) := none
-  line : Option (Nat) := none
-  zero_based_char_column : Option (Nat) := none
-  filename : Option (Nat) := none
-
-def backtracePosition : Parser (CompilerSourcePosition) := do
-  let v ← object ({} : BacktracePositionFields) fun v key => do
-    match key with
-    | "byte_position" => return { v with byte_position := some (← natural) }
-    | "line" => return { v with line := some (← natural) }
-    | "zero_based_char_column" => return { v with zero_based_char_column := some (← natural) }
-    | "filename" => return { v with filename := some (← natural) }
-    | _ => skipValue; pure v
-  return { bytePosition := (← required v.byte_position "byte_position"), line := (← required v.line "line"), column := (← required v.zero_based_char_column "zero_based_char_column"), filename := (← required v.filename "filename") }
-
-private structure BacktraceFields where
-  span : Option (Nat) := none
-  source_position : Option (CompilerSourcePosition) := none
-
-def backtrace (path : String) : Parser (BacktraceSpan) := do
-  let v ← object ({} : BacktraceFields) fun v key => do
-    match key with
-    | "span" => return { v with span := some (← natural) }
-    | "source_position" => return { v with source_position := some (← backtracePosition) }
-    | _ => skipValue; pure v
-  let spanId ← required v.span "span"
-  let position ← required v.source_position "source_position"
-  unless position.bytePosition < 2^32 do fail s!"{path}: compiler BytePos exceeds u32"
-  return { spanId, position }
-
 private structure CallEvidenceFields where
   kind : Option (String) := none
   instance_id : Option (Option Nat) := none

@@ -105,13 +105,23 @@ structure ExpansionLocation where
   column : UInt32
   deriving Repr, DecidableEq
 
+structure SyntaxContext where
+  outerExpansion : Option Nat
+  deriving Repr, DecidableEq
+
+structure SourceExpansion where
+  callSite : SpanId
+  collapseDebuginfo : Bool
+  deriving Repr, DecidableEq
+
 structure SourceSpanData where
   isDummy : Bool := false
   lo : Nat
   hi : Nat
   start : SourcePosition
   «end» : SourcePosition
-  context : String
+  context : Nat
+  runtimeFile : Nat
   file : Nat
   expansionLocation : ExpansionLocation
   deriving Repr, DecidableEq
@@ -663,20 +673,6 @@ structure SourceScope where
   inlinedParent : Option Nat
   deriving Repr, DecidableEq
 
-structure CompilerSourcePosition where
-  bytePosition : Nat
-  line : Nat
-  column : Nat
-  filename : Nat
-  deriving Repr, DecidableEq
-
--- Hygiene collapse depends on the executable body, so this position is not the global span lo.
-structure BacktraceSpan where
-  spanId : SpanId
-  position : CompilerSourcePosition
-  deriving Repr, DecidableEq
-
-
 structure LocalDecl where
   id : LocalId
   typeId : TypeId
@@ -708,7 +704,6 @@ structure BodyCore where
   instanceId : InstanceId
   localSources : Array SourceInfo
   sourceScopes : Array SourceScope
-  backtraceSpans : Array BacktraceSpan
   callEvidence : Array (Option CallResolutionEvidence)
   nodeFacts : Array (Array NodeFacts)
   requiredConsts : Array Miri.MIR.ConstOperand

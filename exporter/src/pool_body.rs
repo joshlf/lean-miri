@@ -33,20 +33,6 @@ pub(super) struct SourceInfo {
 
 
 #[derive(Clone, Debug, Serialize)]
-pub(super) struct SourcePosition {
-    pub byte_position: u32,
-    pub line: usize,
-    pub zero_based_char_column: usize,
-    pub filename: u64,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub(super) struct BacktraceSpan {
-    pub span: u64,
-    pub source_position: SourcePosition,
-}
-
-#[derive(Clone, Debug, Serialize)]
 pub(super) struct InlinedScope {
     pub instance_id: u64,
     pub callsite_span: u64,
@@ -713,7 +699,6 @@ pub(super) struct BasicBlock {
 pub(super) struct Body {
     pub instance_id: u64,
     pub preamble_def_span: u64,
-    pub backtrace_spans: Shared<Vec<BacktraceSpan>>,
     pub source_def_id: u64,
     pub phase: Phase,
     pub injection_phase: Option<Phase>,

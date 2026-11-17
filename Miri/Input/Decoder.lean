@@ -10,6 +10,7 @@ import Miri.Input.SourceTraitsDecoder
 import Miri.Input.SourceVTablesDecoder
 import Miri.Input.SourceAbiDecoder
 import Miri.Input.SourceCastTargetsCodec
+import Miri.Input.SourceHygiene
 
 namespace Miri.Input
 open Lean DecoderValues
@@ -227,6 +228,8 @@ private structure DocumentFields where
   typeConstants : Option (Array MIR.TypeConst) := none
   files : Option (Array String) := none
   spans : Option (Array SourceSpanData) := none
+  syntaxContexts : Option (Array SyntaxContext) := none
+  expansions : Option (Array SourceExpansion) := none
   types : Option (Array TypeNode) := none
   byteImages : Option (Array (AllocationBytes × String)) := none
   allocations : Option (Array (Array AllocationNode)) := none
@@ -256,6 +259,8 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
     | "definitions" => return {d with definitions := some (← parseDefinitions)}
     | "type_constants" => return {d with typeConstants := some (← parseConstants)}
     | "files" => return {d with files := some (← parseFiles)}
+    | "syntax_contexts" => return {d with syntaxContexts := some (← JsonReader.array SourceHygiene.syntaxContext)}
+    | "expansions" => return {d with expansions := some (← JsonReader.array SourceHygiene.expansion)}
     | "spans" => return {d with spans := some (← JsonReader.arrayIndexed (fun index => parseSourceSpan s!"$.spans[{index}]"))}
     | "types" => return {d with types := some (← JsonReader.arrayIndexed (fun index => denseRow "type IDs" index (·.id) (parseTypeNode s!"$.types[{index}]")))}
     | "byte_images" => return {d with byteImages := some (← parseByteImages)}
@@ -311,6 +316,8 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
     typeConstants := ← JsonReader.required d.typeConstants "type_constants"
     files := ← JsonReader.required d.files "files"
     spans := ← JsonReader.required d.spans "spans"
+    syntaxContexts := ← JsonReader.required d.syntaxContexts "syntax_contexts"
+    expansions := ← JsonReader.required d.expansions "expansions"
     types := ← JsonReader.required d.types "types"
     allocations := allocations
     instances := ← JsonReader.required d.instances "instances"
@@ -327,6 +334,7 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
 
 private def validateParsedDocument (parsed : ParsedDocument) (profile : Options) : Except String ImportDocument := do
   let d := parsed.value
+  SourceHygiene.validate d.spans d.syntaxContexts d.expansions
   SourceCastTargetsCodec.validate d.types d.sourceCastTargets
   if let some material := d.sourceAbi then SourceAbiDecoder.validate d.types d.instances material
   SourceTraitsDecoder.validate d.definitions d.typeConstants d.sourceTraits

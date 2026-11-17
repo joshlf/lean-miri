@@ -58,7 +58,7 @@ private def prepare (symbols : Catalog.ForeignSymbols) (definitions : Array Defi
   let source : ImportDocument := {
     base with
     definitions, instances := #[instanceNode 0, instanceNode 1], files := #["test.rs"]
-    spans := #[{ lo := 0, hi := 1, start := ⟨1,0⟩, «end» := ⟨1,1⟩, context := "root", file := 0, expansionLocation := ⟨0,1,1⟩ }] }
+    spans := #[{ lo := 0, hi := 1, start := ⟨1,0⟩, «end» := ⟨1,1⟩, context := 0, file := 0, runtimeFile := 0, expansionLocation := ⟨0,1,1⟩ }] }
   let program : LoweredProgram := ⟨⟨#[], #[], definitions, #[]⟩, #[], #[], #[], source⟩
   let runtime : RuntimeMetadata := { source, target }
   let context : CompilerFacts.Context := { runtime, program }
