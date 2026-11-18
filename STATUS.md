@@ -342,9 +342,10 @@ passed. The [upstream UI run](https://github.com/proofs-rs/lean-miri/actions/run
 still fails. In several cases the exporter passed an empty existential predicate
 list to rustc while collecting a vtable for `dyn Send`. The fix retains the
 allocation keys from the actual auto-trait predicates and the drop, size and
-alignment entries. Fresh local exports complete for both compatible
-`strange_references` profiles, `unsized@tree_implicit_writes`, and
-`wrong-dyn-trait`, for which reference Miri reports the expected wrong-trait UB.
+alignment entries. The local upstream UI comparison passes the ten cases
+identified in the hosted panic logs, including both compatible `unsized` and
+`strange_references` profiles and the expected UB in `wrong-dyn-trait`.
+The existing `wrong-dyn-trait-generic` control also passes.
 The separate `portable-simd` panic remains in `simd_size_and_type` when signature
 collection queries a SIMD array length that is not yet concrete.
 
