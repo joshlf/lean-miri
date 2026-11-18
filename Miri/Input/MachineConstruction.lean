@@ -11,7 +11,7 @@ structure Target where
   os : String
   noCore : Bool
   cpuCount : UInt32
-  cUlongBytes : Nat
+  cUlongBytes : Unit → Except String Nat
   endian : Endian
 
 private def lift (value : Except StepError A) : EStateM StepError S A :=
@@ -26,13 +26,18 @@ def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
       (Host Poll Instant System H D O Native Profiler)) := do
   -- The source checks this limit and computes affinity after profiler creation,
   -- but before eager host poll construction. Query facts are actual target data.
+  let initialAffinity := fun () => do
+    if (target.os == "linux" || target.os == "freebsd" || target.os == "android") && !target.noCore then
+      let bytes ← lift (target.cUlongBytes () |>.mapError fun reason =>
+        .unsupported s!"compiler c_ulong layout: {reason}")
+      pure (some (← lift (CpuAffinity.initial bytes target.endian target.cpuCount)))
+    else
+      pure none
   let beforePoll := do
     if target.cpuCount.toNat > CpuAffinity.maximumCpus then
       throw (.invalidProgram "configured CPU count exceeds source MAX_CPUS")
-    if (target.os == "linux" || target.os == "freebsd" || target.os == "android") then
-      if !target.noCore then
-        let _ ← lift (CpuAffinity.initial target.cUlongBytes target.endian target.cpuCount)
-        pure ()
+    let _ ← initialAffinity ()
+    pure ()
   let beforeDescriptors := do
     let _ ← lift ((GlobalAddressState.new config.provenance config.addressMode
       config.geometry.stackAddress config.addressStop config.addressReuse).mapError
@@ -40,10 +45,7 @@ def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
     pure ()
   let (host,descriptors,ownership) ← HostRuntime.create h hostConfig beforePoll beforeDescriptors
   HostRuntime.protect h host (do
-    let affinity ← if (target.os == "linux" || target.os == "freebsd" || target.os == "android") then
-      if !target.noCore then pure (some (← lift (CpuAffinity.initial target.cUlongBytes target.endian target.cpuCount)))
-      else pure none
-      else pure none
+    let affinity ← initialAffinity ()
     let config := {config with affinity, muteOutput := hostConfig.muteOutput, hostUsizeBits := hostConfig.hostUsizeBits}
     let state ← lift (InitialMachine.create (H := H) (D := D) config memory types choices host)
     -- Use the actual source-created owning descriptor table (no shadow copy).

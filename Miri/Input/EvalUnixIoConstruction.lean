@@ -330,8 +330,9 @@ def controlFromSource
     throw (.invalidProgram "Unix fcntl isolation mode disagrees with Miri configuration")
   let i32Layout ← p.primitiveLayout "i32"
     |>.mapError fun error => .unsupported error
-  let i32PointerType ← CompilerPrimitiveFacts.namedLayout p.runtime "i32_pointer"
-    |>.mapError fun error => .unsupported error
+  let i32PointerType := fun state =>
+    let layout := CompilerPrimitiveFacts.namedLayout p.runtime "i32_pointer"
+    lift (layout.map TyAndLayout.ty |>.mapError StepError.unsupported) state
   let libc := fun name => do
     match CompilerNamedConstants.scalar p.namedConstants name with
     | .ok scalar => pure scalar
@@ -372,12 +373,12 @@ def controlFromSource
     control
     signatures
     signature := CompilerNamedShimAbi.query p.namedAbi
-    i32Type := pure i32PointerType.ty
+    i32Type := i32PointerType
     typeBudget
     writeScalar := fun scalar dest =>
       writePlaceImmediate place choice (.scalar scalar) ⟨.memory dest.mplace,dest.layout⟩ }
   pure (UnixFdControlMachine.bind access descriptor virtual tcp file
-    (pure i32Layout) (pure i32PointerType.ty) place choice base)
+    (pure i32Layout) i32PointerType place choice base)
 
 /-- Full source vectored field construction. The temporary iovec buffer uses
 the compiler's exact element layout, EvalWorld allocation lifecycle, actual

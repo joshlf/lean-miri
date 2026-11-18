@@ -365,6 +365,13 @@ produce the expected fused result in reference Miri and Lean. The larger
 `float.rs` comparison reaches `f64::erf` and still fails because Lean reports a
 return ABI mismatch for the `erf` shim while reference Miri exits successfully.
 
+Machine startup now queries the `c_ulong` layout only when the target uses
+the source CPU affinity mask. Unix descriptor control requests the exact
+`*mut i32` layout at the operation that uses it. The local upstream UI
+comparison passes `no_core` and the standard-library `strange_references@tree`
+control. The Windows raw source entry compiles with the shared initialization
+change.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
