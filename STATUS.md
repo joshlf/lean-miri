@@ -361,9 +361,12 @@ failures.
 The scalar `fma` and `fmuladd` intrinsics now select the floating-point format
 from the first operand as pinned rustc does. The local UI comparison passes
 `fmuladd_nondeterministic`, and focused `fma` calls in binary32 and binary64
-produce the expected fused result in reference Miri and Lean. The larger
-`float.rs` comparison reaches `f64::erf` and still fails because Lean reports a
-return ABI mismatch for the `erf` shim while reference Miri exits successfully.
+produce the expected fused result in reference Miri and Lean.
+
+The C math shim now checks `erf` against the binary64 ABI and `erff` against
+the binary32 ABI, as pinned Miri does. Focused calls pass in both widths, and
+an intentionally mismatched C signature still reaches UB in both interpreters.
+The full `float.rs` comparison is pending.
 
 Machine startup now queries the `c_ulong` layout only when the target uses
 the source CPU affinity mask. Unix descriptor control requests the exact
