@@ -702,14 +702,15 @@ def runFromSourceProfiled
   let noCore ← match startupFacts.noCore with
     | .ok value => pure value
     | .error reason => throw (.unsupported s!"compiler no_core query: {reason}")
-  let machineTarget : MachineConstruction.Target := {
+  let machineTarget : MachineConstruction.TargetInfo := {
     os := targetFacts.os
     noCore
     cpuCount := sourceLeaves.foreignSource.host.unixConfig.numCpus
-    cUlongBytes := fun () => (CompilerPrimitiveFacts.cULongLayout prepared.compiler.runtime).map (·.layout.size.bytes.toNat)
     endian := prepared.compiler.runtime.target.base.endian }
-  let initial ← MachineConstruction.create hostRuntime sourceLeaves.hostConfiguration machineTarget
-    initialConfiguration initialMemory runtimeTypes choiceTape
+  let cUlongBytes := fun () =>
+    (CompilerPrimitiveFacts.cULongLayout prepared.compiler.runtime).map (·.layout.size.bytes.toNat)
+  let initial ← MachineConstruction.createWithCulongLayout hostRuntime sourceLeaves.hostConfiguration
+    machineTarget cUlongBytes initialConfiguration initialMemory runtimeTypes choiceTape
   match runFromInitialProfiled profile prepared image bytes options sourceLeaves choice initialConfiguration
       bootstrapConfiguration limits capacity iterationFuel outerChoices initial
       stableChoice unbounded with

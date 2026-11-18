@@ -11,14 +11,21 @@ structure Target where
   os : String
   noCore : Bool
   cpuCount : UInt32
-  cUlongBytes : Unit → Except String Nat
+  cUlongBytes : Nat
+  endian : Endian
+
+structure TargetInfo where
+  os : String
+  noCore : Bool
+  cpuCount : UInt32
   endian : Endian
 
 private def lift (value : Except StepError A) : EStateM StepError S A :=
   match value with | .ok value => pure value | .error error => throw error
 
-def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
-    (hostConfig : HostRuntime.Configuration) (target : Target)
+def createWithCulongLayout (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
+    (hostConfig : HostRuntime.Configuration) (target : TargetInfo)
+    (cUlongBytes : Unit → Except String Nat)
     (config : InitialMachine.Configuration CpuAffinity.Mask B)
     (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
     (types : RuntimeArrayTypes.World) (choices : ExecutionChoices.Tape) :
@@ -28,7 +35,7 @@ def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
   -- but before eager host poll construction. Query facts are actual target data.
   let initialAffinity := fun () => do
     if (target.os == "linux" || target.os == "freebsd" || target.os == "android") && !target.noCore then
-      let bytes ← lift (target.cUlongBytes () |>.mapError fun reason =>
+      let bytes ← lift (cUlongBytes () |>.mapError fun reason =>
         .unsupported s!"compiler c_ulong layout: {reason}")
       pure (some (← lift (CpuAffinity.initial bytes target.endian target.cpuCount)))
     else
@@ -55,4 +62,15 @@ def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
       {state.machine.user.user with payload := {state.machine.user.user.payload with payload :=
         {world with runtime}}}}}}
   )
+
+/-- Use the caller's already resolved C layout with the shared initialization path. -/
+def create (h : HostRuntime.Hooks S Poll Instant System Native Profiler)
+    (hostConfig : HostRuntime.Configuration) (target : Target)
+    (config : InitialMachine.Configuration CpuAffinity.Mask B)
+    (memory : MemoryState Provenance Miri.TreeBorrows.BorrowTree MiriMemoryKind)
+    (types : RuntimeArrayTypes.World) (choices : ExecutionChoices.Tape) :
+    EStateM StepError S (EvalWorld.State Os R P H D O CpuAffinity.Mask B
+      (Host Poll Instant System H D O Native Profiler)) :=
+  createWithCulongLayout h hostConfig ⟨target.os, target.noCore, target.cpuCount, target.endian⟩
+    (fun () => pure target.cUlongBytes) config memory types choices
 end Miri.Input.MachineConstruction
