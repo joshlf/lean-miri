@@ -21,6 +21,8 @@ pub(super) struct Layout {
 pub(super) struct Coverage {
     pub owner_body: u64,
     pub coroutine_type: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_move_owner: Option<u64>,
     pub coroutine_kind: pool_body::CoroutineKind,
     pub yield_type: Option<u64>,
     pub resume_type: Option<u64>,
@@ -80,9 +82,25 @@ pub(super) fn capture<'tcx>(tcx: TyCtxt<'tcx>, context: &mut ExportContext<'tcx>
         ty::InstanceKind::Shim(ty::ShimKind::AsyncDropGlue(_, value)) => value,
         _ => return export_failure("coroutine coverage", "unexpected coroutine body source kind"),
     };
-    if !matches!(coroutine_ty.kind(), ty::Coroutine(..)) {
+    let ty::Coroutine(definition, args) = *coroutine_ty.kind() else {
         return export_failure("coroutine coverage", "compiler body source is not a coroutine type");
-    }
+    };
+    let by_move_owner = match instance.def {
+        ty::InstanceKind::Item(def) if def != definition => {
+            // Instance::resolve uses this compiler query for the synthetic
+            // by-move body of a by-reference coroutine closure.
+            if tcx.def_kind(def) != rustc_hir::def::DefKind::SyntheticCoroutineBody
+                || body.source.instance != instance.def
+                || args.as_coroutine().kind_ty().to_opt_closure_kind() != Some(ty::ClosureKind::FnOnce)
+                || !tcx.needs_coroutine_by_move_body_def_id(definition)
+                || tcx.coroutine_by_move_body_def_id(definition) != def
+            {
+                return export_failure("coroutine coverage", "unverified synthetic coroutine owner");
+            }
+            Some(def_json(context, def))
+        }
+        _ => None,
+    };
     let coroutine_type = type_json(context, tcx, coroutine_ty)?;
     let source = info.coroutine_layout.as_ref().ok_or("coroutine coverage: transformed layout is absent")?;
     let field_tys = source.field_tys.iter().map(|field| Ok(SavedField {
@@ -145,7 +163,7 @@ pub(super) fn capture<'tcx>(tcx: TyCtxt<'tcx>, context: &mut ExportContext<'tcx>
     if drop_sync.is_some() == drop_async.is_some() || drop_proxy_async.is_some() != drop_sync.is_some() {
         return export_failure("coroutine coverage", "compiler drop roles disagree");
     }
-    context.coroutine_coverage.coroutines.push(Coverage { owner_body: owner, coroutine_type,
+    context.coroutine_coverage.coroutines.push(Coverage { owner_body: owner, coroutine_type, by_move_owner,
         coroutine_kind: coroutine_kind_json(info.coroutine_kind), yield_type: None, resume_type: None,
         layout: Layout { field_tys, variant_fields, variant_source_info, storage_conflicts },
         drop_sync, drop_async, drop_proxy_async });

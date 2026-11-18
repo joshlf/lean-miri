@@ -26,7 +26,11 @@ def validate_catalog(document):
             raise ValueError(f"coroutine catalog: {name} must be an array")
     owners, used = set(), set()
     for row in catalog["coroutines"]:
-        _record(row, "owner_body coroutine_type coroutine_kind yield_type resume_type layout drop_sync drop_async drop_proxy_async", "coroutine witness")
+        keys = "owner_body coroutine_type coroutine_kind yield_type resume_type layout drop_sync drop_async drop_proxy_async"
+        if isinstance(row, dict) and "by_move_owner" in row:
+            keys += " by_move_owner"
+            _reference(row["by_move_owner"], len(document["definitions"]), "coroutine by-move owner")
+        _record(row, keys, "coroutine witness")
         owner = row["owner_body"]
         _reference(owner, len(markers), "coroutine owner")
         if owner in owners or not markers[owner]:
