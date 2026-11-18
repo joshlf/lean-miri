@@ -18,6 +18,10 @@ noncomputable def assignment : Instruction :=
     rw [EmptyFunction.Program.one_statement]
     decide)).kind
 
+private theorem assignment_opcode : ∃ destination rhs,
+    assignment = .statement (.Assign destination rhs) := by
+  exact ⟨_, _, rfl⟩
+
 abbrev hooks (s : Static) := ExecutionMachine.stepHooks s.cfg s.limits
 abbrev permitted (_ : State) (_ : Unit) : Prop := True
 abbrev ProgramFor (s : Static) := Miri.Verification.StepWP.Program (hooks s) permitted
@@ -40,7 +44,8 @@ theorem matchesReturn {K U : Type} {older : Array LocalUnit.F} {frame : LocalUni
     (body : frame.body = EmptyFunction.Program.root.loaded.body)
     (pc : frame.location = .mir ⟨0, 1⟩) :
     Instruction.ret.matches (LocalUnit.current older frame machine) := by
-  simp only [Instruction.matches, LocalUnit.current, Stack.currentFrame?, Array.back?_push, pc, body] <;> rfl
+  simp only [Instruction.matches, currentTerminator, LocalUnit.current, Stack.currentFrame?,
+    Array.back?_push, bind, Bind.bind, Option.bind, pc, body] <;> rfl
 
 abbrev nonUB (error : StepError) (_ : State) : Prop := RunLoop.reportsUB error = false
 
@@ -52,8 +57,7 @@ theorem successfulStep (s : Static) {before after : State} {post : State → Pro
   rintro ⟨⟩ _
   have stepped : Step.step (hooks s) () before = (after, .ok true) := by
     simpa only [ExecutionMachine.step] using outcome
-  rw [stepped]
-  exact ⟨rfl, postcondition⟩
+  simpa only [stepped] using And.intro (rfl : true = true) postcondition
 
 theorem resourceStop (s : Static) {before failed : State} {reason : String}
     (outcome : ExecutionMachine.step s.cfg s.limits () before =
@@ -63,7 +67,7 @@ theorem resourceStop (s : Static) {before failed : State} {reason : String}
   rintro ⟨⟩ _
   have stepped : Step.step (hooks s) () before = (failed, .error (.resourceExhaustion reason)) := by
     simpa only [ExecutionMachine.step] using outcome
-  rw [stepped] <;> rfl
+  simp only [stepped] <;> rfl
 
 /-- The first instruction can stop with a non-UB error; consequently the
 return rule is required only under the first instruction's success condition. -/
@@ -81,12 +85,25 @@ theorem verified (s : Static) (depth : Nat) (entry : State) (middle post : State
         middle (fun _ state => state.stack.frames.size < depth ∧ post state) nonUB := by
     vcgen
     rename_i state ready
-    exact next state ready
+    obtain ⟨matched, enabled, execute⟩ := next state ready
+    change (currentTerminator state).map Terminator.kind = some .Return at matched
+    cases selected : currentTerminator state with
+    | none => simp [selected] at matched
+    | some term =>
+      have kind : term.kind = .Return := by simpa [selected] using matched
+      refine ⟨term, rfl, kind, enabled, ?_⟩
+      intro choice permitted
+      simpa only [step_eq_runTerminator selected (hooks s) choice] using execute choice permitted
   refine ⟨_, lowered s, ?_⟩
+  obtain ⟨destination, rhs, opcode⟩ := assignment_opcode
+  rw [opcode] at atEntry ⊢
   vcgen
   rename_i beforeState equal
   subst beforeState
-  exact ⟨atEntry, stepPre_mono (Triple.le_wp returnRule) (fun _ _ h => h) entry first⟩
+  have initial := stepPre_mono (Triple.le_wp returnRule) (fun _ _ h => h) entry first
+  refine ⟨atEntry, initial.1, ?_⟩
+  intro choice permitted
+  simpa only [step_eq_assign atEntry (hooks s) choice] using initial.2 choice permitted
 
 theorem body (s : Static) (depth : Nat) (entry : State) (middle post : State → Prop)
     (inside : depth ≤ entry.stack.frames.size)

@@ -358,6 +358,28 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     beforeTerminator := fun c => MachineHooks.run (TerminatorMachine.beforeTerminatorWithChoice h.terminators (h.preemptionChoice c))
     terminator := ControlFlow.evalTerminator terminators }
 
+/-- Assignment uses the full place and rvalue implementation. -/
+theorem stepHooks_assign [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
+    (choice : C) (destination : Place) (rhs : Rvalue) (state : State K U) :
+    (stepHooks config limits).assign choice destination rhs state =
+      MachineHooks.run (evalRvalueIntoPlace (rvalueHooks (withValidation config limits) limits)
+        choice rhs destination) state := rfl
+
+/-- A jump keeps the actual target and has no other terminator effect. -/
+theorem stepHooks_goto [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
+    (choice : C) (term : Terminator) (target : BasicBlockId) (hints : Array LoopHintAttr)
+    (kind : term.kind = .Goto target hints) (state : State K U) :
+    (stepHooks config limits).terminator choice term state = ControlFlow.goToBlock target state := by
+  simp only [stepHooks, ControlFlow.evalTerminator, kind, Id.run, pure, Pure.pure]
+
+/-- A normal Return uses the assembled return operation, including copying the
+value into the caller, cleaning up the callee, and resuming its continuation. -/
+theorem stepHooks_return [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
+    (choice : C) (term : Terminator) (kind : term.kind = .Return) (state : State K U) :
+    (stepHooks config limits).terminator choice term state =
+      (stepHooks config limits).returnFromCurrentFrame choice false state := by
+  simp only [stepHooks, ControlFlow.evalTerminator, kind, Id.run, pure, Pure.pure]
+
 def step [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) (c : C) (state : State K U) :
     StepResult (State K U) Bool := Step.step (stepHooks h limits) c state
 

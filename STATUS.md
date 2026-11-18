@@ -814,8 +814,10 @@ vector-clock backend.
   [BodyVCGen](examples/empty_function/BodyVCGen.lean) uses the imported
   `empty_function` body for the whole-local immediate caller case and
   composes its proof with actual frame preparation after callee resolution.
-  General instruction rules, lowering MIR `Call` and branches, loop
-  invariants, whole-run safety, and performance measurements remain pending.
+  Registered rules cover `Nop`, `Assign`, `Goto`, and `Return` at the
+  driver boundary, retaining all callback effects and errors. Reusable
+  operand, memory and frame-lifecycle contracts, CFG lowering (including
+  `Call`), loop invariants, whole-run safety, and timing remain pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`

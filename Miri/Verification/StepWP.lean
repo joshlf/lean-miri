@@ -16,22 +16,35 @@ local notation "Hooks" => StepHooks P L E M C V
 inductive Instruction where
   | statement (kind : StatementKind)
   | ret
+  | goto (target : BasicBlockId) (hints : Array LoopHintAttr)
+
+/-- The terminator selected by the driver, including source information. -/
+def currentTerminator (state : State) : Option Terminator := do
+  let frame ← state.stack.currentFrame?
+  let .mir loc := frame.location | none
+  let block ← frame.body.basicBlocks[loc.block]?
+  match block.statements[loc.statementIndex]? with
+  | some _ => none
+  | none => some block.terminator
 
 /-- Check the same frame, block and statement slot that the driver dispatches. -/
 def Instruction.matches (instruction : Instruction) (state : State) : Prop :=
-  match state.stack.currentFrame? with
-  | some frame =>
-    match frame.location with
-    | .mir loc =>
-      match frame.body.basicBlocks[loc.block]? with
-      | some block =>
-        match instruction, block.statements[loc.statementIndex]? with
-        | .statement kind, some stmt => stmt.kind = kind
-        | .ret, none => block.terminator.kind = .Return
-        | _, _ => False
-      | none => False
-    | .unwinding _ => False
-  | none => False
+  match instruction with
+  | .ret => (currentTerminator state).map Terminator.kind = some .Return
+  | .goto target hints => (currentTerminator state).map Terminator.kind = some (.Goto target hints)
+  | .statement kind =>
+    match state.stack.currentFrame? with
+    | some frame =>
+      match frame.location with
+      | .mir loc =>
+        match frame.body.basicBlocks[loc.block]? with
+        | some block =>
+          match block.statements[loc.statementIndex]? with
+          | some stmt => stmt.kind = kind
+          | none => False
+        | none => False
+      | .unwinding _ => False
+    | none => False
 
 /-- Each step states the expected driver result: `true` for a step that
 continues, `false` for a step that finds an empty stack. -/
@@ -52,15 +65,19 @@ def lowerStraightLine (body : Body) : Option (Program hooks allowed) := do
     (fun statement next => .seq (.instruction (.statement statement.kind)) next)
     (.instruction .ret)
 
-/-- Demand a permitted choice and check every permitted result. The driver
-state on error is the one supplied to the error postcondition. -/
-def stepPre (hooks : Hooks) (allowed : State → C → Prop) (more : Bool)
+/-- Demand a permitted choice and check every permitted result, retaining the
+actual failed state on error. -/
+def transitionPre (allowed : State → C → Prop) (more : Bool) (run : C → StepResult State Bool)
     (post : State → Prop) (onError : StepError → State → Prop) (state : State) : Prop :=
   (∃ choice, allowed state choice) ∧
     ∀ choice, allowed state choice →
-      match Step.step hooks choice state with
+      match run choice with
       | (after, .ok actual) => actual = more ∧ post after
       | (after, .error error) => onError error after
+
+abbrev stepPre (hooks : Hooks) (allowed : State → C → Prop) (more : Bool)
+    (post : State → Prop) (onError : StepError → State → Prop) (state : State) : Prop :=
+  transitionPre allowed more (fun choice => Step.step hooks choice state) post onError state
 
 theorem stepPre_outcome {hooks : Hooks} {allowed : State → C → Prop} {more : Bool}
     {post : State → Prop} {onError : StepError → State → Prop} {before after : State}
@@ -164,12 +181,148 @@ instance : WP (Program hooks allowed) Unit (StepState P L E M → Prop)
       post onError :=
   Triple.iff.mpr (by intro _ h; exact h)
 
-@[spec] theorem spec_instruction (hooks : Hooks) (allowed : State → C → Prop)
+@[spec low] theorem spec_instruction (hooks : Hooks) (allowed : State → C → Prop)
     (operation : Instruction) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
     Triple (Program.instruction (hooks := hooks) (allowed := allowed) operation)
       (fun state => operation.matches state ∧ stepPre hooks allowed true (post ()) onError state)
       post onError :=
   Triple.iff.mpr (by intro _ h; exact h)
+
+private theorem statement_at {kind : StatementKind} {before : State}
+    (matched : (Instruction.statement kind).matches before) :
+    ∃ frame loc block stmt,
+      before.stack.currentFrame? = some frame ∧ frame.location = .mir loc ∧
+      frame.body.basicBlocks[loc.block]? = some block ∧
+      block.statements[loc.statementIndex]? = some stmt ∧ stmt.kind = kind := by
+  cases current : before.stack.currentFrame? with
+  | none => simp [Instruction.matches, current] at matched
+  | some frame =>
+    cases pc : frame.location with
+    | unwinding => simp [Instruction.matches, current, pc] at matched
+    | mir loc =>
+      cases found : frame.body.basicBlocks[loc.block]? with
+      | none => simp [Instruction.matches, current, pc, found] at matched
+      | some block =>
+        cases slot : block.statements[loc.statementIndex]? with
+        | none => simp [Instruction.matches, current, pc, found, slot] at matched
+        | some stmt =>
+          exact ⟨frame, loc, block, stmt, rfl, pc, found, slot, by
+            simpa [Instruction.matches, current, pc, found, slot] using matched⟩
+
+private theorem terminator_at {before : State} {term : Terminator}
+    (selected : currentTerminator before = some term) :
+    ∃ frame loc block,
+      before.stack.currentFrame? = some frame ∧ frame.location = .mir loc ∧
+      frame.body.basicBlocks[loc.block]? = some block ∧
+      block.statements[loc.statementIndex]? = none ∧ block.terminator = term := by
+  cases current : before.stack.currentFrame? with
+  | none => simp [currentTerminator, current] at selected
+  | some frame =>
+    cases pc : frame.location with
+    | unwinding => simp [currentTerminator, current, pc] at selected
+    | mir loc =>
+      cases found : frame.body.basicBlocks[loc.block]? with
+      | none => simp [currentTerminator, current, pc, found] at selected
+      | some block =>
+        cases slot : block.statements[loc.statementIndex]? with
+        | some stmt => simp [currentTerminator, current, pc, found, slot] at selected
+        | none =>
+          exact ⟨frame, loc, block, rfl, pc, found, slot, by
+            simpa [currentTerminator, current, pc, found, slot] using selected⟩
+
+theorem step_eq_runTerminator {before : State} {term : Terminator}
+    (selected : currentTerminator before = some term) (hooks : Hooks) (choice : C) :
+    Step.step hooks choice before = Step.runTerminator hooks choice term before := by
+  obtain ⟨_, _, _, current, pc, found, slot, equal⟩ := terminator_at selected
+  simp only [Step.step, current, pc, found, slot, Id.run, pure, Pure.pure, equal]
+
+/-- Replace the newest frame with the same frame at the next statement. -/
+def afterNop (state : State) (frame : Frame P L E) (loc : Location) : State :=
+  { state with stack := ⟨state.stack.frames.pop.push
+      { frame with location := .mir {loc with statementIndex := loc.statementIndex + 1} }⟩ }
+
+@[spec] theorem spec_nop (hooks : Hooks) (allowed : State → C → Prop)
+    (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement .Nop))
+      (fun before => (Instruction.statement .Nop).matches before ∧
+        (∃ choice, allowed before choice) ∧
+        ∀ frame loc, before.stack.currentFrame? = some frame →
+          frame.location = .mir loc → post () (afterNop before frame loc)) post onError := by
+  apply Triple.iff.mpr
+  rintro before ⟨matched, enabled, next⟩
+  obtain ⟨frame, loc, block, stmt, current, pc, found, slot, kind⟩ := statement_at matched
+  have stack : ∃ older : Array (Frame P L E), before.stack.frames = older.push frame :=
+    Array.back?_eq_some_iff.mp current
+  rcases stack with ⟨older, stack⟩
+  refine ⟨matched, enabled, ?_⟩
+  intro choice _
+  change (match Step.step hooks choice before with
+    | (after, .ok more) => more = true ∧ post () after
+    | (after, .error error) => onError error after)
+  have outcome : Step.step hooks choice before = (afterNop before frame loc, .ok true) := by
+    simp [Step.step, Step.evalStatement, current, pc, found, slot, kind, afterNop, stack, Array.set_push]
+  rw [outcome]
+  exact ⟨rfl, next frame loc current pc⟩
+
+/-- Dispatch the checked assignment to the existing rvalue implementation. -/
+theorem step_eq_assign {before : State} {destination : Place} {rhs : Rvalue}
+    (matched : (Instruction.statement (.Assign destination rhs)).matches before)
+    (hooks : Hooks) (choice : C) :
+    Step.step hooks choice before = Step.finishStatement
+      (before.stack.frames.size - 1) (hooks.assign choice destination rhs before) := by
+  obtain ⟨_, _, _, _, current, pc, found, slot, kind⟩ := statement_at matched
+  simp only [Step.step, current, pc, found, slot, Step.evalStatement, kind, Id.run, pure, Pure.pure]
+
+@[spec] theorem spec_assign (hooks : Hooks) (allowed : State → C → Prop)
+    (destination : Place) (rhs : Rvalue) (post : Unit → State → Prop)
+    (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed)
+        (.statement (.Assign destination rhs)))
+      (fun before => (Instruction.statement (.Assign destination rhs)).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1)
+            (hooks.assign choice destination rhs before)) (post ()) onError before)
+      post onError := by
+  apply Triple.iff.mpr
+  rintro before ⟨matched, enabled, run⟩
+  refine ⟨matched, enabled, ?_⟩
+  intro choice permitted
+  simpa only [step_eq_assign matched hooks choice] using run choice permitted
+
+private theorem spec_terminator_of_kind (hooks : Hooks) (allowed : State → C → Prop)
+    (instruction : Instruction) (kind : TerminatorKind)
+    (dispatch : ∀ state : State, instruction.matches state ↔
+      (currentTerminator state).map Terminator.kind = some kind)
+    (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) instruction)
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = kind ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError := by
+  apply Triple.iff.mpr
+  rintro before ⟨term, selected, kindEq, enabled, run⟩
+  have matched : instruction.matches before := (dispatch before).mpr (by
+    simp only [selected, Option.map_some, kindEq])
+  refine ⟨matched, enabled, ?_⟩
+  intro choice permitted
+  simpa only [step_eq_runTerminator selected hooks choice] using run choice permitted
+
+@[spec] theorem spec_return (hooks : Hooks) (allowed : State → C → Prop)
+    (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) .ret)
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .Return ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed .ret .Return (fun _ => Iff.rfl) post onError
+
+@[spec] theorem spec_goto (hooks : Hooks) (allowed : State → C → Prop)
+    (target : BasicBlockId) (hints : Array LoopHintAttr)
+    (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.goto target hints))
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .Goto target hints ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed (.goto target hints) (.Goto target hints)
+    (fun _ => Iff.rfl) post onError
 
 @[spec] theorem spec_call (hooks : Hooks) (allowed : State → C → Prop)
     (prepare : C → State → EStateM.Result StepError State Unit)
