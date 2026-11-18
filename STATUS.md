@@ -337,6 +337,17 @@ were relaxed. A hosted rerun of these changes remains necessary. The separate
 still fails 19 of 32 shards and its aggregate job; those independent issues,
 including the portable-SIMD compiler panic, remain unresolved.
 
+On `b633b50b` all four [Miri regression lanes](https://github.com/proofs-rs/lean-miri/actions/runs/44189189933)
+passed. The [upstream UI run](https://github.com/proofs-rs/lean-miri/actions/runs/44189189919)
+still fails. In several cases the exporter passed an empty existential predicate
+list to rustc while collecting a vtable for `dyn Send`. The fix retains the
+allocation keys from the actual auto-trait predicates and the drop, size and
+alignment entries. Fresh local exports complete for both compatible
+`strange_references` profiles, `unsized@tree_implicit_writes`, and
+`wrong-dyn-trait`, for which reference Miri reports the expected wrong-trait UB.
+The separate `portable-simd` panic remains in `simd_size_and_type` when signature
+collection queries a SIMD array length that is not yet concrete.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler

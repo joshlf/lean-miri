@@ -189,14 +189,14 @@ pub(super) fn discover<'tcx>(
             let (input, principal) = *state.pairs.get_index(state.pair_cursor).unwrap();
             state.pair_cursor += 1;
             let type_id = type_json(context, tcx, input)?;
-            let predicates = if let Some(principal) = principal {
+            // Principal-less objects have only auto-trait predicates. Keep the
+            // full allocation keys already collected for those objects.
+            if let Some(principal) = principal {
                 let predicate = ty::Binder::dummy(ty::ExistentialPredicate::Trait(principal));
                 existential_predicate_json(context, tcx, predicate)?;
-                tcx.mk_poly_existential_predicates(&[predicate])
-            } else {
-                tcx.mk_poly_existential_predicates(&[])
-            };
-            context.vtable_demands.insert((input, predicates));
+                let predicates = tcx.mk_poly_existential_predicates(&[predicate]);
+                context.vtable_demands.insert((input, predicates));
+            }
             type_json(context, tcx, ty::Ty::new_mut_ptr(tcx, input))?;
             type_json(
                 context,
