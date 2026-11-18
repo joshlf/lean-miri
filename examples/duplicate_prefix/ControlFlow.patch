@@ -1,0 +1,19 @@
+--- a/examples/duplicate_prefix/SourceControl.lean
++++ b/examples/duplicate_prefix/SourceControl.lean
+@@ -87,3 +87,3 @@
+   rw [kind]
+-  simp only [evaluation]
++  simp only [ControlFlow.evalSwitchInt, ControlFlow.selectSwitchTarget, evaluation]
+   simp only [← Array.forIn_toList, List.forIn_cons, List.forIn_nil]
+--- a/examples/duplicate_prefix/BoolAssert.lean
++++ b/examples/duplicate_prefix/BoolAssert.lean
+@@ -16,3 +16,3 @@
+   rw [kind]
+-  simp only [read,beq_self_eq_true,Bool.or_true,ite_true]
++  simp only [ControlFlow.evalAssert, read, beq_self_eq_true, Bool.or_true, ite_true]
+   rfl
+--- a/examples/duplicate_prefix/GenericCallStages.lean
++++ b/examples/duplicate_prefix/GenericCallStages.lean
+@@ -80 +80 @@
+-  simp [effect,progress]
++  simp [ControlFlow.evalCall, effect, progress]

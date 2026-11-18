@@ -822,9 +822,9 @@ vector-clock backend.
   contract. The Lean and vendored Miri wildcard visitors share a local
   workaround for [Miri #5543](https://github.com/rust-lang/miri/issues/5543).
   The [duplicate_prefix vcgen client](examples/duplicate_prefix/README.md)
-  covers the initial switch and prepared zero-count body. The remaining
-  paths, whole-call verification across all counts, and timing measurements
-  are pending.
+  covers the initial switch and prepared zero-count body. The all-counts
+  adapter uses the ordinary-input trace proof from PR #12. The full kernel
+  replay on this library and timing measurements are pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`

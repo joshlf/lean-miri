@@ -7,6 +7,7 @@ before running. The proof sources and MIR are read from that immutable tree.
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
+import argparse
 import os
 import re
 import subprocess
@@ -18,16 +19,23 @@ REVISION = "7950c01b18013969c360df535b8b888dd6181dff"
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--all-counts", action="store_true",
+                        help="also check the ordinary-input call for all counts")
+    args = parser.parse_args()
     os.chdir(ROOT)
     scratch = ROOT / "scratch"
     scratch.mkdir(exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix="duplicate-prefix-vcgen.", dir=scratch))
     archive = subprocess.check_output(["git", "archive", REVISION, "examples/duplicate_prefix"])
     subprocess.run(["tar", "-x", "-C", str(out)], input=archive, check=True)
-    compatibility = ROOT / "examples/duplicate_prefix/SourceControl.patch"
+    compatibility = ROOT / "examples/duplicate_prefix/ControlFlow.patch"
     subprocess.run(["patch", "--batch", "--fuzz=0", "-p1", "-i", str(compatibility)], cwd=out, check=True)
     src = out / "examples/duplicate_prefix"
-    for name in ("VCGen", "ZeroBody"):
+    clients = ("VCGen", "ZeroBody")
+    if args.all_counts:
+        clients += ("ResultCall", "Ordinary")
+    for name in clients:
         client = ROOT / f"examples/duplicate_prefix/{name}.lean"
         (src / client.name).write_bytes(client.read_bytes())
     artifacts = out / "duplicate_prefix"
@@ -45,6 +53,8 @@ def main():
             discover(dep)
 
     discover("ZeroBody")
+    if args.all_counts:
+        discover("Ordinary")
     env = os.environ.copy()
     env.setdefault("ELAN_HOME", str(ROOT / ".elan"))
     env["PATH"] = str(Path(env["ELAN_HOME"]) / "bin") + os.pathsep + env["PATH"]
@@ -88,6 +98,8 @@ def main():
                 checked.add(name)
                 print(f"{len(checked)}/{len(deps)} {name}", flush=True)
     print((out / "ZeroBody.log").read_text(), end="")
+    if args.all_counts:
+        print((out / "Ordinary.log").read_text(), end="")
 
 
 if __name__ == "__main__":
