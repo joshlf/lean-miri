@@ -354,7 +354,9 @@ reading its lane count, preserving the original `FnSig` type identity. For a
 reachable SIMD saturating add or subtract, it retains the exact `(lane type,
 bool)` tuple requested by the source interpreter's overflowing operator. Lean
 continues to use the existing checked tuple lookup and saturation operation.
-The full upstream UI sweep still has unrelated failures.
+The local upstream UI comparison passes `portable-simd` and four SIMD controls,
+including two expected UB cases. The full upstream UI sweep still has unrelated
+failures.
 
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
