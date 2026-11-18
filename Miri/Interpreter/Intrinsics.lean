@@ -284,11 +284,11 @@ private def writeFloat (h : IntrinsicHooks P S C V) (choice : C) (value : FloatB
   let scalar ← liftResult (Memory.Scalar.fromUInt value.bits value.format.size |>.mapError ScalarOps.scalarError)
   writeScalar h choice scalar dest
 
-/-- Portable suffixed float intrinsic families, including genuinely fused FMA.
+/-- Portable float intrinsic families, including genuinely fused FMA.
 Only the machine's choice of fusion/equal operand/NaN remains effectful. -/
 def floatIntrinsic [PointerProvenance P] (h : IntrinsicHooks P S C V) (choice : C)
     (name : String) (args : Array (OpTy P)) (dest : V) : RvalueM S Bool := do
-  let parsed ← if ["floor","ceil","trunc","round","round_ties_even"].contains name then do
+  let parsed ← if ["floor","ceil","trunc","round","round_ties_even","fma","fmuladd"].contains name then do
       let operand ← arg args 0
       let format ← h.floatOps.formatOf choice operand.layout.ty
       pure (some (if name == "round_ties_even" then "round_ties_even_" else name,format))

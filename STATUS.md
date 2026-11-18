@@ -358,6 +358,13 @@ The local upstream UI comparison passes `portable-simd` and four SIMD controls,
 including two expected UB cases. The full upstream UI sweep still has unrelated
 failures.
 
+The scalar `fma` and `fmuladd` intrinsics now select the floating-point format
+from the first operand as pinned rustc does. The local UI comparison passes
+`fmuladd_nondeterministic`, and focused `fma` calls in binary32 and binary64
+produce the expected fused result in reference Miri and Lean. The larger
+`float.rs` comparison reaches `f64::erf` and still fails because Lean reports a
+return ABI mismatch for the `erf` shim while reference Miri exits successfully.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
