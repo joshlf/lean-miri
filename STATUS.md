@@ -346,8 +346,17 @@ alignment entries. The local upstream UI comparison passes the ten cases
 identified in the hosted panic logs, including both compatible `unsized` and
 `strange_references` profiles and the expected UB in `wrong-dyn-trait`.
 The existing `wrong-dyn-trait-generic` control also passes.
-The separate `portable-simd` panic remains in `simd_size_and_type` when signature
-collection queries a SIMD array length that is not yet concrete.
+The [merged-main UI logs](https://github.com/proofs-rs/lean-miri/actions/runs/44206469708)
+also report all ten of these cases passing.
+
+The exporter now normalizes the instantiated fixed-SIMD array field before
+reading its lane count, preserving the original `FnSig` type identity. For a
+reachable SIMD saturating add or subtract, it retains the exact `(lane type,
+bool)` tuple requested by the source interpreter's overflowing operator. Lean
+continues to use the existing checked tuple lookup and saturation operation.
+The local upstream UI comparison passes `portable-simd` and four SIMD controls,
+including two expected UB cases. The full upstream UI sweep still has unrelated
+failures.
 
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
