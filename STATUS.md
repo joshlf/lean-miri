@@ -826,8 +826,11 @@ vector-clock backend.
   `duplicate_prefix` branch checks also passed.
   The [duplicate_prefix vcgen client](examples/duplicate_prefix/README.md)
   covers the initial switch and prepared zero-count body. The all-counts
-  adapter uses the ordinary-input trace proof from PR #12. The full kernel
-  replay on this library and timing measurements are pending.
+  `ordinary_call` theorem uses the ordinary-input trace proof from PR #12
+  and supplies the resolved call's `CallNoUB`, the body's `UBFree` and
+  `NormalPost`, and verified programs for the call and the body. Its
+  2,318-module closure passed on this library, with a transitive axiom
+  audit of 22 client declarations. Timing measurements remain pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`
