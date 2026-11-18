@@ -1,0 +1,7 @@
+--- a/examples/duplicate_prefix/SourceControl.lean
++++ b/examples/duplicate_prefix/SourceControl.lean
+@@ -87,3 +87,3 @@
+   rw [kind]
+-  simp only [evaluation]
++  simp only [ControlFlow.evalSwitchInt, ControlFlow.selectSwitchTarget, evaluation]
+   simp only [← Array.forIn_toList, List.forIn_cons, List.forIn_nil]

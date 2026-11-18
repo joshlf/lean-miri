@@ -819,10 +819,12 @@ vector-clock backend.
   including its retained callees. `body_of_blocks` composes block VCs across
   branches and loops given an entry invariant and a scope-exit postcondition.
   `callPre_of_contract` composes the actual frame preparation with a callee
-  contract. The ordinary-input proof in PR #12 targets a different
-  Tree Borrows wildcard traversal. The current interpreter still needs
-  `duplicate_prefix` block invariants and call contracts, a whole-run
-  proof, and timing measurements.
+  contract. The Lean and vendored Miri wildcard visitors share a local
+  workaround for [Miri #5543](https://github.com/rust-lang/miri/issues/5543).
+  The [duplicate_prefix vcgen client](examples/duplicate_prefix/README.md)
+  covers the initial switch and prepared zero-count body. The remaining
+  paths, whole-call verification across all counts, and timing measurements
+  are pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`
