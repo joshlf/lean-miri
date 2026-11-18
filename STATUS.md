@@ -809,11 +809,13 @@ it; preserve implementations and fail-closed Unsupported outcomes. GenMC is
 removed; available race tracking modes are disabled tracking and the Miri
 vector-clock backend.
 
-* **WP and VC generation** — [StepWP](Miri/Verification/StepWP.lean) connects
-  finite sequences of interpreter driver steps to Lean's `Std.WP`. The first
-  proof exercises a control-flow fixture. Imported MIR lowering, reusable
-  instruction rules, branch joins, loop invariants, calls, whole-run safety
-  and performance measurements remain pending.
+* **WP and VC generation** — [StepWP](Miri/Verification/StepWP.lean) lowers
+  one-block MIR bodies ending in `Return` to checked instruction sequences.
+  [BodyVCGen](examples/empty_function/BodyVCGen.lean) uses the imported
+  `empty_function` body for the whole-local immediate caller case and
+  composes its proof with actual frame preparation after callee resolution.
+  General instruction rules, lowering MIR `Call` and branches, loop
+  invariants, whole-run safety, and performance measurements remain pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`
