@@ -59,13 +59,15 @@ private def setState (tree : NormalTreeState) (node : Nat)
     some { tree with locationStates := tree.locationStates.set node (some state) h }
   else none
 
-private def skippedForeignNodes (tree : NormalTreeState) (kind : AccessKind) :
-    List Nat :=
-  (List.range tree.topology.nodes.size).filter fun node =>
+private def shouldSkipForeignNode (tree : NormalTreeState) (kind : AccessKind)
+    (node : Nat) : Bool :=
+  if node < tree.topology.nodes.size then
+    -- A location state outside the topology does not participate in pruning.
     match tree.stateAt node with
     | none => false
     | some state =>
         state.skipIfKnownNoop kind .ForeignAccess == .SkipSelfAndChildren
+  else false
 
 private def processEvents (tree : NormalTreeState) (root : Nat)
     (kind : AccessKind) : List TraversalEvent → NormalAccessResult
@@ -101,14 +103,12 @@ private def processEvents (tree : NormalTreeState) (root : Nat)
                       ⟨nextTree, root, [event],
                         .PossibleInvariantFailure event.node⟩
 
-/-- Apply the normal concrete-tree access at one location. The visit skip set
-is computed from each node's current-or-default state exactly as Miri's
-foreign-only continue callback does. -/
+/-- Apply a normal concrete-tree access at one location. Read the initial
+current-or-default state only when a foreign subtree is reached. -/
 def performAccess (tree : NormalTreeState) (start : Nat) (kind : AccessKind)
     (mode : ChildrenVisitMode) : NormalAccessResult :=
-  let skipped := skippedForeignNodes tree kind
   let (root, events) :=
-    TraversalTree.traverse tree.topology start mode skipped
+    tree.topology.traverseWithSkip start mode (shouldSkipForeignNode tree kind)
   processEvents tree root kind events
 
 /-- A one-node Cell tree used to establish a complete normal-access contract. -/

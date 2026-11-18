@@ -681,9 +681,7 @@ def main : IO Unit := do
         else
           Tree.ChildrenVisitMode.SkipChildrenOfAccessed
         for skipMask in List.range (2 ^ tree.nodes.size) do
-          let skipped := (List.range tree.nodes.size).filter
-            (fun index => Nat.testBit skipMask index)
-          let (root, events) := Tree.TraversalTree.traverse tree start mode skipped
+          let (root, events) := tree.traverseWithSkip start mode (Nat.testBit skipMask)
           IO.println
             s!"tree-walk {treeName} {start} {if visitChildren then "children" else "nonchildren"} {skipMask} {root} {traversalEventsCode events}"
 

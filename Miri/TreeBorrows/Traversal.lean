@@ -86,36 +86,41 @@ where
 /-- Bottom-up foreign subtree events. The finite fuel corresponds to the
 height bound of a valid rooted tree; a skipped node prunes itself and all
 descendants, matching the source SkipSelfAndChildren result. -/
-private def foreignPostorder (tree : TraversalTree) (skipNodes : List Nat) :
+private def foreignPostorder (tree : TraversalTree) (shouldSkip : Nat → Bool) :
     Nat → Nat → List TraversalEvent
   | 0, _ => []
   | fuel + 1, index =>
-      if skipNodes.contains index then []
+      if shouldSkip index then []
       else
         let children := (nodeAt tree index).children.reverse
-        children.flatMap (foreignPostorder tree skipNodes fuel) ++
+        children.flatMap (foreignPostorder tree shouldSkip fuel) ++
           [⟨index, .ForeignAccess⟩]
 
-/-- Schedule a normal access: access the start and its ancestors first, then
-visit deferred cousin/child subtrees bottom-up. skipNodes models the source's
-foreign-only continue callback. -/
-def traverse (tree : TraversalTree) (start : Nat)
-    (mode : ChildrenVisitMode) (skipNodes : List Nat) :
+/-- Schedule the start and its ancestors first, then visit deferred subtrees
+bottom-up. Query the foreign-only skip predicate at each reached subtree root. -/
+def traverseWithSkip (tree : TraversalTree) (start : Nat)
+    (mode : ChildrenVisitMode) (shouldSkip : Nat → Bool) :
     Nat × List TraversalEvent :=
   let path := ancestorPath tree start
   let root := path.getLast!
   let localEvents := path.map (fun index => ⟨index, .LocalAccess⟩)
   let foreignRoots := initialForeignRoots tree path mode
   let foreignEvents :=
-    foreignRoots.flatMap (foreignPostorder tree skipNodes tree.nodes.size)
+    foreignRoots.flatMap (foreignPostorder tree shouldSkip tree.nodes.size)
   (root, localEvents ++ foreignEvents)
+
+/-- Schedule a normal access with an explicit set of foreign nodes to skip. -/
+def traverse (tree : TraversalTree) (start : Nat)
+    (mode : ChildrenVisitMode) (skipNodes : List Nat) :
+    Nat × List TraversalEvent :=
+  tree.traverseWithSkip start mode skipNodes.contains
 
 /-- The source visitor always propagates at the accessed node first. -/
 theorem traverse_starts_at_accessed_node (tree : TraversalTree) (start : Nat)
     (mode : ChildrenVisitMode) (skipNodes : List Nat) :
     (traverse tree start mode skipNodes).2.head? =
       some ⟨start, .LocalAccess⟩ := by
-  simp [traverse, ancestorPath_head]
+  simp [traverse, traverseWithSkip, ancestorPath_head]
 
 end TraversalTree
 
