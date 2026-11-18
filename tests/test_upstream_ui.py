@@ -143,6 +143,8 @@ fn main() {
     def test_vtable_null_and_shim_convention_keep_exact_categories(self):
         self.assertEqual(category_reference(
             'encountered null pointer, but expected a vtable pointer'), 'invalid_vtable')
+        self.assertEqual(category_reference(
+            'using null pointer as vtable pointer but it does not point to a vtable'), 'invalid_vtable')
         for message in ('null pointer', 'null reference', 'dereferencing a null box'):
             self.assertEqual(category_reference(message), 'null_pointer')
         case = Case('fail/test.rs', errors=[(3, 'invalid value')])
@@ -260,6 +262,9 @@ fn main() {
             ('invalid_discriminant', 'InvalidTag(outside valid range)',
              ('InvalidTag(unknown variant)', 'NotInvalidTag(outside valid range)',
               'InvalidTag(outside valid ranges)', 'dereferencing a null box')),
+            ('invalid_discriminant', 'InvalidTag(untagged variant encoded in niche)',
+             ('InvalidTag(untagged variant)', 'NotInvalidTag(untagged variant encoded in niche)',
+              'InvalidNichedEnumVariantWritten', 'InvalidTag(pointer niche)')),
             ('null_pointer', 'dereferencing a null box',
              ('null box', 'dereferencing a null boxish', 'InvalidTag(outside valid range)')),
         )
