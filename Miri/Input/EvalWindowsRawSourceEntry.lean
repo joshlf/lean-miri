@@ -51,14 +51,15 @@ def runFromSource
   let noCore ← match startupFacts.noCore with
     | .ok value => pure value
     | .error reason => throw (.unsupported s!"compiler no_core query: {reason}")
-  let machineTarget : MachineConstruction.Target := {
+  let machineTarget : MachineConstruction.TargetInfo := {
     os := targetFacts.os
     noCore
     cpuCount := sourceLeaves.foreignSource.host.unixConfig.numCpus
-    cUlongBytes := fun () => (CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
     endian := compiler.runtime.target.base.endian }
-  let initial ← MachineConstruction.create hostRuntime sourceLeaves.hostConfiguration
-    machineTarget initialConfiguration initialMemory runtimeTypes choiceTape
+  let cUlongBytes := fun () =>
+    (CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
+  let initial ← MachineConstruction.createWithCulongLayout hostRuntime sourceLeaves.hostConfiguration
+    machineTarget cUlongBytes initialConfiguration initialMemory runtimeTypes choiceTape
   match EvalWindowsSourceRunConstruction.runFromInitial prepared prepared.image bytes options
       sourceLeaves windowsHost pathToOs choice initialConfiguration bootstrapConfiguration limits
       capacity iterationFuel outerChoices initial with

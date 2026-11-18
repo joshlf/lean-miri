@@ -504,17 +504,18 @@ private def prepareRun (prepared : Input.EvalPreparation.Prepared)
   let targetFacts ← compiler.externStatics.targetFacts.mapError id
   let startupFacts ← (Input.EvalStartupRuntimeConstruction.prepare compiler).mapError id
   let noCore ← startupFacts.noCore.mapError fun reason => s!"compiler no_core query: {reason}"
-  let machineTarget : Input.MachineConstruction.Target := {
+  let machineTarget : Input.MachineConstruction.TargetInfo := {
     os := targetFacts.os
     noCore
     cpuCount := sourceLeaves.foreignSource.host.unixConfig.numCpus
-    cUlongBytes := fun () => (Input.CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
     endian := compiler.runtime.target.base.endian }
+  let cUlongBytes := fun () =>
+    (Input.CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
   let makeInitial : Array ExecutionChoices.Input → Except String (OuterState × InitTrace) := fun inputs => do
     let tape := choiceTape diagnosticSeed inputs
     let creation : EStateM.Result StepError InitTrace OuterState :=
-      (Input.MachineConstruction.create rawInitHooks sourceLeaves.hostConfiguration
-        machineTarget machineConfig initialMemory arrays tape).run ({} : InitTrace)
+      (Input.MachineConstruction.createWithCulongLayout rawInitHooks sourceLeaves.hostConfiguration
+        machineTarget cUlongBytes machineConfig initialMemory arrays tape).run ({} : InitTrace)
     let (initial, trace) : OuterState × InitTrace ← match creation with
       | .ok initial trace => pure (initial, trace)
       | .error error _ => throw s!"source machine construction failed: {reprStr error}"
@@ -536,8 +537,8 @@ private def prepareRun (prepared : Input.EvalPreparation.Prepared)
           Input.EvalChronoTimeSource.installSourceInput enabledLeaves.foreignSource}
         else enabledLeaves
       let creation : EStateM.Result StepError InitTrace OuterState :=
-        (Input.MachineConstruction.create rawInitHooks sourceLeaves.hostConfiguration
-          machineTarget machineConfig initialMemory arrays (choiceTape diagnosticSeed inputs)).run ({} : InitTrace)
+        (Input.MachineConstruction.createWithCulongLayout rawInitHooks sourceLeaves.hostConfiguration
+          machineTarget cUlongBytes machineConfig initialMemory arrays (choiceTape diagnosticSeed inputs)).run ({} : InitTrace)
       let (initial, trace) ← match creation with
         | .ok initial trace => pure (initial, trace)
         | .error error _ => throw error

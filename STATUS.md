@@ -375,6 +375,15 @@ comparison passes `no_core` and the standard-library `strange_references@tree`
 control. The Windows raw source entry compiles with the shared initialization
 change.
 
+The first `no_core` change also changed the input type of `MachineConstruction.create`.
+The [hosted replay, fresh and extended jobs](https://github.com/proofs-rs/lean-miri/actions/runs/44219572142)
+failed when existing connected harnesses supplied the original `Nat` width.
+The original entry point now accepts the resolved width again, and production
+callers use the same initializer with a deferred layout query. All 17 existing
+callers typecheck locally, including the connected proof harness. The retained
+startup replay, fresh atomic handoff, and the `no_core` and `socket-unix` UI
+comparisons pass.
+
 Raw-pointer validity now uses rustc's trivial `Sized` rule for array pointees
 before demanding a layout. The local upstream UI comparison passes
 `too-big-type-behind-raw-ptr`; `too-big-slice` and `wrong-dyn-trait` still reach
