@@ -67,6 +67,8 @@ private def castType (context : CompilerFacts.Context) (tables : CompilerTables)
   | .tuple elements => unchanged (.tuple elements)
   | .functionDefinition definition args .. => unchanged (.fnDefinition definition args)
   | .closure definition args count => unchanged (.closure definition args count)
+  -- `unsize_into_ptr` can create a trait-object vtable for a coroutine pointee.
+  | .coroutine .. => unchanged .coroutine
   | .array element .. =>
     let layout ← CompilerFacts.layoutOf context id
     let .Array _ count := layout.layout.fields | throw "array compiler layout lacks source array count"

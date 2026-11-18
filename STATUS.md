@@ -380,6 +380,11 @@ before demanding a layout. The local upstream UI comparison passes
 `too-big-type-behind-raw-ptr`; `too-big-slice` and `wrong-dyn-trait` still reach
 their expected UB outcomes.
 
+Cast type classification now recognizes coroutine pointees, so the existing
+trait-object unsizing path creates their vtables. The local UI comparison
+passes `track-caller-attribute`, ordinary `unsized@tree`, and the expected
+`wrong-dyn-trait` UB. Synthetic coroutine owner identity remains unresolved.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
