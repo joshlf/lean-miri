@@ -2385,6 +2385,25 @@ fn export_reachable_instances<'tcx>(
                 let item = ty::Instance::new_raw(def_id, instance.args);
                 context.register_metadata_instance(item);
                 context.source_abi_demands.push(item);
+                if matches!(
+                    tcx.item_name(def_id).as_str(),
+                    "simd_saturating_add" | "simd_saturating_sub"
+                ) {
+                    let vector = instance.args.type_at(0);
+                    if vector.is_simd() {
+                        let (element, _) = fixed_simd_field(tcx, vector)?;
+                        if element.is_integral() {
+                            // The source SIMD saturation helper invokes the
+                            // overflowing scalar operator, whose ImmTy::from_pair
+                            // queries the layout of this exact tuple.
+                            type_json(
+                                context,
+                                tcx,
+                                ty::Ty::new_tup(tcx, &[element, tcx.types.bool]),
+                            )?;
+                        }
+                    }
+                }
             }
             let fallback = if matches!(instance.def, ty::InstanceKind::Intrinsic(_))
                 && tcx
@@ -2916,6 +2935,30 @@ fn pattern_json<'tcx>(
     })
 }
 
+fn fixed_simd_field<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    input: ty::Ty<'tcx>,
+) -> Result<(ty::Ty<'tcx>, ty::Const<'tcx>), String> {
+    let ty::Adt(def, args) = *input.kind() else {
+        return Err(format!("expected a SIMD ADT: {input:?}"));
+    };
+    let [field] = def.non_enum_variant().fields.raw.as_slice() else {
+        return Err(format!("expected one SIMD field: {input:?}"));
+    };
+    // An exact FnSig type can still have an unevaluated SIMD array length.
+    // Query its field with the same typing environment as other ADT fields.
+    let field = tcx
+        .try_normalize_erasing_regions(
+            ty::TypingEnv::fully_monomorphized(),
+            field.ty(tcx, args),
+        )
+        .map_err(|error| format!("SIMD field normalization failed: {error:?}"))?;
+    match *field.kind() {
+        ty::Array(element, length) => Ok((element, length)),
+        _ => Err(format!("expected a SIMD array field: {field:?}")),
+    }
+}
+
 fn type_json_inner<'tcx>(
     context: &mut ExportContext<'tcx>,
     tcx: TyCtxt<'tcx>,
@@ -2972,9 +3015,12 @@ fn type_json_inner<'tcx>(
                 element: type_json(context, tcx, element)?,
             })
         } else if input.is_simd() {
-            let (count, element) = input.simd_size_and_type(tcx);
+            let (element, length) = fixed_simd_field(tcx, input)?;
+            let count = length.try_to_target_usize(tcx).ok_or_else(|| {
+                format!("SIMD array length did not normalize to target usize: {length:?}")
+            })?;
             Some(Simd {
-                count: count as u64,
+                count,
                 element: type_json(context, tcx, element)?,
             })
         } else {
