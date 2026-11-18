@@ -805,9 +805,15 @@ execution model.
 
 These gaps remain in the backlog, without implying that the whole feature is
 unimplemented. Check existing support against pinned upstream before extending
-it; preserve implementations and fail-closed Unsupported outcomes. WP remains
-deferred with its implementation removed. GenMC is removed; available race
-tracking modes are disabled tracking and the Miri vector-clock backend.
+it; preserve implementations and fail-closed Unsupported outcomes. GenMC is
+removed; available race tracking modes are disabled tracking and the Miri
+vector-clock backend.
+
+* **WP and VC generation** — [StepWP](Miri/Verification/StepWP.lean) connects
+  finite sequences of interpreter driver steps to Lean's `Std.WP`. The first
+  proof exercises a control-flow fixture. Imported MIR lowering, reusable
+  instruction rules, branch joins, loop invariants, calls, whole-run safety
+  and performance measurements remain pending.
 
 * **Windows / peripheral OS facilities** —
   [WindowsPlatform](Miri/Interpreter/WindowsPlatform.lean), `MiriTests/Native/`
