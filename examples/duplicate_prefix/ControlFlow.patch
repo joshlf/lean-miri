@@ -17,3 +17,16 @@
 @@ -80 +80 @@
 -  simp [effect,progress]
 +  simp [ControlFlow.evalCall, effect, progress]
+--- a/examples/duplicate_prefix/DuplicatePrefixTerminalStack.lean
++++ b/examples/duplicate_prefix/DuplicatePrefixTerminalStack.lean
+@@ -27 +27 @@
+-  simp only [Id.run, pure, bind, Except.map] at terminal
++  simp only [Id.run, pure, Except.map] at terminal
+@@ -32 +32,6 @@
+-    all_goals simp_all
++    all_goals
++      try unfold_terminal_finish at terminal
++      try simp only [Except.map] at terminal
++      repeat' split at terminal
++      simp_all
++      all_goals cases congrArg Prod.snd terminal

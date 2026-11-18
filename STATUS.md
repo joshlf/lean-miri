@@ -821,6 +821,9 @@ vector-clock backend.
   `callPre_of_contract` composes the actual frame preparation with a callee
   contract. The Lean and vendored Miri wildcard visitors share a local
   workaround for [Miri #5543](https://github.com/rust-lang/miri/issues/5543).
+  The full vendored Miri build and its 37 library tests passed with the
+  pinned rustc-dev toolchain. The upstream regression and native
+  `duplicate_prefix` branch checks also passed.
   The [duplicate_prefix vcgen client](examples/duplicate_prefix/README.md)
   covers the initial switch and prepared zero-count body. The all-counts
   adapter uses the ordinary-input trace proof from PR #12. The full kernel

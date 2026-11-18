@@ -25,6 +25,6 @@ python3 tools/check-duplicate-prefix-vcgen.py --all-counts
 The checker builds the pinned client sources against the Lean interpreter in
 this checkout and audits the new theorems' transitive axioms. The all-counts
 mode checks the larger ordinary-input proof closure. A proof-only patch
-makes the imported control-flow proofs unfold the current switch, assert
-and call definitions. Build artifacts and logs go under
+makes the imported proofs unfold the current control-flow and driver
+definitions. Build artifacts and logs go under
 `scratch/duplicate-prefix-vcgen.*`.
