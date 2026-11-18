@@ -256,7 +256,11 @@ def boolean (runtime : RuntimeMetadata) (id : TypeId) (query : String) : Except 
   | "is_unsafe_unpin" => ConcreteTraitQueries.check runtime .unsafeUnpin id
   | "needs_drop" => needsDrop runtime id
   | "opsem_inhabited" => opsemInhabited runtime id
-  | "is_sized" => return (← runtime.lookup id |>.mapError toString).layout.isSized
+  | "is_sized" =>
+    -- rustc's has_trivial_sizedness classifies arrays before querying layout.
+    -- This lets validity check a thin raw pointer even if its array is too large.
+    if value.shapeKind == .array then return true
+    return (← runtime.lookup id |>.mapError toString).layout.isSized
   | "pass_indirectly_in_non_rustic_abis" => return match value.shape with
       | .adt data => data.representation.flagsBits &&& 32 != 0
       | _ => false

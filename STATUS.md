@@ -372,6 +372,11 @@ comparison passes `no_core` and the standard-library `strange_references@tree`
 control. The Windows raw source entry compiles with the shared initialization
 change.
 
+Raw-pointer validity now uses rustc's trivial `Sized` rule for array pointees
+before demanding a layout. The local upstream UI comparison passes
+`too-big-type-behind-raw-ptr`; `too-big-slice` and `wrong-dyn-trait` still reach
+their expected UB outcomes.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler
