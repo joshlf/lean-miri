@@ -392,7 +392,14 @@ their expected UB outcomes.
 Cast type classification now recognizes coroutine pointees, so the existing
 trait-object unsizing path creates their vtables. The local UI comparison
 passes `track-caller-attribute`, ordinary `unsized@tree`, and the expected
-`wrong-dyn-trait` UB. Synthetic coroutine owner identity remains unresolved.
+`wrong-dyn-trait` UB.
+
+For coroutine closures with a synthetic by-move body, the exporter verifies its
+owner using rustc's `coroutine_by_move_body_def_id` query. The decoder checks the
+body and instance definition IDs and exact coroutine arguments against that
+evidence. Existing coverage records retain the direct owner check. Local UI
+comparison passes `iter_macro` and the existing coroutine controls, and removing
+or substituting the `iter_macro` by-move owner causes the decoder to reject it.
 
 The upstream UI oracle now recognizes the upstream diagnostic for a null
 vtable pointer and Lean's exact invalid tag for an untagged variant encoded in

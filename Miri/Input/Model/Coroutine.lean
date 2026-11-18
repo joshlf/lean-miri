@@ -29,6 +29,8 @@ structure CoroutineEvidence where
   dropSync : Option Nat
   dropAsync : Option Nat
   dropProxyAsync : Option Nat
+  /-- Compiler's `coroutine_by_move_body_def_id` for a synthetic owner. -/
+  byMoveOwner : Option DefinitionRef
 
 structure CoroutineAuxiliaryBody where
   ownerBody : BodyId

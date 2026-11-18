@@ -71,6 +71,31 @@ def check_queries(control, output, env, settings):
     return [path.stem for path, _ in mutations]
 
 
+def check_by_move_owner(control, output, env, settings):
+    document = load_mir_document(control)
+    rows = document["compiler_coroutine_coverage"]["coroutines"]
+    row, = (row for row in rows if "by_move_owner" in row)
+    underlying = document["types"][row["coroutine_type"]]["shape"]
+    owner = document["bodies"][row["owner_body"]]
+    assert underlying["def_id"] != row["by_move_owner"] == owner["source_def_id"]
+    names = []
+    for name in ("missing-by-move-owner", "wrong-by-move-owner"):
+        if name == "missing-by-move-owner":
+            del row["by_move_owner"]
+        else:
+            row["by_move_owner"] = underlying["def_id"]
+        snapshot = output / (name + ".json")
+        with snapshot.open("w") as stream:
+            json.dump(document, stream, separators=(",", ":"))
+        code = run(["lake", "env", "lean", "--run", "tests/input/CoroutineReject.lean", str(snapshot),
+                    "coroutine type differs from owner instance"], cwd=ROOT, env=env,
+                   log=snapshot.with_suffix(".log"), timeout=180, memory_limit=settings.memory_limit)
+        assert code.returncode == 0, (snapshot, code)
+        names.append(name)
+        print("PASS constructed decoder mutation", name, flush=True)
+    return names
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--output", type=Path, required=True)
@@ -94,12 +119,14 @@ def main():
     hashes = [driver.sha256(path) for path in (settings.exporter, settings.runner, settings.queries)]
     originals = {f"pass/{name}.rs@{revision}" for name in ("future-self-referential", "generators")
                  for revision in ("tree", "tree_implicit_writes")}
-    records, control = [], None
+    by_move_case = "pass/iter_macro.rs"
+    originals.add(by_move_case)
+    records, control, by_move = [], None, None
     for sources, selected in [(ROOT / "upstream/miri-source/tests", originals),
                               (ROOT / "tests/upstream_ui/fixtures/coroutines", None)]:
         driver.SOURCES = sources
         cases = [case for case in discover(sources) if selected is None or case.id in selected]
-        assert len(cases) == (4 if selected is not None else 2)
+        assert len(cases) == (len(originals) if selected is not None else 2)
         for case in cases:
             assert not case.reasons, case.reasons
             record = driver.run_case(case, settings, env, args.output)
@@ -116,12 +143,15 @@ def main():
             assert not owners & {row["instance_id"] for row in document["compiler_native_signature_queries"]}
             if selected is None and control is None:
                 control = snapshot
+            if case.id == by_move_case:
+                by_move = snapshot
             del document, coverage
             gc.collect()
             records.append(record)
             print("PASS strict coroutine comparison", case.id, flush=True)
-    assert control is not None
+    assert control is not None and by_move is not None
     mutations = check_queries(control, args.output, env, settings)
+    mutations += check_by_move_owner(by_move, args.output, env, settings)
     assert hashes == [driver.sha256(path) for path in (settings.exporter, settings.runner, settings.queries)]
     (args.output / "summary.json").write_text(json.dumps({"cases": records,
         "binary_sha256": hashes, "decoder_mutations": mutations}, indent=2))

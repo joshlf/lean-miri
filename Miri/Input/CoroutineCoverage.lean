@@ -137,6 +137,7 @@ private structure evidenceFields where
   drop_sync : Option (Option Nat) := none
   drop_async : Option (Option Nat) := none
   drop_proxy_async : Option (Option Nat) := none
+  by_move_owner : Option Nat := none
 
 private def evidence (pools : DecodeMIR.MIRParser.SharedPools) : Parser CoroutineEvidence := do
   let v ← object ({} : evidenceFields) fun v key => do
@@ -150,8 +151,9 @@ private def evidence (pools : DecodeMIR.MIRParser.SharedPools) : Parser Coroutin
     | "drop_sync" => return {v with drop_sync := some (← nullable natural)}
     | "drop_async" => return {v with drop_async := some (← nullable natural)}
     | "drop_proxy_async" => return {v with drop_proxy_async := some (← nullable natural)}
+    | "by_move_owner" => return {v with by_move_owner := some (← natural)}
     | _ => fail s!"unknown coroutine coverage field `{key}`"
-  return ⟨(← required v.owner_body "owner_body"), (← required v.coroutine_type "coroutine_type"), (← required v.coroutine_kind "coroutine_kind"), (← required v.yield_type "yield_type"), (← required v.resume_type "resume_type"), (← required v.layout "layout"), (← required v.drop_sync "drop_sync"), (← required v.drop_async "drop_async"), (← required v.drop_proxy_async "drop_proxy_async")⟩
+  return ⟨(← required v.owner_body "owner_body"), (← required v.coroutine_type "coroutine_type"), (← required v.coroutine_kind "coroutine_kind"), (← required v.yield_type "yield_type"), (← required v.resume_type "resume_type"), (← required v.layout "layout"), (← required v.drop_sync "drop_sync"), (← required v.drop_async "drop_async"), (← required v.drop_proxy_async "drop_proxy_async"), v.by_move_owner⟩
 
 structure Parsed where
   value : CoroutineCoverage
@@ -227,10 +229,16 @@ def validate (document : ImportDocument) (coverage : CoroutineCoverage) : Except
       throw "coroutine coverage: absent owner instance"
     match coroutineType.shape, ownerInstance.instanceKind with
     | .coroutine definition args, .Item source =>
-      unless definition == source && args == ownerInstance.genericArgs do
+      let validOwner := match row.byMoveOwner, row.kind with
+        | none, _ => definition == source
+        | some synthetic, .Desugared _ .Closure =>
+          synthetic == source && definition != source && owner.definitionId == some synthetic
+        | some _, _ => false
+      unless validOwner && args == ownerInstance.genericArgs do
         throw "coroutine coverage: coroutine type differs from owner instance"
     | .coroutine .., .Shim (.AsyncDropGlue _ ty) =>
-      unless ty == row.coroutineType do throw "coroutine coverage: async glue type differs from owner"
+      unless row.byMoveOwner.isNone && ty == row.coroutineType do
+        throw "coroutine coverage: async glue type differs from owner"
     | _, _ => throw "coroutine coverage: owner type/source is not a coroutine"
     let fields := row.layout.fields
     unless row.layout.variants.size >= 3 && row.layout.variants.size == row.layout.variantSources.size &&

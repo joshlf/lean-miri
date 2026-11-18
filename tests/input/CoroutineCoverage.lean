@@ -40,7 +40,7 @@ private def componentChecks (original : ImportDocument) : IO Unit := do
     instances := original.instances.set! owner.instanceId ownerInstance}
   let source : Miri.Input.SourceInfo := ⟨owner.spanId, 0⟩
   let row : CoroutineEvidence := ⟨0, 0, .Coroutine .Movable, none, none,
-    ⟨#[], #[#[], #[], #[]], #[source, source, source], #[]⟩, some 0, none, some 1⟩
+    ⟨#[], #[#[], #[], #[]], #[source, source, source], #[]⟩, some 0, none, some 1, none⟩
   let sync : CoroutineAuxiliaryBody := ⟨0, .sync, .Shim (.DropGlue definition (some 0)),
     {owner with mir := {owner.mir with phase := .Runtime .Initial}}⟩
   let proxy : CoroutineAuxiliaryBody := ⟨0, .proxyAsync, ownerInstance.instanceKind,
