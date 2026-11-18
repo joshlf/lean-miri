@@ -222,7 +222,8 @@ def math (h : Math.Hooks Provenance (State Os R P H D O Aff B Host) C (RuntimePl
     (args : Array (OpTy Provenance)) (dest : RuntimePlace Provenance) :
     M Os R P H D O Aff B Host ForeignItems.EmulateItemResult := do
   let source := {h with checkCSignature := fun _ name count => do
-    let floating := if name.endsWith "f" || name == "lgammaf_r" then
+    -- `erf` is the binary64 C symbol. Only `erff` has the float suffix.
+    let floating := if (name != "erf" && name.endsWith "f") || name == "lgammaf_r" then
       ForeignItems.SignatureType.f32 else .f64
     let parameters := if count == 1 then #[floating]
       else if ["_ldexp","ldexp","scalbn"].contains name then #[floating,.i32]
