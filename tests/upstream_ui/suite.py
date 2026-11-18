@@ -13,6 +13,15 @@ import shlex
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ROOT / 'upstream/miri-source/tests'
 TARGET = 'x86_64-unknown-linux-gnu'
+LONG_CASES = frozenset({
+    'pass/btreemap.rs@tree',
+    'pass/btreemap.rs@tree_implicit_writes',
+    'pass/heap_allocator.rs',
+    'pass/panic/nested_panic_caught.rs',
+    'pass/shims/x86/intrinsics-x86-avx2.rs',
+    'pass/shims/x86/intrinsics-x86-gfni.rs',
+    'pass/shims/x86/rounding-error.rs',
+})
 DIRECTIVE = re.compile(r'^\s*//@\s*(?:\[([^]]+)\])?\s*([\w-]+)(?::\s*(.*))?$')
 ANNOTATION = re.compile(r'//(?:\[([^]]+)\])?~(?:\[([^]]+)\])?([\^v|]*)\s*ERROR:\s*(.*)')
 
@@ -26,6 +35,13 @@ RUNTIME_FLAGS = {
     '-Zmiri-ignore-leaks', '-Zmiri-fixed-schedule',
     '-Zmiri-disable-data-race-detector', '-Zmiri-deterministic-concurrency',
 }
+
+
+def case_shard(case_id, shard_count, dedicated_long_shard=False):
+    if dedicated_long_shard and case_id in LONG_CASES:
+        return shard_count - 1
+    regular_shards = shard_count - int(dedicated_long_shard)
+    return int(hashlib.sha256(case_id.encode()).hexdigest(), 16) % regular_shards
 
 
 def runtime_profile(flags):

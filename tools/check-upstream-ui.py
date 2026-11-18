@@ -19,7 +19,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tests/upstream_ui'))
-from suite import (SOURCES, compare, discover, profile_differences, reference_oracle,
+from suite import (SOURCES, case_shard, compare, discover, profile_differences, reference_oracle,
                    reference_profile_differences, runtime_profile, source_fingerprint)
 from run_guarded import run as guarded_run
 from upstream_ui_control import (ControlProtocolError, UI_CHOICE_MODE, control_file, read_control)
@@ -237,6 +237,8 @@ def main():
     parser.add_argument('--export-timeout', type=float, default=900)
     parser.add_argument('--shard-index', type=int, default=0)
     parser.add_argument('--shard-count', type=int, default=1)
+    parser.add_argument('--dedicated-long-shard', action='store_true',
+                        help='assign known long cases to the final shard')
     parser.add_argument('--jobs', type=int, default=1, help='independent guest processes (default serial; high memory per case)')
     parser.add_argument('--keep-inputs', action='store_true')
     args = parser.parse_args()
@@ -251,7 +253,9 @@ def main():
         cases = [c for c in cases if c.id in args.case]
     if not 0 <= args.shard_index < args.shard_count:
         parser.error('require 0 <= shard-index < shard-count')
-    cases = [c for c in cases if int(hashlib.sha256(c.id.encode()).hexdigest(), 16) % args.shard_count == args.shard_index]
+    if args.dedicated_long_shard and args.shard_count < 2:
+        parser.error('a dedicated long shard requires at least two shards')
+    cases = [c for c in cases if case_shard(c.id, args.shard_count, args.dedicated_long_shard) == args.shard_index]
     if args.inventory:
         print(json.dumps([c.record() for c in cases], indent=2))
         return 0
@@ -285,6 +289,7 @@ def main():
     (output / 'provenance.json').write_text(json.dumps({
         'project_source_sha256': source_hash,
         'shard_index': args.shard_index, 'shard_count': args.shard_count,
+        'dedicated_long_shard': args.dedicated_long_shard,
         'source_lock_sha256': sha256(ROOT / 'upstream/source-lock.json'),
         'exporter_sha256': exporter_hash, 'runner_sha256': runner_hash,
         'timeout': args.timeout, 'memory_limit': args.memory_limit, 'export_timeout': args.export_timeout,
