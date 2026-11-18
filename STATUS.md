@@ -390,6 +390,11 @@ vtable pointer and Lean's exact invalid tag for an untagged variant encoded in
 its niche. Both original UI cases pass their UB class and source-site checks,
 along with the distinct null-box and wrong-trait controls.
 
+Delayed virtual-socket readiness now drains peer reader and writer waiters
+through the ordinary callback router before updating readiness. The original
+fixed-schedule `socket-unix` UI comparison passes, including the peer close
+that wakes a blocked reader.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler

@@ -55,7 +55,7 @@ structure Hooks (S F : Type) where
   readiness : F → M S Bits
   delayed : M S (Array F)
   putDelayed : Array F → M S Unit
-  beforeDelayed : F → M S Unit
+  beforeDelayed : F → M S (Array (ThreadId × BlockReason))
   /-- Must enable/swap the full target thread view, execute its typed callback,
   and restore only on success. No callback token acknowledgment is accepted. -/
   unblock : ThreadId → BlockReason → M S Unit
@@ -243,7 +243,9 @@ def processDelayed (budget : Nat) (h : Hooks S F) : M S Unit := do
   | budget + 1 =>
     let some fd := queue[queue.size - 1]? | throw (.invalidProgram "delayed readiness stack missing element")
     h.putDelayed (queue.extract 0 (queue.size - 1))
-    onError (h.beforeDelayed fd) (h.dropFd fd)
+    onError (do
+      for (thread, reason) in ← h.beforeDelayed fd do
+        h.unblock thread reason) (h.dropFd fd)
     updateFd budget h fd {}
     processDelayed budget h
 

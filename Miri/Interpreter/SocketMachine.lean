@@ -119,8 +119,7 @@ def bindReadiness (h : ReadinessMachine.Hooks K U H D O) (descriptor : Descripto
     beforeDelayed := fun ref => do
       let value ← virtualState store ref
       putVirtual store ref {value with blockedRead := #[], blockedWrite := #[]}
-      for thread in value.blockedRead ++ value.blockedWrite do
-        canonical.unblock thread .VirtualSocket
+      pure ((value.blockedRead ++ value.blockedWrite).map fun thread => (thread, .VirtualSocket))
     supportsWatching := fun ref => if (kind descriptor ref).isSome then true else canonical.supportsWatching ref
     readiness := fun ref => do
       match kind descriptor ref with
