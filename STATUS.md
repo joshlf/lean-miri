@@ -366,7 +366,7 @@ produce the expected fused result in reference Miri and Lean.
 The C math shim now checks `erf` against the binary64 ABI and `erff` against
 the binary32 ABI, as pinned Miri does. Focused calls pass in both widths, and
 an intentionally mismatched C signature still reaches UB in both interpreters.
-The full `float.rs` comparison is pending.
+The full local `float.rs` comparison also passes.
 
 Machine startup now queries the `c_ulong` layout only when the target uses
 the source CPU affinity mask. Unix descriptor control requests the exact
