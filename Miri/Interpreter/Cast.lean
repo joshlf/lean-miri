@@ -19,6 +19,7 @@ inductive CastTypeInfo where
   | fnPointer
   | fnDefinition (definition : DefId) (args : Array GenericArg)
   | closure (definition : DefId) (args : Array GenericArg) (upvarCount : Nat)
+  | coroutine
   | pattern (inner : TyId) (patternId : Nat)
   | adt (definition : DefId)
   | tuple (elements : Array TyId)
