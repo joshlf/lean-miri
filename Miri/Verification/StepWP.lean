@@ -17,6 +17,7 @@ inductive Instruction where
   | statement (kind : StatementKind)
   | ret
   | goto (target : BasicBlockId) (hints : Array LoopHintAttr)
+  | terminator (kind : TerminatorKind)
 
 /-- The terminator selected by the driver, including source information. -/
 def currentTerminator (state : State) : Option Terminator := do
@@ -32,6 +33,7 @@ def Instruction.matches (instruction : Instruction) (state : State) : Prop :=
   match instruction with
   | .ret => (currentTerminator state).map Terminator.kind = some .Return
   | .goto target hints => (currentTerminator state).map Terminator.kind = some (.Goto target hints)
+  | .terminator kind => (currentTerminator state).map Terminator.kind = some kind
   | .statement kind =>
     match state.stack.currentFrame? with
     | some frame =>
@@ -56,14 +58,28 @@ inductive Program (hooks : Hooks) (allowed : State → C → Prop) where
 
 variable {hooks : StepHooks P L E M C V} {allowed : StepState P L E M → C → Prop}
 
+/-- The control instructions with a registered driver rule. -/
+def lowerTerminator : TerminatorKind → Option Instruction
+  | .Return => some .ret
+  | .Goto target hints => some (.goto target hints)
+  | kind@(.SwitchInt ..) | kind@(.Assert ..) | kind@(.Call ..) | kind@(.Drop ..) =>
+    some (.terminator kind)
+  | _ => none
+
+/-- Lower a block up to and including its terminator. The postcondition observes
+the actual successor state, so branch targets need not be evaluated here. -/
+def lowerBlock (block : BasicBlock) : Option (Program hooks allowed) := do
+  let last ← lowerTerminator block.terminator.kind
+  return block.statements.foldr
+    (fun statement next => .seq (.instruction (.statement statement.kind)) next)
+    (.instruction last)
+
 /-- Lower a one-block body with a Return terminator. Instruction guards bind
 the resulting verification program to the MIR actually stepped. -/
 def lowerStraightLine (body : Body) : Option (Program hooks allowed) := do
   let #[block] := body.basicBlocks | none
   let .Return := block.terminator.kind | none
-  return block.statements.foldr
-    (fun statement next => .seq (.instruction (.statement statement.kind)) next)
-    (.instruction .ret)
+  lowerBlock block
 
 /-- Demand a permitted choice and check every permitted result, retaining the
 actual failed state on error. -/
@@ -264,6 +280,28 @@ def afterNop (state : State) (frame : Frame P L E) (loc : Location) : State :=
   rw [outcome]
   exact ⟨rfl, next frame loc current pc⟩
 
+private theorem spec_statement_effect (hooks : Hooks) (allowed : State → C → Prop)
+    (kind : StatementKind) (effect : C → State → StepResult State Unit)
+    (dispatch : ∀ choice source state,
+      Step.evalStatement hooks choice ⟨source, kind⟩ state = effect choice state)
+    (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement kind))
+      (fun before => (Instruction.statement kind).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1) (effect choice before))
+          (post ()) onError before) post onError := by
+  apply Triple.iff.mpr
+  rintro before ⟨matched, enabled, run⟩
+  obtain ⟨_, _, _, stmt, current, pc, found, slot, kindEq⟩ := statement_at matched
+  have stmtEq : stmt = ⟨stmt.sourceInfo, kind⟩ := by cases stmt; simp_all
+  refine ⟨matched, enabled, ?_⟩
+  intro choice permitted
+  have outcome : Step.step hooks choice before = Step.finishStatement
+      (before.stack.frames.size - 1) (effect choice before) := by
+    simp only [Step.step, current, pc, found, slot, Id.run, pure, Pure.pure]
+    rw [stmtEq, dispatch]
+  simpa only [outcome] using run choice permitted
+
 /-- Dispatch the checked assignment to the existing rvalue implementation. -/
 theorem step_eq_assign {before : State} {destination : Place} {rhs : Rvalue}
     (matched : (Instruction.statement (.Assign destination rhs)).matches before)
@@ -288,6 +326,49 @@ theorem step_eq_assign {before : State} {destination : Place} {rhs : Rvalue}
   refine ⟨matched, enabled, ?_⟩
   intro choice permitted
   simpa only [step_eq_assign matched hooks choice] using run choice permitted
+
+@[spec] theorem spec_storageLive (hooks : Hooks) (allowed : State → C → Prop)
+    (localId : LocalId) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement (.StorageLive localId)))
+      (fun before => (Instruction.statement (.StorageLive localId)).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1)
+            (hooks.storageLive choice localId before)) (post ()) onError before)
+      post onError :=
+  spec_statement_effect hooks allowed (.StorageLive localId) (fun choice => hooks.storageLive choice localId) (by intros; rfl) post onError
+
+@[spec] theorem spec_storageDead (hooks : Hooks) (allowed : State → C → Prop)
+    (localId : LocalId) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement (.StorageDead localId)))
+      (fun before => (Instruction.statement (.StorageDead localId)).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1)
+            (hooks.storageDead choice localId before)) (post ()) onError before)
+      post onError :=
+  spec_statement_effect hooks allowed (.StorageDead localId) (fun choice => hooks.storageDead choice localId) (by intros; rfl) post onError
+
+@[spec] theorem spec_placeMention (hooks : Hooks) (allowed : State → C → Prop)
+    (place : Place) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement (.PlaceMention place)))
+      (fun before => (Instruction.statement (.PlaceMention place)).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1)
+            ((let result := hooks.evalPlace choice place false before
+             (result.1, result.2.map fun _ => ())))) (post ()) onError before)
+      post onError :=
+  spec_statement_effect hooks allowed (.PlaceMention place) (fun choice state =>
+    let result := hooks.evalPlace choice place false state
+    (result.1, result.2.map fun _ => ())) (by intros; rfl) post onError
+
+@[spec] theorem spec_copyNonOverlapping (hooks : Hooks) (allowed : State → C → Prop)
+    (args : CopyNonOverlapping) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed) (.statement (.Intrinsic (.CopyNonOverlapping args))))
+      (fun before => (Instruction.statement (.Intrinsic (.CopyNonOverlapping args))).matches before ∧
+        transitionPre allowed true
+          (fun choice => Step.finishStatement (before.stack.frames.size - 1)
+            (hooks.intrinsic choice (.CopyNonOverlapping args) before)) (post ()) onError before)
+      post onError :=
+  spec_statement_effect hooks allowed (.Intrinsic (.CopyNonOverlapping args)) (fun choice => hooks.intrinsic choice (.CopyNonOverlapping args)) (by intros; rfl) post onError
 
 private theorem spec_terminator_of_kind (hooks : Hooks) (allowed : State → C → Prop)
     (instruction : Instruction) (kind : TerminatorKind)
@@ -323,6 +404,49 @@ private theorem spec_terminator_of_kind (hooks : Hooks) (allowed : State → C �
           (post ()) onError before) post onError :=
   spec_terminator_of_kind hooks allowed (.goto target hints) (.Goto target hints)
     (fun _ => Iff.rfl) post onError
+
+@[spec] theorem spec_switchInt (hooks : Hooks) (allowed : State → C → Prop)
+    (discriminant : Operand) (targets : SwitchTargets) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed)
+        (.terminator (.SwitchInt discriminant targets)))
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .SwitchInt discriminant targets ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed (.terminator (.SwitchInt discriminant targets))
+    (.SwitchInt discriminant targets) (fun _ => Iff.rfl) post onError
+
+@[spec] theorem spec_assert (hooks : Hooks) (allowed : State → C → Prop)
+    (condition : Operand) (expected : Bool) (message : AssertKind)
+    (target : BasicBlockId) (unwind : UnwindAction) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed)
+        (.terminator (.Assert condition expected message target unwind)))
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .Assert condition expected message target unwind ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed (.terminator (.Assert condition expected message target unwind))
+    (.Assert condition expected message target unwind) (fun _ => Iff.rfl) post onError
+
+@[spec] theorem spec_callTerminator (hooks : Hooks) (allowed : State → C → Prop)
+    (callee : Operand) (args : Array SpannedOperand) (destination : Place)
+    (target : Option BasicBlockId) (unwind : UnwindAction) (source : CallSource) (span : SpanRef) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed)
+        (.terminator (.Call callee args destination target unwind source span)))
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .Call callee args destination target unwind source span ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed (.terminator (.Call callee args destination target unwind source span))
+    (.Call callee args destination target unwind source span) (fun _ => Iff.rfl) post onError
+
+@[spec] theorem spec_drop (hooks : Hooks) (allowed : State → C → Prop)
+    (place : Place) (target : BasicBlockId) (unwind : UnwindAction)
+    (replace : Bool) (asyncDrop : Option BasicBlockId) (post : Unit → State → Prop) (onError : StepError → State → Prop) :
+    Triple (Program.instruction (hooks := hooks) (allowed := allowed)
+        (.terminator (.Drop place target unwind replace asyncDrop)))
+      (fun before => ∃ term, currentTerminator before = some term ∧ term.kind = .Drop place target unwind replace asyncDrop ∧
+        transitionPre allowed true (fun choice => Step.runTerminator hooks choice term before)
+          (post ()) onError before) post onError :=
+  spec_terminator_of_kind hooks allowed (.terminator (.Drop place target unwind replace asyncDrop))
+    (.Drop place target unwind replace asyncDrop) (fun _ => Iff.rfl) post onError
 
 @[spec] theorem spec_call (hooks : Hooks) (allowed : State → C → Prop)
     (prepare : C → State → EStateM.Result StepError State Unit)

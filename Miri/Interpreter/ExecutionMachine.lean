@@ -294,9 +294,10 @@ def callHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) : Ca
     limits.retag limits.callDispatch operands (projectionHooks h) h.functions virtual
     h.varArgs h.arithmetic intrinsic
 
-/-- The same existing small-step Step.step executes the assembled hooks. -/
-def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
-    StepHooks Provenance LocalLayout FrameExtra (MachineHooks.MachineState K U) C Value :=
+/-- Assemble the canonical terminator operations used by the step driver. -/
+abbrev terminatorHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
+    TerminatorHooks Provenance LocalLayout FrameExtra (MachineHooks.MachineState K U)
+      C (OpTy Provenance) (RvalueImmTy Provenance) :=
   let h := withValidation h limits
   let operands := operandHooks h
   let eval := fun c op => OperandMachine.evalOperand operands c op none
@@ -309,9 +310,7 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     driver := FunctionCalls.bindUnwind h.panic.driver helpers}
   let control := ExecutionControl.hooks h.control.bodySpan h.lifecycle h.access
     (projectionHooks h).place h.copy h.retag helpers h.unwindTerminateFunction
-  let discr := discriminantHooks h
-  let terminators : TerminatorHooks Provenance LocalLayout FrameExtra (MachineHooks.MachineState K U)
-      C (OpTy Provenance) (RvalueImmTy Provenance) := {
+  {
     toControlHooks := control
     evalDiscriminant := fun c op => MachineHooks.run (read c op)
     compareSwitchCase := fun c value bits => MachineHooks.run do
@@ -333,28 +332,41 @@ def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
     ignoreOptionalOverflowChecks := fun _ => h.ignoreOptionalOverflowChecks
     readAssertCondition := fun c op => MachineHooks.run do lift ((← scalar (← read c op)).toBool.mapError ScalarOps.scalarError)
     assertPanic := fun c message unwind => MachineHooks.run (Panic.assertPanic panic c message unwind) }
+
+/-- The memory callbacks used by nondiverging MIR intrinsics. -/
+abbrev memoryIntrinsicHooks [DecidableEq K] (h : Config K U C O X Host) :
+    MemoryIntrinsicHooks Provenance (State K U) C :=
+  {
+    target := h.access.runtime.base
+    maxSizeOfVal := h.projection.maxSizeOfVal
+    layoutOf := h.casts.layoutOf
+    pointeeType := fun c ty => do
+      let some pointee ← h.casts.builtinDeref c ty true
+        | throw (.invalidProgram "copy intrinsic requires a pointer type")
+      pure pointee
+    readImmediate := fun _ => PlaceMachine.readImmediate h.access
+    checkAlign := h.atomics.checkPointerAlign
+    memCopy := fun _ source dest size nonoverlap =>
+      GlobalMemoryCopyMachine.genericCopy h.access h.addresses h.arithmetic source dest size 1 nonoverlap}
+
+/-- The same existing small-step Step.step executes the assembled hooks. -/
+def stepHooks [DecidableEq K] (h : Config K U C O X Host) (limits : Limits) :
+    StepHooks Provenance LocalLayout FrameExtra (MachineHooks.MachineState K U) C Value :=
+  let terminators := terminatorHooks h limits
+  let h := withValidation h limits
+  let operands := operandHooks h
+  let discr := discriminantHooks h
   {
     assign := fun c dest value => MachineHooks.run (evalRvalueIntoPlace (rvalueHooks h limits) c value dest)
     evalPlace := fun c dest skip => MachineHooks.run (PlaceDynamic.evalPlace (projectionHooks h) c dest skip)
     writeDiscriminant := fun c variant dest => MachineHooks.run (Discriminant.writeDiscriminant discr c variant dest)
     storageLive := fun _ id => MachineHooks.run (MachineHooks.storageLiveDyn h.lifecycle.storage id .none)
     storageDead := fun _ id => MachineHooks.run (MachineHooks.storageDead h.lifecycle.storage id)
-    intrinsic := fun c intrinsic => MachineHooks.run (Intrinsics.evalNondivergingWith {
-      target := h.access.runtime.base
-      maxSizeOfVal := h.projection.maxSizeOfVal
-      layoutOf := h.casts.layoutOf
-      pointeeType := fun c ty => do
-        let some pointee ← h.casts.builtinDeref c ty true
-          | throw (.invalidProgram "copy intrinsic requires a pointer type")
-        pure pointee
-      readImmediate := fun _ => PlaceMachine.readImmediate h.access
-      checkAlign := h.atomics.checkPointerAlign
-      memCopy := fun _ source dest size nonoverlap =>
-        GlobalMemoryCopyMachine.genericCopy h.access h.addresses h.arithmetic source dest size 1 nonoverlap}
-      (fun c op => OperandMachine.evalOperand operands c op none) c intrinsic)
+    intrinsic := fun c intrinsic => MachineHooks.run (Intrinsics.evalNondivergingWith
+      (memoryIntrinsicHooks h) (fun c op => OperandMachine.evalOperand operands c op none) c intrinsic)
     -- Pinned Miri inherits rustc's empty counter hook.
     incrementConstEvalCounter := fun _ state => (state,.ok ())
-    returnFromCurrentFrame := ControlFlow.returnFromCurrentFrame control
+    returnFromCurrentFrame := ControlFlow.returnFromCurrentFrame terminators.toControlHooks
     beforeTerminator := fun c => MachineHooks.run (TerminatorMachine.beforeTerminatorWithChoice h.terminators (h.preemptionChoice c))
     terminator := ControlFlow.evalTerminator terminators }
 
@@ -364,6 +376,22 @@ theorem stepHooks_assign [DecidableEq K] (config : Config K U C O X Host) (limit
     (stepHooks config limits).assign choice destination rhs state =
       MachineHooks.run (evalRvalueIntoPlace (rvalueHooks (withValidation config limits) limits)
         choice rhs destination) state := rfl
+
+/-- The canonical driver dispatches the actual selected terminator. -/
+theorem stepHooks_terminator [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
+    (choice : C) (term : Terminator) (state : State K U) :
+    (stepHooks config limits).terminator choice term state =
+      ControlFlow.evalTerminator (terminatorHooks config limits) choice term state := rfl
+
+/-- The intrinsic hook uses the same operand evaluation and checked memory copy
+as the standalone intrinsic action. -/
+theorem stepHooks_intrinsic [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
+    (choice : C) (intrinsic : NonDivergingIntrinsic) (state : State K U) :
+    (stepHooks config limits).intrinsic choice intrinsic state =
+      MachineHooks.run (Intrinsics.evalNondivergingWith
+        (memoryIntrinsicHooks (withValidation config limits))
+        (fun c op => OperandMachine.evalOperand (operandHooks (withValidation config limits)) c op none)
+        choice intrinsic) state := rfl
 
 /-- A jump keeps the actual target and has no other terminator effect. -/
 theorem stepHooks_goto [DecidableEq K] (config : Config K U C O X Host) (limits : Limits)
