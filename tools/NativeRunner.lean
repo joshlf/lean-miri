@@ -504,12 +504,11 @@ private def prepareRun (prepared : Input.EvalPreparation.Prepared)
   let targetFacts ← compiler.externStatics.targetFacts.mapError id
   let startupFacts ← (Input.EvalStartupRuntimeConstruction.prepare compiler).mapError id
   let noCore ← startupFacts.noCore.mapError fun reason => s!"compiler no_core query: {reason}"
-  let cULong ← (Input.CompilerPrimitiveFacts.cULongLayout compiler.runtime).mapError id
   let machineTarget : Input.MachineConstruction.Target := {
     os := targetFacts.os
     noCore
     cpuCount := sourceLeaves.foreignSource.host.unixConfig.numCpus
-    cUlongBytes := cULong.layout.size.bytes.toNat
+    cUlongBytes := fun () => (Input.CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
     endian := compiler.runtime.target.base.endian }
   let makeInitial : Array ExecutionChoices.Input → Except String (OuterState × InitTrace) := fun inputs => do
     let tape := choiceTape diagnosticSeed inputs

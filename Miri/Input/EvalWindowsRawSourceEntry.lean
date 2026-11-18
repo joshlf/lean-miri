@@ -51,14 +51,11 @@ def runFromSource
   let noCore ← match startupFacts.noCore with
     | .ok value => pure value
     | .error reason => throw (.unsupported s!"compiler no_core query: {reason}")
-  let cULong ← match CompilerPrimitiveFacts.cULongLayout compiler.runtime with
-    | .ok layout => pure layout
-    | .error reason => throw (.unsupported s!"compiler c_ulong layout: {reason}")
   let machineTarget : MachineConstruction.Target := {
     os := targetFacts.os
     noCore
     cpuCount := sourceLeaves.foreignSource.host.unixConfig.numCpus
-    cUlongBytes := cULong.layout.size.bytes.toNat
+    cUlongBytes := fun () => (CompilerPrimitiveFacts.cULongLayout compiler.runtime).map (·.layout.size.bytes.toNat)
     endian := compiler.runtime.target.base.endian }
   let initial ← MachineConstruction.create hostRuntime sourceLeaves.hostConfiguration
     machineTarget initialConfiguration initialMemory runtimeTypes choiceTape
