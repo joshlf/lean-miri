@@ -142,12 +142,15 @@ theorem directCall_spec (s : Static) (p : Packet) (entry : State) (post : State 
   rename_i beforeState equal
   subst beforeState
   change callPre (hooks s) permitted (fun _ before => install s { p with before }) post nonUB p.before
-  refine ⟨⟨(), trivial⟩, ?_⟩
-  rintro ⟨⟩ _
   have same : { p with before := p.before } = p := by cases p; rfl
-  delta ExecutionMachine.step at safe returned
-  simpa only [same, prepared, FunctionBody.UBFree, depth] using
-    And.intro entryDepth (And.intro safe returned)
+  apply callPre_of_contract ⟨(), trivial⟩
+  · intro choice _ failed error outcome
+    rw [same, prepared] at outcome
+    cases outcome
+  · intro choice _ state outcome
+    rw [same, prepared] at outcome
+    cases outcome
+    exact ⟨entryDepth, safe, returned⟩
 
 theorem returned_of_call (s : Static) (p : Packet) (entry after : State) (post : State → Prop)
     (contract : Triple (directCall s p) (fun state => state = p.before) (fun _ => post) nonUB)

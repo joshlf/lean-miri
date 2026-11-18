@@ -122,6 +122,27 @@ def callPre (hooks : Hooks) (allowed : State → C → Prop)
           FunctionBody.OnError (Step.step hooks) stackDepth allowed depth entry onError ∧
           FunctionBody.NormalPost (Step.step hooks) stackDepth allowed depth entry post
 
+/-- Apply a callee contract to actual preparation. The contract is checked at
+every entry produced by a permitted choice; the preparation error is separate. -/
+theorem callPre_of_contract {prepare : C → State → EStateM.Result StepError State Unit}
+    {post : State → Prop} {onError : StepError → State → Prop} {before : State}
+    (enabled : ∃ choice, allowed before choice)
+    (prepareError : ∀ choice, allowed before choice → ∀ failed error,
+      prepare choice before = .error error failed → onError error failed)
+    (prepared : ∀ choice, allowed before choice → ∀ entry, prepare choice before = .ok () entry →
+      entry.stack.frames.size = before.stack.frames.size + 1 ∧
+      FunctionBody.OnError (Step.step hooks) (fun state => state.stack.frames.size) allowed
+        (before.stack.frames.size + 1) entry onError ∧
+      FunctionBody.NormalPost (Step.step hooks) (fun state => state.stack.frames.size) allowed
+        (before.stack.frames.size + 1) entry post) :
+    callPre hooks allowed prepare post onError before := by
+  refine ⟨enabled, fun choice permitted => ?_⟩
+  cases outcome : prepare choice before with
+  | error error failed => exact prepareError choice permitted failed error outcome
+  | ok value entry =>
+    cases value
+    exact prepared choice permitted entry outcome
+
 /-- After each expected successful result, the next command sees the updated state.
 Errors go directly to the enclosing error postcondition. -/
 def pre : Program hooks allowed → (State → Prop) → (StepError → State → Prop) → State → Prop
@@ -302,6 +323,42 @@ private theorem spec_statement_effect (hooks : Hooks) (allowed : State → C →
     rw [stmtEq, dispatch]
   simpa only [outcome] using run choice permitted
 
+private theorem successful_statement_depth {kind : StatementKind} {before after : State}
+    (choice : C) (matched : (Instruction.statement kind).matches before)
+    (outcome : Step.step hooks choice before = (after, .ok true)) :
+    after.stack.frames.size = before.stack.frames.size := by
+  obtain ⟨frame, _, _, stmt, current, pc, found, slot, _⟩ := statement_at matched
+  have nonempty : 0 < before.stack.frames.size := by
+    have nonempty : before.stack.frames.back? = some frame := current
+    cases h : before.stack.frames.size with
+    | zero =>
+      rw [show before.stack.frames = #[] from Array.size_eq_zero_iff.mp h] at nonempty
+      contradiction
+    | succ n => omega
+  simp only [Step.step, current, pc, found, slot, Id.run, pure, Pure.pure] at outcome
+  rcases executed : Step.evalStatement hooks choice stmt before with ⟨state, result⟩
+  rw [executed] at outcome
+  cases result with
+  | error error => simp at outcome
+  | ok value =>
+    cases value
+    dsimp only at outcome
+    split at outcome
+    · simp at outcome
+    rename_i index
+    split at outcome
+    · rename_i current hcurrent
+      split at outcome
+      · split at outcome
+        · cases outcome
+          simp only [Array.size_set]
+          have indices : before.stack.frames.size - 1 = state.stack.frames.size - 1 := by
+            simpa using index
+          omega
+        · simp at outcome
+      · simp at outcome
+    · simp at outcome
+
 /-- Dispatch the checked assignment to the existing rvalue implementation. -/
 theorem step_eq_assign {before : State} {destination : Place} {rhs : Rvalue}
     (matched : (Instruction.statement (.Assign destination rhs)).matches before)
@@ -454,6 +511,84 @@ private theorem spec_terminator_of_kind (hooks : Hooks) (allowed : State → C �
     Triple (Program.call (hooks := hooks) (allowed := allowed) prepare)
       (callPre hooks allowed prepare (post ()) onError) post onError :=
   Triple.iff.mpr (by intro _ h; exact h)
+
+/-- Nonempty suffixes of a lowered block, with all statements before its
+terminator. Keeping the suffix accounts for errors at intermediate PCs. -/
+private inductive BlockSuffix : Program hooks allowed → Prop where
+  | last (instruction : Instruction) : BlockSuffix (.instruction instruction)
+  | statement (kind : StatementKind) {rest : Program hooks allowed} :
+      BlockSuffix rest → BlockSuffix (.seq (.instruction (.statement kind)) rest)
+
+private theorem lowered_suffix {block : BasicBlock} {program : Program hooks allowed}
+    (lowered : lowerBlock block = some program) : BlockSuffix program := by
+  unfold lowerBlock at lowered
+  cases last : lowerTerminator block.terminator.kind with
+  | none => simp [last] at lowered
+  | some instruction =>
+    rw [last] at lowered
+    change some (block.statements.foldr
+      (fun statement next => .seq (.instruction (.statement statement.kind)) next)
+      (.instruction instruction)) = some program at lowered
+    simp only [Option.some.injEq] at lowered
+    subst program
+    rw [← Array.foldr_toList]
+    induction block.statements.toList with
+    | nil => exact .last _
+    | cons s _ ih => exact .statement s.kind ih
+
+/-- A checked block can return to any block entry satisfying the invariant
+or leave the function's scope and establish its return postcondition.
+This checks every reachable instruction, including prefixes of looping blocks. -/
+theorem body_of_blocks {start : State} {depth : Nat} {entry post : State → Prop}
+    (inside : depth ≤ start.stack.frames.size) (initial : entry start)
+    (blocks : ∀ before, entry before → depth ≤ before.stack.frames.size →
+      ∃ (block : BasicBlock) (program : Program hooks allowed), lowerBlock block = some program ∧
+        Triple program (· = before)
+          (fun _ after => (depth ≤ after.stack.frames.size ∧ entry after) ∨
+            (after.stack.frames.size < depth ∧ post after))
+          (fun error _ => RunLoop.reportsUB error = false)) :
+    FunctionBody.UBFree (Step.step hooks) (fun state => state.stack.frames.size) allowed depth start ∧
+    FunctionBody.NormalPost (Step.step hooks) (fun state => state.stack.frames.size) allowed depth
+      start post := by
+  let boundary := fun after : State =>
+    (depth ≤ after.stack.frames.size ∧ entry after) ∨ (after.stack.frames.size < depth ∧ post after)
+  let nonUB := fun (error : StepError) (_ : State) => RunLoop.reportsUB error = false
+  let invariant := fun state : State => boundary state ∨
+    (depth ≤ state.stack.frames.size ∧
+      ∃ program : Program hooks allowed, BlockSuffix program ∧ pre program boundary nonUB state)
+  have advance (before : State) (active : depth ≤ before.stack.frames.size)
+      (valid : invariant before) : stepPre hooks allowed true invariant nonUB before := by
+    have suffix : ∃ program : Program hooks allowed, BlockSuffix program ∧ pre program boundary nonUB before := by
+      rcases valid with (⟨_, ready⟩ | ⟨outside, _⟩) | ⟨_, pending⟩
+      · obtain ⟨block, program, lowered, triple⟩ := blocks before ready active
+        exact ⟨program, lowered_suffix lowered, Triple.le_wp triple before rfl⟩
+      · exact (Nat.not_lt_of_ge active outside).elim
+      · exact pending
+    obtain ⟨program, code, verified⟩ := suffix
+    cases code with
+    | last =>
+      exact stepPre_mono (fun _ done => Or.inl done) (fun _ _ safe => safe) before verified.2
+    | @statement kind rest tail =>
+      refine ⟨verified.2.1, fun choice permitted => ?_⟩
+      rcases outcome : Step.step hooks choice before with ⟨after, result⟩
+      have checked := stepPre_outcome verified.2 ⟨choice, permitted, outcome⟩
+      cases result with
+      | error error => simpa only [outcome] using checked
+      | ok more =>
+        obtain ⟨rfl, pending⟩ := checked
+        have same := successful_statement_depth choice verified.1 outcome
+        simp only [outcome, true_and]
+        exact Or.inr ⟨same.symm ▸ active, rest, tail, pending⟩
+  apply FunctionBody.ofInvariant invariant (Or.inl (Or.inl ⟨inside, initial⟩))
+  · intro before after choice valid active permitted outcome
+    exact (stepPre_outcome (advance before active valid) ⟨choice, permitted, outcome⟩).2
+  · intro before after choice error valid active permitted outcome
+    exact stepPre_outcome (advance before active valid) ⟨choice, permitted, outcome⟩
+  · intro after valid outside
+    rcases valid with (⟨active, _⟩ | ⟨_, done⟩) | ⟨active, _⟩
+    · exact (Nat.not_lt_of_ge active outside).elim
+    · exact done
+    · exact (Nat.not_lt_of_ge active outside).elim
 
 /-- A checked two-instruction body ends below its entry stack depth whenever
 both instructions succeed. Either can instead leave a classified non-UB error. -/

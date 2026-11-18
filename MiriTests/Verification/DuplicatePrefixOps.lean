@@ -146,4 +146,58 @@ example (base : RvalueHooks Unit Nat Unit Unit) (layout : TyAndLayout TyId) (op 
     simp [wp, WP.wpTrans, copyFixture, bind, Bind.bind, EStateM.bind, pure, Pure.pure, EStateM.pure,
       set, MonadStateOf.set, EStateM.set]
 
+open Miri.Verification in
+set_option maxHeartbeats 1000000 in
+example :
+    let start := ControlTests.program ControlTests.fixture
+    let final := ControlTests.run3 start
+    let step := Step.step ControlTests.stepHooks
+    FunctionBody.UBFree step (·.stack.frames.size) (fun _ _ => True) 1 start ∧
+    FunctionBody.NormalPost step (·.stack.frames.size) (fun _ _ => True) 1 start
+      (fun after => after = final) := by
+  dsimp only
+  let first := ControlTests.program ControlTests.fixture
+  let second := (Step.step ControlTests.stepHooks () first).1
+  let done := ControlTests.run3 first
+  let entry := fun state : ControlTests.S => state = first ∨ state = second
+  refine body_of_blocks (entry := entry) (by decide) (Or.inl rfl) ?_
+  rintro before (rfl | rfl) _
+  · refine ⟨ControlTests.block #[] (.Goto 1 #[]), .instruction (.goto 1 #[]), rfl, ?_⟩
+    vcgen
+    rename_i state equal
+    subst state
+    refine ⟨⟨ControlTests.source, .Goto 1 #[]⟩, rfl, rfl, ⟨(), trivial⟩, ?_⟩
+    rintro ⟨⟩ _
+    exact ⟨rfl, Or.inl ⟨by decide, Or.inr rfl⟩⟩
+  · refine ⟨ControlTests.block #[⟨ControlTests.source, .Nop⟩] .Return,
+      .seq (.instruction (.statement .Nop)) (.instruction .ret), rfl, ?_⟩
+    apply Triple.iff.mpr
+    rintro state rfl
+    change pre (.seq (.instruction (.statement .Nop)) (.instruction .ret)) _ _ second
+    refine ⟨rfl, ⟨(), trivial⟩, ?_⟩
+    rintro ⟨⟩ _
+    refine ⟨rfl, rfl, ⟨(), trivial⟩, ?_⟩
+    rintro ⟨⟩ _
+    exact ⟨rfl, Or.inr ⟨by decide, rfl⟩⟩
+
+open Miri.Verification in
+example :
+    let block := ControlTests.block #[] (.Goto 0 #[])
+    let frame := ControlTests.fixture
+    let start : ControlTests.S := ⟨⟨#[{ frame with body := { frame.body with basicBlocks := #[block] } }]⟩, []⟩
+    let hooks := { ControlTests.stepHooks with beforeTerminator := fun _ state => (state, .ok ()) }
+    FunctionBody.UBFree (Step.step hooks) (·.stack.frames.size) (fun _ _ => True) 1 start ∧
+    FunctionBody.NormalPost (Step.step hooks) (·.stack.frames.size)
+      (fun _ _ => True) 1 start (fun _ => False) := by
+  intro block frame start hooks
+  refine body_of_blocks (entry := (· = start)) (by decide) rfl ?_
+  rintro before rfl _
+  refine ⟨block, .instruction (.goto 0 #[]), rfl, ?_⟩
+  vcgen
+  rename_i state equal
+  subst state
+  refine ⟨⟨ControlTests.source, .Goto 0 #[]⟩, rfl, rfl, ⟨(), trivial⟩, ?_⟩
+  rintro ⟨⟩ _
+  exact ⟨rfl, Or.inl ⟨by decide, rfl⟩⟩
+
 end MiriTests.Verification.DuplicatePrefixOps
