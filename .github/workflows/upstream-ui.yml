@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 defaults:
   run:
@@ -18,13 +19,13 @@ concurrency:
 
 jobs:
   compare:
-    name: UI shard ${{ matrix.shard }}
+    name: ${{ matrix.shard == 32 && 'Long-running UI cases' || format('UI shard {0}', matrix.shard) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
     env:
       LEAN_NUM_THREADS: '1'
       CARGO_BUILD_JOBS: '2'
@@ -54,7 +55,7 @@ jobs:
       - name: Compare every compatible case in this shard
         run: >-
           python3 tools/check-upstream-ui.py
-          --shard-index '${{ matrix.shard }}' --shard-count 32
+          --shard-index '${{ matrix.shard }}' --shard-count 33 --dedicated-long-shard
           --export-timeout 600 --timeout 600
           --output scratch/upstream-ui/ci
       - name: Retain inventory, reference diagnostics and all outcomes
@@ -84,10 +85,27 @@ jobs:
         with:
           pattern: upstream-ui-*-${{ github.run_attempt }}
           path: scratch/upstream-artifacts
+      - name: Retrieve previous main comparison when available
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          previous=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/upstream-ui.yml/runs" \
+            -f head_sha="$BASE_SHA" -f branch=main -f event=push -f status=completed \
+            --jq '.workflow_runs[0] | select(. != null) | [.id,.run_attempt] | @tsv') || exit 0
+          if [[ -z "$previous" ]]; then
+            echo "Previous main comparison is unavailable."
+            exit 0
+          fi
+          read -r run_id attempt <<< "$previous"
+          gh run download "$run_id" --name "upstream-ui-summary-$attempt" \
+            --dir scratch/upstream-baseline || echo "Previous main summary is unavailable."
       - name: Require complete inventory and successful compatible cases
         run: >-
           python3 tools/collect-upstream-ui.py scratch/upstream-artifacts
-          --shards 32 --output scratch/upstream-summary.json
+          --shards 33 --dedicated-long-shard --baseline scratch/upstream-baseline/upstream-summary.json
+          --output scratch/upstream-summary.json
       - name: Retain full-sweep summary
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

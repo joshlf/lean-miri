@@ -404,6 +404,12 @@ through the ordinary callback router before updating readiness. The original
 fixed-schedule `socket-unix` UI comparison passes, including the peer close
 that wakes a blocked reader.
 
+Seven upstream UI cases with observed timeouts run together in the
+`Long-running UI cases` job. The full sweep still requires each shard and
+each compatible case to succeed under the same 600-second execution limit.
+When the previous main commit has a complete summary under the same pins and
+settings, the inventory report shows changed outcomes by case.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler

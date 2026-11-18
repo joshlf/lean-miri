@@ -29,6 +29,32 @@ driver = load('upstream_ui_driver', 'check-upstream-ui.py')
 
 
 class CollectionTests(unittest.TestCase):
+    def test_long_shard_preserves_the_regular_assignment_and_inventory(self):
+        cases = {case.id for case in discover() if not case.reasons}
+        self.assertLessEqual(ui_suite.LONG_CASES, cases)
+        for case in cases:
+            expected = 32 if case in ui_suite.LONG_CASES else ui_suite.case_shard(case, 32)
+            self.assertEqual(ui_suite.case_shard(case, 33, True), expected)
+
+    def test_baseline_requires_comparability_and_keeps_failed_outcomes(self):
+        settings = {'source_lock_sha256': 'pin', 'timeout': 600}
+        baseline = {'complete': True, 'settings': settings, 'cases': {
+            'new': {'status': 'passed'}, 'known': {'status': 'lean_timeout'},
+            'fixed': {'status': 'export_failed'}, 'changed': {'status': 'export_failed'},
+            'profile': {'status': 'passed', 'runtime_flags': []}}}
+        current = {'complete': True, 'settings': settings, 'cases': {
+            'new': {'status': 'lean_timeout'}, 'known': {'status': 'lean_timeout'},
+            'fixed': {'status': 'passed'}, 'changed': {'status': 'lean_timeout'},
+            'profile': {'status': 'lean_timeout', 'runtime_flags': ['changed']}}}
+        report = collector.compare_baseline(current, baseline)
+        self.assertTrue(report['available'])
+        for key, case in [('new_failures', 'new'), ('same_failure_status', 'known'),
+                          ('resolved', 'fixed'), ('changed_failure_status', 'changed')]:
+            self.assertEqual([row['id'] for row in report[key]], [case])
+        self.assertEqual(report['not_comparable'], ['profile'])
+        self.assertFalse(collector.compare_baseline(current, baseline | {'complete': False})['available'])
+        self.assertFalse(collector.compare_baseline(current, baseline | {'settings': {'timeout': 1}})['available'])
+
     def test_compiler_owns_source_crate_name_and_explicit_flags(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
