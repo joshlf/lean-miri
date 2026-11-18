@@ -61,7 +61,7 @@ def CallNoUB (step : C → S → StepResult S Bool) (stackDepth : S → Nat)
   | .ok () entry => depth ≤ stackDepth entry ∧ UBFree step stackDepth allowed depth entry
 
 /-- Compose the error condition on actual preparation with the callee body proof. -/
-theorem call_noUB_of_body {step : C → S → StepResult S Bool} {stackDepth allowed depth}
+theorem CallNoUB.of_preparation {step : C → S → StepResult S Bool} {stackDepth allowed depth}
     (prepare : EStateM.Result StepError S Unit) (pre : S → Prop)
     (prepareError : ∀ failed error, prepare = .error error failed → RunLoop.reportsUB error = false)
     (prepared : ∀ entry, prepare = .ok () entry → depth ≤ stackDepth entry ∧ pre entry)

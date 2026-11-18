@@ -57,7 +57,7 @@ theorem of_body (s : Static) (p : Packet) (pre : State → Prop)
     (body : ∀ entry, pre entry → ScopedSafety.NoUB s.cfg s.limits (fun _ _ => True)
       (depth p) entry) :
     NoUB s p := by
-  have checked := Miri.Verification.FunctionBody.call_noUB_of_body
+  have checked := Miri.Verification.FunctionBody.CallNoUB.of_preparation
     (step := ExecutionMachine.step s.cfg s.limits)
     (stackDepth := fun state => state.stack.frames.size) (allowed := fun _ _ => True)
     (depth := depth p) (install s p) pre prepareError prepared body
