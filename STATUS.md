@@ -385,6 +385,11 @@ trait-object unsizing path creates their vtables. The local UI comparison
 passes `track-caller-attribute`, ordinary `unsized@tree`, and the expected
 `wrong-dyn-trait` UB. Synthetic coroutine owner identity remains unresolved.
 
+The upstream UI oracle now recognizes the upstream diagnostic for a null
+vtable pointer and Lean's exact invalid tag for an untagged variant encoded in
+its niche. Both original UI cases pass their UB class and source-site checks,
+along with the distinct null-box and wrong-trait controls.
+
 At main `45640654`, the [hosted regression
 run](https://github.com/proofs-rs/lean-miri/actions/runs/44004172382) failed all four
 lanes. Local follow-up repairs the reference-profile patch application, scheduler

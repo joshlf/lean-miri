@@ -274,7 +274,7 @@ CATEGORIES = [
     ('overflow', r'overflow', r'overflow|Overflow'),
     # A niched-variant write failure is distinct from an invalid enum read.
     ('niched_variant_write', r'trying to set discriminant .* to the niched variant, but the value does not match', r'(?-i:^InvalidNichedEnumVariantWritten$|"InvalidNichedEnumVariantWritten"$)'),
-    ('invalid_discriminant', r'discriminant|enum tag|enum value has invalid tag', r'discriminant|Discriminant|enumTag|\bInvalidTag\(outside valid range\)'),
+    ('invalid_discriminant', r'discriminant|enum tag|enum value has invalid tag', r'discriminant|Discriminant|enumTag|\bInvalidTag\((?:outside valid range|untagged variant encoded in niche)\)'),
     ('invalid_function', r'function pointer|not pointing to a function', r'functionPointer|function pointer|FunctionPointer'),
     ('unreachable', r'entering unreachable code|unreachable_unchecked', r'unreachable|Unreachable'),
     ('overlap', r'overlap', r'overlap|Overlap'),
@@ -287,7 +287,7 @@ def category_reference(text):
     if re.search(r'\b(?:encountered uninitialized|uninitialized (?:memory|data|bytes|value)|memory is uninitialized)\b', text, re.I):
         return 'uninitialized'
     # Vtable validity is specific even when its malformed metadata is null.
-    if re.search(r'\bexpected a vtable pointer\b', text, re.I):
+    if re.search(r'\b(?:expected a vtable pointer|using null pointer as vtable pointer but it does not point to a vtable)\b', text, re.I):
         return 'invalid_vtable'
     for name, reference, _ in CATEGORIES:
         if re.search(reference, text, re.I):
