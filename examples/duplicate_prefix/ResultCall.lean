@@ -1,10 +1,24 @@
 import duplicate_prefix.DuplicatePrefixArgumentCallResult
 import duplicate_prefix.VCGen
+import Miri.Verification.CallBoundary
 
 namespace DuplicatePrefix.VCGen
 
 open Miri Miri.Input Miri.Memory Miri.MIR Miri.Interpreter
 open Miri.Verification Miri.Verification.StepWP Std.WP ActualReferenceContext
+
+noncomputable def resolvedCall (options : EvalConfigurationCore.Options)
+    (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
+    (argument : DuplicatePrefixSliceArgument.Argument) (len count : UInt64)
+    (place : MPlaceTy Provenance) : ResolvedCall where
+  callee := RootBody.reflected.functionInstance
+  body := RootBody.reflected.body
+  callerAbi := RootCompilerFacts.rootAbi
+  arguments := #[.Copy (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base
+    argument len), .Copy (EmptyRootArguments.second count)]
+  withCallerLocation := false
+  destination := .memory place
+  continuation := .stop true
 
 noncomputable def ordinaryPreparation (options : EvalConfigurationCore.Options)
     (limits : ExecutionMachine.Limits) (remaining : Nat) (span : PreparedContracts.FixedSpanQuery)
@@ -12,11 +26,8 @@ noncomputable def ordinaryPreparation (options : EvalConfigurationCore.Options)
     (place : MPlaceTy Provenance) :
     Unit → MachineHooks.State MiriMemoryKind Machine.RootUser →
       EStateM.Result StepError (MachineHooks.State MiriMemoryKind Machine.RootUser) Unit :=
-  let cfg := config options (remaining + 1) span
-  fun choice before => Call.initStackFrame (ExecutionMachine.callHooks cfg limits) choice
-    RootBody.reflected.functionInstance RootBody.reflected.body RootCompilerFacts.rootAbi
-    #[.Copy (DuplicatePrefixSliceArgument.first (config options remaining span).access.runtime.base
-      argument len), .Copy (EmptyRootArguments.second count)] false (.memory place) (.stop true) before
+  (resolvedCall options remaining span argument len count place).prepare
+    (ExecutionMachine.callHooks (config options (remaining + 1) span) limits)
 
 /-- A resolved root call and its finite body program agree on the final state. -/
 noncomputable def OrdinaryContract (options : EvalConfigurationCore.Options) (limits : ExecutionMachine.Limits)

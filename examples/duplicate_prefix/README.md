@@ -14,6 +14,15 @@ and the finite body program against the same final machine state. This
 uses the existing source-level trace proof for the memory and pointer
 obligations.
 
+`VCGen.CallPre` exposes the shared `Miri.Verification.CallWellFormed`
+condition alongside the hypotheses of the whole-body proof.
+`CallWellFormed` uses the resolved MIR call and its compiler ABI to check
+frame preparation for every permitted choice. This includes the ABI and
+return-place checks performed at entry, argument copies, and FnEntry retagging.
+`VCGen.callPre_of_ordinary_input` derives that condition from the existing
+`OrdinaryInput`, and `VCGen.call_of_precondition` consumes the combined
+precondition. The whole-body hypotheses are independent of the count.
+
 From the repository root, fetch the immutable proof input and run the check:
 
 ```bash
