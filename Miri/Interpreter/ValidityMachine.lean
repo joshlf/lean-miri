@@ -310,8 +310,8 @@ def validateRuntime [DecidableEq K]
 
 def bindValidation [DecidableEq K]
     (compiler : Compiler K User C) (copy : PlaceCopyHooks Provenance (State K User) C)
-    (h : ValidityVisitor.Hooks Provenance (State K User) C MachineHooks.FrameExtra F A Pad)
-    : Compiler K User C × PlaceCopyHooks Provenance (State K User) C :=
+    (h : ValidityVisitor.Hooks Provenance (State K User) C MachineHooks.FrameExtra F A Pad) :
+    Compiler K User C × PlaceCopyHooks Provenance (State K User) C :=
   let compiler := compilerPolicy compiler
   ({compiler with validate := fun c place => validateRuntime h c place true},
    {copy with validateSource := fun c source destination => do

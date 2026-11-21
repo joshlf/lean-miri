@@ -156,8 +156,7 @@ theorem canonical_unit (s : Static) (metadata : Metadata s) (profile : Profile s
       .ok ⟨.indirect place.mplace,place.layout⟩ (BodyValidation.active state))
     (forceQuery : forceAllocation config.validity.projection.place () ⟨reference,place.layout⟩ (BodyValidation.active state) =
       .ok place (BodyValidation.active state))
-    (layout : place.layout = s.abi.ret.layout) (noGhost : state.machine.user.payload.ghost = false)
-    :
+    (layout : place.layout = s.abi.ret.layout) (noGhost : state.machine.user.payload.ghost = false) :
     ValidityVisitor.validatePlace config.validity () (⟨reference,place.layout⟩ : RuntimePlace Provenance) false true state =
       .ok () state := by
   let leaves := Configuration.leaves s.prepared s.options.place.debugAssertions

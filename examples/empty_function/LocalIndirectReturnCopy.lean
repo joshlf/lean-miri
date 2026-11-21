@@ -199,8 +199,7 @@ theorem canonical_unit (s : Static) (metadata : Metadata s) (profile : Profile s
     (id : MIR.LocalId) (slot : LocalState Provenance LocalLayout) (place : MPlaceTy Provenance)
     (atSlot : frame.locals[id]? = some slot) (live : slot.value = .live (.indirect place.mplace))
     (cache : slot.layout = some place.layout) (noClocks : frame.extra.dataRace = none)
-    (layout : place.layout = s.abi.ret.layout) (noGhost : machine.user.payload.ghost = false)
-    :
+    (layout : place.layout = s.abi.ret.layout) (noGhost : machine.user.payload.ghost = false) :
     ValidityVisitor.validatePlace config.validity () (destination frames frame id place.layout) false true (LocalUnit.current frames frame machine) =
       .ok () (LocalUnit.current frames frame machine) := by
   let state := LocalUnit.current frames frame machine

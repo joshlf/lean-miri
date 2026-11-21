@@ -41,8 +41,7 @@ def bind [DecidableEq K]
     (pointers : PointerMachine.Hooks K (ValidityMachine.Control U))
     (dynamic : DynamicLayoutHooks Provenance (State K U) C)
     (dynamicFuel : Nat)
-    (validity : ValidityVisitor.Hooks Provenance (State K U) C MachineHooks.FrameExtra F A Padding)
-    :
+    (validity : ValidityVisitor.Hooks Provenance (State K U) C MachineHooks.FrameExtra F A Padding) :
     IntrinsicHooks Provenance (State K U) C (RuntimePlace Provenance) :=
   let access := MemoryExtras.bindAccess deallocation.extras access
   let places := PlaceMachine.placeHooks access allocation compiler

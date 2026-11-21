@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Finite original/control comparisons and mutations of fresh coroutine evidence.
 
-Requires a built coherent schema-16 exporter/native pair and coroutine_native_queries. No builds or flag/budget
+Requires a built coherent schema-17 exporter/native pair and coroutine_native_queries. No builds or flag/budget
 changes are performed. Serialize heavy checks externally with the guest lock.
 """
 import argparse

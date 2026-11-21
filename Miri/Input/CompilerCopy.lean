@@ -29,8 +29,7 @@ def hooks [DecidableEq K] (runtime : RuntimeMetadata) (debug : Bool)
     (access : ValidityMachine.Access K U)
     (addresses : ValidityMachine.UserState U → AllocAddresses.GlobalAddressState)
     (arithmetic : PointerArithmetic)
-    (visitor : ValidityVisitor.Hooks Provenance (ValidityMachine.State K U) C MachineHooks.FrameExtra F A Pad)
-    :
+    (visitor : ValidityVisitor.Hooks Provenance (ValidityMachine.State K U) C MachineHooks.FrameExtra F A Pad) :
     PlaceCopyHooks Provenance (ValidityMachine.State K U) C where
   compatible := compatible
   hasPadding := hasPadding runtime debug

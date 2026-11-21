@@ -203,7 +203,7 @@ private theorem initialized_fixed (s : Static) (metadata : Metadata s) (capacity
   simp only [finish,finalMachine,post,LocalModel.finish,LocalModel.machine,machineEq,frames,caller]
 /-- Resource-independent UB freedom for the original whole-local immediate
 caller family. Errors during the body retain their actual failed states; the
-successful branch obtains its capacity/validation facts from actual success. -/
+successful branch obtains its construction capacity from actual success. -/
 theorem noUB (s : Static) (metadata : Metadata s) (profile : Profile s)
     (p : Packet) (runtime : RuntimeProfile s p) (input : InputDraft.CurrentInputDraft s p)
     (destination : InputDraft.LocalDestination s p input.tracker)

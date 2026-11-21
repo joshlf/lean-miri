@@ -27,7 +27,7 @@ example (rank : Miri.MIR.TyId → Nat) (parent child : LocalLayout)
     (dynamic : parent.layout.isSized = false) (concrete : child.layout.isSized = true) :
     Prod.Lex (· < ·) (· < ·) (ValidityVisitor.visitOrder rank child) (ValidityVisitor.visitOrder rank parent) := by
   apply Prod.Lex.left
-  simp [ValidityVisitor.visitOrder,dynamic,concrete]
+  simp [dynamic,concrete]
 
 private def testId : AllocId := ⟨1, by decide⟩
 private def testTag : BorTag := ⟨1, by decide⟩

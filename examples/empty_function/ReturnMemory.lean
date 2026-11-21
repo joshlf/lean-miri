@@ -98,8 +98,7 @@ structure Fields (config : WholeCall.Config) : Prop where
     (built : EvalConfigurationCore.make s.prepared.compiler s.prepared.image s.bytes (EmptyFunction.Configuration.proofOptions s.options)
       (Configuration.leaves s.prepared s.options.place.debugAssertions) () (remaining+1) = .ok config)
     (state : WholeCall.State) (place : MPlaceTy Provenance)
-    (layout : place.layout = s.abi.ret.layout) (noGhost : state.machine.user.payload.ghost = false)
-    :
+    (layout : place.layout = s.abi.ret.layout) (noGhost : state.machine.user.payload.ghost = false) :
     ValidityVisitor.validatePlace config.validity () ⟨.memory place.mplace,place.layout⟩ false true state =
       .ok () state := by
   let leaves := Configuration.leaves s.prepared s.options.place.debugAssertions
