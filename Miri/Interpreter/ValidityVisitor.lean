@@ -532,7 +532,7 @@ def validatePlace [PointerProvenance P] [DecidableEq P] (h : Hooks P S C E F A P
   let initial : Session P := {
     path := ⟨name,#[]⟩, flags := ⟨reset,false⟩, ctfeMode := none
     refTracking := if recursive then some .empty else none, dataBytes := none }
-  let mut session ← h.withGhostValidation do
+  let session ← h.withGhostValidation do
     let mut session := initial
     if reset then
       if let .indirect _ := (← h.toOp c place).op then session := {session with dataBytes := some .empty}
@@ -540,20 +540,13 @@ def validatePlace [PointerProvenance P] [DecidableEq P] (h : Hooks P S C E F A P
     resetPadding h c session place
     return session
   if recursive then
-    let mut remaining := fuel
-    let mut continueLoop := true
-    while continueLoop do
-      match session.refTracking.bind RefTracking.next with
-      | none => continueLoop := false
-      | some ((key,path),tracking) =>
-        if remaining == 0 then throw (.resourceExhaustion "recursive validity tracker fuel")
-        remaining := remaining - 1
-        session := {session with refTracking := some tracking}
-        let childSession : Session P := {path, flags := ⟨false,true⟩,ctfeMode := none,refTracking := none,dataBytes := none}
-        h.withGhostValidation do
-          let child : RuntimePlace P := ⟨.memory key.mplace,key.layout⟩
-          let visited ← visit h c fuel childSession child
-          resetPadding h c visited child
+    let some tracking := session.refTracking | return
+    for (key,path) in tracking.todo.reverse do
+      let childSession : Session P := {path, flags := ⟨false,true⟩,ctfeMode := none,refTracking := none,dataBytes := none}
+      h.withGhostValidation do
+        let child : RuntimePlace P := ⟨.memory key.mplace,key.layout⟩
+        let visited ← visit h c fuel childSession child
+        resetPadding h c visited child
 
 /-- Const validation exposes the updated worklist to its outer interning loop;
 CTFE restrictions are distinct from ordinary recursive runtime checks. -/
