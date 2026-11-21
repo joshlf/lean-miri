@@ -196,4 +196,48 @@ def main : IO Unit := do
         state.machine.user.symbolicAlignment.size == 1
       | _ => false)
     "checkSafe remapping changed the non-alignment error or discarded its resolver state prefix"
+  -- Three distinct references fit at depth two. The invalid first element is
+  -- visited last by the pointee worklist, after the two valid pointees.
+  let refLayout := testLayout Align.ONE
+  let arrayLayout := { refLayout with ty := 2, layout := { refLayout.layout with
+    fields := .Array (Size.ofBytes 8) 3, size := Size.ofBytes 24 } }
+  let elementLayout := { refLayout with ty := 3 }
+  let hooks := { visitorHooks with
+    classify := fun _ ty => pure (if ty == 2 then .sequence 1 else if ty == 1 then .reference false else .boolean)
+    unitLayout := fun _ => pure refLayout
+    projection := { visitorHooks.projection with
+      layoutOf := fun _ _ => pure refLayout, field := fun _ _ _ => pure refLayout
+      place := { visitorHooks.projection.place with memoryOffset := fun _ base offset _ metadata => do
+        let offset ← match base.ptr.offset.add offset with
+          | .ok value => pure value | .error error => throw (.invalidProgram (reprStr error))
+        pure {base with ptr := {base.ptr with offset}, metadata := metadata} } }
+    readImmediate := fun _ place _ => do
+      let .memory memory := place.ref | missing
+      let scalar ← if place.layout.ty == 1 then
+          pure (Scalar.fromPointer RuntimeTargetDataLayout.default.base
+            (Pointer.new (.concrete testId testTag) memory.ptr.offset))
+        else do
+          modify fun state =>
+            let user := state.machine.user
+            {state with machine := {state.machine with user := {user with
+              symbolicAlignment := user.symbolicAlignment.push (testId,memory.ptr.offset,Align.ONE)}}}
+          match Scalar.fromUInt (BitVec.ofNat 128 (if memory.ptr.offset == Size.ZERO then 2 else 1)) (Size.ofBytes 1) with
+          | .ok value => pure value | .error _ => missing
+      pure ⟨.scalar scalar,place.layout⟩
+    ptrToPlace := fun _ value => do
+      let .scalar scalar := value.imm | missing
+      let .ok ptr := scalar.toPointer RuntimeTargetDataLayout.default.base | missing
+      pure ⟨⟨ptr,.none,none⟩,elementLayout⟩
+    sizeAndAlign := fun _ _ => pure (some (Size.ofBytes 1,Align.ONE))
+    scalarMayBeNull := fun _ _ => pure false
+    checkPointerAlignResult := fun _ _ _ => pure (.ok ())
+    checkPointerAccess := fun _ _ _ => pure (.ok ()) }
+  let arrayRoot : RuntimePlace Provenance :=
+    ⟨.memory ⟨{testPointer with offset := Size.ZERO},.none,none⟩,arrayLayout⟩
+  match ValidityVisitor.validatePlace hooks () 2 arrayRoot true false testState with
+  | .error (.undefinedBehavior message) state =>
+    check (state.machine.user.symbolicAlignment.map (fun entry => entry.2.1.bytes) == #[16,8,0])
+      "tracked pointees did not run in reverse discovery order"
+    check (message.startsWith "validation[0]") s!"unexpected pointee diagnostic: {message}"
+  | _ => throw <| IO.userError "validation failed to reach the invalid third tracked pointee"
   IO.println "Connected pointer alignment check: PASS"
