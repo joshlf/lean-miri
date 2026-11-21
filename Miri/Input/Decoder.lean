@@ -334,6 +334,31 @@ private def parseDocumentFields (pools : SharedPools) : JsonReader.Parser Parsed
 
 private def validateParsedDocument (parsed : ParsedDocument) (profile : Options) : Except String ImportDocument := do
   let d := parsed.value
+  for node in d.types do
+    let checkChild := fun (child : TypeId) => do
+      let some source := d.types[child]? | throw s!"missing validation child {child}"
+      unless source.validationRank < node.validationRank do
+        throw s!"validation rank does not decrease from type {node.id} to {child}"
+    if node.sourceLayout.normalizedType != node.id then
+      checkChild node.sourceLayout.normalizedType
+    else
+      match node.shape with
+      | .adt data =>
+        for variant in data.variants do
+          for field in variant.fields do checkChild field.typeId
+      | .array element .. | .slice element => checkChild element
+      | .patternType base _ | .unsafeBinder base _ => checkChild base
+      | .tuple elements => for child in elements do checkChild child
+      | .closure .. | .coroutineClosure .. =>
+        for child in node.sourceLayout.closureUpvars do checkChild child
+      | .coroutine .. =>
+        if let some layout := node.sourceLayout.coroutine then
+          for child in layout.prefix do checkChild child
+          for variant in layout.variants do
+            for field in variant do
+              let some child := layout.savedTypes[field]? | throw "missing coroutine saved type"
+              checkChild child
+      | _ => pure ()
   SourceHygiene.validate d.spans d.syntaxContexts d.expansions
   SourceCastTargetsCodec.validate d.types d.sourceCastTargets
   if let some material := d.sourceAbi then SourceAbiDecoder.validate d.types d.instances material

@@ -253,7 +253,7 @@ def make [DecidableEq K]
     (dynamic : DynamicLayoutHooks Provenance (State K U) C)
     (dynamicFuel : Nat)
     (validity : ValidityVisitor.Hooks Provenance (State K U) C MachineHooks.FrameExtra F A Padding)
-    (validationFuel : Nat) :
+    :
     IntrinsicHooks Provenance (State K U) C (RuntimePlace Provenance) :=
   let access := MemoryExtras.bindAccess extras access
   let copy := {copy with
@@ -330,7 +330,7 @@ def make [DecidableEq K]
     enforceValidity := fun _ _ => ValidityMachine.enforceValidity
     enforceValidityRecursively := fun _ _ => ValidityMachine.enforceValidityRecursively
     validatePlace := fun c dest recursive reset =>
-      ValidityVisitor.validatePlace validity c validationFuel dest recursive reset
+      ValidityVisitor.validatePlace validity c dest recursive reset
     vtableSizeAlign := dynamic.vtableSizeAndAlign }
 end Core
 

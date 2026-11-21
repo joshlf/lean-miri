@@ -30,7 +30,7 @@ def hooks [DecidableEq K] (runtime : RuntimeMetadata) (debug : Bool)
     (addresses : ValidityMachine.UserState U → AllocAddresses.GlobalAddressState)
     (arithmetic : PointerArithmetic)
     (visitor : ValidityVisitor.Hooks Provenance (ValidityMachine.State K U) C MachineHooks.FrameExtra F A Pad)
-    (validationBudget : Nat) :
+    :
     PlaceCopyHooks Provenance (ValidityMachine.State K U) C where
   compatible := compatible
   hasPadding := hasPadding runtime debug
@@ -41,5 +41,5 @@ def hooks [DecidableEq K] (runtime : RuntimeMetadata) (debug : Bool)
     if !source.layout.isSized || !destination.layout.layout.isSized || source.layout.size != destination.layout.layout.size then
       throw (.invalidProgram "source validation transmute requires equally sized layouts")
     let sourcePlace ← PlaceDynamic.offsetWithMeta visitor.projection c destination .ZERO .wrapping .none source
-    ValidityMachine.validateRuntime visitor c validationBudget sourcePlace true
+    ValidityMachine.validateRuntime visitor c sourcePlace true
 end Miri.Input.CompilerCopy
